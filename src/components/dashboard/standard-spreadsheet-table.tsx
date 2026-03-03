@@ -333,14 +333,76 @@ export function StandardSpreadsheetTable({ data: initialData, columns, onSave, o
   const containerRef = React.useRef<HTMLDivElement>(null); const isSelectingRef = React.useRef(false); const [isPromoting, setIsPromoting] = React.useState(false);
   const [pickerOpen, setPickerOpen] = React.useState(false); const [detailData, setDetailData] = React.useState<any>(null);
   const ROW_HEIGHT = 32; const HEADER_HEIGHT = groupHeaders ? 80 : 40;
+  
+  // --- Undo(실행 취소)를 위한 상태 ---
+  const [history, setHistory] = React.useState<{id: string, field: string, oldValue: any}[]>([]);
+
+  const recordHistory = React.useCallback((updates: {id: string, field: string, oldValue: any}[]) => {
+    setHistory(prev => [updates, ...prev].slice(0, 20) as any); // 최대 20단계
+  }, []);
+
+  const handleUndo = React.useCallback(async () => {
+    if (history.length === 0) return;
+    
+    const lastChanges = history[0] as any;
+    const newHistory = history.slice(1);
+    
+    const newData = [...data];
+    const serverUpdates: any[] = [];
+    
+    lastChanges.forEach((change: any) => {
+      const dIdx = newData.findIndex(s => s.id === change.id);
+      if (dIdx !== -1) {
+        newData[dIdx] = { ...newData[dIdx], [change.field]: change.oldValue };
+        serverUpdates.push({ id: change.id, field: change.field, value: change.oldValue });
+      }
+    });
+    
+    setData(newData);
+    setHistory(newHistory);
+    
+    const result = await onBulkSave(serverUpdates);
+    if (result.success) {
+      toast({ title: '실행 취소 완료', description: '이전 상태로 되돌렸습니다.' });
+    } else {
+      toast({ variant: 'destructive', title: '복구 실패', description: result.error });
+    }
+  }, [history, data, onBulkSave, toast]);
 
   React.useEffect(() => { 
     setData(initialData);
-    // 데이터(필터 등)가 변경되면 선택 상태 초기화
+    // 서버 데이터가 변경되면 선택 상태 초기화
     setInternalSelectedRowIds([]);
     setSelectionStart(null);
     setSelectionEnd(null);
   }, [initialData]);
+
+  const filterOptions = React.useMemo(() => {
+    const opts: Record<string, Set<any>> = {}; columns.forEach(c => opts[c.key] = new Set());
+    initialData.forEach(s => columns.forEach(c => { if(s[c.key]) opts[c.key].add(s[c.key]); }));
+    const result: Record<string, any[]> = {}; Object.keys(opts).forEach(k => result[k] = Array.from(opts[k]).sort()); return result;
+  }, [initialData, columns]);
+
+  const filteredData = React.useMemo(() => data.filter(row => {
+    const mF = Object.entries(columnFilters).every(([f, v]) => !v?.length || v.includes(String(row[f] || '')));
+    const mS = !searchTerm || columns.some(c => String(row[c.key] || '').toLowerCase().includes(searchTerm.toLowerCase()));
+    return mF && mS;
+  }), [data, columnFilters, searchTerm, columns]);
+
+  // 로컬 필터(헤더 필터, 검색) 변경 시 선택 상태 초기화 및 스크롤 조정
+  React.useEffect(() => {
+    setSelectionStart(null);
+    setSelectionEnd(null);
+    
+    // 필터로 인해 데이터가 줄어들었을 때 스크롤 위치가 범위를 벗어나지 않도록 조정
+    if (containerRef.current) {
+      const maxScroll = Math.max(0, filteredData.length * ROW_HEIGHT + HEADER_HEIGHT - containerHeight);
+      if (containerRef.current.scrollTop > maxScroll) {
+        containerRef.current.scrollTop = 0; // 혹은 maxScroll로 조정
+      }
+    }
+  }, [columnFilters, searchTerm, filteredData.length]);
+
   React.useEffect(() => {
     if (!containerRef.current) return;
     const observer = new ResizeObserver((entries) => { for (let entry of entries) setContainerHeight(entry.contentRect.height); });
@@ -352,18 +414,6 @@ export function StandardSpreadsheetTable({ data: initialData, columns, onSave, o
     window.addEventListener('mouseup', stop); window.addEventListener('pointerup', stop);
     return () => { window.removeEventListener('mouseup', stop); window.removeEventListener('pointerup', stop); };
   }, []);
-
-  const filterOptions = React.useMemo(() => {
-    const opts: Record<string, Set<any>> = {}; columns.forEach(c => opts[c.key] = new Set());
-    initialData.forEach(s => columns.forEach(c => { if(s[c.key]) opts[c.key].add(s[c.key]); }));
-    const result: Record<string, any[]> = {}; Object.keys(opts).forEach(k => result[k] = Array.from(opts[k]).sort()); return result;
-  }, [initialData, columns]);
-
-  const filteredData = React.useMemo(() => initialData.filter(row => {
-    const mF = Object.entries(columnFilters).every(([f, v]) => !v?.length || v.includes(String(row[f] || '')));
-    const mS = !searchTerm || columns.some(c => String(row[c.key] || '').toLowerCase().includes(searchTerm.toLowerCase()));
-    return mF && mS;
-  }), [initialData, columnFilters, searchTerm, columns]);
 
   const selectedRowIds = externalSelectedRowIds || internalSelectedRowIds;
   const syncSelected = React.useCallback((ids: any) => onSelectionChange ? onSelectionChange(ids) : setInternalSelectedRowIds(ids), [onSelectionChange]);
@@ -381,7 +431,111 @@ export function StandardSpreadsheetTable({ data: initialData, columns, onSave, o
 
   const handleMouseEnter = React.useCallback((row: any, col: any) => { if (isSelectingRef.current) requestAnimationFrame(() => setSelectionEnd({ row, col })); }, []);
   
-  // --- 핵심: Delete 키 처리 로직 ---
+  // --- 핵심: 복사/붙여넣기 로직 ---
+  const handleCopy = React.useCallback(async () => {
+    if (!selectionStart || !selectionEnd) return
+    
+    const minR = Math.min(selectionStart.row, selectionEnd.row), maxR = Math.max(selectionStart.row, selectionEnd.row)
+    const minC = Math.min(selectionStart.col, selectionEnd.col), maxC = Math.max(selectionStart.col, selectionEnd.col)
+    
+    let text = ""
+    for (let r = minR; r <= maxR; r++) {
+      const rowData = filteredData[r]
+      if (!rowData) continue
+      const line = []
+      for (let c = minC; c <= maxC; c++) {
+        const val = rowData[columns[c].key]
+        line.push(Array.isArray(val) ? val.join(', ') : (val || ''))
+      }
+      text += line.join('\t') + (r === maxR ? "" : "\n")
+    }
+    
+    try {
+      await navigator.clipboard.writeText(text)
+      toast({ title: '복사 완료', description: '선택 영역이 클립보드에 복사되었습니다.' })
+    } catch (err) {
+      toast({ variant: 'destructive', title: '복사 실패', description: '클립보드 접근 권한이 없습니다.' })
+    }
+  }, [selectionStart, selectionEnd, filteredData, columns, toast]);
+
+  const handlePaste = React.useCallback(async () => {
+    if (!selectionStart) return
+    
+    try {
+      const text = await navigator.clipboard.readText()
+      if (!text) return
+      
+      const clipboardRows = text.split(/\r?\n/).filter(line => line.length > 0).map(row => row.split('\t'))
+      const cbHeight = clipboardRows.length
+      const cbWidth = clipboardRows[0].length
+
+      // 사용자가 선택한 실제 영역 계산
+      const selEnd = selectionEnd || selectionStart
+      const minR = Math.min(selectionStart.row, selEnd.row)
+      const maxR = Math.max(selectionStart.row, selEnd.row)
+      const minC = Math.min(selectionStart.col, selEnd.col)
+      const maxC = Math.max(selectionStart.col, selEnd.col)
+
+      // 붙여넣기 타겟 범위 결정 (단일 선택이면 클립보드 크기만큼, 블록 선택이면 블록 크기만큼)
+      const targetMaxR = (selectionStart.row === selEnd.row && selectionStart.col === selEnd.col) 
+        ? minR + cbHeight - 1 
+        : maxR
+      const targetMaxC = (selectionStart.row === selEnd.row && selectionStart.col === selEnd.col) 
+        ? minC + cbWidth - 1 
+        : maxC
+      
+      const updates: any[] = []
+      const historyUpdates: any[] = []
+      const newData = [...data]
+      
+      for (let r = minR; r <= targetMaxR; r++) {
+        const rowData = filteredData[r]
+        if (!rowData) continue
+        
+        const dIdx = newData.findIndex(s => s.id === rowData.id)
+        if (dIdx === -1) continue
+
+        const rOffset = r - minR
+        const clipboardRIdx = rOffset % cbHeight 
+
+        for (let c = minC; c <= targetMaxC; c++) {
+          const config = columns[c]
+          if (!config || config.readOnly || config.type === 'action') continue
+          
+          const cOffset = c - minC
+          const clipboardCIdx = cOffset % cbWidth 
+          
+          let val = clipboardRows[clipboardRIdx][clipboardCIdx]
+          if (val === undefined) continue 
+
+          let finalVal: any = val.trim()
+          if (config.type === 'multi-select') {
+             finalVal = finalVal ? finalVal.split(',').map((v:any) => v.trim()) : []
+          }
+          
+          if (newData[dIdx][config.key] !== finalVal) {
+            historyUpdates.push({ id: rowData.id, field: config.key, oldValue: newData[dIdx][config.key] })
+            newData[dIdx] = { ...newData[dIdx], [config.key]: finalVal }
+            updates.push({ id: rowData.id, field: config.key, value: finalVal })
+          }
+        }
+      }
+      
+      if (updates.length > 0) {
+        recordHistory(historyUpdates)
+        setData(newData)
+        const result = await onBulkSave(updates)
+        if (result.success) {
+          toast({ title: '붙여넣기 완료', description: `${updates.length}개의 셀이 업데이트되었습니다.` })
+        } else {
+          toast({ variant: 'destructive', title: '저장 실패', description: result.error })
+        }
+      }
+    } catch (err) {
+      toast({ variant: 'destructive', title: '붙여넣기 실패', description: '클립보드 데이터를 읽을 수 없습니다.' })
+    }
+  }, [selectionStart, selectionEnd, filteredData, columns, data, onBulkSave, toast]);
+
   const handleDelete = React.useCallback(async () => {
     if (editingCell || !selectionStart || !selectionEnd) return
     
@@ -389,6 +543,7 @@ export function StandardSpreadsheetTable({ data: initialData, columns, onSave, o
     const minC = Math.min(selectionStart.col, selectionEnd.col), maxC = Math.max(selectionStart.col, selectionEnd.col)
     
     const updates: any[] = []
+    const historyUpdates: any[] = []
     const newData = [...data]
     
     for (let r = minR; r <= maxR; r++) {
@@ -403,12 +558,16 @@ export function StandardSpreadsheetTable({ data: initialData, columns, onSave, o
         if (config.readOnly || config.type === 'action') continue
         
         const emptyVal = config.key === 'certificates' ? [] : ''
-        newData[dIdx] = { ...newData[dIdx], [config.key]: emptyVal }
-        updates.push({ id: rowData.id, field: config.key, value: emptyVal })
+        if (newData[dIdx][config.key] !== emptyVal) {
+          historyUpdates.push({ id: rowData.id, field: config.key, oldValue: newData[dIdx][config.key] })
+          newData[dIdx] = { ...newData[dIdx], [config.key]: emptyVal }
+          updates.push({ id: rowData.id, field: config.key, value: emptyVal })
+        }
       }
     }
     
     if (updates.length > 0) {
+      recordHistory(historyUpdates)
       setData(newData)
       const result = await onBulkSave(updates)
       if (result.success) toast({ title: '셀 내용 지우기 완료' })
@@ -425,13 +584,40 @@ export function StandardSpreadsheetTable({ data: initialData, columns, onSave, o
       setPickerOpen(true); 
       return { success: true }; 
     }
+    
+    const student = data.find(s => s.id === id);
+    if (student && student[field] !== value) {
+      recordHistory([{ id, field, oldValue: student[field] }]);
+    }
+
     setEditingCell(null);
     setData(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s)); return onSave(id, field, value); 
-  }, [onSave, filteredData, columns]);
+  }, [onSave, filteredData, columns, data, recordHistory]);
 
   const handleKeyDown = React.useCallback((e: React.KeyboardEvent) => {
     if (editingCell) return;
     
+    // Ctrl + C (복사)
+    if (e.ctrlKey && e.key === 'c') {
+      e.preventDefault();
+      handleCopy();
+      return;
+    }
+
+    // Ctrl + V (붙여넣기)
+    if (e.ctrlKey && e.key === 'v') {
+      e.preventDefault();
+      handlePaste();
+      return;
+    }
+
+    // Ctrl + Z (실행 취소)
+    if (e.ctrlKey && e.key === 'z') {
+      e.preventDefault();
+      handleUndo();
+      return;
+    }
+
     // Delete/Backspace 키 처리 보강
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault(); // 브라우저 기본 동작 방지

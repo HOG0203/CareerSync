@@ -6,7 +6,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import {
-  getStudentEmploymentData,
+  getFilteredStudentData,
   getGraduationYears,
   MAJOR_SORT_ORDER,
 } from '@/lib/data';
@@ -28,9 +28,8 @@ export default async function DashboardPage({
 }) {
   const params = await searchParams;
 
-  // 1. 병렬 데이터 패칭 (성능 향상의 핵심)
-  const [allData, graduationYears, settings] = await Promise.all([
-    getStudentEmploymentData(),
+  // 1. 기반 설정 패칭 (학년도 목록 및 시스템 설정)
+  const [graduationYears, settings] = await Promise.all([
     getGraduationYears(),
     getSystemSettings()
   ]);
@@ -42,11 +41,13 @@ export default async function DashboardPage({
   const selectedClass = params.class || 'all';
   const selectedStatus = params.status || 'all';
 
+  // 2. 타겟 데이터 패칭 (해당 학년의 데이터만 DB에서 직접 필터링하여 가져옴)
+  const allData = await getFilteredStudentData(selectedYear);
+
   // 학년도 역산 (표시용)
   const displayAY = parseInt(selectedYear) - 1;
 
-  // 2. 필터링 로직 최적화: 한 번의 순회로 필요한 데이터 및 카운트 추출
-  const yearFilteredData: typeof allData = [];
+  // 3. 필터링 로직 최적화: 한 번의 순회로 필요한 데이터 및 카운트 추출
   const majorCounts: Record<string, number> = {};
   const classCounts: Record<string, number> = {};
   const statusCounts: Record<string, number> = {};
@@ -54,30 +55,23 @@ export default async function DashboardPage({
 
   // 한 번의 루프로 모든 통계와 필터링 수행
   for (const student of allData) {
-    const sYear = student.graduation_year?.toString();
-    
-    // 연도 필터링
-    if (!selectedYear || sYear === selectedYear) {
-      yearFilteredData.push(student);
-      
-      // 학과 카운트 (연도 필터링된 기준)
-      const major = student.major || '미지정';
-      majorCounts[major] = (majorCounts[major] || 0) + 1;
+    // 학과 카운트
+    const major = student.major || '미지정';
+    majorCounts[major] = (majorCounts[major] || 0) + 1;
 
-      // 현재 선택된 학과에 해당하는 반 카운트
-      if (selectedMajor === 'all' || student.major === selectedMajor) {
-        const cInfo = student.class_info || '미지정';
-        classCounts[cInfo] = (classCounts[cInfo] || 0) + 1;
+    // 현재 선택된 학과에 해당하는 반 카운트
+    if (selectedMajor === 'all' || student.major === selectedMajor) {
+      const cInfo = student.class_info || '미지정';
+      classCounts[cInfo] = (classCounts[cInfo] || 0) + 1;
+      
+      // 현재 선택된 반까지 만족하는 상태 카운트
+      if (selectedClass === 'all' || student.class_info === selectedClass) {
+        const status = student.employment_status || '미취업';
+        statusCounts[status] = (statusCounts[status] || 0) + 1;
         
-        // 현재 선택된 반까지 만족하는 상태 카운트
-        if (selectedClass === 'all' || student.class_info === selectedClass) {
-          const status = student.employment_status || '미취업';
-          statusCounts[status] = (statusCounts[status] || 0) + 1;
-          
-          // 최종 필터링 데이터 (카드 및 차트용)
-          if (selectedStatus === 'all' || student.employment_status === selectedStatus) {
-            filteredData.push(student);
-          }
+        // 최종 필터링 데이터 (카드 및 차트용)
+        if (selectedStatus === 'all' || student.employment_status === selectedStatus) {
+          filteredData.push(student);
         }
       }
     }
@@ -120,7 +114,7 @@ export default async function DashboardPage({
         <div>
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900">취업 및 현장실습 대시보드</h2>
           <p className="text-muted-foreground text-[11px] sm:text-sm mt-1">
-            <span className="font-semibold text-blue-600">{displayAY}학년도 3학년</span> 분석 데이터
+            <span className="font-bold text-indigo-600">{displayAY}학년도 3학년</span> 취업 및 현장실습 현황 분석
             {selectedMajor !== 'all' && ` • ${selectedMajor}`}
           </p>
         </div>

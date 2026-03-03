@@ -5,7 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { getStudentEmploymentData, getGraduationYears, MAJOR_SORT_ORDER } from '@/lib/data';
+import { getFilteredStudentData, getGraduationYears, MAJOR_SORT_ORDER } from '@/lib/data';
 import { Users } from 'lucide-react';
 import { StudentTable } from './student-table';
 import { createClient } from '@/lib/supabase/server';
@@ -38,13 +38,18 @@ export default async function StudentsPage({
   const isAdmin = profile?.role === 'admin';
   const isTeacher = profile?.role === 'teacher';
 
-  const settings = await getSystemSettings();
+  // 1. 기반 설정 패칭
+  const [settings, graduationYears] = await Promise.all([
+    getSystemSettings(),
+    getGraduationYears()
+  ]);
+
   // 기본 조회 졸업연도: 학사학년도 + 1 (3학년 통합 관리 기준)
   const defaultGradYear = (settings.baseYear + 1).toString();
   const selectedYear = params.year || defaultGradYear;
-  const graduationYears = await getGraduationYears();
 
-  let allStudentData = await getStudentEmploymentData();
+  // 2. 타겟 데이터 패칭 (해당 학년의 데이터만 DB에서 직접 필터링하여 가져옴)
+  let allStudentData = await getFilteredStudentData(selectedYear);
   
   // 교직원일 경우 본인 담당 학반 데이터만 추출 (관리자는 전체)
   if (isTeacher && profile.assigned_year) {
@@ -55,32 +60,30 @@ export default async function StudentsPage({
     );
   }
 
-  // 필터 옵션 계산 (이미 필터링된 데이터 기준)
-  const baseFilteredData = allStudentData.filter(s => s.graduation_year?.toString() === selectedYear);
-  
-  const majors = Array.from(new Set(baseFilteredData.map(s => s.major).filter(Boolean)))
+  // 필터 옵션 계산 (이미 DB에서 학년은 걸러짐)
+  const majors = Array.from(new Set(allStudentData.map(s => s.major).filter(Boolean)))
     .sort((a, b) => {
       const indexA = MAJOR_SORT_ORDER.indexOf(a!);
       const indexB = MAJOR_SORT_ORDER.indexOf(b!);
       return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
     })
     .map(m => ({
-      label: m!, value: m!, count: baseFilteredData.filter(s => s.major === m).length
+      label: m!, value: m!, count: allStudentData.filter(s => s.major === m).length
     }));
 
   const selectedMajor = params.major || 'all';
   const selectedClass = params.class || 'all';
 
-  const classes = Array.from(new Set(baseFilteredData.filter(s => selectedMajor === 'all' || s.major === selectedMajor).map(s => s.class_info).filter(Boolean))).sort().map(c => ({
-    label: c, value: c, count: baseFilteredData.filter(s => s.class_info === c && (selectedMajor === 'all' || s.major === selectedMajor)).length
+  const classes = Array.from(new Set(allStudentData.filter(s => selectedMajor === 'all' || s.major === selectedMajor).map(s => s.class_info).filter(Boolean))).sort().map(c => ({
+    label: c, value: c, count: allStudentData.filter(s => s.class_info === c && (selectedMajor === 'all' || s.major === selectedMajor)).length
   }));
 
-  const statuses = Array.from(new Set(baseFilteredData.filter(s => (selectedMajor === 'all' || s.major === selectedMajor) && (selectedClass === 'all' || s.class_info === selectedClass)).map(s => s.employment_status).filter(Boolean))).sort().map(st => ({
-    label: st, value: st, count: baseFilteredData.filter(s => s.employment_status === st && (selectedMajor === 'all' || s.major === selectedMajor) && (selectedClass === 'all' || s.class_info === selectedClass)).length
+  const statuses = Array.from(new Set(allStudentData.filter(s => (selectedMajor === 'all' || s.major === selectedMajor) && (selectedClass === 'all' || s.class_info === selectedClass)).map(s => s.employment_status).filter(Boolean))).sort().map(st => ({
+    label: st, value: st, count: allStudentData.filter(s => s.employment_status === st && (selectedMajor === 'all' || s.major === selectedMajor) && (selectedClass === 'all' || s.class_info === selectedClass)).length
   }));
 
-  // 최종 데이터 필터링 (getStudentEmploymentData가 이미 정렬을 수행하지만 다시 한번 보장)
-  const filteredData = baseFilteredData.filter(student => {
+  // 최종 데이터 필터링 (학과/반/상태)
+  const filteredData = allStudentData.filter(student => {
     const majorMatch = !params.major || params.major === 'all' || student.major === params.major;
     const classMatch = !params.class || params.class === 'all' || student.class_info === params.class;
     const statusMatch = !params.status || params.status === 'all' || student.employment_status === params.status;

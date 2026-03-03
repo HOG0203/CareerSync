@@ -82,6 +82,35 @@ function flattenStudentData(student: any): StudentEmploymentData {
 }
 
 /**
+ * 필터링된 학생 데이터를 가져옵니다 (연도 필터 추가).
+ */
+export async function getFilteredStudentData(year?: string): Promise<StudentEmploymentData[]> {
+  const supabase = await createClient();
+  
+  let query = supabase
+    .from('students')
+    .select(`
+      *,
+      student_employments (*)
+    `)
+    .order('graduation_year', { ascending: false });
+
+  if (year && year !== 'all') {
+    query = query.eq('graduation_year', parseInt(year));
+  }
+
+  const { data, error } = await query.range(0, 999);
+
+  if (error) {
+    console.error('Error fetching filtered student data:', error.message);
+    return [];
+  }
+
+  const flattenedData = data.map(flattenStudentData);
+  return sortStudents(flattenedData);
+}
+
+/**
  * 모든 학생 데이터를 가져옵니다.
  */
 export async function getStudentEmploymentData(): Promise<StudentEmploymentData[]> {
@@ -93,7 +122,8 @@ export async function getStudentEmploymentData(): Promise<StudentEmploymentData[
       *,
       student_employments (*)
     `)
-    .order('graduation_year', { ascending: false });
+    .order('graduation_year', { ascending: false })
+    .range(0, 999); // 명시적으로 더 많은 범위를 가져오도록 설정
 
   if (error) {
     console.error('Error fetching student data:', error.message);
@@ -118,7 +148,8 @@ export async function getAssignedStudentDetails(year: number, major: string, cla
     `)
     .eq('graduation_year', year)
     .eq('major', major)
-    .eq('class_info', className);
+    .eq('class_info', className)
+    .range(0, 999); // 명시적으로 더 많은 범위를 가져오도록 설정
 
   if (error) {
     console.error('Error fetching assigned students:', error.message);

@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { getAssignedStudentDetails, getGraduationYears, getStudentEmploymentData, MAJOR_SORT_ORDER } from '@/lib/data';
+import { getAssignedStudentDetails, getGraduationYears, getFilteredStudentData, MAJOR_SORT_ORDER } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -22,11 +22,11 @@ export default async function ClassManagementPage({
   const params = await searchParams;
   const supabase = await createClient();
   
-  // 1. 사용자 정보 및 기반 데이터 병렬 패칭 시작
-  const [userRes, settings, allBaseData, masterCertificates] = await Promise.all([
+  // 1. 기반 공통 데이터 병렬 패칭
+  const [userRes, settings, graduationYears, masterCertificates] = await Promise.all([
     supabase.auth.getUser(),
     getSystemSettings(),
-    getStudentEmploymentData(),
+    getGraduationYears(),
     getMasterCertificates()
   ]);
 
@@ -42,20 +42,18 @@ export default async function ClassManagementPage({
 
   const isAdmin = profile?.role === 'admin';
 
-  // 3. 필터링 및 옵션 계산 최적화 (단일 루프)
+  // 3. 학년 옵션 계산 (졸업연도 목록 기반 역산)
   const availableGradesSet = new Set<number>();
   const gradeToYearMap = new Map<number, number>();
   
-  // 학년별 졸업연도 미리 계산
   [1, 2, 3].forEach(g => {
     const y = settings.baseYear + (4 - g);
     gradeToYearMap.set(g, y);
   });
 
-  // 존재하는 학년 확인
-  for (const s of allBaseData) {
+  for (const year of graduationYears) {
     for (const [g, y] of gradeToYearMap.entries()) {
-      if (s.graduation_year === y) availableGradesSet.add(g);
+      if (year === y) availableGradesSet.add(g);
     }
   }
   const availableGrades = Array.from(availableGradesSet).sort((a, b) => b - a);
@@ -69,15 +67,15 @@ export default async function ClassManagementPage({
     ? settings.baseYear + (4 - selectedGrade)
     : (profile?.assigned_year || settings.baseYear + (4 - selectedGrade));
 
-  // 학과 및 반 추출 (단일 루프)
+  // 4. 해당 학년의 전체 데이터만 DB에서 직접 필터링하여 패칭
+  const allBaseData = await getFilteredStudentData(calculatedYear.toString());
+
+  // 학과 및 반 추출
   const availableMajorsSet = new Set<string>();
   const availableClassesSet = new Set<string>();
 
-  // 먼저 선택된 학년에 맞는 학과들 추출
   for (const s of allBaseData) {
-    if (s.graduation_year === calculatedYear) {
-      if (s.major) availableMajorsSet.add(s.major);
-    }
+    if (s.major) availableMajorsSet.add(s.major);
   }
 
   const availableMajors = Array.from(availableMajorsSet).sort((a, b) => {
@@ -92,7 +90,7 @@ export default async function ClassManagementPage({
 
   // 선택된 학년 + 학과에 맞는 반들 추출
   for (const s of allBaseData) {
-    if (s.graduation_year === calculatedYear && s.major === targetMajor) {
+    if (s.major === targetMajor) {
       if (s.class_info) availableClassesSet.add(s.class_info);
     }
   }

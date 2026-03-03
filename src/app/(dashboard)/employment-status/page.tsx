@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import { getStudentEmploymentData, getGraduationYears, StudentEmploymentData } from '@/lib/data';
+import { getFilteredStudentData, getGraduationYears, StudentEmploymentData } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import EmploymentStatusFilters from './employment-status-filters';
 import { getSystemSettings } from '@/app/admin/settings/actions';
@@ -74,9 +74,8 @@ export default async function EmploymentStatusPage({
 }) {
   const params = await searchParams;
 
-  // 1. 병렬 데이터 패칭 (성능 향상의 핵심)
-  const [allData, graduationYears, settings] = await Promise.all([
-    getStudentEmploymentData(),
+  // 1. 기반 설정 패칭
+  const [graduationYears, settings] = await Promise.all([
     getGraduationYears(),
     getSystemSettings()
   ]);
@@ -85,21 +84,22 @@ export default async function EmploymentStatusPage({
   const defaultGradYear = (settings.baseYear + 1).toString();
   const selectedYear = params.year || defaultGradYear;
 
+  // 2. 타겟 데이터 패칭 (해당 학년의 데이터만 DB에서 직접 필터링하여 가져옴)
+  const allData = await getFilteredStudentData(selectedYear);
+
   // 학년도 계산 (표시용)
   const displayAY = parseInt(selectedYear) - 1;
 
-  // 2. 필터링 및 그룹화 로직 최적화
+  // 3. 필터링 및 그룹화 로직 최적화
   const groupedData: Record<string, StudentEmploymentData[]> = {};
   
   for (const student of allData) {
-    if (!selectedYear || student.graduation_year?.toString() === selectedYear) {
-      const major = student.major || '';
-      const classInfo = student.class_info || '';
-      const displayClassName = getShortClassName(major, classInfo);
-      
-      if (!groupedData[displayClassName]) groupedData[displayClassName] = [];
-      groupedData[displayClassName].push(student);
-    }
+    const major = student.major || '';
+    const classInfo = student.class_info || '';
+    const displayClassName = getShortClassName(major, classInfo);
+    
+    if (!groupedData[displayClassName]) groupedData[displayClassName] = [];
+    groupedData[displayClassName].push(student);
   }
 
   // 3. 정렬 로직 최적화

@@ -70,8 +70,8 @@ export default function DashboardFilters({
           </SelectTrigger>
           <SelectContent>
             {graduationYears.sort((a, b) => b - a).map((year) => (
-              <SelectItem key={year} value={String(year)} className="text-xs">
-                {parseInt(String(year)) - 1}학년도
+              <SelectItem key={year} value={String(year)} className="text-xs font-medium">
+                {parseInt(String(year)) - 1}학년도 3학년
               </SelectItem>
             ))}
           </SelectContent>
