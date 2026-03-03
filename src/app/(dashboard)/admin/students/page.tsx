@@ -1,0 +1,113 @@
+import { getStudentEmploymentData, getGraduationYears, MAJOR_SORT_ORDER } from '@/lib/data';
+import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
+import { getSystemSettings } from '@/app/admin/settings/actions';
+import { AdminStudentHub } from './admin-student-hub';
+
+export const dynamic = 'force-dynamic';
+
+export default async function AdminStudentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ year?: string; major?: string; class?: string; status?: string }>;
+}) {
+  const params = await searchParams;
+  const supabase = await createClient();
+  
+  // 1. 사용자 정보 및 기반 데이터 병렬 패칭 시작
+  const [userRes, settings, graduationYears, allStudentData] = await Promise.all([
+    supabase.auth.getUser(),
+    getSystemSettings(),
+    getGraduationYears(),
+    getStudentEmploymentData()
+  ]);
+
+  const user = userRes.data.user;
+  if (!user) {
+    redirect('/login');
+  }
+
+  // 2. 프로필 정보 조회
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (profile?.role !== 'admin') {
+    redirect('/dashboard');
+  }
+
+  // 기본 조회 졸업연도: 학사학년도 + 1 (3학년 통합 관리 기준)
+  const defaultGradYear = (settings.baseYear + 1).toString();
+  const selectedYear = params.year || defaultGradYear;
+  const selectedMajor = params.major || 'all';
+  const selectedClass = params.class || 'all';
+  const selectedStatus = params.status || 'all';
+
+  // 3. 필터링 및 옵션 계산 최적화 (단일 루프)
+  const yearFilteredData: typeof allStudentData = [];
+  const majorCounts: Record<string, number> = {};
+  const classCounts: Record<string, number> = {};
+  const statusCounts: Record<string, number> = {};
+  const filteredData: typeof allStudentData = [];
+
+  for (const student of allStudentData) {
+    const sYear = student.graduation_year?.toString();
+    
+    // 연도 필터링
+    if (sYear === selectedYear) {
+      yearFilteredData.push(student);
+      
+      // 학과 카운트 (연도 필터링된 기준)
+      const major = student.major || '미지정';
+      majorCounts[major] = (majorCounts[major] || 0) + 1;
+
+      // 현재 선택된 학과에 해당하는 반 카운트
+      if (selectedMajor === 'all' || student.major === selectedMajor) {
+        const cInfo = student.class_info || '미지정';
+        classCounts[cInfo] = (classCounts[cInfo] || 0) + 1;
+        
+        // 현재 선택된 반까지 만족하는 상태 카운트
+        if (selectedClass === 'all' || student.class_info === selectedClass) {
+          const status = student.employment_status || '미취업';
+          statusCounts[status] = (statusCounts[status] || 0) + 1;
+          
+          // 최종 필터링 데이터 (허브 테이블용)
+          if (selectedStatus === 'all' || student.employment_status === selectedStatus) {
+            filteredData.push(student);
+          }
+        }
+      }
+    }
+  }
+
+  // 드롭다운 옵션 변환
+  const majors = Object.entries(majorCounts)
+    .sort(([a], [b]) => {
+      const indexA = MAJOR_SORT_ORDER.indexOf(a);
+      const indexB = MAJOR_SORT_ORDER.indexOf(b);
+      return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+    })
+    .map(([m, count]) => ({ label: m, value: m, count }));
+
+  const classes = Object.entries(classCounts)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([c, count]) => ({ label: c, value: c, count }));
+
+  const statuses = Object.entries(statusCounts)
+    .sort(([, a], [, b]) => b - a)
+    .map(([s, count]) => ({ label: s, value: s, count }));
+
+  return (
+    <AdminStudentHub 
+      initialData={filteredData}
+      graduationYears={graduationYears}
+      majors={majors}
+      classes={classes}
+      statuses={statuses}
+      settings={settings}
+      params={params}
+    />
+  );
+}

@@ -1,0 +1,32 @@
+# Docs and Local Snapshots (Heavy files)
+docs/
+docs/**
+*.md
+
+# Local Environments
+.env*.local
+.env
+
+# Tooling and IDEs
+.idx/
+.vscode/
+.idea/
+.git/
+.gitignore
+.geminiignore
+
+# Temporary and Build artifacts
+.next/
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Static Assets not used in production
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+apphosting.yaml
