@@ -1,31 +1,46 @@
-# CareerSync 작업 인계 및 다음 단계 (2026-02-26)
+# CareerSync 작업 인계 및 다음 단계 (Handover)
 
-## 1. 현재 시스템 상태
-### 🔐 인증 (Auth)
-- **아이디 기반 로그인**: 이메일 대신 아이디로 로그인 가능.
-- **한글 지원**: 한글 아이디 사용 시 내부적으로 `Hex 인코딩`을 거쳐 `@careersync.local` 가상 이메일로 변환되어 저장됨.
-- **관리자 기능**: `src/app/admin/users/actions.ts`를 통해 아이디만으로 계정 생성 가능.
+**최종 업데이트:** 2026-03-04 (v1.5)  
+**작성자:** bkit (Gemini CLI)
 
-### 📊 학생 관리 테이블 (Spreadsheet UX)
-- **엑셀 기능**: 범위 선택(드래그, Shift), 복사(Ctrl+C), 붙여넣기(Ctrl+V), 삭제(Delete) 구현 완료.
-- **성능**: `Optimistic UI` 및 백그라운드 저장 적용으로 지연 시간 최소화.
-- **색상 가이드**: 
-  - 취업구분: 고대비(High Contrast) 원색 계열.
-  - 희망유무: 파스텔톤(녹색, 적색, 주황 등).
+---
 
-## 2. ⚠️ 필수 실행 확인 (DB SQL)
-다음 파일들이 Supabase SQL Editor에서 실행되었는지 확인이 필요합니다:
-- [ ] `07-expand-student-employments-schema.sql`: 18개 컬럼 확장
-- [ ] `08-add-sort-order-column.sql`: 순번 정렬 기능 추가
-- [ ] `10-remove-employment-check-constraint.sql`: 취업구분 제약 제거
-- [ ] `11-remove-desiring-employment-constraint.sql`: 희망유무 제약 제거
+## 1. 🚀 최근 주요 개편 사항 (핵심 요약)
 
-## 3. 주요 파일 경로
-- **서버 액션**: `src/app/students/actions.ts` (일괄 업데이트, 삭제, 개별 수정 로직)
-- **메인 테이블**: `src/app/(dashboard)/students/student-table.tsx` (UX 핵심 로직)
-- **데이터 타입**: `src/lib/data.ts` (DB-FE 데이터 매핑)
+### 📅 필터 시스템 대개편 (v1.5)
+- **학년도/학년 분리**: 사용자가 '학사학년도'와 '학년'을 각각 선택하면 내부적으로 `졸업연도`를 계산하여 쿼리하는 방식으로 개편됨.
+- **공식**: `GraduationYear = AcademicYear + (4 - Grade)`
+- **통일된 디자인**: `DashboardFilters` 컴포넌트가 모든 대시보드 페이지의 스타일을 제어하며, 아이콘 기반 프리미엄 UI가 적용됨.
 
-## 4. 다음 작업 제언
-- **데이터 정합성**: 엑셀 붙여넣기 시 날짜 형식(YYYY-MM-DD) 유효성 검사 보강.
-- **필터링 기능**: 학과별, 취업구분별 상단 필터 및 검색 기능 추가.
-- **대시보드 연동**: 확장된 18개 항목 데이터를 기반으로 통계 차트(Recharts) 업데이트.
+### 📱 모바일 UX 고도화
+- **상세 모달 개선**: `MobileDetailModal` 내 모든 입력 필드에 **원클릭 지우기(X)** 버튼 및 **선택 취소** 옵션 추가.
+- **데이터 실시간 갱신**: 모바일에서 수정/삭제 시 `key` 속성 트리거를 통해 UI가 즉시 초기화/반영되도록 처리됨.
+
+### 🗄️ 데이터 아키텍처 최적화
+- **데이터 소스 통합**: 모든 설정(학년도, 자격증 등)이 Supabase DB(`system_settings`, `master_certificates`)를 기반으로 작동함.
+- **불필요 로직 제거**: 로컬 JSON 파일 기반의 설정 로직은 더 이상 사용되지 않음 (임포트 경로 수정 완료).
+
+---
+
+## 2. 🛠️ 다음 작업자를 위한 기술 가이드
+
+### 📍 핵심 수정 파일
+- **공통 필터**: `src/components/dashboard/dashboard-filters.tsx` (학년도/학년 로직의 심장)
+- **시스템 설정 액션**: `src/app/(dashboard)/admin/settings/actions.ts` (DB 조회/수정 핵심)
+- **학년 표시 로직**: `src/app/(dashboard)/admin/students/admin-student-hub.tsx` (`processedData`를 통한 학년 계산)
+
+### ⚠️ 주의사항 및 미결 과제 (To-Do)
+- **[ ] 레거시 코드 정리**: `src/app/admin/settings/` 폴더(파일 기반 액션)가 아직 물리적으로 존재함. 모든 참조가 제거되었으므로 최종 확인 후 폴더 삭제 권장.
+- **[ ] 학년도 전이 테스트**: 관리자 설정에서 `baseYear`를 변경했을 때, 전 페이지의 학년 표시가 의도대로 시프트(Shift) 되는지 엣지 케이스 확인 필요.
+- **[ ] 자격증 동기화**: `AdminStudentHub`에 추가된 `masterCertificates` 연동이 모든 필드에서 완벽히 작동하는지 재검증.
+
+---
+
+## 3. 💡 향후 고도화 제언
+
+1.  **AI 기반 취업 예측**: 현재 수집된 학과별/기업별 데이터를 `src/ai/` 로직에 연동하여, 학생의 현재 스펙(자격증 등) 대비 취업 성공률을 제안하는 대시보드 카드 추가.
+2.  **PDF 리포트 생성**: 학교 보고용을 위해 현재의 대시보드 차트와 취업 현황 그리드를 PDF로 일괄 출력하는 기능.
+3.  **실시간 감사 로그**: 교사들이 학생 데이터를 수정할 때 어떤 필드가 언제 바뀌었는지 관리자가 확인할 수 있는 `audit_logs` UI 구축.
+
+---
+*참조 문서: `DEVELOPMENT_NOTES.md` (로직 공식 및 컨벤션 정리)*
