@@ -45,9 +45,14 @@ export default async function StudentsPage({
     getMasterCertificates()
   ]);
 
-  // 기본 조회 졸업연도: 학사학년도 + 1 (3학년 통합 관리 기준)
+  // 학사학년도(AY)와 학년(Grade) 기반 졸업연도 계산
+  const ay = params.ay ? parseInt(params.ay) : settings.baseYear;
+  const grade = params.grade ? parseInt(params.grade) : 3;
+  const calculatedGradYear = (ay + (4 - grade)).toString();
+
+  // 기본 조회 졸업연도 결정
   const defaultGradYear = (settings.baseYear + 1).toString();
-  const selectedYear = params.year || defaultGradYear;
+  const selectedYear = params.year || calculatedGradYear || defaultGradYear;
 
   // 2. 타겟 데이터 패칭 (해당 학년의 데이터만 DB에서 직접 필터링하여 가져옴)
   let allStudentData = await getFilteredStudentData(selectedYear);
@@ -111,6 +116,8 @@ export default async function StudentsPage({
               statuses={statuses}
               defaultYear={defaultGradYear}
               baseUrl="/students"
+              baseYear={settings.baseYear}
+              hideGrade={true}
             />
           </div>
         </div>

@@ -17,14 +17,14 @@ import DashboardFilters from '@/components/dashboard/dashboard-filters';
 import { AddStudentButton } from './add-student-button';
 import { StandardSpreadsheetTable } from '@/components/dashboard/standard-spreadsheet-table'
 import { updateStudentField, bulkUpdateStudentData, deleteStudents } from '@/app/students/actions'
-import masterCerts from '@/lib/certificates.json'
+import { MasterCertificate } from '@/app/(dashboard)/admin/settings/actions'
 import { PromotionModal } from '../../class-management/promotion-modal'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 
 // 학생 등록 및 진급 관리 전용 컬럼 (기본 정보만 노출)
 const COLUMNS = [
-  { key: 'graduation_year', label: '졸업연도', width: 80, readOnly: true },
+  { key: 'grade', label: '학년', width: 60, readOnly: true },
   { key: 'major', label: '학과', width: 120, readOnly: true },
   { key: 'class_info', label: '반', width: 60, readOnly: true },
   { key: 'student_number', label: '번호', width: 60, readOnly: true },
@@ -42,13 +42,36 @@ export function AdminStudentHub({
   classes, 
   statuses, 
   settings,
-  params 
-}: any) {
+  params,
+  masterCertificates = []
+}: {
+  initialData: any[],
+  graduationYears: any[],
+  majors: any[],
+  classes: any[],
+  statuses: any[],
+  settings: { baseYear: number },
+  params: any,
+  masterCertificates?: MasterCertificate[]
+}) {
   const [selectedRowIds, setSelectedRowIds] = React.useState<string[]>([])
   const [isPromotionModalOpen, setIsPromotionModalOpen] = React.useState(false)
   const [selectedIdsForPromotion, setSelectedIdsForPromotion] = React.useState<string[]>([])
   const router = useRouter()
   const { toast } = useToast()
+
+  // 학사학년도 기반으로 각 학생의 학년 계산하여 데이터 가공
+  const processedData = React.useMemo(() => {
+    return initialData.map(s => {
+      // 공식: 4 - (졸업연도 - 학사학년도)
+      // 예: 2027(GY) 졸업생의 2026(AY) 학년은? 4 - (2027 - 2026) = 3학년
+      const diff = s.graduation_year - settings.baseYear;
+      const grade = diff === 1 ? '3학년' : 
+                    diff === 2 ? '2학년' : 
+                    diff === 3 ? '1학년' : `${s.graduation_year}졸업`;
+      return { ...s, grade };
+    });
+  }, [initialData, settings.baseYear]);
 
   // 학년도 필터 등이 변경되면 선택된 항목 초기화
   React.useEffect(() => {
@@ -85,7 +108,7 @@ export function AdminStudentHub({
     }
   }
 
-  const selectedStudentsForPromotion = initialData.filter((s: any) => selectedIdsForPromotion.includes(s.id))
+  const selectedStudentsForPromotion = processedData.filter((s: any) => selectedIdsForPromotion.includes(s.id))
 
   return (
     <div className="flex flex-col h-full w-full gap-4 sm:gap-6 pb-16 sm:pb-0">
@@ -102,7 +125,7 @@ export function AdminStudentHub({
         
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap border-t lg:border-none pt-3 lg:pt-0">
           <ImportButton />
-          <ExportButton data={initialData} filename={`전교생_학생명부_${new Date().toLocaleDateString()}.csv`} />
+          <ExportButton data={processedData} filename={`전교생_학생명부_${new Date().toLocaleDateString()}.csv`} />
           <AddStudentButton 
             baseYear={settings.baseYear} 
             majors={majors.map((m: any) => m.value)} 
@@ -119,13 +142,14 @@ export function AdminStudentHub({
             statuses={statuses}
             defaultYear={(settings.baseYear + 1).toString()}
             baseUrl="/admin/students"
+            baseYear={settings.baseYear}
           />
         </div>
         
         <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-l sm:border-t-0 pt-3 sm:pt-0 sm:pl-4 border-slate-100 shrink-0">
           <div className="flex flex-col items-start sm:items-end">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Students</span>
-            <span className="text-base sm:text-lg font-black text-indigo-600">{initialData.length}명</span>
+            <span className="text-base sm:text-lg font-black text-indigo-600">{processedData.length}명</span>
           </div>
         </div>
       </div>
@@ -150,7 +174,7 @@ export function AdminStudentHub({
         </CardHeader>
         <CardContent className="flex-1 p-0 relative">
           <StandardSpreadsheetTable 
-            data={initialData}
+            data={processedData}
             columns={COLUMNS}
             groupHeaders={GROUP_HEADERS}
             onSave={handleSave}
@@ -160,7 +184,7 @@ export function AdminStudentHub({
             selectedRowIds={selectedRowIds}
             onSelectionChange={setSelectedRowIds}
             searchPlaceholder="빠른 학생 검색..."
-            masterCertificates={masterCerts}
+            masterCertificates={masterCertificates}
           />
         </CardContent>
       </Card>

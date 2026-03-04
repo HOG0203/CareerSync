@@ -34,9 +34,14 @@ export default async function DashboardPage({
     getSystemSettings()
   ]);
 
-  // 기본 조회 졸업연도: 학사학년도 + 1 (3학년 기준)
+  // 학사학년도(AY)와 학년(Grade) 기반 졸업연도 계산
+  const ay = params.ay ? parseInt(params.ay) : settings.baseYear;
+  const grade = params.grade ? parseInt(params.grade) : 3;
+  const calculatedGradYear = (ay + (4 - grade)).toString();
+
+  // 기본 조회 졸업연도 결정 (신규 파라미터 우선)
   const defaultGradYear = (settings.baseYear + 1).toString();
-  const selectedYear = params.year || defaultGradYear;
+  const selectedYear = params.year || calculatedGradYear || defaultGradYear;
   const selectedMajor = params.major || 'all';
   const selectedClass = params.class || 'all';
   const selectedStatus = params.status || 'all';
@@ -44,8 +49,8 @@ export default async function DashboardPage({
   // 2. 타겟 데이터 패칭 (해당 학년의 데이터만 DB에서 직접 필터링하여 가져옴)
   const allData = await getFilteredStudentData(selectedYear);
 
-  // 학년도 역산 (표시용)
-  const displayAY = parseInt(selectedYear) - 1;
+  // 학사학년도 표시용 (선택된 AY가 있으면 그것을 사용, 아니면 역산)
+  const displayAY = params.ay ? parseInt(params.ay) : (parseInt(selectedYear) - (4 - grade));
 
   // 3. 필터링 로직 최적화: 한 번의 순회로 필요한 데이터 및 카운트 추출
   const majorCounts: Record<string, number> = {};
@@ -125,6 +130,8 @@ export default async function DashboardPage({
             classes={classes} 
             statuses={statuses} 
             defaultYear={defaultGradYear}
+            baseYear={settings.baseYear}
+            hideGrade={true}
           />
         </div>
       </div>

@@ -45,24 +45,22 @@ export default function ClassEmploymentChart({ data, majorName }: { data: Studen
       </CardHeader>
       <CardContent className="pt-4">
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 30, top: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} opacity={0.3} />
-              <XAxis type="number" hide />
-              <YAxis 
-                dataKey="className" 
-                type="category" 
-                tick={{ fontSize: 11, fontWeight: 600 }} 
-                width={60}
-                axisLine={false}
-                tickLine={false}
-              />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '11px', paddingBottom: '10px' }} />
-              <Bar dataKey="취업" stackId="a" fill="var(--color-취업)" barSize={20} />
-              <Bar dataKey="미취업" stackId="a" fill="var(--color-미취업)" radius={[0, 4, 4, 0]} barSize={20} />
-            </BarChart>
-          </ResponsiveContainer>
+          <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 30, top: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} opacity={0.3} />
+            <XAxis type="number" hide />
+            <YAxis 
+              dataKey="className" 
+              type="category" 
+              tick={{ fontSize: 11, fontWeight: 600 }} 
+              width={60}
+              axisLine={false}
+              tickLine={false}
+            />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '11px', paddingBottom: '10px' }} />
+            <Bar dataKey="취업" stackId="a" fill="var(--color-취업)" barSize={20} />
+            <Bar dataKey="미취업" stackId="a" fill="var(--color-미취업)" radius={[0, 4, 4, 0]} barSize={20} />
+          </BarChart>
         </ChartContainer>
       </CardContent>
     </Card>

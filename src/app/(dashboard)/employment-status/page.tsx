@@ -70,7 +70,7 @@ const SORT_ORDER = [
 export default async function EmploymentStatusPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string }>;
+  searchParams: Promise<{ year?: string; ay?: string; grade?: string }>;
 }) {
   const params = await searchParams;
 
@@ -80,15 +80,20 @@ export default async function EmploymentStatusPage({
     getSystemSettings()
   ]);
 
-  // 기본 조회 졸업연도: 학사학년도 + 1 (3학년 기준)
+  // 학사학년도(AY)와 학년(Grade) 기반 졸업연도 계산
+  const ay = params.ay ? parseInt(params.ay) : settings.baseYear;
+  const grade = params.grade ? parseInt(params.grade) : 3;
+  const calculatedGradYear = (ay + (4 - grade)).toString();
+
+  // 기본 조회 졸업연도 결정
   const defaultGradYear = (settings.baseYear + 1).toString();
-  const selectedYear = params.year || defaultGradYear;
+  const selectedYear = params.year || calculatedGradYear || defaultGradYear;
 
   // 2. 타겟 데이터 패칭 (해당 학년의 데이터만 DB에서 직접 필터링하여 가져옴)
   const allData = await getFilteredStudentData(selectedYear);
 
-  // 학년도 계산 (표시용)
-  const displayAY = parseInt(selectedYear) - 1;
+  // 학사학년도 표시용
+  const displayAY = params.ay ? parseInt(params.ay) : (parseInt(selectedYear) - (4 - grade));
 
   // 3. 필터링 및 그룹화 로직 최적화
   const groupedData: Record<string, StudentEmploymentData[]> = {};
@@ -129,11 +134,12 @@ export default async function EmploymentStatusPage({
                 <EmploymentStatusFilters 
                   graduationYears={graduationYears} 
                   defaultYear={defaultGradYear}
+                  baseYear={settings.baseYear}
                 />
               </div>
             </div>
             <p className="text-muted-foreground text-[11px] sm:text-xs font-medium leading-tight whitespace-nowrap">
-              <span className="text-blue-600 font-bold">{displayAY}학년도 3학년</span> 취업 및 현장실습 현황
+              <span className="text-blue-600 font-bold">{displayAY}학년도 {grade}학년</span> 취업 및 현장실습 현황
             </p>
           </div>
           

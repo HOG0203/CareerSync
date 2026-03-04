@@ -28,6 +28,7 @@ const COLUMNS: ColumnConfig[] = [
       { label: '진학', value: '진학' },
       { label: '기술사관', value: '기술사관' },
       { label: '부사관', value: '부사관' },
+      { label: '군특성화', value: '군특성화' },
       { label: '기타', value: '기타' },
     ],
     variant: (val) => val ? 'bg-blue-50 text-blue-700 border-blue-100' : ''

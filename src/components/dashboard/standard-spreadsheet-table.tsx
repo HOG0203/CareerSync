@@ -287,7 +287,7 @@ const MobileDetailModal = ({ isOpen, onClose, data, columns, onSave, onAction }:
       <DialogContent className="w-[95vw] max-h-[95vh] flex flex-col p-0 overflow-hidden sm:max-w-[500px] border-none rounded-2xl shadow-2xl">
         <DialogHeader className="p-6 pb-2 bg-indigo-600 text-white shrink-0">
           <DialogTitle className="text-xl font-bold flex items-center gap-2"><UserPlus className="h-5 w-5" /> 상세 정보 및 관리</DialogTitle>
-          <DialogDescription className="text-indigo-100 text-[10px]">{data.name} 학생의 학적 및 상담 기록을 관리합니다.</DialogDescription>
+          <DialogDescription className="text-indigo-100 text-[10px]">{data.student_name || data.name} 학생의 학적 및 상담 기록을 관리합니다.</DialogDescription>
         </DialogHeader>
         
         <div className="p-4 space-y-4 overflow-y-auto flex-1 bg-slate-50/50">
@@ -307,12 +307,49 @@ const MobileDetailModal = ({ isOpen, onClose, data, columns, onSave, onAction }:
             {columns.filter((c:any)=>c.type!=='action').map((col: any) => (
               <div key={col.key} className="space-y-1.5 p-3 rounded-xl bg-white border border-slate-200 shadow-sm">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{col.label}</label>
-                {col.readOnly ? <div className="text-sm font-semibold text-slate-700">{data[col.key] || '-'}</div> : col.type === 'multi-select' ? (
+                {col.readOnly ? (
+                  <div className="text-sm font-semibold text-slate-700 h-10 flex items-center px-1">{data[col.key] || '-'}</div>
+                ) : col.type === 'multi-select' ? (
                   <div className="flex flex-wrap gap-1 p-2 border border-slate-200 rounded-md bg-white min-h-10 items-center">
                     {normalizeCertificates(data[col.key]).map((cert, i) => (<Badge key={i} variant="secondary" className="text-[10px] bg-slate-100">{cert}</Badge>))}
                     <Button variant="ghost" size="sm" className="h-7 ml-auto text-indigo-600 font-bold hover:bg-indigo-50" onClick={() => onSave(data.id, col.key, 'OPEN_PICKER')}>수정하기</Button>
                   </div>
-                ) : col.type === 'select' ? <Select value={col.options?.some((o:any)=>o.value===data[col.key])?data[col.key]:''} onValueChange={(v)=>onSave(data.id,col.key,v)}><SelectTrigger className="h-10 w-full bg-white"><SelectValue placeholder="선택..." /></SelectTrigger><SelectContent>{col.options?.map((o:any)=>(<SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>))}</SelectContent></Select> : col.type === 'date' ? <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-sm h-10">{data[col.key] || '날짜 선택...'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={data[col.key] ? new Date(data[col.key]) : undefined} onSelect={(date) => date && onSave(data.id, col.key, format(date, 'yyyy-MM-dd'))} locale={ko} /></PopoverContent></Popover> : <Input defaultValue={data[col.key] || ''} onBlur={(e) => { if(e.target.value!==data[col.key]) onSave(data.id, col.key, e.target.value) }} className="h-10 w-full bg-white" />}
+                ) : col.type === 'select' ? (
+                  <Select value={col.options?.some((o:any)=>o.value===data[col.key])?data[col.key]:''} onValueChange={(v)=>onSave(data.id,col.key,v)}>
+                    <SelectTrigger className="h-10 w-full bg-white"><SelectValue placeholder="선택..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CLEARED" className="text-rose-500 font-bold">선택 취소 (비우기)</SelectItem>
+                      {col.options?.map((o:any)=>(<SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                ) : col.type === 'date' ? (
+                  <div className="flex gap-1">
+                    <Popover>
+                      <PopoverTrigger asChild><Button variant="outline" className="flex-1 justify-start text-sm h-10 font-medium">{data[col.key] || '날짜 선택...'}</Button></PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={data[col.key] ? new Date(data[col.key]) : undefined} onSelect={(date) => date && onSave(data.id, col.key, format(date, 'yyyy-MM-dd'))} locale={ko} /></PopoverContent>
+                    </Popover>
+                    {data[col.key] && (
+                      <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 text-slate-400 hover:text-rose-500" onClick={() => onSave(data.id, col.key, '')}><X className="h-4 w-4" /></Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <Input 
+                      key={data.id + col.key + data[col.key]} // 데이터 변경 시 리렌더링 강제
+                      defaultValue={data[col.key] || ''} 
+                      onBlur={(e) => { if(e.target.value!==data[col.key]) onSave(data.id, col.key, e.target.value) }} 
+                      className="h-10 w-full bg-white pr-10 font-medium" 
+                    />
+                    {data[col.key] && (
+                      <button 
+                        onClick={() => onSave(data.id, col.key, '')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500 transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>

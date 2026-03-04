@@ -1,7 +1,7 @@
 import { getFilteredStudentData, getGraduationYears, MAJOR_SORT_ORDER } from '@/lib/data';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
+import { getMasterCertificates, getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { AdminStudentHub } from './admin-student-hub';
 
 export const dynamic = 'force-dynamic';
@@ -15,10 +15,11 @@ export default async function AdminStudentsPage({
   const supabase = await createClient();
   
   // 1. 기반 설정 패칭
-  const [userRes, settings, graduationYears] = await Promise.all([
+  const [userRes, settings, graduationYears, masterCertificates] = await Promise.all([
     supabase.auth.getUser(),
     getSystemSettings(),
-    getGraduationYears()
+    getGraduationYears(),
+    getMasterCertificates()
   ]);
 
   const user = userRes.data.user;
@@ -37,9 +38,14 @@ export default async function AdminStudentsPage({
     redirect('/dashboard');
   }
 
-  // 선택된 필터값
+  // 학사학년도(AY)와 학년(Grade) 기반 졸업연도 계산
+  const ay = params.ay ? parseInt(params.ay) : settings.baseYear;
+  const grade = params.grade ? parseInt(params.grade) : 3;
+  const calculatedGradYear = (ay + (4 - grade)).toString();
+
+  // 선택된 필터값 결정
   const defaultGradYear = (settings.baseYear + 1).toString();
-  const selectedYear = params.year || defaultGradYear;
+  const selectedYear = params.year || calculatedGradYear || defaultGradYear;
   const selectedMajor = params.major || 'all';
   const selectedClass = params.class || 'all';
   const selectedStatus = params.status || 'all';
@@ -104,6 +110,7 @@ export default async function AdminStudentsPage({
       statuses={statuses}
       settings={settings}
       params={params}
+      masterCertificates={masterCertificates}
     />
   );
 }
