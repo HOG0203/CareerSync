@@ -712,9 +712,35 @@ export function StandardSpreadsheetTable({ data: initialData, columns, onSave, o
                 const sMaxR = selectionStart && selectionEnd ? Math.max(selectionStart.row, selectionEnd.row) : -1;
                 const sMinC = selectionStart && selectionEnd ? Math.min(selectionStart.col, selectionEnd.col) : -1;
                 const sMaxC = selectionStart && selectionEnd ? Math.max(selectionStart.col, selectionEnd.col) : -1;
-                const rows = []; if (start > 0) rows.push(<tr key="t" style={{ height: start * ROW_HEIGHT }}><td colSpan={columns.length + 1}></td></tr>);
-                for (let i = start; i <= end; i++) rows.push(<SpreadsheetRow key={filteredData[i].id} rIdx={i} row={filteredData[i]} columns={columns} selMinR={sMinR} selMaxR={sMaxR} selMinC={sMinC} selMaxC={sMaxC} selStart={selectionStart} editCell={editingCell} onMouseDown={handleMouseDown} onMouseEnter={handleMouseEnter} onStartEdit={(r:any,c:any)=>{ if(columns[c].type==='multi-select'){ setEditingCell({row:r,col:c}); setPickerOpen(true); } else setEditingCell({row:r,col:c}); }} onEndEdit={()=>setEditingCell(null)} onSave={handleSaveInternal} isSelectedRow={selectedRowIds.includes(filteredData[i].id)} onSelectRow={(id:any,v:any)=>syncSelected(v?[...selectedRowIds,id]:selectedRowIds.filter(x=>x!==id))} onAction={onAction} />);
-                if (end < filteredData.length - 1) rows.push(<tr key="b" style={{ height: (filteredData.length - 1 - end) * ROW_HEIGHT }}><td colSpan={columns.length + 1}></td></tr>); return rows;
+                
+                const rows = []; 
+                if (start > 0) rows.push(<tr key="t" style={{ height: start * ROW_HEIGHT }}><td colSpan={columns.length + 1} className="border-none"></td></tr>);
+                for (let i = start; i <= end; i++) {
+                  rows.push(
+                    <SpreadsheetRow 
+                      key={filteredData[i].id} 
+                      rIdx={i} 
+                      row={filteredData[i]} 
+                      columns={columns} 
+                      selMinR={sMinR} selMaxR={sMaxR} selMinC={sMinC} selMaxC={sMaxC} 
+                      selStart={selectionStart} 
+                      editCell={editingCell} 
+                      onMouseDown={handleMouseDown} 
+                      onMouseEnter={handleMouseEnter} 
+                      onStartEdit={(r:any,c:any)=>{ 
+                        if(columns[c].type==='multi-select'){ setEditingCell({row:r,col:c}); setPickerOpen(true); } 
+                        else setEditingCell({row:r,col:c}); 
+                      }} 
+                      onEndEdit={()=>setEditingCell(null)} 
+                      onSave={handleSaveInternal} 
+                      isSelectedRow={selectedRowIds.includes(filteredData[i].id)} 
+                      onSelectRow={(id:any,v:any)=>syncSelected(v?[...selectedRowIds,id]:selectedRowIds.filter(x=>x!==id))} 
+                      onAction={onAction} 
+                    />
+                  );
+                }
+                if (end < filteredData.length - 1) rows.push(<tr key="b" style={{ height: (filteredData.length - 1 - end) * ROW_HEIGHT }}><td colSpan={columns.length + 1} className="border-none"></td></tr>); 
+                return rows;
               })()}
             </tbody>
           </table>

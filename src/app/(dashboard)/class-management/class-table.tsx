@@ -54,6 +54,41 @@ const COLUMNS: ColumnConfig[] = [
     width: 150, 
     type: 'multi-select' 
   },
+  { 
+    key: 'military_status', 
+    label: '병역희망', 
+    width: 80, 
+    type: 'select',
+    options: [
+      { label: '군대입소', value: '군대입소' },
+      { label: '병역특례', value: '병역특례' },
+      { label: '병역면제', value: '병역면제' },
+    ],
+    variant: (val) => val === '군대입소' ? 'bg-slate-50 text-slate-700 border-slate-100' : val === '병역특례' ? 'bg-purple-50 text-purple-700 border-purple-100' : ''
+  },
+  { 
+    key: 'desired_work_area', 
+    label: '취업희망지역', 
+    width: 120,
+    type: 'select',
+    options: [
+      { label: '대구인근지역', value: '대구인근지역' },
+      { label: '원거리(기숙사)', value: '원거리(기숙사)' },
+    ],
+    variant: (val) => val === '대구인근지역' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : val === '원거리(기숙사)' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : ''
+  },
+  { 
+    key: 'parents_opinion', 
+    label: '부모님의견', 
+    width: 130,
+    type: 'select',
+    options: [
+      { label: '취업', value: '취업' },
+      { label: '진학', value: '진학' },
+      { label: '내선택 존중', value: '내선택 존중' },
+    ],
+    variant: (val) => val === '내선택 존중' ? 'bg-amber-50 text-amber-700 border-amber-100' : val ? 'bg-slate-50 text-slate-700 border-slate-100' : ''
+  },
   { key: 'shoe_size', label: '신발', width: 50 },
   { key: 'top_size', label: '상의', width: 50 },
   { key: 'personal_remarks', label: '비고(행정)', width: 150 },
@@ -63,6 +98,15 @@ const COLUMNS: ColumnConfig[] = [
     width: 100, 
     type: 'action' 
   },
+]
+
+const GROUP_HEADERS = [
+  { label: '학생 기본 정보', colSpan: 2, className: 'bg-slate-100 text-slate-900 text-[11px]' },
+  { label: '진로 및 특이사항', colSpan: 2, className: 'bg-blue-50 text-blue-900 text-[11px]' },
+  { label: '취득 자격', colSpan: 1, className: 'bg-amber-50 text-amber-900 text-[11px]' },
+  { label: '취업 상세 및 의견', colSpan: 3, className: 'bg-emerald-50 text-emerald-900 text-[11px]' },
+  { label: '피복 및 비고', colSpan: 3, className: 'bg-slate-50 text-slate-700 text-[11px]' },
+  { label: '기록', colSpan: 1, className: 'bg-indigo-50 text-indigo-900 text-[11px]' },
 ]
 
 export function ClassTable({ initialData, masterCertificates }: ClassTableProps) {
@@ -100,6 +144,7 @@ export function ClassTable({ initialData, masterCertificates }: ClassTableProps)
       <StandardSpreadsheetTable 
         data={initialData}
         columns={COLUMNS}
+        groupHeaders={GROUP_HEADERS}
         onSave={handleSave}
         onBulkSave={handleBulkSave}
         onAction={handleAction}
