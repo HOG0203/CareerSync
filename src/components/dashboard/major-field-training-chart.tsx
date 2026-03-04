@@ -43,14 +43,28 @@ export default function MajorFieldTrainingChart({ data }: { data: StudentEmploym
       </CardHeader>
       <CardContent className="pt-4">
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <BarChart data={chartData} margin={{ top: 0, right: 30, left: 20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-            <XAxis dataKey="major" tick={{ fontSize: 11, fontWeight: 600 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+          <BarChart 
+            data={chartData} 
+            layout="vertical"
+            margin={{ top: 0, right: 30, left: 60, bottom: 5 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={true} opacity={0.3} />
+            <XAxis 
+              type="number" 
+              hide 
+            />
+            <YAxis 
+              dataKey="major" 
+              type="category"
+              tick={{ fontSize: 11, fontWeight: 600 }} 
+              axisLine={false} 
+              tickLine={false}
+              width={60}
+            />
             <ChartTooltip content={<ChartTooltipContent />} />
             <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
             <Bar dataKey="실시" stackId="a" fill="var(--color-실시)" />
-            <Bar dataKey="미실시" stackId="a" fill="var(--color-미실시)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="미실시" stackId="a" fill="var(--color-미실시)" radius={[0, 4, 4, 0]} />
           </BarChart>
         </ChartContainer>
       </CardContent>

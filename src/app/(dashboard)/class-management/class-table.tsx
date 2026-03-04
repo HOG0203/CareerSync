@@ -66,18 +66,18 @@ const COLUMNS: ColumnConfig[] = [
     ],
     variant: (val) => val === '군대입소' ? 'bg-slate-50 text-slate-700 border-slate-100' : val === '병역특례' ? 'bg-purple-50 text-purple-700 border-purple-100' : ''
   },
-  { 
-    key: 'desired_work_area', 
-    label: '취업희망지역', 
+  {
+    key: 'desired_work_area',
+    label: '취업희망지역',
     width: 120,
     type: 'select',
     options: [
-      { label: '대구인근지역', value: '대구인근지역' },
+      { label: '대구인근', value: '대구인근' },
       { label: '원거리(기숙사)', value: '원거리(기숙사)' },
+      { label: '둘다가능', value: '둘다가능' },
     ],
-    variant: (val) => val === '대구인근지역' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : val === '원거리(기숙사)' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : ''
-  },
-  { 
+    variant: (val) => val === '대구인근' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : val === '원거리(기숙사)' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : val === '둘다가능' ? 'bg-sky-50 text-sky-700 border-sky-100' : ''
+  },  { 
     key: 'parents_opinion', 
     label: '부모님의견', 
     width: 130,

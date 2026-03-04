@@ -765,7 +765,14 @@ export function StandardSpreadsheetTable({ data: initialData, columns, onSave, o
                   {infoCols.map(col => (<div key={col.key} className="space-y-0.5 min-w-0"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate">{col.label}</p><p className="text-xs font-semibold text-slate-700 truncate">{row[col.key] || '-'}</p></div>))}
                 </div>
                 <div className="mt-3 flex items-center justify-between text-slate-400">
-                  <div className="flex gap-1 overflow-hidden">{normalizeCertificates(row.certificates).slice(0, 2).map((cert, i) => (<span key={i} className="text-[8px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-sm whitespace-nowrap">{cert}</span>))}{normalizeCertificates(row.certificates).length > 2 && (<span className="text-[8px] text-slate-400">+{normalizeCertificates(row.certificates).length - 2}</span>)}</div>
+                  <div className="flex gap-1 overflow-hidden">
+                    {normalizeCertificates(row?.certificates || []).slice(0, 2).map((cert, i) => (
+                      <span key={i} className="text-[8px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-sm whitespace-nowrap">{cert}</span>
+                    ))}
+                    {normalizeCertificates(row?.certificates || []).length > 2 && (
+                      <span className="text-[8px] text-slate-400">+{normalizeCertificates(row?.certificates || []).length - 2}</span>
+                    )}
+                  </div>
                   <ChevronRight className="h-4 w-4" />
                 </div>
               </div>
@@ -781,10 +788,10 @@ export function StandardSpreadsheetTable({ data: initialData, columns, onSave, o
           setPickerOpen(false);
           setEditingCell(null);
         }} 
-        initialValues={editingCell ? filteredData[editingCell.row].certificates : []} 
+        initialValues={editingCell ? (filteredData[editingCell.row]?.certificates || []) : []} 
         masterCerts={masterCertificates} 
         onSave={(vals: any) => { 
-          if(editingCell) handleSaveInternal(filteredData[editingCell.row].id, 'certificates', vals); 
+          if(editingCell) handleSaveInternal(filteredData[editingCell.row]?.id, 'certificates', vals); 
           setPickerOpen(false); 
         }} 
       />
