@@ -10,7 +10,7 @@ import { Users } from 'lucide-react';
 import { StudentTable } from './student-table';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { getSystemSettings } from '@/app/admin/settings/actions';
+import { getMasterCertificates, getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 
 import DashboardFilters from '@/components/dashboard/dashboard-filters';
 
@@ -39,9 +39,10 @@ export default async function StudentsPage({
   const isTeacher = profile?.role === 'teacher';
 
   // 1. 기반 설정 패칭
-  const [settings, graduationYears] = await Promise.all([
+  const [settings, graduationYears, masterCertificates] = await Promise.all([
     getSystemSettings(),
-    getGraduationYears()
+    getGraduationYears(),
+    getMasterCertificates()
   ]);
 
   // 기본 조회 졸업연도: 학사학년도 + 1 (3학년 통합 관리 기준)
@@ -135,7 +136,11 @@ export default async function StudentsPage({
         </CardHeader>
         <CardContent className="flex-1 overflow-auto p-0 relative">
           <div className="min-w-max h-full">
-            <StudentTable initialData={filteredData} isAdmin={isAdmin} />
+            <StudentTable 
+              initialData={filteredData} 
+              isAdmin={isAdmin} 
+              masterCertificates={masterCertificates} 
+            />
           </div>
         </CardContent>
       </Card>

@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { StandardSpreadsheetTable, ColumnConfig } from '@/components/dashboard/standard-spreadsheet-table'
 import { updateStudentField, bulkUpdateStudentData } from '@/app/students/actions'
-import masterCerts from '../../../lib/certificates.json'
+import { MasterCertificate } from '@/app/(dashboard)/admin/settings/actions'
 
 // 학생 관리 컬럼 정의 (모든 데이터 필드 포함 풀 버전)
 const COLUMNS: ColumnConfig[] = [
@@ -129,7 +129,15 @@ const GROUP_HEADERS = [
   { label: '기타/자격', colSpan: 2, className: 'bg-slate-50 text-slate-700 text-[10px]' },
 ]
 
-export function StudentTable({ initialData, isAdmin = false }: { initialData: any[], isAdmin?: boolean }) {
+export function StudentTable({ 
+  initialData, 
+  isAdmin = false, 
+  masterCertificates = [] 
+}: { 
+  initialData: any[], 
+  isAdmin?: boolean,
+  masterCertificates?: MasterCertificate[]
+}) {
   const handleSave = async (id: string, field: string, value: any) => {
     if (!isAdmin) return { success: false, error: '권한이 없습니다.' }
     const result = await updateStudentField(id, field, value)
@@ -164,7 +172,7 @@ export function StudentTable({ initialData, isAdmin = false }: { initialData: an
           onSave={handleSave}
           onBulkSave={handleBulkSave}
           searchPlaceholder="빠른 학생 검색..."
-          masterCertificates={masterCerts}
+          masterCertificates={masterCertificates}
         />
       </div>
     </div>

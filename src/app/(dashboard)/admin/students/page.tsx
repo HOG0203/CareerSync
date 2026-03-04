@@ -1,7 +1,7 @@
 import { getFilteredStudentData, getGraduationYears, MAJOR_SORT_ORDER } from '@/lib/data';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { getSystemSettings } from '@/app/admin/settings/actions';
+import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { AdminStudentHub } from './admin-student-hub';
 
 export const dynamic = 'force-dynamic';

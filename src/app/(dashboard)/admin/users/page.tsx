@@ -10,7 +10,7 @@ import {
 import { UserTable } from './user-table';
 import { CreateUserButton } from './create-user-button';
 import { getProfiles, getGraduationYears, getStudentEmploymentData } from '@/lib/data';
-import { getSystemSettings } from '@/app/admin/settings/actions';
+import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 
 export const dynamic = 'force-dynamic';
 

@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import { getFilteredStudentData, getGraduationYears, StudentEmploymentData } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import EmploymentStatusFilters from './employment-status-filters';
-import { getSystemSettings } from '@/app/admin/settings/actions';
+import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { StudentGridCell } from './student-grid-cell';
 
 export const metadata: Metadata = {

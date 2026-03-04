@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { getSystemSettings } from '@/app/admin/settings/actions'
+import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions'
 
 /**
  * 학적 이력 동기화 (내부 함수 - 학사학년도 공식 적용)

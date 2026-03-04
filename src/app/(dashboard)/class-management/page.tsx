@@ -10,7 +10,7 @@ import {
 import { ClassTable } from './class-table';
 import { ShieldAlert, Users } from 'lucide-react';
 import AdminClassSelector from './admin-class-selector';
-import { getMasterCertificates, getSystemSettings } from '@/app/admin/settings/actions';
+import { getMasterCertificates, getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 
 export const dynamic = 'force-dynamic';
 

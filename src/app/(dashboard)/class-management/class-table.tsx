@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { StandardSpreadsheetTable, ColumnConfig } from '@/components/dashboard/standard-spreadsheet-table'
 import { updatePersonalDetail, bulkUpdatePersonalDetails } from './actions'
-import { MasterCertificate } from '@/app/admin/settings/actions'
+import { MasterCertificate } from '@/app/(dashboard)/admin/settings/actions'
 import { CounselingModal } from './counseling-modal'
 
 interface ClassTableProps {

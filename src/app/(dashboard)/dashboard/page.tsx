@@ -17,7 +17,7 @@ import MajorFieldTrainingChart from '@/components/dashboard/major-field-training
 import ClassEmploymentChart from '@/components/dashboard/class-employment-chart';
 import ClassFieldTrainingChart from '@/components/dashboard/class-field-training-chart';
 import DashboardFilters from '@/components/dashboard/dashboard-filters';
-import { getSystemSettings } from '@/app/admin/settings/actions';
+import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 
 export const dynamic = 'force-dynamic';
 
