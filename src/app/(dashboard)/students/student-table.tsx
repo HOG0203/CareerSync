@@ -4,6 +4,7 @@ import * as React from 'react'
 import { StandardSpreadsheetTable, ColumnConfig } from '@/components/dashboard/standard-spreadsheet-table'
 import { updateStudentField, bulkUpdateStudentData } from '@/app/students/actions'
 import { MasterCertificate } from '@/app/(dashboard)/admin/settings/actions'
+import { FieldTrainingModal } from './field-training-modal'
 
 // 학생 관리 컬럼 정의 (모든 데이터 필드 포함 풀 버전)
 const COLUMNS: ColumnConfig[] = [
@@ -11,27 +12,39 @@ const COLUMNS: ColumnConfig[] = [
   { key: 'class_info', label: '반', width: 40, readOnly: true },
   { key: 'student_number', label: '번호', width: 40, readOnly: true },
   { key: 'student_name', label: '성명', width: 65, readOnly: true },
-  { key: 'graduation_year', label: '졸업연도', width: 60, readOnly: true },
   { 
-    key: 'is_desiring_employment', label: '희망', width: 55, type: 'select', 
+    key: 'is_desiring_employment', label: '취업\n희망', width: 55, type: 'select', 
     options: [
       { label: '예', value: '예' }, 
-      { label: '아니오', value: '아니오' }, 
-      { label: '제외인정', value: '제외인정' }, 
-      { label: '기술사관', value: '기술사관' }, 
-      { label: '위탁학생', value: '위탁학생' }
+      { label: '아니오', value: '아니오' }
     ],
     variant: (val) => {
       if (val === '예') return 'bg-emerald-50 text-emerald-700 border-emerald-100'
       if (val === '아니오') return 'bg-rose-50 text-rose-700 border-rose-100'
-      if (val === '제외인정') return 'bg-slate-100 text-slate-700 border-slate-200'
-      if (val === '기술사관') return 'bg-indigo-50 text-indigo-700 border-indigo-100'
-      if (val === '위탁학생') return 'bg-orange-50 text-orange-700 border-orange-100'
       return 'text-slate-500'
     }
   },
   { 
-    key: 'employment_status', label: '취업구분', width: 100, type: 'select',
+    key: 'business_type', 
+    label: '취업\n여부', 
+    width: 80,
+    type: 'select',
+    options: [
+      { label: '예', value: '예' },
+      { label: '아니오', value: '아니오' },
+      { label: '제외인정자', value: '제외인정자' }
+    ],
+    variant: (val) => {
+      switch (val) {
+        case '예': return 'bg-emerald-100 text-emerald-700 border-emerald-200'
+        case '아니오': return 'bg-rose-100 text-rose-700 border-rose-200'
+        case '제외인정자': return 'bg-slate-100 text-slate-700 border-slate-200'
+        default: return val ? 'bg-slate-50 text-slate-600 border-slate-100' : ''
+      }
+    }
+  },
+  { 
+    key: 'employment_status', label: '취업\n구분', width: 100, type: 'select', 
     options: [
       { label: '일반취업', value: '일반취업' }, 
       { label: '청솔반', value: '청솔반' }, 
@@ -40,8 +53,8 @@ const COLUMNS: ColumnConfig[] = [
       { label: '군특성화', value: '군특성화' }, 
       { label: '기술사관', value: '기술사관' }, 
       { label: '도제', value: '도제' }, 
-      { label: '면접진행중', value: '면접진행중' },
-      { label: '아우스빌둥', value: '아우스빌둥' }
+      { label: '아우스빌둥', value: '아우스빌둥' },
+      { label: '면접진행중', value: '면접진행중' }
     ],
     variant: (val) => {
       switch (val) {
@@ -59,33 +72,7 @@ const COLUMNS: ColumnConfig[] = [
     }
   },
   { 
-    key: 'business_type', 
-    label: '사업구분', 
-    width: 100,
-    type: 'select',
-    options: [
-      { label: '청솔반', value: '청솔반' },
-      { label: '혁신지구사업', value: '혁신지구사업' },
-      { label: '아우스빌둥', value: '아우스빌둥' },
-      { label: '일학습병행', value: '일학습병행' },
-      { label: '도제교육', value: '도제교육' },
-      { label: '대구형현장학습', value: '대구형현장학습' }
-    ],
-    variant: (val) => {
-      switch (val) {
-        case '청솔반': return 'bg-emerald-100 text-emerald-700 border-emerald-200'
-        case '혁신지구사업': return 'bg-sky-100 text-sky-700 border-sky-200'
-        case '아우스빌둥': return 'bg-indigo-100 text-indigo-700 border-indigo-200'
-        case '일학습병행': return 'bg-purple-100 text-purple-700 border-purple-200'
-        case '도제교육': return 'bg-rose-100 text-rose-700 border-rose-200'
-        case '대구형현장학습': return 'bg-amber-100 text-amber-700 border-amber-200'
-        default: return val ? 'bg-slate-50 text-slate-600 border-slate-100' : ''
-      }
-    }
-  },
-  { key: 'company', label: '취업처(회사명)', width: 130 },
-  { 
-    key: 'company_type', label: '기업', width: 95, type: 'select', 
+    key: 'company_type', label: '기업\n구분', width: 95, type: 'select', 
     options: [
       { label: '대기업', value: '대기업' }, 
       { label: '공기업', value: '공기업' }, 
@@ -108,25 +95,23 @@ const COLUMNS: ColumnConfig[] = [
       }
     }
   },
-  { key: 'has_field_training', label: '실습', width: 40, type: 'select', options: [{ label: 'O', value: 'O' }, { label: 'X', value: 'X' }] },
-  { key: 'start_date', label: '시작일', width: 85, type: 'date' },
-  { key: 'end_date', label: '종료일', width: 85, type: 'date' },
-  { key: 'training_stipend_status', label: '지원금', width: 50, type: 'select', options: [{ label: 'O', value: 'O' }, { label: 'X', value: 'X' }] },
-  { key: 'is_hiring_conversion', label: '채용전환여부', width: 85, type: 'select', options: [{ label: 'O', value: 'O' }, { label: 'X', value: 'X' }] },
-  { key: 'conversion_date', label: '채용전환일', width: 85, type: 'date' },
-  { key: 'is_returned', label: '복교여부', width: 65, type: 'select', options: [{ label: 'O', value: 'O' }, { label: 'X', value: 'X' }] },
-  { key: 'return_to_school_reason', label: '복교사유', width: 120 },
+  { key: 'company', label: '취업처\n(회사명)', width: 130 },
+  { key: 'latest_training_company', label: '실습처\n(회사명)', width: 120, readOnly: true },
+  { key: 'start_date', label: '시작일', width: 85, readOnly: true },
+  { key: 'end_date', label: '종료일', width: 85, readOnly: true },
+  { key: 'training_stipend_status', label: '지원금\n신청', width: 50, readOnly: true },
+  { key: 'is_hiring_conversion', label: '채용\n전환', width: 85, readOnly: true },
+  { key: 'is_returned', label: '복교', width: 60, readOnly: true },
+  { key: 'field_training_action', label: '실습이력', width: 100, type: 'action' },
   { key: 'remarks', label: '비고(특이사항)', width: 150 },
   { key: 'certificates', label: '자격증', width: 120, type: 'multi-select' },
 ]
 
 const GROUP_HEADERS = [
-  { label: '기본 정보', colSpan: 5, className: 'bg-slate-100 text-slate-900 text-[10px]' },
-  { label: '취업 현황', colSpan: 5, className: 'bg-blue-100/50 text-blue-900 text-[10px]' },
-  { label: '현장실습 상세', colSpan: 4, className: 'bg-amber-100/50 text-amber-900 text-[10px]' },
-  { label: '채용', colSpan: 2, className: 'bg-purple-100/50 text-purple-900 text-[10px]' },
-  { label: '복교', colSpan: 2, className: 'bg-rose-100/50 text-rose-900 text-[10px]' },
-  { label: '기타/자격', colSpan: 2, className: 'bg-slate-50 text-slate-700 text-[10px]' },
+  { label: '기본 정보', colSpan: 4, className: 'bg-slate-100 text-slate-900 text-[11px]' },
+  { label: '취업 현황', colSpan: 5, className: 'bg-blue-100/50 text-blue-900 text-[11px]' },
+  { label: '현장실습 상세 및 결과 (최근 차수)', colSpan: 7, className: 'bg-amber-100/50 text-amber-900 text-[11px]' },
+  { label: '기기/자격', colSpan: 2, className: 'bg-slate-50 text-slate-700 text-[11px]' },
 ]
 
 export function StudentTable({ 
@@ -138,16 +123,39 @@ export function StudentTable({
   isAdmin?: boolean,
   masterCertificates?: MasterCertificate[]
 }) {
+  const [selectedStudent, setSelectedStudent] = React.useState<any | null>(null)
+  const [isModalOpen, setIsModalOpen] = React.useState(false)
+
   const handleSave = async (id: string, field: string, value: any) => {
-    if (!isAdmin) return { success: false, error: '권한이 없습니다.' }
-    const result = await updateStudentField(id, field, value)
-    return result as any
+    console.log(`[StudentTable] Saving field: ${field}, value:`, value);
+    if (!isAdmin) {
+      console.warn('[StudentTable] Save denied: User is not admin.');
+      return { success: false, error: '권한이 없습니다.' };
+    }
+    const result = await updateStudentField(id, field, value);
+    if (!result.success) console.error(`[StudentTable] Save failed for ${field}:`, result.error);
+    return result as any;
   }
 
   const handleBulkSave = async (updates: any[]) => {
-    if (!isAdmin) return { success: false, error: '권한이 없습니다.' }
-    const result = await bulkUpdateStudentData(updates)
-    return result as any
+    console.log(`[StudentTable] Bulk saving ${updates.length} items.`);
+    if (!isAdmin) {
+      console.warn('[StudentTable] Bulk save denied: User is not admin.');
+      return { success: false, error: '권한이 없습니다.' };
+    }
+    const result: any = await bulkUpdateStudentData(updates);
+    if (!result.success) console.error('[StudentTable] Bulk save failed:', result.error);
+    return result
+  }
+
+  const handleAction = (id: string, key: string) => {
+    if (key === 'field_training_action') {
+      const student = initialData.find(s => s.id === id)
+      if (student) {
+        setSelectedStudent(student)
+        setIsModalOpen(true)
+      }
+    }
   }
 
   // 관리자가 아닐 경우 모든 컬럼을 readOnly로 설정
@@ -171,10 +179,17 @@ export function StudentTable({
           groupHeaders={GROUP_HEADERS}
           onSave={handleSave}
           onBulkSave={handleBulkSave}
+          onAction={handleAction}
           searchPlaceholder="빠른 학생 검색..."
           masterCertificates={masterCertificates}
         />
       </div>
+
+      <FieldTrainingModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        student={selectedStudent}
+      />
     </div>
   )
 }

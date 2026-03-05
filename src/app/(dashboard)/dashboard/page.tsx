@@ -17,6 +17,7 @@ import MajorFieldTrainingChart from '@/components/dashboard/major-field-training
 import ClassEmploymentChart from '@/components/dashboard/class-employment-chart';
 import ClassFieldTrainingChart from '@/components/dashboard/class-field-training-chart';
 import DashboardFilters from '@/components/dashboard/dashboard-filters';
+import CertificateStatusChart from '@/components/dashboard/certificate-status-chart';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 
 export const dynamic = 'force-dynamic';
@@ -24,7 +25,7 @@ export const dynamic = 'force-dynamic';
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; major?: string; class?: string; status?: string }>;
+  searchParams: Promise<{ year?: string; major?: string; class?: string; status?: string; ay?: string; grade?: string }>;
 }) {
   const params = await searchParams;
 
@@ -71,11 +72,11 @@ export default async function DashboardPage({
       
       // 현재 선택된 반까지 만족하는 상태 카운트
       if (selectedClass === 'all' || student.class_info === selectedClass) {
-        const status = student.employment_status || '미취업';
+        const status = student.business_type || '아니오';
         statusCounts[status] = (statusCounts[status] || 0) + 1;
         
         // 최종 필터링 데이터 (카드 및 차트용)
-        if (selectedStatus === 'all' || student.employment_status === selectedStatus) {
+        if (selectedStatus === 'all' || (student.business_type || '아니오') === selectedStatus) {
           filteredData.push(student);
         }
       }
@@ -99,19 +100,22 @@ export default async function DashboardPage({
     .sort(([, a], [, b]) => b - a)
     .map(([s, count]) => ({ label: s, value: s, count }));
 
-  const totalStudents = filteredData.length;
   let employedStudents = 0;
+  let excludingStudents = 0; // 제외인정자 수
   let trainingStudents = 0;
   let majorCompanyStudents = 0;
 
   // 최종 데이터 요약 통계 (한 번 더 순회)
   for (const s of filteredData) {
-    if (s.employment_status !== '미취업' && s.employment_status) employedStudents++;
+    if (s.business_type === '예') employedStudents++;
+    if (s.business_type === '제외인정자') excludingStudents++;
     if (s.has_field_training === 'O') trainingStudents++;
     if (['대기업', '공기업', '공무원'].includes(s.company_type || '')) majorCompanyStudents++;
   }
 
-  const employmentRate = totalStudents > 0 ? (employedStudents / totalStudents) * 100 : 0;
+  // 모수: 전체 필터링된 인원 - 제외인정자
+  const analysisTargetCount = filteredData.length - excludingStudents;
+  const employmentRate = analysisTargetCount > 0 ? (employedStudents / analysisTargetCount) * 100 : 0;
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6 min-w-0 overflow-hidden p-1 sm:p-0">
@@ -143,8 +147,8 @@ export default async function DashboardPage({
             <Users className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
           </CardHeader>
           <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-            <div className="text-lg sm:text-2xl font-bold text-blue-900">{totalStudents}명</div>
-            <p className="text-[9px] sm:text-xs text-blue-700/70 mt-0.5">대상 인원</p>
+            <div className="text-lg sm:text-2xl font-bold text-blue-900">{filteredData.length}명</div>
+            <p className="text-[9px] sm:text-xs text-blue-700/70 mt-0.5">제외인정자 {excludingStudents}명</p>
           </CardContent>
         </Card>
         
@@ -191,11 +195,16 @@ export default async function DashboardPage({
          )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:gap-6 min-w-0 overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 min-w-0 overflow-hidden">
          {selectedMajor !== 'all' ? (
            <ClassFieldTrainingChart data={filteredData} majorName={selectedMajor} />
          ) : (
            <MajorFieldTrainingChart data={filteredData} />
+         )}
+         {selectedMajor !== 'all' ? (
+           <CertificateStatusChart data={filteredData} type="class" title={`${selectedMajor} 학반별 자격증 취득 현황`} />
+         ) : (
+           <CertificateStatusChart data={filteredData} type="major" title="학과별 자격증 취득 현황" />
          )}
       </div>
     </div>

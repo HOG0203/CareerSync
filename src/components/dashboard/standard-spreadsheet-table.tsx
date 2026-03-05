@@ -78,7 +78,7 @@ const TableHeader = React.memo(({ columns, groupHeaders, filterOptions, columnFi
               key={i} 
               colSpan={h.colSpan} 
               className={cn(
-                "sticky top-0 z-40 text-center border-r border-b font-bold p-0 text-[10px] bg-slate-50 shadow-[0_1px_0_0_rgba(0,0,0,0.1)]", 
+                "sticky top-0 z-40 text-center border-r border-b font-bold p-0 text-[11px] bg-slate-50 shadow-[0_1px_0_0_rgba(0,0,0,0.1)]", 
                 h.className
               )}
             >
@@ -100,10 +100,10 @@ const TableHeader = React.memo(({ columns, groupHeaders, filterOptions, columnFi
               "sticky z-40 group text-center border-r border-b font-semibold p-0 hover:bg-slate-100 bg-slate-50 shadow-[0_1px_0_0_rgba(0,0,0,0.1)]", 
               hasGroup ? "top-10" : "top-0"
             )} 
-            style={{ width: col.width }}
+            style={{ minWidth: col.width, width: 'auto' }}
           >
-            <div className="flex items-center justify-center px-1 gap-1 h-full">
-              <span className="truncate">{col.label}</span>
+            <div className="flex items-center justify-center px-2 gap-1 h-full min-h-[40px]">
+              <span className="whitespace-pre-line leading-tight py-1">{col.label}</span>
               <Popover>
                 <PopoverTrigger asChild><button className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"><ListFilter className="h-3 w-3" /></button></PopoverTrigger>
                 <PopoverContent className="w-48 p-0 z-[50]" align="start">
@@ -131,7 +131,17 @@ const TableHeader = React.memo(({ columns, groupHeaders, filterOptions, columnFi
 // --- 셀 컴포넌트 ---
 const SpreadsheetCell = React.memo(({ id, field, value, config, isEditing, isSelected, isFocused, onMouseDown, onMouseEnter, onStartEdit, onEndEdit, onSave, onAction }: any) => {
   const [localValue, setLocalValue] = React.useState(value || '')
+  
   React.useEffect(() => { if (isEditing) setLocalValue(value || '') }, [value, isEditing])
+  
+  // 멀티 셀렉트인 경우 에디팅 모드 진입 시 픽커 트리거 (에러 방지를 위해 useEffect 사용)
+  React.useEffect(() => {
+    if (isEditing && config.type === 'multi-select') {
+      onSave(id, field, 'OPEN_PICKER');
+      // onEndEdit()을 여기서 호출하면 editingCell이 null이 되어 저장이 안 됨
+    }
+  }, [isEditing, config.type, id, field, onSave]);
+
   const handleCommit = React.useCallback((v: any) => { if (v !== value) onSave(id, field, v); onEndEdit(); }, [id, field, value, onSave, onEndEdit]);
 
   if (isEditing) {
@@ -162,11 +172,23 @@ const SpreadsheetCell = React.memo(({ id, field, value, config, isEditing, isSel
   return (
     <td 
       className={cn("p-0 border-r border-b relative h-8 transition-none select-none cursor-cell text-center overflow-hidden", isSelected && "bg-blue-50/70", isFocused && "ring-2 ring-blue-500 ring-inset z-10")} 
-      style={{ width: config.width }}
+      style={{ minWidth: config.width, width: 'auto' }}
       onMouseDown={(e) => onMouseDown(e.shiftKey)} onMouseEnter={onMouseEnter} onDoubleClick={() => !config.readOnly && config.type !== 'action' && onStartEdit()}
     >
-      <div className="px-1 truncate text-[11px] w-full h-full flex items-center justify-center">
-        {config.type === 'action' ? <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] bg-blue-50 text-blue-600 font-bold hover:bg-blue-100" onClick={(e) => { e.stopPropagation(); onAction?.(id, field); }}>상세보기</Button> : (config.variant ? <span className={cn("px-1.5 py-0.5 rounded-sm font-medium border text-[9px] leading-none", config.variant(value))}>{value || ''}</span> : <span>{Array.isArray(value) ? value.join(', ') : (value || '')}</span>)}
+      <div className="px-2 text-[11px] w-full h-full flex items-center justify-center whitespace-nowrap">
+        {config.type === 'action' ? (
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] bg-blue-50 text-blue-600 font-bold hover:bg-blue-100" onClick={(e) => { e.stopPropagation(); onAction?.(id, field); }}>
+            상세보기
+          </Button>
+        ) : config.variant ? (
+          <span className={cn("px-1.5 py-0.5 rounded-sm font-medium border text-[9px] leading-none whitespace-nowrap", config.variant(value))}>
+            {value === 'X' ? '' : (value || '')}
+          </span>
+        ) : (
+          <span className="whitespace-nowrap">
+            {Array.isArray(value) ? value.join(', ') : (value === 'X' ? '' : (value || ''))}
+          </span>
+        )}
       </div>
     </td>
   )
@@ -415,13 +437,32 @@ export function StandardSpreadsheetTable({ data: initialData, columns, onSave, o
   }, [initialData]);
 
   const filterOptions = React.useMemo(() => {
-    const opts: Record<string, Set<any>> = {}; columns.forEach(c => opts[c.key] = new Set());
-    initialData.forEach(s => columns.forEach(c => { if(s[c.key]) opts[c.key].add(s[c.key]); }));
-    const result: Record<string, any[]> = {}; Object.keys(opts).forEach(k => result[k] = Array.from(opts[k]).sort()); return result;
+    const opts: Record<string, Set<any>> = {}; 
+    columns.forEach(c => opts[c.key] = new Set());
+    initialData.forEach(s => columns.forEach(c => { 
+      const val = s[c.key];
+      if (val === null || val === undefined || val === '') {
+        opts[c.key].add('(빈칸)');
+      } else {
+        opts[c.key].add(String(val));
+      }
+    }));
+    const result: Record<string, any[]> = {}; 
+    Object.keys(opts).forEach(k => result[k] = Array.from(opts[k]).sort((a, b) => {
+      if (a === '(빈칸)') return -1;
+      if (b === '(빈칸)') return 1;
+      return a.localeCompare(b, 'ko');
+    })); 
+    return result;
   }, [initialData, columns]);
 
   const filteredData = React.useMemo(() => data.filter(row => {
-    const mF = Object.entries(columnFilters).every(([f, v]) => !v?.length || v.includes(String(row[f] || '')));
+    const mF = Object.entries(columnFilters).every(([f, v]) => {
+      if (!v?.length) return true;
+      const rowVal = row[f];
+      const normalizedRowVal = (rowVal === null || rowVal === undefined || rowVal === '') ? '(빈칸)' : String(rowVal);
+      return v.includes(normalizedRowVal);
+    });
     const mS = !searchTerm || columns.some(c => String(row[c.key] || '').toLowerCase().includes(searchTerm.toLowerCase()));
     return mF && mS;
   }), [data, columnFilters, searchTerm, columns]);
@@ -701,8 +742,8 @@ export function StandardSpreadsheetTable({ data: initialData, columns, onSave, o
 
       {!isMobile ? (
         <div ref={containerRef} className="relative outline-none bg-white overflow-auto border rounded-md shadow-inner custom-scrollbar flex-1" onScroll={(e)=>setScrollTop(e.currentTarget.scrollTop)} onKeyDown={handleKeyDown} tabIndex={0}>
-          <table className="text-[11px] border-collapse table-fixed min-w-max text-center relative border-none">
-            <colgroup><col style={{ width: 32 }} />{columns.map((c, i) => <col key={i} style={{ width: c.width }} />)}</colgroup>
+          <table className="text-[11px] border-collapse table-auto min-w-max text-center relative border-none">
+            <colgroup><col style={{ width: 32 }} />{columns.map((c, i) => <col key={i} style={{ minWidth: c.width }} />)}</colgroup>
             <TableHeader columns={columns} groupHeaders={groupHeaders} filterOptions={filterOptions} columnFilters={columnFilters} onFilterChange={(k:any,v:any)=>setColumnFilters(p=>v==='RESET'?{...p,[k]:[]}:{...p,[k]:p[k]?.includes(v)?p[k].filter(x=>x!==v):[...(p[k]||[]),v]})} onSelectAll={handleSelectAll} isAllSelected={filteredData.length > 0 && filteredData.every(r => selectedRowIds.includes(r.id))} />
             <tbody>
               {(() => {

@@ -85,7 +85,7 @@ export default async function ClassManagementPage({
   });
 
   const targetMajor = isAdmin 
-    ? (params.major && availableMajors.includes(params.major) ? params.major : availableMajors[0])
+    ? (params.major && availableMajors.includes(params.major) ? params.major : (availableMajors[0] || null))
     : (profile?.assigned_major || null);
 
   // 선택된 학년 + 학과에 맞는 반들 추출
@@ -97,16 +97,16 @@ export default async function ClassManagementPage({
   const availableClasses = Array.from(availableClassesSet).sort();
 
   const targetClass = isAdmin 
-    ? (params.class && availableClasses.includes(params.class) ? params.class : availableClasses[0])
+    ? (params.class && availableClasses.includes(params.class) ? params.class : (availableClasses[0] || null))
     : (profile?.assigned_class || null);
 
   // --- 학생 상세 데이터 패칭 ---
-  const isViewable = !!(calculatedYear && targetMajor && targetClass);
+  const isViewable = !!(targetMajor && targetClass);
   let studentData: any[] = [];
 
   if (isViewable) {
-    // 이미 필요한 데이터가 준비되었으므로 상세 데이터를 가져옵니다.
-    studentData = await getAssignedStudentDetails(calculatedYear, targetMajor!, targetClass!);
+    // lib/data.ts 정의: (major, classInfo, graduationYear)
+    studentData = await getAssignedStudentDetails(targetMajor!, targetClass!, calculatedYear);
   }
 
   const displayClass = targetClass && !targetClass.includes('-') ? `${selectedGrade}-${targetClass}` : targetClass;

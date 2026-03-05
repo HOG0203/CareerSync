@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic';
 export default async function StudentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; major?: string; class?: string; status?: string }>;
+  searchParams: Promise<{ year?: string; major?: string; class?: string; status?: string; ay?: string; grade?: string }>;
 }) {
   const params = await searchParams;
   const supabase = await createClient();
@@ -81,11 +81,11 @@ export default async function StudentsPage({
   const selectedClass = params.class || 'all';
 
   const classes = Array.from(new Set(allStudentData.filter(s => selectedMajor === 'all' || s.major === selectedMajor).map(s => s.class_info).filter(Boolean))).sort().map(c => ({
-    label: c, value: c, count: allStudentData.filter(s => s.class_info === c && (selectedMajor === 'all' || s.major === selectedMajor)).length
+    label: c || '미지정', value: c || '미지정', count: allStudentData.filter(s => s.class_info === c && (selectedMajor === 'all' || s.major === selectedMajor)).length
   }));
 
   const statuses = Array.from(new Set(allStudentData.filter(s => (selectedMajor === 'all' || s.major === selectedMajor) && (selectedClass === 'all' || s.class_info === selectedClass)).map(s => s.employment_status).filter(Boolean))).sort().map(st => ({
-    label: st, value: st, count: allStudentData.filter(s => s.employment_status === st && (selectedMajor === 'all' || s.major === selectedMajor) && (selectedClass === 'all' || s.class_info === selectedClass)).length
+    label: st || '미지정', value: st || '미지정', count: allStudentData.filter(s => s.employment_status === st && (selectedMajor === 'all' || s.major === selectedMajor) && (selectedClass === 'all' || s.class_info === selectedClass)).length
   }));
 
   // 최종 데이터 필터링 (학과/반/상태)

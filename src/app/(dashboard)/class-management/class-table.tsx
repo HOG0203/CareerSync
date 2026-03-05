@@ -114,19 +114,19 @@ export function ClassTable({ initialData, masterCertificates }: ClassTableProps)
   const [isModalOpen, setIsModalOpen] = React.useState(false)
 
   const handleSave = async (id: string, field: string, value: any) => {
-    const result = await updatePersonalDetail(id, field, value)
+    const result: any = await updatePersonalDetail(id, field, value)
     if (!result.success) {
       console.error(`[개별 저장 실패] ID: ${id}, Field: ${field}, Error:`, result.error)
     }
-    return result as any
+    return result
   }
 
   const handleBulkSave = async (updates: any[]) => {
-    const result = await bulkUpdatePersonalDetails(updates)
+    const result: any = await bulkUpdatePersonalDetails(updates)
     if (!result.success) {
       console.error('[일괄 저장 실패] Updates:', updates, 'Error:', result.error)
     }
-    return result as any
+    return result
   }
 
   const handleAction = (id: string, key: string) => {

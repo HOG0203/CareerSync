@@ -15,23 +15,33 @@ interface StudentGridCellProps {
 }
 
 export function StudentGridCell({ student, idx, variant }: StudentGridCellProps) {
+  const getDesireColor = (status?: string) => {
+    switch (status) {
+      case '예': return 'bg-emerald-500';
+      case '아니오': return 'bg-rose-500';
+      case '제외인정자': return 'bg-slate-400';
+      default: return 'bg-transparent';
+    }
+  };
+
   return (
     <Popover>
       <PopoverTrigger asChild>
         <div
           className={cn(
-            "h-7 border-b border-gray-200 flex items-center justify-between px-0.5 text-[10px] transition-colors hover:opacity-80 cursor-pointer active:bg-slate-100",
+            "h-7 border-b border-gray-200 flex items-center justify-between px-0.5 text-[10px] transition-colors hover:opacity-80 cursor-pointer active:bg-slate-100 relative pr-[5px]",
             variant
           )}
         >
           <span className="opacity-60 text-[7px] w-2">{student.student_number || idx + 1}</span>
-          <span className="flex-1 text-center font-medium truncate tracking-tighter">{student.student_name}</span>
+          <span className="flex-1 text-center font-medium truncate tracking-tighter pr-0.5">{student.student_name}</span>
+          <div className={cn("absolute right-[1px] top-[2px] bottom-[2px] w-[2.5px] rounded-full", getDesireColor(student.is_desiring_employment))} />
         </div>
       </PopoverTrigger>
       <PopoverContent 
         side="right" 
         align="start"
-        className="p-3 w-[220px] text-xs shadow-xl border-2 z-[100]"
+        className="p-3 w-[155px] text-xs shadow-xl border-2 z-[100]"
         sideOffset={5}
       >
         <div className="space-y-1.5">
@@ -46,7 +56,6 @@ export function StudentGridCell({ student, idx, variant }: StudentGridCellProps)
           </div>
           <div className="space-y-1 text-slate-600">
             <p className="flex justify-between"><span className="text-slate-400 font-medium">취업구분</span> <span className="font-semibold text-slate-700">{student.employment_status || '-'}</span></p>
-            <p className="flex justify-between"><span className="text-slate-400 font-medium">사업구분</span> <span className="font-semibold text-slate-700">{student.business_type || '-'}</span></p>
             <p className="flex justify-between"><span className="text-slate-400 font-medium">기업구분</span> <span className="font-semibold text-slate-700">{student.company_type || '-'}</span></p>
           </div>
           <div className="pt-1.5 border-t mt-1">
@@ -58,6 +67,18 @@ export function StudentGridCell({ student, idx, variant }: StudentGridCellProps)
           {student.remarks && (
             <div className="mt-1.5 p-1.5 bg-slate-50 rounded text-[10px] text-slate-500 italic border-l-2 border-slate-200">
               "{student.remarks}"
+            </div>
+          )}
+          {student.certificates && student.certificates.length > 0 && (
+            <div className="pt-1.5 border-t mt-1.5">
+              <p className="text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-tighter">취득 자격증</p>
+              <div className="flex flex-wrap gap-1">
+                {student.certificates.map((cert, i) => (
+                  <span key={i} className="bg-blue-50 text-blue-600 px-1 py-0.5 rounded-[2px] text-[9px] font-medium border border-blue-100/50">
+                    {cert}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
         </div>

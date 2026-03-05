@@ -1,5 +1,5 @@
 'use client';
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+
 import {
   Card,
   CardContent,
@@ -8,85 +8,46 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import {
+  ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
-import type { ChartConfig } from '@/components/ui/chart';
-import type { StudentEmploymentData } from '@/lib/data';
-import * as React from 'react';
+import { Line, LineChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { StudentEmploymentData } from '@/lib/types';
 
-const chartConfig = {
-  employed: {
-    label: '취업 학생',
-    color: 'hsl(var(--chart-1))',
-  },
-} satisfies ChartConfig;
+export default function EmploymentOverTimeChart({ data }: { data: StudentEmploymentData[] }) {
+  const years = Array.from(new Set(data.map((s) => s.graduation_year).filter(Boolean))).sort() as number[];
+  
+  const chartData = years.map((year) => {
+    const employedCount = data.filter(s => s.graduation_year === year && s.business_type === '예').length;
+    const totalCount = data.filter(s => s.graduation_year === year && s.business_type !== '제외인정자').length;
+    
+    return {
+      year: `${year}년`,
+      rate: totalCount > 0 ? parseFloat(((employedCount / totalCount) * 100).toFixed(1)) : 0,
+    };
+  });
 
-export default function EmploymentOverTimeChart({
-  data,
-  graduationYears
-}: {
-  data: StudentEmploymentData[];
-  graduationYears: number[];
-}) {
-  const employmentOverTime = React.useMemo(() => {
-    return [...graduationYears].sort().map(year => {
-      const employedCount = data.filter(s => s.graduationYear === year && s.employmentStatus === '취업').length;
-      return { year: year.toString(), employed: employedCount };
-    });
-  }, [data, graduationYears]);
+  const chartConfig = {
+    rate: { label: '취업률 (%)', color: '#2563eb' },
+  } satisfies ChartConfig;
 
   return (
-    <Card>
+    <Card className="border-none shadow-sm bg-white/50 backdrop-blur-sm">
       <CardHeader>
-        <CardTitle>시간에 따른 취업 트렌드</CardTitle>
-        <CardDescription>
-          졸업 연도별 취업 학생 수.
-        </CardDescription>
+        <CardTitle className="text-lg font-bold">연도별 취업률 추이</CardTitle>
+        <CardDescription>지난 몇 년간의 취업 성공률 변화.</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-4">
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <AreaChart
-            accessibilityLayer
-            data={employmentOverTime}
-            margin={{
-              left: 12,
-              right: 12,
-            }}
-          >
-            <CartesianGrid vertical={false} />
-            <XAxis
-              dataKey="year"
-              tickLine={false}
-              axisLine={false}
-              tickMargin={8}
-            />
-            <YAxis allowDecimals={false} />
-            <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-            <defs>
-              <linearGradient id="fillEmployed" x1="0" y1="0" x2="0" y2="1">
-                <stop
-                  offset="5%"
-                  stopColor="var(--color-employed)"
-                  stopOpacity={0.8}
-                />
-                <stop
-                  offset="95%"
-                  stopColor="var(--color-employed)"
-                  stopOpacity={0.1}
-                />
-              </linearGradient>
-            </defs>
-            <Area
-              dataKey="employed"
-              type="natural"
-              fill="url(#fillEmployed)"
-              fillOpacity={0.4}
-              stroke="var(--color-employed)"
-              stackId="a"
-            />
-          </AreaChart>
+          <LineChart data={chartData}>
+            <CartesianGrid vertical={false} opacity={0.3} />
+            <XAxis dataKey="year" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 100]} />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <Line type="monotone" dataKey="rate" stroke="var(--color-rate)" strokeWidth={2} dot={{ r: 4 }} />
+          </LineChart>
         </ChartContainer>
       </CardContent>
     </Card>

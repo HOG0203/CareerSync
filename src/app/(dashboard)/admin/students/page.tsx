@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export default async function AdminStudentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; major?: string; class?: string; status?: string }>;
+  searchParams: Promise<{ year?: string; major?: string; class?: string; status?: string; ay?: string; grade?: string }>;
 }) {
   const params = await searchParams;
   const supabase = await createClient();

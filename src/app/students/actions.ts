@@ -101,7 +101,7 @@ export async function uploadStudentsCSV(csvData: string) {
 
     if (sError || !student) continue;
 
-    // 2. student_employments 테이블 UPSERT
+    // 2. student_employments 테이블 UPSERT (실습 관련 컬럼 제외)
     await supabase.from('student_employments').upsert({
       id: student.id,
       is_desiring_employment: values[6] || '예',
@@ -109,18 +109,27 @@ export async function uploadStudentsCSV(csvData: string) {
       company_type: values[8],
       business_type: values[9],
       company: values[10],
-      has_field_training: values[11] || 'X',
-      start_date: normalizeDate(values[12]),
-      end_date: normalizeDate(values[13]),
-      training_stipend_status: values[14] || 'X',
-      is_hiring_conversion: values[15] || 'X',
-      conversion_date: normalizeDate(values[16]),
-      is_returned: values[17] || 'X',
-      return_to_school_reason: values[18],
       remarks: values[19]
     }, { onConflict: 'id' })
 
-    // 3. 이력 동기화 (현재 시스템 학사학년도 기준으로 기록)
+    // 3. field_training_records (1차 실습 정보) - 실습 시작일 또는 종료일이 있는 경우에만 생성
+    const startDate = normalizeDate(values[12]);
+    const endDate = normalizeDate(values[13]);
+    if (startDate || endDate) {
+      await supabase.from('field_training_records').upsert({
+        student_id: student.id,
+        training_order: 1,
+        company: values[10] || '미지정',
+        start_date: startDate,
+        end_date: endDate,
+        stipend_status: values[14] || 'X',
+        hiring_status: values[15] === 'O' ? '채용전환' : (values[17] === 'O' ? '복교' : '진행중'),
+        conversion_date: normalizeDate(values[16]),
+        return_reason: values[18]
+      }, { onConflict: 'student_id, training_order' })
+    }
+
+    // 4. 이력 동기화 (현재 시스템 학사학년도 기준으로 기록)
     await syncAcademicHistory(supabase, student.id, student, settings.baseYear)
   }
 
@@ -131,21 +140,32 @@ export async function uploadStudentsCSV(csvData: string) {
 
 export async function updateStudentField(id: string, field: string, value: any) {
   const supabase = await createClient()
-  const finalValue = (field === 'graduation_year') ? (value ? parseInt(value) : null) : (value === '' ? null : value)
   const settings = await getSystemSettings()
+
+  // 값 정규화 로직 개선
+  let finalValue = value;
+  if (field === 'graduation_year') {
+    finalValue = value ? parseInt(value) : null;
+  } else if (value === '' || (Array.isArray(value) && value.length === 0)) {
+    // 빈 문자열이거나 빈 배열인 경우 null로 처리하여 DB 값 삭제
+    finalValue = null;
+  }
 
   const isBasicField = BASIC_INFO_FIELDS.includes(field);
   const targetTable = isBasicField ? 'students' : 'student_employments';
 
   const { error } = await supabase
     .from(targetTable)
-    .upsert({ 
-      id: id,
+    .update({ 
       [field]: finalValue,
       updated_at: new Date().toISOString()
-    }, { onConflict: 'id' })
+    })
+    .eq('id', id)
 
-  if (error) return { error: error.message }
+  if (error) {
+    console.error(`[Update Error] Field: ${field}, Error:`, error.message);
+    return { error: error.message };
+  }
 
   // 소속 정보 변경 시 이력 동기화 (현재 시스템 학사학년도 기준)
   if (['major', 'class_info', 'student_number', 'graduation_year'].includes(field)) {
@@ -153,6 +173,9 @@ export async function updateStudentField(id: string, field: string, value: any) 
     if (student) await syncAcademicHistory(supabase, id, student, settings.baseYear);
   }
 
+  revalidatePath('/students')
+  revalidatePath('/admin/students')
+  revalidatePath('/class-management')
   return { success: true }
 }
 
@@ -161,15 +184,27 @@ export async function bulkUpdateStudentData(updates: { id: string, field: string
   const settings = await getSystemSettings()
   
   for (const update of updates) {
-    const finalValue = (update.field === 'graduation_year') ? (update.value ? parseInt(update.value) : null) : (update.value === '' ? null : update.value)
+    let finalValue = update.value;
+    if (update.field === 'graduation_year') {
+      finalValue = update.value ? parseInt(update.value) : null;
+    } else if (update.value === '' || (Array.isArray(update.value) && update.value.length === 0)) {
+      finalValue = null;
+    }
+
     const isBasicField = BASIC_INFO_FIELDS.includes(update.field);
     const targetTable = isBasicField ? 'students' : 'student_employments';
 
-    await supabase.from(targetTable).upsert({
-      id: update.id,
-      [update.field]: finalValue,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'id' });
+    const { error } = await supabase
+      .from(targetTable)
+      .update({
+        [update.field]: finalValue,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', update.id);
+
+    if (error) {
+      console.error(`[Bulk Update Error] ID: ${update.id}, Field: ${update.field}, Error:`, error.message);
+    }
   }
 
   const criticalFields = ['major', 'class_info', 'student_number', 'graduation_year']
@@ -183,6 +218,7 @@ export async function bulkUpdateStudentData(updates: { id: string, field: string
 
   revalidatePath('/students')
   revalidatePath('/admin/students')
+  revalidatePath('/class-management')
   return { success: true }
 }
 
@@ -223,5 +259,61 @@ export async function deleteStudents(ids: string[]) {
   revalidatePath('/admin/students')
   revalidatePath('/students')
   revalidatePath('/class-management')
+  return { success: true }
+}
+
+/**
+ * 현장실습 이력 저장 (Upsert)
+ */
+export async function upsertFieldTrainingRecord(record: any) {
+  const supabase = await createClient()
+  const { id, ...data } = record
+
+  // 빈 문자열로 오는 날짜 필드들을 null로 처리 (DB 에러 방지)
+  const sanitizedData = {
+    ...data,
+    start_date: data.start_date || null,
+    end_date: data.end_date || null,
+    conversion_date: data.conversion_date || null,
+  }
+  
+  const { data: upserted, error } = await supabase
+    .from('field_training_records')
+    .upsert({
+      ...(id ? { id } : {}),
+      ...sanitizedData,
+      updated_at: new Date().toISOString()
+    })
+    .select()
+    .single()
+
+  if (error) return { error: error.message }
+
+  // 만약 결과가 '채용전환'이라면 student_employments의 company(최종취업처)도 자동 업데이트
+  if (data.hiring_status === '채용전환') {
+    await supabase.from('student_employments').upsert({
+      id: data.student_id,
+      company: data.company,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'id' })
+  }
+
+  revalidatePath('/students')
+  return { success: true, data: upserted }
+}
+
+/**
+ * 현장실습 이력 삭제
+ */
+export async function deleteFieldTrainingRecord(id: string) {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('field_training_records')
+    .delete()
+    .eq('id', id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/students')
   return { success: true }
 }

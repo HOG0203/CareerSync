@@ -14,34 +14,41 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Legend } from 'recharts';
-import { StudentEmploymentData } from '@/lib/data';
+import { StudentEmploymentData, MAJOR_SORT_ORDER } from '@/lib/types';
 
 export default function MajorEmploymentChart({ data }: { data: StudentEmploymentData[] }) {
-  const majors = Array.from(new Set(data.map((s) => s.major).filter(Boolean)));
+  const majors = Array.from(new Set(data.map((s) => s.major).filter(Boolean))).sort((a, b) => {
+    const indexA = MAJOR_SORT_ORDER.indexOf(a as string);
+    const indexB = MAJOR_SORT_ORDER.indexOf(b as string);
+    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+  });
   
   const chartData = majors.map((major) => {
     const majorStudents = data.filter((s) => s.major === major);
-    const employedCount = majorStudents.filter(
-      (s) => s.employment_status !== '미취업' && s.employment_status
-    ).length;
+    const 취업 = majorStudents.filter((s) => s.business_type === '예').length;
+    const 미취업 = majorStudents.filter((s) => s.business_type === '아니오').length;
+    const 제외인정자 = majorStudents.filter((s) => s.business_type === '제외인정자').length;
     
     return {
       major,
-      취업: employedCount,
-      미취업: majorStudents.length - employedCount,
+      취업,
+      미취업,
+      제외인정자,
+      total: 취업 + 미취업 + 제외인정자
     };
-  }).sort((a, b) => b.취업 - a.취업);
+  }); // sort() 제거 (이미 majors에서 정렬됨)
 
   const chartConfig = {
-    취업: { label: '취업', color: '#93c5fd' },
-    미취업: { label: '미취업', color: '#cbd5e1' },
+    취업: { label: '취업', color: '#10b981' },
+    미취업: { label: '미취업', color: '#ef4444' },
+    제외인정자: { label: '제외인정자', color: '#94a3b8' },
   } satisfies ChartConfig;
 
   return (
     <Card className="border-none shadow-sm bg-white/50 backdrop-blur-sm h-full">
       <CardHeader>
         <CardTitle className="text-lg font-bold text-blue-900">학과별 취업 현황</CardTitle>
-        <CardDescription>학과별 취업자 및 미취업자 인원 비교</CardDescription>
+        <CardDescription>학과별 취업, 미취업 및 제외인정자 학생 인원 분포가 표시됩니다.</CardDescription>
       </CardHeader>
       <CardContent className="pt-4">
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
@@ -57,9 +64,10 @@ export default function MajorEmploymentChart({ data }: { data: StudentEmployment
               tickLine={false}
             />
             <ChartTooltip content={<ChartTooltipContent />} />
-            <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '11px', paddingBottom: '10px' }} />
+            <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '20px' }} />
             <Bar dataKey="취업" stackId="a" fill="var(--color-취업)" barSize={20} />
-            <Bar dataKey="미취업" stackId="a" fill="var(--color-미취업)" radius={[0, 4, 4, 0]} barSize={20} />
+            <Bar dataKey="미취업" stackId="a" fill="var(--color-미취업)" barSize={20} />
+            <Bar dataKey="제외인정자" stackId="a" fill="var(--color-제외인정자)" radius={[0, 4, 4, 0]} barSize={20} />
           </BarChart>
         </ChartContainer>
       </CardContent>

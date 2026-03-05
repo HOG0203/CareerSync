@@ -1,6 +1,5 @@
 'use client';
 
-import * as React from 'react';
 import {
   Card,
   CardContent,
@@ -9,76 +8,47 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import {
+  ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent,
 } from '@/components/ui/chart';
-import type { StudentEmploymentData } from '@/lib/data';
-import { Pie, PieChart, Cell } from 'recharts';
-import type { ChartConfig } from '@/components/ui/chart';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { StudentEmploymentData } from '@/lib/types';
 
 export default function EmploymentByIndustryChart({ data }: { data: StudentEmploymentData[] }) {
-  const chartDataAndConfig = React.useMemo(() => {
-    const industryData = data
-      .filter((s) => s.employmentStatus === '취업')
+  const chartData = Object.entries(
+    data
+      .filter((s) => s.business_type === '예')
       .reduce((acc, s) => {
-        acc[s.industry] = (acc[s.industry] || 0) + 1;
+        // 현재 스키마에 industry 필드가 명확하지 않으므로, 추후 확장을 대비해 안전하게 처리
+        const industry = (s as any).industry || '기타';
+        acc[industry] = (acc[industry] || 0) + 1;
         return acc;
-      }, {} as Record<string, number>);
+      }, {} as Record<string, number>)
+  )
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
 
-    const chartData = Object.entries(industryData).map(([industry, count]) => ({
-      name: industry,
-      value: count,
-    }));
-
-    const config = {
-      value: {
-        label: '학생 수',
-      },
-      ...Object.fromEntries(
-        chartData.map((d, i) => [
-          d.name,
-          {
-            label: d.name,
-            color: `hsl(var(--chart-${(i % 5) + 1}))`,
-          },
-        ])
-      ),
-    } satisfies ChartConfig;
-    
-    return { chartData, config };
-  }, [data]);
+  const chartConfig = {
+    value: { label: '학생 수', color: '#2563eb' },
+  } satisfies ChartConfig;
 
   return (
-    <Card>
+    <Card className="border-none shadow-sm bg-white/50 backdrop-blur-sm">
       <CardHeader>
-        <CardTitle>산업별 취업 현황</CardTitle>
-        <CardDescription>
-          다양한 산업에 걸친 취업 졸업생 분포.
-        </CardDescription>
+        <CardTitle className="text-lg font-bold">산업군별 취업 분포</CardTitle>
+        <CardDescription>다양한 산업에 걸친 취업 졸업생 분포.</CardDescription>
       </CardHeader>
-      <CardContent>
-        <ChartContainer
-          config={chartDataAndConfig.config}
-          className="mx-auto aspect-square max-h-[300px]"
-        >
-          <PieChart>
-            <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
-            <Pie data={chartDataAndConfig.chartData} dataKey="value" nameKey="name" innerRadius={60}>
-              {chartDataAndConfig.chartData.map((entry) => (
-                <Cell
-                  key={entry.name}
-                  fill={(chartDataAndConfig.config as Record<string, { color?: string }>)[entry.name]?.color}
-                />
-              ))}
-            </Pie>
-            <ChartLegend
-              content={<ChartLegendContent nameKey="name" />}
-              className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
-            />
-          </PieChart>
+      <CardContent className="pt-4">
+        <ChartContainer config={chartConfig} className="h-[300px] w-full">
+          <BarChart data={chartData}>
+            <CartesianGrid vertical={false} opacity={0.3} />
+            <XAxis dataKey="name" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <Bar dataKey="value" fill="var(--color-value)" radius={[4, 4, 0, 0]} />
+          </BarChart>
         </ChartContainer>
       </CardContent>
     </Card>

@@ -4,13 +4,13 @@ import {
   analyzeEmploymentTrends,
   type TrendAnalysisOutput,
 } from '@/ai/flows/ai-powered-trend-analysis';
-import { getStudentEmploymentData } from '@/lib/data';
+import { getAllStudentBaseData } from '@/lib/data';
 
 export async function getAiTrendAnalysis(): Promise<
   TrendAnalysisOutput | { error: string }
 > {
   try {
-    const studentEmploymentData = await getStudentEmploymentData();
+    const studentEmploymentData = await getAllStudentBaseData();
     const analysis = await analyzeEmploymentTrends({
       employmentDataJson: JSON.stringify(studentEmploymentData),
     });

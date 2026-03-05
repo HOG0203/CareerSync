@@ -85,9 +85,9 @@ export default function DashboardFilters({
         {!hideYear && (
           <>
             <div className="flex items-center gap-1.5 px-2">
-              <Calendar className="h-3.5 w-3.5 text-slate-400" />
+              <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
               <Select value={currentAY} onValueChange={(v) => updateFilters('ay', v)}>
-                <SelectTrigger className="w-[95px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0">
+                <SelectTrigger className="w-[95px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 overflow-hidden">
                   <SelectValue placeholder="학년도" />
                 </SelectTrigger>
                 <SelectContent>
@@ -101,9 +101,9 @@ export default function DashboardFilters({
               <>
                 <div className="w-[1px] h-4 bg-slate-200" />
                 <div className="flex items-center gap-1.5 px-2">
-                  <GraduationCap className="h-3.5 w-3.5 text-slate-400" />
+                  <GraduationCap className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                   <Select value={currentGrade} onValueChange={(v) => updateFilters('grade', v)}>
-                    <SelectTrigger className="w-[70px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0">
+                    <SelectTrigger className="w-[70px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 overflow-hidden">
                       <SelectValue placeholder="학년" />
                     </SelectTrigger>
                     <SelectContent>
@@ -121,9 +121,9 @@ export default function DashboardFilters({
         
         {/* 학과 필터 */}
         <div className="flex items-center gap-1.5 px-2">
-          <Building2 className="h-3.5 w-3.5 text-slate-400" />
+          <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
           <Select value={currentMajor} onValueChange={(v) => updateFilters('major', v)}>
-            <SelectTrigger className="w-[125px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0">
+            <SelectTrigger className="w-[130px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 overflow-hidden">
               <SelectValue placeholder="전체 학과" />
             </SelectTrigger>
             <SelectContent>
@@ -144,9 +144,9 @@ export default function DashboardFilters({
 
         {/* 학반 필터 */}
         <div className="flex items-center gap-1.5 px-2">
-          <LayoutGrid className="h-3.5 w-3.5 text-slate-400" />
+          <LayoutGrid className="h-3.5 w-3.5 text-slate-400 shrink-0" />
           <Select value={currentClass} onValueChange={(v) => updateFilters('class', v)}>
-            <SelectTrigger className="w-[85px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0">
+            <SelectTrigger className="w-[90px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 overflow-hidden">
               <SelectValue placeholder="전체 반" />
             </SelectTrigger>
             <SelectContent>
@@ -167,9 +167,9 @@ export default function DashboardFilters({
 
         {/* 취업상태 필터 */}
         <div className="flex items-center gap-1.5 px-2">
-          <ListFilter className="h-3.5 w-3.5 text-slate-400" />
+          <ListFilter className="h-3.5 w-3.5 text-slate-400 shrink-0" />
           <Select value={currentStatus} onValueChange={(v) => updateFilters('status', v)}>
-            <SelectTrigger className="w-[110px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0">
+            <SelectTrigger className="w-[115px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 overflow-hidden">
               <SelectValue placeholder="취업상태" />
             </SelectTrigger>
             <SelectContent>

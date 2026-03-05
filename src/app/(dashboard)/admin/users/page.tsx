@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/card';
 import { UserTable } from './user-table';
 import { CreateUserButton } from './create-user-button';
-import { getProfiles, getGraduationYears, getStudentEmploymentData } from '@/lib/data';
+import { getProfiles, getGraduationYears, getAllStudentBaseData } from '@/lib/data';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 
 export const dynamic = 'force-dynamic';
@@ -39,14 +39,14 @@ export default async function AdminUsersPage() {
 
   const profiles = await getProfiles();
   const graduationYears = await getGraduationYears();
-  const allBaseData = await getStudentEmploymentData();
+  const allBaseData = await getAllStudentBaseData();
   const settings = await getSystemSettings();
   
   // 학년도별 학과 및 반 정보 전체 매핑 데이터 생성
-  const fullClassMapping = allBaseData
+  const fullClassMapping: { year: number; major: string; className: string }[] = allBaseData
     .map(s => ({ 
       year: s.graduation_year || 0,
-      major: s.major, 
+      major: s.major || '', 
       className: s.class_info || '' 
     }))
     .filter((v, i, a) => a.findIndex(t => t.year === v.year && t.major === v.major && t.className === v.className) === i)
