@@ -97,10 +97,10 @@ export default async function StudentsPage({
   });
 
   return (
-    <div className="flex flex-col h-[calc(100vh-135px)] sm:h-[calc(100vh-95px)] overflow-hidden">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between shrink-0 mb-3 sm:mb-5 px-1">
-        <div className="flex flex-col sm:flex-row sm:items-center flex-1 w-full">
-          <div className="flex flex-col mb-3 sm:mb-0">
+    <div className="flex flex-col h-[calc(100vh-135px)] lg:h-[calc(100vh-95px)] overflow-hidden">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between shrink-0 mb-3 lg:mb-5 px-1">
+        <div className="flex flex-col lg:flex-row lg:items-center flex-1 w-full">
+          <div className="flex flex-col mb-3 lg:mb-0">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
               <Users className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
               학생 취업 현황

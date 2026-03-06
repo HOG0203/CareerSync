@@ -804,7 +804,7 @@ export function StandardSpreadsheetTable({ data: initialData, columns, onSave, o
           </table>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:hidden p-1 overflow-y-auto">
+        <div className="grid grid-cols-1 gap-3 lg:hidden p-1 overflow-y-auto">
           {filteredData.map((row) => {
             const titleCol = columns.find(c => c.key.includes('name')) || columns[1];
             const subTitleCol = columns.find(c => c.key.includes('number')) || columns[0];

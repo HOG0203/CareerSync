@@ -48,7 +48,7 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
             <Header />
           </div>
 
-          <main className="flex-1 p-2 sm:p-4 lg:p-6 lg:mt-0 mt-14 lg:mb-0 mb-16 overflow-auto min-w-0">
+          <main className="flex-1 p-2 lg:p-6 lg:mt-0 mt-14 lg:mb-0 mb-16 overflow-auto min-w-0">
             {children}
           </main>
 

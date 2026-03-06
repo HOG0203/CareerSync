@@ -118,19 +118,23 @@ export default async function DashboardPage({
   const employmentRate = analysisTargetCount > 0 ? (employedStudents / analysisTargetCount) * 100 : 0;
 
   return (
-    <div className="flex flex-col h-full gap-4 sm:gap-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between shrink-0 gap-4 px-1">
+    <div className="flex flex-col h-full gap-4 lg:gap-6">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between shrink-0 gap-4 px-1">
         <div className="flex flex-col gap-1">
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
-            <LayoutDashboard className="h-7 w-7 sm:h-8 sm:w-8 text-indigo-600" />
+          <h2 className="text-2xl lg:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+            <LayoutDashboard className="h-7 w-7 lg:h-8 lg:w-8 text-indigo-600" />
             종합 통계 대시보드
           </h2>
-          <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed">
-            <span className="font-bold text-indigo-600">{displayAY}학년도 3학년</span> 취업 및 현장실습 현황 분석
-            {selectedMajor !== 'all' && ` • ${selectedMajor}`}
-          </p>
+          <div className="flex flex-col gap-0.5 text-muted-foreground text-[10px] lg:text-xs font-medium leading-relaxed">
+            <p>학교 전체의 취업 및 현장실습 현황을 실시간 통계로 분석합니다.</p>
+            <p className="text-indigo-600 font-bold">
+              {displayAY}학년도 3학년 {selectedMajor !== 'all' ? `${selectedMajor} ` : '전체 학과 '}
+              {selectedClass !== 'all' ? `${selectedClass}반 ` : ''}
+              분석 결과
+            </p>
+          </div>
         </div>
-        <div className="shrink-0 scale-95 sm:scale-100 origin-left sm:origin-right">
+        <div className="shrink-0 scale-95 lg:scale-100 origin-left lg:origin-right">
           <DashboardFilters 
             graduationYears={graduationYears} 
             majors={majors} 
