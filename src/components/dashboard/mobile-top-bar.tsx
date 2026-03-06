@@ -26,7 +26,7 @@ export function MobileTopBar({ isAdmin = false }: { isAdmin?: boolean }) {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between h-14 px-4 bg-white/90 backdrop-blur-md border-b border-slate-100 sm:hidden shadow-sm">
+    <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between h-14 px-4 bg-white/90 backdrop-blur-md border-b border-slate-100 lg:hidden shadow-sm">
       <div className="scale-90 origin-left">
         <Logo />
       </div>

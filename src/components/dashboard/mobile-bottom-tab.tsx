@@ -31,7 +31,7 @@ export function MobileBottomTab({ isAdmin = false }: { isAdmin?: boolean }) {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around h-16 bg-white border-t border-slate-100 pb-safe shadow-[0_-4px_12px_rgba(0,0,0,0.05)] sm:hidden overflow-x-auto custom-scrollbar-none px-2">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around h-16 bg-white border-t border-slate-100 pb-safe shadow-[0_-4px_12px_rgba(0,0,0,0.05)] lg:hidden overflow-x-auto custom-scrollbar-none px-2">
       {tabs.map((tab) => {
         const isActive = pathname === tab.href;
         return (
