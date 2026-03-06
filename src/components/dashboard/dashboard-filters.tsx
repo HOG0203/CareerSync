@@ -84,7 +84,7 @@ export default function DashboardFilters({
         {/* 학사학년도 및 학년 */}
         {!hideYear && (
           <>
-            <div className="flex items-center gap-1.5 px-2">
+            <div className="flex items-center gap-1 px-1">
               <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
               <Select value={currentAY} onValueChange={(v) => updateFilters('ay', v)}>
                 <SelectTrigger className="w-[95px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 overflow-hidden">
@@ -100,7 +100,7 @@ export default function DashboardFilters({
             {!hideGrade && (
               <>
                 <div className="w-[1px] h-4 bg-slate-200" />
-                <div className="flex items-center gap-1.5 px-2">
+                <div className="flex items-center gap-1 px-1">
                   <GraduationCap className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                   <Select value={currentGrade} onValueChange={(v) => updateFilters('grade', v)}>
                     <SelectTrigger className="w-[70px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 overflow-hidden">
@@ -120,7 +120,7 @@ export default function DashboardFilters({
         )}
         
         {/* 학과 필터 */}
-        <div className="flex items-center gap-1.5 px-2">
+        <div className="flex items-center gap-1 px-1">
           <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
           <Select value={currentMajor} onValueChange={(v) => updateFilters('major', v)}>
             <SelectTrigger className="w-[130px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 overflow-hidden">
@@ -143,7 +143,7 @@ export default function DashboardFilters({
         <div className="w-[1px] h-4 bg-slate-200" />
 
         {/* 학반 필터 */}
-        <div className="flex items-center gap-1.5 px-2">
+        <div className="flex items-center gap-1 px-1">
           <LayoutGrid className="h-3.5 w-3.5 text-slate-400 shrink-0" />
           <Select value={currentClass} onValueChange={(v) => updateFilters('class', v)}>
             <SelectTrigger className="w-[90px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 overflow-hidden">
@@ -165,15 +165,15 @@ export default function DashboardFilters({
 
         <div className="w-[1px] h-4 bg-slate-200" />
 
-        {/* 취업상태 필터 */}
-        <div className="flex items-center gap-1.5 px-2">
+        {/* 취업여부 필터 */}
+        <div className="flex items-center gap-1 px-1">
           <ListFilter className="h-3.5 w-3.5 text-slate-400 shrink-0" />
           <Select value={currentStatus} onValueChange={(v) => updateFilters('status', v)}>
             <SelectTrigger className="w-[115px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 overflow-hidden">
-              <SelectValue placeholder="취업상태" />
+              <SelectValue placeholder="취업여부" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all" className="text-xs">전체 상태</SelectItem>
+              <SelectItem value="all" className="text-xs">전체 여부</SelectItem>
               {statuses.map((s) => (
                 <SelectItem key={s.value} value={s.value} className="text-xs">
                   <div className="flex justify-between w-full items-center gap-2">

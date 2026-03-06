@@ -684,7 +684,7 @@ export function StandardSpreadsheetTable({ data: initialData, columns, onSave, o
     setData(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
     
     // 모바일 상세 모달 데이터 즉시 갱신
-    setDetailData(prev => (prev && prev.id === id) ? { ...prev, [field]: value } : prev);
+    setDetailData((prev: any) => (prev && prev.id === id) ? { ...prev, [field]: value } : prev);
     
     return onSave(id, field, value); 
   }, [onSave, filteredData, columns, data, recordHistory]);

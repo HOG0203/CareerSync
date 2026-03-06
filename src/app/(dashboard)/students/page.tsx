@@ -84,31 +84,39 @@ export default async function StudentsPage({
     label: c || '미지정', value: c || '미지정', count: allStudentData.filter(s => s.class_info === c && (selectedMajor === 'all' || s.major === selectedMajor)).length
   }));
 
-  const statuses = Array.from(new Set(allStudentData.filter(s => (selectedMajor === 'all' || s.major === selectedMajor) && (selectedClass === 'all' || s.class_info === selectedClass)).map(s => s.employment_status).filter(Boolean))).sort().map(st => ({
-    label: st || '미지정', value: st || '미지정', count: allStudentData.filter(s => s.employment_status === st && (selectedMajor === 'all' || s.major === selectedMajor) && (selectedClass === 'all' || s.class_info === selectedClass)).length
+  const statuses = Array.from(new Set(allStudentData.map(s => s.business_type || '아니오').filter(Boolean))).sort().map(st => ({
+    label: st, value: st, count: allStudentData.filter(s => (s.business_type || '아니오') === st && (selectedMajor === 'all' || s.major === selectedMajor) && (selectedClass === 'all' || s.class_info === selectedClass)).length
   }));
 
   // 최종 데이터 필터링 (학과/반/상태)
   const filteredData = allStudentData.filter(student => {
     const majorMatch = !params.major || params.major === 'all' || student.major === params.major;
     const classMatch = !params.class || params.class === 'all' || student.class_info === params.class;
-    const statusMatch = !params.status || params.status === 'all' || student.employment_status === params.status;
+    const statusMatch = !params.status || params.status === 'all' || (student.business_type || '아니오') === params.status;
     return majorMatch && classMatch && statusMatch;
   });
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] sm:h-[calc(100vh-110px)] w-full overflow-hidden">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-4 shrink-0 px-1 gap-4 sm:gap-6">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 flex-1">
-          <div className="shrink-0">
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2 flex-wrap sm:flex-nowrap">
-              학생 취업 및 현장실습 현황
+    <div className="flex flex-col h-[calc(100vh-135px)] sm:h-[calc(100vh-95px)] overflow-hidden">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between shrink-0 mb-3 sm:mb-5 px-1">
+        <div className="flex flex-col sm:flex-row sm:items-center flex-1 w-full">
+          <div className="flex flex-col mb-3 sm:mb-0">
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+              <Users className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
+              학생 취업 현황
               <span className="text-[10px] sm:text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full whitespace-nowrap">3학년 통합관리</span>
             </h2>
-            <p className="text-muted-foreground text-[10px] sm:text-[11px] mt-0.5 font-medium">졸업 예정자들의 취업 이력과 현장실습 데이터를 통합 관리합니다.</p>
+            <div className="flex flex-col gap-0.5 text-muted-foreground text-[10px] sm:text-xs font-medium leading-relaxed">
+              <p>졸업 예정자들의 취업 이력과 현장실습 데이터를 통합 관리합니다.</p>
+              <p className="text-blue-600 font-bold">
+                {parseInt(selectedYear) - 1}학년도 3학년 {params.major && params.major !== 'all' ? `${params.major} ` : '전체 학과 '}
+                {params.class && params.class !== 'all' ? `${params.class}반 ` : ''}
+                총 {filteredData.length}명 조회 중
+              </p>
+            </div>
           </div>
           
-          <div className="bg-slate-100/50 p-1.5 rounded-xl border border-slate-200 w-full sm:w-auto flex-shrink-0">
+          <div className="bg-slate-100/50 p-1 rounded-xl border border-slate-200 w-full sm:w-auto sm:ml-auto flex-shrink-0">
             <DashboardFilters 
               graduationYears={graduationYears}
               majors={majors}
@@ -123,24 +131,7 @@ export default async function StudentsPage({
         </div>
       </div>
 
-      <Card className="flex-1 min-h-0 shadow-sm border bg-white flex flex-col rounded-xl overflow-hidden min-w-full">
-        <CardHeader className="py-2.5 sm:py-3 px-3 sm:px-4 border-b shrink-0 bg-white/50 flex flex-row items-center justify-between">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="bg-blue-100 p-1 rounded-lg shrink-0">
-              <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
-            </div>
-            <div>
-              <CardTitle className="text-sm sm:text-base font-bold text-gray-900">
-                {parseInt(selectedYear) - 1}학년도 3학년 데이터
-              </CardTitle>
-              <CardDescription className="text-[9px] sm:text-[10px] leading-tight mt-0.5">
-                {params.major && params.major !== 'all' ? `${params.major} ` : '전체 학과 '}
-                {params.class && params.class !== 'all' ? `${params.class}반 ` : ''}
-                총 {filteredData.length}명의 데이터가 필터링되었습니다.
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
+      <Card className="flex-1 min-h-0 shadow-sm border bg-white flex flex-col rounded-xl overflow-hidden min-w-full mb-0">
         <CardContent className="flex-1 overflow-auto p-0 relative">
           <div className="min-w-max h-full">
             <StudentTable 
