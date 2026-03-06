@@ -10,7 +10,7 @@ import {
   getGraduationYears,
   MAJOR_SORT_ORDER,
 } from '@/lib/data';
-import { Users, Briefcase, GraduationCap, Building2 } from 'lucide-react';
+import { Users, Briefcase, GraduationCap, Building2, LayoutDashboard } from 'lucide-react';
 import CompanyTypeChart from '@/components/dashboard/company-type-chart';
 import MajorEmploymentChart from '@/components/dashboard/major-employment-chart';
 import MajorFieldTrainingChart from '@/components/dashboard/major-field-training-chart';
@@ -118,16 +118,19 @@ export default async function DashboardPage({
   const employmentRate = analysisTargetCount > 0 ? (employedStudents / analysisTargetCount) * 100 : 0;
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-6 min-w-0 overflow-hidden p-1 sm:p-0">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-4">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900">취업 및 현장실습 대시보드</h2>
-          <p className="text-muted-foreground text-[11px] sm:text-sm mt-1">
+    <div className="flex flex-col h-full gap-4 sm:gap-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between shrink-0 gap-4 px-1">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+            <LayoutDashboard className="h-7 w-7 sm:h-8 sm:w-8 text-indigo-600" />
+            종합 통계 대시보드
+          </h2>
+          <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed">
             <span className="font-bold text-indigo-600">{displayAY}학년도 3학년</span> 취업 및 현장실습 현황 분석
             {selectedMajor !== 'all' && ` • ${selectedMajor}`}
           </p>
         </div>
-        <div className="shrink-0 scale-95 sm:scale-100 origin-left">
+        <div className="shrink-0 scale-95 sm:scale-100 origin-left sm:origin-right">
           <DashboardFilters 
             graduationYears={graduationYears} 
             majors={majors} 

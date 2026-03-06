@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import EmploymentStatusFilters from './employment-status-filters';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { StudentGridCell } from './student-grid-cell';
+import { Grid3X3 } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: '취업상세현황 | CareerSync',
@@ -124,26 +125,30 @@ export default async function EmploymentStatusPage({
   });
 
   return (
-    <div className="flex flex-col h-full bg-background overflow-hidden">
-      <div className="p-3 sm:p-4 border-b flex flex-col gap-3 sm:gap-4 bg-white shrink-0">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex flex-col gap-2 sm:gap-1">
-            <div className="flex flex-col xs:flex-row xs:items-center gap-2 sm:gap-4">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 shrink-0">취업상세현황</h1>
-              <div className="shrink-0 scale-100 sm:scale-100 origin-left w-full xs:w-auto">
-                <EmploymentStatusFilters 
-                  graduationYears={graduationYears} 
-                  defaultYear={defaultGradYear}
-                  baseYear={settings.baseYear}
-                />
-              </div>
-            </div>
-            <p className="text-muted-foreground text-[11px] sm:text-xs font-medium leading-tight whitespace-nowrap">
-              <span className="text-blue-600 font-bold">{displayAY}학년도 {grade}학년</span> 취업 및 현장실습 현황
-            </p>
+    <div className="flex flex-col h-full gap-4 sm:gap-6">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between shrink-0 gap-4 px-1">
+        {/* 좌측: 제목 및 부제목 */}
+        <div className="flex flex-col gap-1">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+            <Grid3X3 className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
+            취업상세현황
+          </h2>
+          <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed">
+            <span className="text-blue-600 font-bold">{displayAY}학년도 {grade}학년</span> 취업 및 현장실습 현황
+          </p>
+        </div>
+        
+        {/* 우측: 필터 및 범례 */}
+        <div className="flex flex-col items-start sm:items-end gap-3 sm:gap-2">
+          <div className="shrink-0 scale-90 sm:scale-100 origin-left sm:origin-right">
+            <EmploymentStatusFilters 
+              graduationYears={graduationYears} 
+              defaultYear={defaultGradYear}
+              baseYear={settings.baseYear}
+            />
           </div>
           
-          <div className="grid grid-cols-3 xs:grid-cols-3 sm:flex gap-x-2 gap-y-2 sm:gap-x-3 sm:gap-y-1.5 text-[9px] sm:text-[10px] font-medium border-t sm:border-none pt-3 sm:pt-0">
+          <div className="grid grid-cols-3 xs:grid-cols-3 sm:flex gap-x-2 gap-y-2 sm:gap-x-3 sm:gap-y-1.5 text-[9px] sm:text-[10px] font-medium pt-2 sm:pt-0 border-t sm:border-none w-full sm:w-auto justify-between sm:justify-end">
             <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-blue-600 rounded-sm shrink-0"></div> 대/공기업</div>
             <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-indigo-700 rounded-sm shrink-0"></div> 공무원/부사관</div>
             <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-purple-600 rounded-sm shrink-0"></div> 중견기업</div>
@@ -154,7 +159,7 @@ export default async function EmploymentStatusPage({
         </div>
       </div>
 
-      <div className="flex-1 overflow-x-auto p-2 bg-gray-50/50">
+      <div className="flex-1 overflow-x-auto overflow-y-auto bg-gray-50/50 rounded-xl border border-slate-200 shadow-sm p-2 sm:p-4">
         <div className="flex gap-px bg-gray-300 border border-gray-300 min-w-max mx-auto shadow-sm">
           {classNames.map((className) => {
             const students = [...groupedData[className]].sort((a, b) => 

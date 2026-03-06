@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Calendar, GraduationCap } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import * as React from 'react';
 
 interface EmploymentStatusFiltersProps {
@@ -32,10 +32,10 @@ export default function EmploymentStatusFilters({ graduationYears, defaultYear, 
     return Array.from(years).sort((a, b) => b - a);
   }, [graduationYears, baseYear]);
 
-  const updateFilters = (key: string, value: string) => {
+  const updateFilters = (value: string) => {
     const params = new URLSearchParams(searchParams.toString());
-    const ay = key === 'ay' ? parseInt(value) : parseInt(currentAY);
-    const grade = key === 'grade' ? parseInt(value) : parseInt(currentGrade);
+    const ay = parseInt(value);
+    const grade = 3; // 학년 필터 삭제로 인한 기본값 3 고정
     const gradYear = ay + (4 - grade);
     
     params.set('ay', ay.toString());
@@ -45,34 +45,17 @@ export default function EmploymentStatusFilters({ graduationYears, defaultYear, 
   };
 
   return (
-    <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-200">
+    <div className="flex items-center bg-slate-50 p-1 rounded-lg border border-slate-200 w-[130px] min-w-[130px] justify-between">
       {/* 학사학년도 */}
-      <div className="flex items-center gap-1.5 px-2">
-        <Calendar className="h-3.5 w-3.5 text-slate-400" />
-        <Select value={currentAY} onValueChange={(v) => updateFilters('ay', v)}>
-          <SelectTrigger className="w-[95px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0">
+      <div className="flex items-center gap-1.5 px-2 w-full">
+        <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+        <Select value={currentAY} onValueChange={(v) => updateFilters(v)}>
+          <SelectTrigger className="w-full h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0">
             <SelectValue placeholder="학년도" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent position="popper" className="w-[130px]">
             {academicYears.map((year) => (
               <SelectItem key={year} value={String(year)} className="text-[11px] font-medium">{year}학년도</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="w-[1px] h-4 bg-slate-200" />
-
-      {/* 학년 */}
-      <div className="flex items-center gap-1.5 px-2">
-        <GraduationCap className="h-3.5 w-3.5 text-slate-400" />
-        <Select value={currentGrade} onValueChange={(v) => updateFilters('grade', v)}>
-          <SelectTrigger className="w-[70px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0">
-            <SelectValue placeholder="학년" />
-          </SelectTrigger>
-          <SelectContent>
-            {[3, 2, 1].map((g) => (
-              <SelectItem key={g} value={String(g)} className="text-[11px] font-medium">{g}학년</SelectItem>
             ))}
           </SelectContent>
         </Select>

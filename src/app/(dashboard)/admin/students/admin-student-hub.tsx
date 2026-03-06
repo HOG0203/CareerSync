@@ -111,7 +111,7 @@ export function AdminStudentHub({
   const selectedStudentsForPromotion = processedData.filter((s: any) => selectedIdsForPromotion.includes(s.id))
 
   return (
-    <div className="flex flex-col h-full w-full gap-4 sm:gap-6 pb-16 sm:pb-0">
+    <div className="flex flex-col h-full gap-4 sm:gap-6">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between px-1 gap-4">
         <div className="flex flex-col gap-1">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">

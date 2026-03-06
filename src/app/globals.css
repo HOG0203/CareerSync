@@ -84,5 +84,30 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+    /* Radix UI가 주입하는 모든 레이아웃 시프트 유발 요소를 강제로 무력화 */
+    padding-right: 0px !important;
+    margin-right: 0px !important;
+    overflow: auto !important;
+    position: relative;
+    width: 100%;
   }
+}
+
+/* 루트 레벨에서 스크롤바 공간을 미리 확보하여 레이아웃 시프트를 원천 차단 */
+html {
+  overflow-y: scroll !important;
+  scrollbar-gutter: stable both-edges;
+  padding-right: 0px !important;
+}
+
+/* Radix UI 포털 컨텐츠가 열릴 때 발생하는 모든 레이아웃 간섭 제거 */
+[data-radix-scroll-lock] {
+  overflow: auto !important;
+  padding-right: 0px !important;
+  margin-right: 0px !important;
+}
+
+/* 드롭다운이 열려도 배경이 상호작용 가능하게 유지 (스크롤바 사라짐 방지) */
+[data-radix-popper-content-wrapper] {
+  z-index: 50 !important;
 }

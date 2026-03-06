@@ -80,14 +80,14 @@ export default function AdminSettingsPage() {
   const years = Array.from({ length: 11 }, (_, i) => currentYear - 5 + i);
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-6 p-4 sm:p-6 h-full overflow-auto bg-slate-50/30">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
-        <div>
+    <div className="flex flex-col h-full gap-4 sm:gap-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 px-1">
+        <div className="flex flex-col gap-1">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
             <Settings2 className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
             시스템 설정
           </h2>
-          <p className="text-muted-foreground mt-1 text-xs sm:text-sm font-medium leading-relaxed">자격증 목록 및 급수 체계, 학사학년도를 통합 관리합니다.</p>
+          <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed">자격증 목록 및 급수 체계, 학사학년도를 통합 관리합니다.</p>
         </div>
         <Button 
           onClick={handleSaveAll} 
@@ -171,25 +171,25 @@ export default function AdminSettingsPage() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[500px] overflow-auto pr-1 custom-scrollbar">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-[500px] overflow-auto pr-1 custom-scrollbar">
               {certs.map((cert) => (
-                <div key={cert.name} className="group flex flex-col p-4 rounded-2xl border border-slate-100 bg-white hover:border-blue-200 hover:shadow-sm transition-all relative">
-                  <div className="flex items-start justify-between mb-2">
-                    <span className="font-bold text-slate-800 text-[14px]">{cert.name}</span>
+                <div key={cert.name} className="group flex flex-col p-2.5 rounded-xl border border-slate-100 bg-white hover:border-blue-200 hover:shadow-sm transition-all relative">
+                  <div className="flex items-start justify-between mb-1.5">
+                    <span className="font-bold text-slate-800 text-[12px] leading-tight break-all mr-4">{cert.name}</span>
                     <button 
                       onClick={() => removeCert(cert.name)} 
-                      className="opacity-100 sm:opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all"
+                      className="absolute top-1.5 right-1.5 opacity-100 sm:opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all"
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-3 w-3" />
                     </button>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-1">
                     {cert.levels.length > 0 ? cert.levels.map(l => (
-                      <Badge key={l} variant="outline" className="text-[10px] py-0.5 px-2 font-semibold border-slate-200 text-slate-500 bg-slate-50 rounded-lg">
+                      <Badge key={l} variant="outline" className="text-[9px] py-0 px-1.5 font-medium border-slate-200 text-slate-500 bg-slate-50 rounded-md">
                         {l}
                       </Badge>
                     )) : (
-                      <span className="text-[10px] text-slate-400 italic">급수 없음 (단일 자격)</span>
+                      <span className="text-[9px] text-slate-400 italic">단일 자격</span>
                     )}
                   </div>
                 </div>

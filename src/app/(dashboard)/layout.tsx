@@ -31,9 +31,9 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen w-full flex bg-background overflow-hidden">
+      <div className="min-h-screen w-full flex bg-background">
         {/* Desktop Sidebar */}
-        <div className="hidden sm:block">
+        <div className="hidden lg:block">
           <Sidebar>
             <Nav isAdmin={isAdmin} />
           </Sidebar>
@@ -44,11 +44,11 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
           <MobileTopBar isAdmin={isAdmin} />
           
           {/* Desktop Header */}
-          <div className="hidden sm:block">
+          <div className="hidden lg:block">
             <Header />
           </div>
 
-          <main className="flex-1 p-2 sm:p-4 lg:p-6 mt-14 sm:mt-0 mb-16 sm:mb-0 overflow-auto min-w-0">
+          <main className="flex-1 p-2 sm:p-4 lg:p-6 mt-14 lg:mt-0 mb-16 lg:mb-0 overflow-auto min-w-0">
             {children}
           </main>
 

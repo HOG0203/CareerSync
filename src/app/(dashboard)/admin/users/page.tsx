@@ -11,6 +11,7 @@ import { UserTable } from './user-table';
 import { CreateUserButton } from './create-user-button';
 import { getProfiles, getGraduationYears, getAllStudentBaseData } from '@/lib/data';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
+import { UserCog } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,11 +54,14 @@ export default async function AdminUsersPage() {
     .filter(item => item.year && item.major && item.className);
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-6 p-4 sm:p-6 pb-20 sm:pb-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">사용자 관리</h2>
-          <p className="text-muted-foreground mt-1 text-xs sm:text-sm">시스템 접속 권한 및 담당 학반 정보를 관리합니다.</p>
+    <div className="flex flex-col h-full gap-4 sm:gap-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 px-1">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+            <UserCog className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
+            사용자 관리
+          </h2>
+          <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed">시스템 접속 권한 및 담당 학반 정보를 관리합니다.</p>
         </div>
         <div className="w-full sm:w-auto">
           <CreateUserButton />
