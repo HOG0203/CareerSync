@@ -314,15 +314,28 @@ const MobileDetailModal = ({ isOpen, onClose, data, columns, onSave, onAction }:
         
         <div className="p-4 space-y-4 overflow-y-auto flex-1 bg-slate-50/50">
           <div className="space-y-2">
-            {columns.filter((c:any) => c.type === 'action').map((col: any) => (
-              <Button key={col.key} variant="outline" className="w-full h-14 border-indigo-100 bg-white text-indigo-700 font-bold flex justify-between px-4 group hover:bg-indigo-100 shadow-sm rounded-xl" onClick={() => { onClose(); onAction?.(data.id, col.key); }}>
-                <div className="flex items-center gap-3">
-                  <div className="bg-indigo-100 p-2 rounded-lg group-hover:bg-indigo-200 transition-colors"><BookUser className="h-5 w-5 text-indigo-600" /></div>
-                  <span className="text-base">{col.label} 열기</span>
-                </div>
-                <ChevronRight className="h-5 w-5 text-indigo-300 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            ))}
+            {columns.filter((c:any) => c.type === 'action').map((col: any) => {
+              const isFieldTraining = col.key === 'field_training_action';
+              return (
+                <Button 
+                  key={col.key} 
+                  variant="outline" 
+                  className={cn(
+                    "w-full h-14 border-indigo-100 bg-white font-bold flex justify-between px-4 group hover:bg-indigo-100 shadow-sm rounded-xl",
+                    isFieldTraining ? "text-emerald-700 border-emerald-100 hover:bg-emerald-50" : "text-indigo-700"
+                  )} 
+                  onClick={() => { onClose(); onAction?.(data.id, col.key); }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={cn("p-2 rounded-lg transition-colors", isFieldTraining ? "bg-emerald-100 group-hover:bg-emerald-200" : "bg-indigo-100 group-hover:bg-indigo-200")}>
+                      {isFieldTraining ? <Award className="h-5 w-5 text-emerald-600" /> : <BookUser className="h-5 w-5 text-indigo-600" />}
+                    </div>
+                    <span className="text-base">{col.label} 열기</span>
+                  </div>
+                  <ChevronRight className={cn("h-5 w-5 group-hover:translate-x-1 transition-transform", isFieldTraining ? "text-emerald-300" : "text-indigo-300")} />
+                </Button>
+              );
+            })}
           </div>
 
           <div className="grid grid-cols-1 gap-3">
@@ -357,9 +370,8 @@ const MobileDetailModal = ({ isOpen, onClose, data, columns, onSave, onAction }:
                 ) : (
                   <div className="relative">
                     <Input 
-                      key={data.id + col.key + data[col.key]} // 데이터 변경 시 리렌더링 강제
-                      defaultValue={data[col.key] || ''} 
-                      onBlur={(e) => { if(e.target.value!==data[col.key]) onSave(data.id, col.key, e.target.value) }} 
+                      value={data[col.key] || ''} 
+                      onChange={(e) => onSave(data.id, col.key, e.target.value)}
                       className="h-10 w-full bg-white pr-10 font-medium" 
                     />
                     {data[col.key] && (
@@ -669,7 +681,12 @@ export function StandardSpreadsheetTable({ data: initialData, columns, onSave, o
     }
 
     setEditingCell(null);
-    setData(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s)); return onSave(id, field, value); 
+    setData(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
+    
+    // 모바일 상세 모달 데이터 즉시 갱신
+    setDetailData(prev => (prev && prev.id === id) ? { ...prev, [field]: value } : prev);
+    
+    return onSave(id, field, value); 
   }, [onSave, filteredData, columns, data, recordHistory]);
 
   const handleKeyDown = React.useCallback((e: React.KeyboardEvent) => {

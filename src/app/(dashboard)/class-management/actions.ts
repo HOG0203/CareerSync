@@ -40,7 +40,7 @@ export async function updatePersonalDetail(id: string, field: string, value: any
   
   const { error } = await supabase
     .from('students')
-    .update({ [field]: value === '' ? null : value })
+    .update({ [field]: (value === '' || value === 'CLEARED') ? null : value })
     .eq('id', id)
 
   if (error) return { error: error.message }
@@ -64,7 +64,7 @@ export async function bulkUpdatePersonalDetails(updates: { id: string, field: st
   for (const update of updates) {
     await supabase
       .from('students')
-      .update({ [update.field]: update.value === '' ? null : update.value })
+      .update({ [update.field]: (update.value === '' || update.value === 'CLEARED') ? null : update.value })
       .eq('id', update.id)
   }
 

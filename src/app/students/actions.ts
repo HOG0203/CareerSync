@@ -146,8 +146,8 @@ export async function updateStudentField(id: string, field: string, value: any) 
   let finalValue = value;
   if (field === 'graduation_year') {
     finalValue = value ? parseInt(value) : null;
-  } else if (value === '' || (Array.isArray(value) && value.length === 0)) {
-    // 빈 문자열이거나 빈 배열인 경우 null로 처리하여 DB 값 삭제
+  } else if (value === '' || value === 'CLEARED' || (Array.isArray(value) && value.length === 0)) {
+    // 빈 문자열, 'CLEARED' 상수, 또는 빈 배열인 경우 null로 처리하여 DB 값 삭제
     finalValue = null;
   }
 
@@ -187,7 +187,7 @@ export async function bulkUpdateStudentData(updates: { id: string, field: string
     let finalValue = update.value;
     if (update.field === 'graduation_year') {
       finalValue = update.value ? parseInt(update.value) : null;
-    } else if (update.value === '' || (Array.isArray(update.value) && update.value.length === 0)) {
+    } else if (update.value === '' || update.value === 'CLEARED' || (Array.isArray(update.value) && update.value.length === 0)) {
       finalValue = null;
     }
 

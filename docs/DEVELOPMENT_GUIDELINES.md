@@ -20,3 +20,10 @@
 ## 4. 모바일 UI (Mobile UX)
 - **하단 탭 바**: 메뉴 추가 시 `MobileBottomTab`의 공간(최대 7개)을 고려하십시오.
 - **터치 타겟**: 모바일 버튼은 최소 `h-10`(40px) 이상을 유지하고 `active:scale` 피드백을 포함하십시오.
+- **상태 동기화**: 모바일 상세 모달(`MobileDetailModal`)에서 데이터를 수정할 경우, 반드시 리스트 상태(`setData`)와 상세 상태(`setDetailData`)를 동시에 갱신하여 UI 불일치를 방지하십시오.
+- **반응형 모달**: 새로운 모달 추가 시 `DialogContent`에 `w-[95vw]`와 `max-h-[95vh]`를 적용하여 모바일 화면 활용도를 높이십시오.
+
+## 5. 데이터 무결성 및 서버 액션 (Data Integrity)
+- **CLEARED 처리**: 클라이언트 UI에서 '선택 취소' 또는 '비우기' 요청 시 전송되는 `"CLEARED"` 문자열은 서버 액션에서 반드시 `null`로 변환하여 저장해야 합니다.
+- **날짜 정규화**: 날짜 데이터 저장 전 `normalizeDate` 유틸리티를 사용하여 형식(YYYY-MM-DD)을 검증하고, 유효하지 않은 값은 `null`로 처리하십시오.
+- **갱신 전파**: `updateStudentField` 등 데이터 변경 액션 성공 후에는 반드시 관련 경로를 `revalidatePath`로 갱신하십시오.
