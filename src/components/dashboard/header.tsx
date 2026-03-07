@@ -39,10 +39,15 @@ function toTitleCase(str: string) {
 }
 
 export default function Header() {
+  const [mounted, setMounted] = React.useState(false);
   const avatar = PlaceHolderImages.find((img) => img.id === 'user-avatar');
   const pathname = usePathname();
   const pageTitle = toTitleCase(pathname.split('/').pop()?.replace('-', ' ') || 'Dashboard');
   const [profileModalOpen, setProfileModalOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
   
   const pageTitleTranslations: {[key: string]: string} = {
     'Dashboard': '대시보드',
@@ -54,6 +59,10 @@ export default function Header() {
   const handleLogout = async () => {
     await logout();
   };
+
+  if (!mounted) {
+    return <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 lg:static lg:h-auto lg:border-0 lg:bg-transparent lg:px-6" />;
+  }
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 lg:static lg:h-auto lg:border-0 lg:bg-transparent lg:px-6">

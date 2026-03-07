@@ -1,24 +1,15 @@
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
   getFilteredStudentData,
   getGraduationYears,
   MAJOR_SORT_ORDER,
+  getCurrentUserProfile,
 } from '@/lib/data';
-import { Users, Briefcase, GraduationCap, Building2, LayoutDashboard } from 'lucide-react';
-import CompanyTypeChart from '@/components/dashboard/company-type-chart';
-import MajorEmploymentChart from '@/components/dashboard/major-employment-chart';
-import MajorFieldTrainingChart from '@/components/dashboard/major-field-training-chart';
-import ClassEmploymentChart from '@/components/dashboard/class-employment-chart';
-import ClassFieldTrainingChart from '@/components/dashboard/class-field-training-chart';
+import { LayoutDashboard } from 'lucide-react';
 import DashboardFilters from '@/components/dashboard/dashboard-filters';
-import CertificateStatusChart from '@/components/dashboard/certificate-status-chart';
+import Grade3View from '@/components/dashboard/grade3-view';
+import LowerGradeView from '@/components/dashboard/lower-grade-view';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,29 +20,37 @@ export default async function DashboardPage({
 }) {
   const params = await searchParams;
 
-  // 1. 기반 설정 패칭 (학년도 목록 및 시스템 설정)
-  const [graduationYears, settings] = await Promise.all([
+  // 1. 기반 설정 및 사용자 프로필 패칭
+  const [graduationYears, settings, profile] = await Promise.all([
     getGraduationYears(),
-    getSystemSettings()
+    getSystemSettings(),
+    getCurrentUserProfile()
   ]);
 
-  // 학사학년도(AY)와 학년(Grade) 기반 졸업연도 계산
-  const ay = params.ay ? parseInt(params.ay) : settings.baseYear;
-  const grade = params.grade ? parseInt(params.grade) : 3;
+  // 지능형 초기 학년 설정 (Smart Default)
+  const defaultGrade = profile?.assigned_grade || 3;
+  const currentGradeParam = params.grade;
+  const currentAYParam = params.ay;
+
+  // 초기 진입 시(파라미터 부재 시) 사용자 맞춤형으로 리다이렉트
+  if (!currentGradeParam || !currentAYParam) {
+    const targetGrade = currentGradeParam || defaultGrade;
+    const targetAY = currentAYParam || settings.baseYear;
+    redirect(`/dashboard?grade=${targetGrade}&ay=${targetAY}`);
+  }
+
+  const ay = parseInt(currentAYParam);
+  const grade = parseInt(currentGradeParam);
   const calculatedGradYear = (ay + (4 - grade)).toString();
 
-  // 기본 조회 졸업연도 결정 (신규 파라미터 우선)
-  const defaultGradYear = (settings.baseYear + 1).toString();
-  const selectedYear = params.year || calculatedGradYear || defaultGradYear;
+  // 기본 조회 졸업연도 결정
+  const selectedYear = params.year || calculatedGradYear;
   const selectedMajor = params.major || 'all';
   const selectedClass = params.class || 'all';
   const selectedStatus = params.status || 'all';
 
-  // 2. 타겟 데이터 패칭 (해당 학년의 데이터만 DB에서 직접 필터링하여 가져옴)
+  // 2. 타겟 데이터 패칭
   const allData = await getFilteredStudentData(selectedYear);
-
-  // 학사학년도 표시용 (선택된 AY가 있으면 그것을 사용, 아니면 역산)
-  const displayAY = params.ay ? parseInt(params.ay) : (parseInt(selectedYear) - (4 - grade));
 
   // 3. 필터링 로직 최적화: 한 번의 순회로 필요한 데이터 및 카운트 추출
   const majorCounts: Record<string, number> = {};
@@ -59,7 +58,6 @@ export default async function DashboardPage({
   const statusCounts: Record<string, number> = {};
   const filteredData: typeof allData = [];
 
-  // 한 번의 루프로 모든 통계와 필터링 수행
   for (const student of allData) {
     // 학과 카운트
     const major = student.major || '미지정';
@@ -75,7 +73,7 @@ export default async function DashboardPage({
         const status = student.business_type || '아니오';
         statusCounts[status] = (statusCounts[status] || 0) + 1;
         
-        // 최종 필터링 데이터 (카드 및 차트용)
+        // 최종 필터링 데이터
         if (selectedStatus === 'all' || (student.business_type || '아니오') === selectedStatus) {
           filteredData.push(student);
         }
@@ -83,7 +81,7 @@ export default async function DashboardPage({
     }
   }
 
-  // 드롭다운 옵션 변환
+  // 필터 드롭다운 옵션 구성
   const majors = Object.entries(majorCounts)
     .sort(([a], [b]) => {
       const indexA = MAJOR_SORT_ORDER.indexOf(a);
@@ -92,28 +90,24 @@ export default async function DashboardPage({
     })
     .map(([m, count]) => ({ label: m, value: m, count }));
 
-  const classes = Object.entries(classCounts)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([c, count]) => ({ label: c, value: c, count }));
+  const classes = Object.entries(classCounts).sort(([a], [b]) => a.localeCompare(b)).map(([c, count]) => ({ label: c, value: c, count }));
+  const statuses = Object.entries(statusCounts).sort(([, a], [, b]) => b - a).map(([s, count]) => ({ label: s, value: s, count }));
 
-  const statuses = Object.entries(statusCounts)
-    .sort(([, a], [, b]) => b - a)
-    .map(([s, count]) => ({ label: s, value: s, count }));
-
+  // 3학년용 추가 집계
   let employedStudents = 0;
-  let excludingStudents = 0; // 제외인정자 수
+  let excludingStudents = 0;
   let trainingStudents = 0;
   let majorCompanyStudents = 0;
 
-  // 최종 데이터 요약 통계 (한 번 더 순회)
-  for (const s of filteredData) {
-    if (s.business_type === '예') employedStudents++;
-    if (s.business_type === '제외인정자') excludingStudents++;
-    if (s.has_field_training === 'O') trainingStudents++;
-    if (['대기업', '공기업', '공무원'].includes(s.company_type || '')) majorCompanyStudents++;
+  if (grade === 3) {
+    for (const s of filteredData) {
+      if (s.business_type === '예') employedStudents++;
+      if (s.business_type === '제외인정자') excludingStudents++;
+      if (s.has_field_training === 'O') trainingStudents++;
+      if (['대기업', '공기업', '공무원'].includes(s.company_type || '')) majorCompanyStudents++;
+    }
   }
 
-  // 모수: 전체 필터링된 인원 - 제외인정자
   const analysisTargetCount = filteredData.length - excludingStudents;
   const employmentRate = analysisTargetCount > 0 ? (employedStudents / analysisTargetCount) * 100 : 0;
 
@@ -126,9 +120,9 @@ export default async function DashboardPage({
             종합 통계 대시보드
           </h2>
           <div className="flex flex-col gap-0.5 text-muted-foreground text-[10px] lg:text-xs font-medium leading-relaxed">
-            <p>학교 전체의 취업 및 현장실습 현황을 실시간 통계로 분석합니다.</p>
+            <p>학교 전체의 진로 및 취업 현황을 실시간 통계로 분석합니다.</p>
             <p className="text-indigo-600 font-bold">
-              {displayAY}학년도 3학년 {selectedMajor !== 'all' ? `${selectedMajor} ` : '전체 학과 '}
+              {ay}학년도 {grade}학년 {selectedMajor !== 'all' ? `${selectedMajor} ` : '전체 학과 '}
               {selectedClass !== 'all' ? `${selectedClass}반 ` : ''}
               분석 결과
             </p>
@@ -140,80 +134,32 @@ export default async function DashboardPage({
             majors={majors} 
             classes={classes} 
             statuses={statuses} 
-            defaultYear={defaultGradYear}
+            defaultYear={selectedYear}
             baseYear={settings.baseYear}
-            hideGrade={true}
+            hideGrade={false}
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="bg-blue-50/30 border-blue-100 shadow-sm border-l-4 border-l-blue-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
-            <CardTitle className="text-[10px] sm:text-sm font-semibold text-blue-900">총 학생 수</CardTitle>
-            <Users className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-            <div className="text-lg sm:text-2xl font-bold text-blue-900">{filteredData.length}명</div>
-            <p className="text-[9px] sm:text-xs text-blue-700/70 mt-0.5">제외인정자 {excludingStudents}명</p>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-emerald-50/30 border-emerald-100 shadow-sm border-l-4 border-l-emerald-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
-            <CardTitle className="text-[10px] sm:text-sm font-semibold text-emerald-900">전체 취업률</CardTitle>
-            <Briefcase className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-600" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-            <div className="text-lg sm:text-2xl font-bold text-emerald-900">{employmentRate.toFixed(1)}%</div>
-            <p className="text-[9px] sm:text-xs text-emerald-700/70 mt-0.5">{employedStudents}명 확정</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-cyan-50/30 border-cyan-100 shadow-sm border-l-4 border-l-cyan-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
-            <CardTitle className="text-[10px] sm:text-sm font-semibold text-cyan-900">현장실습</CardTitle>
-            <GraduationCap className="h-3 w-3 sm:h-4 sm:w-4 text-cyan-600" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-            <div className="text-lg sm:text-2xl font-bold text-cyan-900">{trainingStudents}명</div>
-            <p className="text-[9px] sm:text-xs text-cyan-700/70 mt-0.5">참여 인원</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-indigo-50/30 border-indigo-100 shadow-sm border-l-4 border-l-indigo-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
-            <CardTitle className="text-[10px] sm:text-sm font-semibold text-indigo-900">주요 기업</CardTitle>
-            <Building2 className="h-3 w-3 sm:h-4 sm:w-4 text-indigo-600" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-            <div className="text-lg sm:text-2xl font-bold text-indigo-900">{majorCompanyStudents}명</div>
-            <p className="text-[9px] sm:text-xs text-indigo-700/70 mt-0.5">대/공기업/공직</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 min-w-0 overflow-hidden">
-         <CompanyTypeChart data={filteredData} />
-         {selectedMajor !== 'all' ? (
-           <ClassEmploymentChart data={filteredData} majorName={selectedMajor} />
-         ) : (
-           <MajorEmploymentChart data={filteredData} />
-         )}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 min-w-0 overflow-hidden">
-         {selectedMajor !== 'all' ? (
-           <ClassFieldTrainingChart data={filteredData} majorName={selectedMajor} />
-         ) : (
-           <MajorFieldTrainingChart data={filteredData} />
-         )}
-         {selectedMajor !== 'all' ? (
-           <CertificateStatusChart data={filteredData} type="class" title={`${selectedMajor} 학반별 자격증 취득 현황`} />
-         ) : (
-           <CertificateStatusChart data={filteredData} type="major" title="학과별 자격증 취득 현황" />
-         )}
-      </div>
+      {/* 학년별 조건부 뷰 전환 */}
+      {grade === 3 ? (
+        <Grade3View 
+          filteredData={filteredData}
+          selectedMajor={selectedMajor}
+          employmentRate={employmentRate}
+          employedStudents={employedStudents}
+          excludingStudents={excludingStudents}
+          trainingStudents={trainingStudents}
+          majorCompanyStudents={majorCompanyStudents}
+          grade={grade}
+        />
+      ) : (
+        <LowerGradeView 
+          filteredData={filteredData}
+          selectedMajor={selectedMajor}
+          grade={grade}
+        />
+      )}
     </div>
   );
 }

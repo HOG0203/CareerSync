@@ -165,3 +165,59 @@ export async function getProfiles() {
   const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
   return data || [];
 }
+
+/**
+ * 학년별 주요 지표(진로희망, 자격증, 병역희망) 통계를 가져옵니다.
+ */
+export async function getGradeStatistics(graduationYear: number) {
+  const supabase = await createClient();
+  
+  const { data: students, error } = await supabase
+    .from('students')
+    .select('career_aspiration, certificates, military_status, major, class_info')
+    .eq('graduation_year', graduationYear);
+
+  if (error || !students) return null;
+
+  const stats = {
+    careerAspiration: {} as Record<string, number>,
+    militaryStatus: {} as Record<string, number>,
+    certificateDistribution: {
+      '0개': 0, '1개': 0, '2개': 0, '3개': 0, '4개': 0, '5개': 0, '6개 이상': 0
+    }
+  };
+
+  students.forEach(s => {
+    // 1. 기초진로희망 집계
+    const aspiration = s.career_aspiration || '미설정';
+    stats.careerAspiration[aspiration] = (stats.careerAspiration[aspiration] || 0) + 1;
+
+    // 2. 병역희망 집계
+    const military = s.military_status || '미설정';
+    stats.militaryStatus[military] = (stats.militaryStatus[military] || 0) + 1;
+
+    // 3. 자격증 분포 집계 (3학년 디자인 호환)
+    const certCount = Array.isArray(s.certificates) ? s.certificates.length : 0;
+    if (certCount >= 6) stats.certificateDistribution['6개 이상']++;
+    else stats.certificateDistribution[`${certCount}개` as keyof typeof stats.certificateDistribution]++;
+  });
+
+  return stats;
+}
+
+/**
+ * 현재 로그인한 사용자의 프로필 정보를 가져옵니다.
+ */
+export async function getCurrentUserProfile() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, role, assigned_year, assigned_major, assigned_class, assigned_grade')
+    .eq('id', user.id)
+    .single();
+
+  return profile;
+}

@@ -11,140 +11,207 @@ interface ClassTableProps {
   masterCertificates: MasterCertificate[];
 }
 
-// 학반 관리 컬럼 정의 (상담일지 우측 이동 및 액션화)
-const COLUMNS: ColumnConfig[] = [
-  { key: 'student_number', label: '번호', width: 35, readOnly: true },
-  { key: 'student_name', label: '성명', width: 65, readOnly: true },
-  { 
-    key: 'career_aspiration', 
-    label: '기초진로희망', 
-    width: 120, 
-    type: 'select', 
-    options: [
-      { label: '취업(일반취업)', value: '취업(일반취업)' },
-      { label: '취업(대/공기업)', value: '취업(대/공기업)' },
-      { label: '취업(일학습병행)', value: '취업(일학습병행)' },
-      { label: '취업(취업맞춤반)', value: '취업(취업맞춤반)' },
-      { label: '진학', value: '진학' },
-      { label: '기술사관', value: '기술사관' },
+// 학년별 기초진로희망 옵션 생성 함수
+const GET_CAREER_OPTIONS = (grade: number) => {
+  if (grade === 1) {
+    return [
+      { label: '대/공기업준비', value: '대/공기업준비' },
+      { label: '취업희망', value: '취업희망' },
+      { label: '진학희망', value: '진학희망' },
+      { label: '가업승계', value: '가업승계' },
+    ]
+  }
+  if (grade === 2) {
+    return [
+      { label: '대/공기업', value: '대/공기업' },
+      { label: '공무원', value: '공무원' },
+      { label: '중견기업', value: '중견기업' },
+      { label: '강소기업', value: '강소기업' },
+      { label: '가업승계', value: '가업승계' },
       { label: '부사관', value: '부사관' },
+      { label: '아우스빌둥', value: '아우스빌둥' },
       { label: '군특성화', value: '군특성화' },
-      { label: '기타', value: '기타' },
-    ],
-    variant: (val) => val ? 'bg-blue-50 text-blue-700 border-blue-100' : ''
-  },
-  { 
-    key: 'special_notes', 
-    label: '특이사항', 
-    width: 100, 
-    type: 'select',
-    options: [
-      { label: '청솔반', value: '청솔반' },
-      { label: '도제반', value: '도제반' },
-      { label: '축구부', value: '축구부' },
-      { label: '검도부', value: '검도부' },
-      { label: '특수교육대상자', value: '특수교육대상자' },
-      { label: '기타', value: '기타' },
-    ],
-    variant: (val) => val ? 'bg-amber-50 text-amber-700 border-amber-100' : ''
-  },
-  { 
-    key: 'certificates', 
-    label: '취득자격증', 
-    width: 150, 
-    type: 'multi-select' 
-  },
-  { 
-    key: 'military_status', 
-    label: '병역희망', 
-    width: 80, 
-    type: 'select',
-    options: [
-      { label: '군대입소', value: '군대입소' },
-      { label: '병역특례', value: '병역특례' },
-      { label: '병역면제', value: '병역면제' },
-    ],
-    variant: (val) => val === '군대입소' ? 'bg-slate-50 text-slate-700 border-slate-100' : val === '병역특례' ? 'bg-purple-50 text-purple-700 border-purple-100' : ''
-  },
-  {
-    key: 'desired_work_area',
-    label: '취업희망지역',
-    width: 120,
-    type: 'select',
-    options: [
-      { label: '대구인근', value: '대구인근' },
-      { label: '원거리(기숙사)', value: '원거리(기숙사)' },
-      { label: '둘다가능', value: '둘다가능' },
-    ],
-    variant: (val) => val === '대구인근' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : val === '원거리(기숙사)' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : val === '둘다가능' ? 'bg-sky-50 text-sky-700 border-sky-100' : ''
-  },  { 
-    key: 'parents_opinion', 
-    label: '부모님의견', 
-    width: 130,
-    type: 'select',
-    options: [
-      { label: '취업', value: '취업' },
+      { label: '기술사관', value: '기술사관' },
       { label: '진학', value: '진학' },
-      { label: '내선택 존중', value: '내선택 존중' },
-    ],
-    variant: (val) => val === '내선택 존중' ? 'bg-amber-50 text-amber-700 border-amber-100' : val ? 'bg-slate-50 text-slate-700 border-slate-100' : ''
-  },
-  { key: 'shoe_size', label: '신발', width: 50 },
-  { key: 'top_size', label: '상의', width: 50 },
-  { key: 'personal_remarks', label: '비고(행정)', width: 150 },
-  { 
-    key: 'counseling_log_action', 
-    label: '상담일지', 
-    width: 100, 
-    type: 'action' 
-  },
-]
+    ]
+  }
+  // 3학년 (기본값)
+  return [
+    { label: '대/공기업', value: '대/공기업' },
+    { label: '일학습병행', value: '일학습병행' },
+    { label: '취업맞춤반', value: '취업맞춤반' },
+    { label: '일반취업', value: '일반취업' },
+    { label: '가업승계', value: '가업승계' },
+    { label: '부사관', value: '부사관' },
+    { label: '아우스빌둥', value: '아우스빌둥' },
+    { label: '군특성화', value: '군특성화' },
+    { label: '기술사관', value: '기술사관' },
+    { label: '진학', value: '진학' },
+    { label: '기타', value: '기타' },
+  ]
+}
 
-const GROUP_HEADERS = [
-  { label: '학생 기본 정보', colSpan: 2, className: 'bg-slate-100 text-slate-900 text-[11px]' },
-  { label: '진로 및 특이사항', colSpan: 2, className: 'bg-blue-50 text-blue-900 text-[11px]' },
-  { label: '취득 자격', colSpan: 1, className: 'bg-amber-50 text-amber-900 text-[11px]' },
-  { label: '취업 상세 및 의견', colSpan: 3, className: 'bg-emerald-50 text-emerald-900 text-[11px]' },
-  { label: '피복 및 비고', colSpan: 3, className: 'bg-slate-50 text-slate-700 text-[11px]' },
-  { label: '기록', colSpan: 1, className: 'bg-indigo-50 text-indigo-900 text-[11px]' },
-]
+// 학년별 특이사항 옵션 생성 함수
+const GET_SPECIAL_NOTES_OPTIONS = (grade: number) => {
+  const common = [
+    { label: '축구부', value: '축구부' },
+    { label: '검도부', value: '검도부' },
+    { label: '특수교육대상자', value: '특수교육대상자' },
+    { label: '기타(직접입력)', value: '기타(직접입력)' },
+  ]
+  
+  if (grade === 1) return common;
+  
+  const seniorOptions = [{ label: '청솔반', value: '청솔반' }, ...common];
+  if (grade === 2) return [{ label: '도제반', value: '도제반' }, ...seniorOptions];
+  return [{ label: '도제반', value: '도제반' }, ...seniorOptions];
+}
 
 export function ClassTable({ initialData, masterCertificates }: ClassTableProps) {
   const [selectedStudent, setSelectedStudent] = React.useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = React.useState(false)
 
-  const handleSave = async (id: string, field: string, value: any) => {
-    const result: any = await updatePersonalDetail(id, field, value)
-    if (!result.success) {
-      console.error(`[개별 저장 실패] ID: ${id}, Field: ${field}, Error:`, result.error)
-    }
-    return result
-  }
+  // 현재 데이터로부터 학년 판별
+  const currentGrade = React.useMemo(() => {
+    if (!initialData || initialData.length === 0) return 3;
+    const student = initialData[0];
+    if (student.grade) return Number(student.grade);
+    const gradYear = student.graduation_year || student.GraduationYear;
+    if (!gradYear) return 3;
+    const calculatedGrade = 4 - (gradYear - 2026); 
+    return Math.max(1, Math.min(3, calculatedGrade)) || 3;
+  }, [initialData]);
 
-  const handleBulkSave = async (updates: any[]) => {
-    const result: any = await bulkUpdatePersonalDetails(updates)
-    if (!result.success) {
-      console.error('[일괄 저장 실패] Updates:', updates, 'Error:', result.error)
-    }
-    return result
-  }
+  // 학년에 맞는 컬럼 정의 동적 생성 (항목별 색상 강화)
+  const columns: ColumnConfig[] = React.useMemo(() => {
+    const baseCols: ColumnConfig[] = [
+      { key: 'student_number', label: '번호', width: 35, readOnly: true },
+      { key: 'student_name', label: '성명', width: 65, readOnly: true },
+      { 
+        key: 'career_aspiration', 
+        label: '기초진로희망', 
+        width: 120, 
+        type: 'select', 
+        options: GET_CAREER_OPTIONS(currentGrade),
+        variant: (val) => {
+          if (!val) return '';
+          if (val.includes('대/공기업') || val.includes('공무원')) return 'bg-blue-50 text-blue-700 border-blue-100';
+          if (val.includes('취업') || val === '일반취업') return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+          if (val.includes('가업승계')) return 'bg-amber-50 text-amber-700 border-amber-100';
+          if (val.includes('진학')) return 'bg-indigo-50 text-indigo-700 border-indigo-100';
+          if (val.includes('부사관') || val.includes('군특성화')) return 'bg-cyan-50 text-cyan-700 border-cyan-100';
+          if (val.includes('아우스빌둥') || val.includes('일학습') || val.includes('맞춤반') || val.includes('기술사관')) return 'bg-purple-50 text-purple-700 border-purple-100';
+          return 'bg-slate-50 text-slate-600 border-slate-100';
+        }
+      },
+      { 
+        key: 'special_notes', 
+        label: '특이사항', 
+        width: 100, 
+        type: 'select',
+        options: GET_SPECIAL_NOTES_OPTIONS(currentGrade),
+        variant: (val) => {
+          if (!val) return '';
+          if (val === '도제반') return 'bg-pink-50 text-pink-700 border-pink-100';
+          if (val === '청솔반') return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+          if (val === '축구부') return 'bg-orange-50 text-orange-700 border-orange-100';
+          if (val === '검도부') return 'bg-sky-50 text-sky-700 border-sky-100';
+          if (val === '특수교육대상자') return 'bg-slate-100 text-slate-700 border-slate-200';
+          return 'bg-amber-50 text-amber-700 border-amber-100';
+        }
+      },
+      { key: 'certificates', label: '취득자격증', width: 150, type: 'multi-select' },
+      { 
+        key: 'military_status', 
+        label: '병역희망', 
+        width: 80, 
+        type: 'select',
+        options: [
+          { label: '부사관', value: '부사관' },
+          { label: '군입대', value: '군입대' },
+          { label: '병역특례', value: '병역특례' },
+          { label: '병역면제', value: '병역면제' },
+        ],
+        variant: (val) => 
+          val === '부사관' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+          val === '군입대' ? 'bg-slate-50 text-slate-700 border-slate-100' : 
+          val === '병역특례' ? 'bg-purple-50 text-purple-700 border-purple-100' : 
+          val === '병역면제' ? 'bg-orange-50 text-orange-700 border-orange-100' : ''
+      },
+      {
+        key: 'desired_work_area',
+        label: '취업희망지역',
+        width: 120,
+        type: 'select',
+        options: [
+          { label: '대구인근', value: '대구인근' },
+          { label: '원거리(기숙사)', value: '원거리(기숙사)' },
+          { label: '둘다가능', value: '둘다가능' },
+        ],
+        variant: (val) => val === '대구인근' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : val === '원거리(기숙사)' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : val === '둘다가능' ? 'bg-sky-50 text-sky-700 border-sky-100' : ''
+      },
+      { 
+        key: 'parents_opinion', 
+        label: '부모님의견', 
+        width: 130,
+        type: 'select',
+        options: [
+          { label: '취업', value: '취업' },
+          { label: '진학', value: '진학' },
+          { label: '내선택 존중', value: '내선택 존중' },
+        ],
+        variant: (val) => 
+          val === '취업' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+          val === '진학' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' :
+          val === '내선택 존중' ? 'bg-amber-50 text-amber-700 border-amber-100' : ''
+      },
+    ];
 
-  const handleAction = (id: string, key: string) => {
+    if (currentGrade === 3) {
+      baseCols.push({ key: 'shoe_size', label: '신발', width: 50 });
+      baseCols.push({ key: 'top_size', label: '상의', width: 50 });
+    }
+
+    baseCols.push({ key: 'personal_remarks', label: '비고(행정)', width: 150 });
+    baseCols.push({ key: 'counseling_log_action', label: '상담일지', width: 100, type: 'action' });
+
+    return baseCols;
+  }, [currentGrade]);
+
+  const groupHeaders = React.useMemo(() => [
+    { label: '학생 기본 정보', colSpan: 2, className: 'bg-slate-100 text-slate-900 text-[11px]' },
+    { label: '진로 및 특이사항', colSpan: 2, className: 'bg-blue-50 text-blue-900 text-[11px]' },
+    { label: '취득 자격', colSpan: 1, className: 'bg-amber-50 text-amber-900 text-[11px]' },
+    { label: '취업 상세 및 의견', colSpan: 3, className: 'bg-emerald-50 text-emerald-900 text-[11px]' },
+    { 
+      label: '피복 및 비고', 
+      colSpan: currentGrade === 3 ? 3 : 1,
+      className: 'bg-slate-50 text-slate-700 text-[11px]' 
+    },
+    { label: '기록', colSpan: 1, className: 'bg-indigo-50 text-indigo-900 text-[11px]' },
+  ], [currentGrade]);
+
+  const handleSave = React.useCallback(async (id: string, field: string, value: any) => {
+    return await updatePersonalDetail(id, field, value)
+  }, []);
+
+  const handleBulkSave = React.useCallback(async (updates: any[]) => {
+    return await bulkUpdatePersonalDetails(updates)
+  }, []);
+
+  const handleAction = React.useCallback((id: string, key: string) => {
     if (key === 'counseling_log_action') {
       const student = initialData.find(s => s.id === id)
-      if (student) {
-        setSelectedStudent(student)
-        setIsModalOpen(true)
-      }
+      if (student) { setSelectedStudent(student); setIsModalOpen(true); }
     }
-  }
+  }, [initialData]);
 
   return (
     <div className="w-full overflow-hidden">
       <StandardSpreadsheetTable 
         data={initialData}
-        columns={COLUMNS}
-        groupHeaders={GROUP_HEADERS}
+        columns={columns}
+        groupHeaders={groupHeaders}
         onSave={handleSave}
         onBulkSave={handleBulkSave}
         onAction={handleAction}

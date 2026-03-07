@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import {
   Card,
   CardContent,
@@ -13,98 +14,165 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Legend
-} from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Legend, Pie, PieChart, Cell } from 'recharts';
 import { StudentEmploymentData, MAJOR_SORT_ORDER } from '@/lib/types';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { LayoutGrid, PieChart as PieChartIcon } from 'lucide-react';
 
-interface CertificateStatusChartProps {
+// 0개는 진한 회색, 1개부터는 선명한 하늘색/파란색 계열의 그라데이션 적용
+const CERT_COLORS = [
+  '#cbd5e1', // 0개
+  '#bae6fd', // 1개
+  '#7dd3fc', // 2개
+  '#38bdf8', // 3개
+  '#0ea5e9', // 4개
+  '#0284c7', // 5개
+  '#0369a1', // 6개 이상
+];
+
+const CERT_LABELS = ['0개', '1개', '2개', '3개', '4개', '5개', '6개 이상'];
+
+export default function CertificateStatusChart({ 
+  data, 
+  title = "자격증 취득 현황",
+  selectedMajor = 'all'
+}: { 
   data: StudentEmploymentData[];
-  type: 'major' | 'class';
-  title: string;
-}
+  selectedMajor?: string;
+  title?: string;
+}) {
+  const [viewType, setViewType] = React.useState<'pie' | 'bar'>('pie');
 
-export default function CertificateStatusChart({ data, type, title }: CertificateStatusChartProps) {
-  // 1. 학과 또는 반 목록 추출 및 정렬
-  const groups = Array.from(new Set(data.map((s) => type === 'major' ? s.major : s.class_info).filter(Boolean))).sort((a, b) => {
-    if (type === 'major') {
-      const indexA = MAJOR_SORT_ORDER.indexOf(a as string);
-      const indexB = MAJOR_SORT_ORDER.indexOf(b as string);
-      return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
-    }
-    return (a as string || '').localeCompare((b as string || ''), 'ko');
-  });
-  
-  // 2. 데이터 집계 (학과/반 별로 자격증 개수 구간별 학생 수 카운트)
-  const chartData = groups.map((groupName) => {
-    const groupStudents = data.filter((s) => (type === 'major' ? s.major : s.class_info) === groupName);
-    
-    return {
-      name: type === 'major' ? groupName : `${groupName}반`,
-      '0개': groupStudents.filter(s => (s.certificates?.length || 0) === 0).length,
-      '1개': groupStudents.filter(s => (s.certificates?.length || 0) === 1).length,
-      '2개': groupStudents.filter(s => (s.certificates?.length || 0) === 2).length,
-      '3개': groupStudents.filter(s => (s.certificates?.length || 0) === 3).length,
-      '4개': groupStudents.filter(s => (s.certificates?.length || 0) === 4).length,
-      '5개': groupStudents.filter(s => (s.certificates?.length || 0) === 5).length,
-      '6개이상': groupStudents.filter(s => (s.certificates?.length || 0) >= 6).length,
-    };
-  });
+  // 1. 학과별 또는 반별 막대 차트용 데이터 집계
+  const formattedBarData = React.useMemo(() => {
+    const isFiltered = selectedMajor !== 'all';
+    const groupKey = isFiltered ? 'class_info' : 'major';
 
-  // 3. 차트 설정 (푸른색 -> 회색 그라데이션)
-  const chartConfig = {
-    '6개이상': { label: '6개 이상', color: '#1e3a8a' }, // Deep Blue
-    '5개': { label: '5개', color: '#1d4ed8' },
-    '4개': { label: '4개', color: '#3b82f6' },
-    '3개': { label: '3개', color: '#60a5fa' },
-    '2개': { label: '2개', color: '#93c5fd' },
-    '1개': { label: '1개', color: '#bfdbfe' },
-    '0개': { label: '0개', color: '#cbd5e1' },      // Slate Gray
-  } satisfies ChartConfig;
+    const groups = Array.from(new Set(data.map((s: any) => s[groupKey]).filter(Boolean))).sort((a: any, b: any) => {
+      if (!isFiltered) {
+        const indexA = MAJOR_SORT_ORDER.indexOf(a);
+        const indexB = MAJOR_SORT_ORDER.indexOf(b);
+        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+      }
+      return a.localeCompare(b, 'ko');
+    });
+
+    return groups.map((group) => {
+      const groupStudents = data.filter((s: any) => s[groupKey] === group);
+      const row: any = { group };
+      
+      CERT_LABELS.forEach((label, idx) => {
+        const count = groupStudents.filter(s => {
+          const certCount = s.certificates?.length || 0;
+          if (idx === 6) return certCount >= 6;
+          return certCount === idx;
+        }).length;
+        row[label] = count;
+      });
+      
+      return row;
+    });
+  }, [data, selectedMajor]);
+
+  // 2. 전체 분포 도넛 차트 데이터
+  const formattedPieData = React.useMemo(() => {
+    const counts = data.reduce((acc, s) => {
+      const certCount = s.certificates?.length || 0;
+      const bucket = certCount >= 6 ? '6개 이상' : `${certCount}개`;
+      acc[bucket] = (acc[bucket] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return CERT_LABELS.map(label => ({
+      name: label,
+      value: counts[label] || 0
+    })).filter(d => d.value > 0);
+  }, [data]);
+
+  const chartConfig = React.useMemo(() => {
+    const config: ChartConfig = {};
+    CERT_LABELS.forEach((label, idx) => {
+      config[label] = { label, color: CERT_COLORS[idx] };
+    });
+    return config;
+  }, []);
 
   return (
-    <Card className="border-none shadow-sm bg-white/50 backdrop-blur-sm h-full">
-      <CardHeader>
-        <CardTitle className="text-lg font-bold text-blue-900">{title}</CardTitle>
-        <CardDescription>보유한 자격증 개수에 따른 학생 인원 분포가 표시됩니다.</CardDescription>
+    <Card className="flex flex-col border-none shadow-sm bg-white/50 backdrop-blur-sm overflow-hidden h-full">
+      <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+        <div className="flex flex-col gap-1">
+          <CardTitle className="text-lg font-bold text-blue-900">{title}</CardTitle>
+          <CardDescription>{selectedMajor === 'all' ? '전체 학과' : `${selectedMajor}`} 자격증 취득 현황입니다.</CardDescription>
+        </div>
+        <Tabs value={viewType} onValueChange={(v: any) => setViewType(v)} className="w-auto">
+          <TabsList className="grid w-full grid-cols-2 h-8">
+            <TabsTrigger value="pie" className="px-2 py-1"><PieChartIcon className="h-3.5 w-3.5 mr-1" />분포</TabsTrigger>
+            <TabsTrigger value="bar" className="px-2 py-1">
+              <LayoutGrid className="h-3.5 w-3.5 mr-1" />
+              {selectedMajor === 'all' ? '학과별' : '반별'}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </CardHeader>
-      <CardContent className="pt-4">
-        <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 30, top: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} opacity={0.3} />
-            <XAxis 
-              type="number" 
-              domain={[0, 6]} 
-              ticks={[0, 1, 2, 3, 4, 5, 6]}
-              tick={{ fontSize: 10 }}
-              hide
-            />
-            <YAxis 
-              dataKey="name" 
-              type="category" 
-              tick={{ fontSize: 11, fontWeight: 600 }} 
-              width={80}
-              axisLine={false}
-              tickLine={false}
-            />
-            <ChartTooltip content={<ChartTooltipContent />} />
-            <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '20px' }} />
-            
-            {/* 데이터 표시 순서 (0개가 가장 왼쪽, 6개이상이 가장 오른쪽) */}
-            <Bar dataKey="0개" stackId="a" fill="var(--color-0개)" barSize={20} />
-            <Bar dataKey="1개" stackId="a" fill="var(--color-1개)" barSize={20} />
-            <Bar dataKey="2개" stackId="a" fill="var(--color-2개)" barSize={20} />
-            <Bar dataKey="3개" stackId="a" fill="var(--color-3개)" barSize={20} />
-            <Bar dataKey="4개" stackId="a" fill="var(--color-4개)" barSize={20} />
-            <Bar dataKey="5개" stackId="a" fill="var(--color-5개)" barSize={20} />
-            <Bar dataKey="6개이상" stackId="a" fill="var(--color-6개이상)" radius={[0, 4, 4, 0]} barSize={20} />
-          </BarChart>
-        </ChartContainer>
+      <CardContent className="flex-1 pb-4 relative min-h-[300px]">
+        {data.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground"><p className="text-sm font-medium">데이터가 없습니다.</p></div>
+        ) : viewType === 'pie' ? (
+          <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[300px] w-full animate-in fade-in zoom-in-95 duration-300">
+            <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+              <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+              <Pie
+                data={formattedPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="55%" outerRadius="75%" paddingAngle={2}
+                startAngle={180} endAngle={-180} strokeWidth={1} stroke="#fff" labelLine={true}
+                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+              >
+                {formattedPieData.map((entry) => (
+                  <Cell key={`cell-${entry.name}`} fill={CERT_COLORS[CERT_LABELS.indexOf(entry.name)]} />
+                ))}
+              </Pie>
+              <Legend verticalAlign="bottom" align="center" iconType="circle" layout="horizontal" wrapperStyle={{ fontSize: '10px', paddingTop: '30px' }} />
+            </PieChart>
+          </ChartContainer>
+        ) : (
+          <ChartContainer config={chartConfig} className="h-[300px] w-full animate-in fade-in slide-in-from-right-4 duration-300">
+            <BarChart 
+              data={formattedBarData} 
+              layout="vertical"
+              margin={{ left: 10, right: 30, top: 0, bottom: 0 }}
+              categoryGap={15}
+            >
+              <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} opacity={0.3} />
+              <XAxis type="number" hide />
+              <YAxis 
+                dataKey="group" 
+                type="category" 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fontSize: 11, fontWeight: 600 }} 
+                width={80} 
+                tickFormatter={(val) => selectedMajor !== 'all' ? (val.includes('반') ? val : `${val}반`) : val}
+              />
+              <ChartTooltip 
+                content={
+                  <ChartTooltipContent 
+                    labelFormatter={(label) => selectedMajor !== 'all' ? (label.includes('반') ? label : `${label}반`) : label} 
+                  />
+                } 
+              />
+              <Legend verticalAlign="bottom" align="center" iconType="circle" layout="horizontal" wrapperStyle={{ fontSize: '10px', paddingTop: '20px' }} />
+              {CERT_LABELS.map((label, idx) => (
+                <Bar 
+                  key={label} 
+                  dataKey={label} 
+                  stackId="a" 
+                  fill={CERT_COLORS[idx]} 
+                  barSize={20} 
+                  radius={idx === 6 ? [0, 4, 4, 0] : [0, 0, 0, 0]} 
+                />
+              ))}
+            </BarChart>
+          </ChartContainer>
+        )}
       </CardContent>
     </Card>
   );

@@ -22,6 +22,8 @@ export type StudentEmploymentData = {
   return_to_school_reason?: string;
   remarks?: string;
   certificates?: string[];
+  career_aspiration?: string;
+  military_status?: string;
   shoe_size?: string;
   top_size?: string;
   personal_remarks?: string;

@@ -6,12 +6,41 @@ import { updateStudentField, bulkUpdateStudentData } from '@/app/students/action
 import { MasterCertificate } from '@/app/(dashboard)/admin/settings/actions'
 import { FieldTrainingModal } from './field-training-modal'
 
-// 학생 관리 컬럼 정의 (모든 데이터 필드 포함 풀 버전)
+// 학생 관리 컬럼 정의
 const COLUMNS: ColumnConfig[] = [
   { key: 'major', label: '학과', width: 70, readOnly: true },
   { key: 'class_info', label: '반', width: 40, readOnly: true },
   { key: 'student_number', label: '번호', width: 40, readOnly: true },
   { key: 'student_name', label: '성명', width: 65, readOnly: true },
+  { 
+    key: 'career_aspiration', 
+    label: '기초\n진로희망', 
+    width: 80, 
+    type: 'select',
+    options: [
+      { label: '대/공기업', value: '대/공기업' },
+      { label: '일학습병행', value: '일학습병행' },
+      { label: '취업맞춤반', value: '취업맞춤반' },
+      { label: '일반취업', value: '일반취업' },
+      { label: '가업승계', value: '가업승계' },
+      { label: '부사관', value: '부사관' },
+      { label: '아우스빌둥', value: '아우스빌둥' },
+      { label: '군특성화', value: '군특성화' },
+      { label: '기술사관', value: '기술사관' },
+      { label: '진학', value: '진학' },
+      { label: '기타(직접입력)', value: '기타(직접입력)' },
+    ],
+    variant: (val) => {
+      if (!val) return '';
+      if (val.includes('대/공기업') || val.includes('공무원')) return 'bg-blue-50 text-blue-700 border-blue-100';
+      if (val.includes('취업')) return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+      if (val.includes('가업승계')) return 'bg-amber-50 text-amber-700 border-amber-100';
+      if (val.includes('진학')) return 'bg-indigo-50 text-indigo-700 border-indigo-100';
+      if (val.includes('부사관') || val.includes('군특성화')) return 'bg-cyan-50 text-cyan-700 border-cyan-100';
+      if (val.includes('아우스빌둥') || val.includes('일학습') || val.includes('맞춤반') || val.includes('기술사관')) return 'bg-purple-50 text-purple-700 border-purple-100';
+      return 'bg-slate-50 text-slate-600 border-slate-100';
+    }
+  },
   { 
     key: 'is_desiring_employment', label: '취업\n희망', width: 55, type: 'select', 
     options: [
@@ -108,7 +137,7 @@ const COLUMNS: ColumnConfig[] = [
 ]
 
 const GROUP_HEADERS = [
-  { label: '기본 정보', colSpan: 4, className: 'bg-slate-100 text-slate-900 text-[11px]' },
+  { label: '기본 정보', colSpan: 5, className: 'bg-slate-100 text-slate-900 text-[11px]' },
   { label: '취업 현황', colSpan: 5, className: 'bg-blue-100/50 text-blue-900 text-[11px]' },
   { label: '현장실습 상세 및 결과 (최근 차수)', colSpan: 7, className: 'bg-amber-100/50 text-amber-900 text-[11px]' },
   { label: '기기/자격', colSpan: 2, className: 'bg-slate-50 text-slate-700 text-[11px]' },
@@ -126,29 +155,18 @@ export function StudentTable({
   const [selectedStudent, setSelectedStudent] = React.useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = React.useState(false)
 
-  const handleSave = async (id: string, field: string, value: any) => {
-    console.log(`[StudentTable] Saving field: ${field}, value:`, value);
-    if (!isAdmin) {
-      console.warn('[StudentTable] Save denied: User is not admin.');
-      return { success: false, error: '권한이 없습니다.' };
-    }
-    const result = await updateStudentField(id, field, value);
-    if (!result.success) console.error(`[StudentTable] Save failed for ${field}:`, result.error);
-    return result as any;
-  }
+  // 모든 핸들러 함수를 useCallback으로 메모이제이션
+  const handleSave = React.useCallback(async (id: string, field: string, value: any) => {
+    if (!isAdmin) return { success: false, error: '권한이 없습니다.' };
+    return await updateStudentField(id, field, value);
+  }, [isAdmin]);
 
-  const handleBulkSave = async (updates: any[]) => {
-    console.log(`[StudentTable] Bulk saving ${updates.length} items.`);
-    if (!isAdmin) {
-      console.warn('[StudentTable] Bulk save denied: User is not admin.');
-      return { success: false, error: '권한이 없습니다.' };
-    }
-    const result: any = await bulkUpdateStudentData(updates);
-    if (!result.success) console.error('[StudentTable] Bulk save failed:', result.error);
-    return result
-  }
+  const handleBulkSave = React.useCallback(async (updates: any[]) => {
+    if (!isAdmin) return { success: false, error: '권한이 없습니다.' };
+    return await bulkUpdateStudentData(updates);
+  }, [isAdmin]);
 
-  const handleAction = (id: string, key: string) => {
+  const handleAction = React.useCallback((id: string, key: string) => {
     if (key === 'field_training_action') {
       const student = initialData.find(s => s.id === id)
       if (student) {
@@ -156,13 +174,12 @@ export function StudentTable({
         setIsModalOpen(true)
       }
     }
-  }
+  }, [initialData]);
 
-  // 관리자가 아닐 경우 모든 컬럼을 readOnly로 설정
-  const columns = COLUMNS.map(col => ({
+  const columns = React.useMemo(() => COLUMNS.map(col => ({
     ...col,
     readOnly: !isAdmin || col.readOnly
-  }));
+  })), [isAdmin]);
 
   return (
     <div className="w-full h-full flex flex-col">
