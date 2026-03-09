@@ -28,6 +28,7 @@ const COLUMNS: ColumnConfig[] = [
       { label: '군특성화', value: '군특성화' },
       { label: '기술사관', value: '기술사관' },
       { label: '진학', value: '진학' },
+      { label: '운동부', value: '운동부' },
       { label: '기타(직접입력)', value: '기타(직접입력)' },
     ],
     variant: (val) => {

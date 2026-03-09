@@ -17,8 +17,9 @@ const GET_CAREER_OPTIONS = (grade: number) => {
     return [
       { label: '대/공기업준비', value: '대/공기업준비' },
       { label: '취업희망', value: '취업희망' },
-      { label: '진학희망', value: '진학희망' },
       { label: '가업승계', value: '가업승계' },
+      { label: '진학희망', value: '진학희망' },
+      { label: '운동부', value: '운동부' },
     ]
   }
   if (grade === 2) {
@@ -33,6 +34,7 @@ const GET_CAREER_OPTIONS = (grade: number) => {
       { label: '군특성화', value: '군특성화' },
       { label: '기술사관', value: '기술사관' },
       { label: '진학', value: '진학' },
+      { label: '운동부', value: '운동부' },
     ]
   }
   // 3학년 (기본값)
@@ -47,6 +49,7 @@ const GET_CAREER_OPTIONS = (grade: number) => {
     { label: '군특성화', value: '군특성화' },
     { label: '기술사관', value: '기술사관' },
     { label: '진학', value: '진학' },
+    { label: '운동부', value: '운동부' },
     { label: '기타', value: '기타' },
   ]
 }
