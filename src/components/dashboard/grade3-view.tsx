@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Briefcase, GraduationCap, Building2 } from 'lucide-react';
 import CompanyTypeChart from './company-type-chart';
 import MajorEmploymentChart from './major-employment-chart';
-import ClassEmploymentChart from './class-employment-chart'; // 3학년 전용 기존 막대차트
 import ClassFieldTrainingChart from './class-field-training-chart';
 import MajorFieldTrainingChart from './major-field-training-chart';
 import CertificateStatusChart from './certificate-status-chart';
@@ -91,9 +90,8 @@ export default function Grade3View({
          <CompanyTypeChart data={filteredData} selectedMajor={selectedMajor} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 min-w-0 overflow-hidden">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 min-w-0 overflow-hidden">
          <CertificateStatusChart data={filteredData} selectedMajor={selectedMajor} />
-         <ClassEmploymentChart data={filteredData} selectedMajor={selectedMajor} />
       </div>
     </div>
   );
