@@ -95,7 +95,7 @@ export function ClassTable({ initialData, masterCertificates }: ClassTableProps)
       },
       { 
         key: 'special_notes', 
-        label: '진로코스 및\n특이사항', 
+        label: '진로 코스', 
         width: 100, 
         type: 'select',
         options: (rowData) => GET_CAREER_COURSE_OPTIONS(rowData),
@@ -179,7 +179,7 @@ export function ClassTable({ initialData, masterCertificates }: ClassTableProps)
 
   const groupHeaders = React.useMemo(() => [
     { label: '학생 기본 정보', colSpan: 2, className: 'bg-slate-100 text-slate-900 text-[11px]' },
-    { label: '진로 및\n진로코스', colSpan: 2, className: 'bg-blue-50 text-blue-900 text-[11px]' },
+    { label: '진로 코스', colSpan: 2, className: 'bg-blue-50 text-blue-900 text-[11px]' },
     { label: '취득 자격', colSpan: 1, className: 'bg-amber-50 text-amber-900 text-[11px]' },
     { label: '취업 상세 및 의견', colSpan: 3, className: 'bg-emerald-50 text-emerald-900 text-[11px]' },
     { 

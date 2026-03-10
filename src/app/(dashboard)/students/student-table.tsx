@@ -69,7 +69,7 @@ const COLUMNS: ColumnConfig[] = [
   },
   { 
     key: 'special_notes', 
-    label: '진로코스 및\n특이사항', 
+    label: '진로 코스', 
     width: 100, 
     type: 'select',
     options: (rowData) => GET_CAREER_COURSE_OPTIONS(rowData),
