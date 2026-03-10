@@ -59,6 +59,7 @@ CareerSync는 '졸업연도'가 아닌 **'현재 학사학년도'**를 기준으
 - **Undo/Redo 지원**: 테이블 내 모든 수정 사항은 `Ctrl + Z`(실행 취소) 및 `Ctrl + Y`(다시 실행)를 지원하며, 최대 20단계까지 복구 가능합니다.
 - **지능형 직접 입력**: 드롭다운 항목 중 '기타(직접입력)' 선택 시 즉시 `Input` 모드로 전환되며, 실제 값을 입력하지 않으면 빈칸(`null`)으로 저장됩니다.
 - **동적 옵션 (Dependency Select)**: `options` 속성에 함수를 전달하여 다른 열의 값에 따라 드롭다운 목록을 동적으로 변경할 수 있습니다. (예: 진로희망에 따른 진로코스 필터링)
+- **헤더 그룹화**: 유사한 성격의 컬럼은 `GROUP_HEADERS`를 통해 묶어 시각적으로 분리합니다. (예: 학생 관리 페이지의 '비고(특이사항)')
 
 ### 3.4 모바일 및 태블릿 (Mobile & Tablet)
 - **중단점 표준**: **`lg` (1024px)**를 기준으로 인터페이스를 전환합니다.
@@ -70,7 +71,7 @@ CareerSync는 '졸업연도'가 아닌 **'현재 학사학년도'**를 기준으
 
 ### 4.1 용어 체계 (Common Labels)
 - **진로희망**: 기존 '기초진로희망'에서 명칭 통일. 대분류(취업, 진학, 제외인정자) 중심으로 관리합니다.
-- **진로코스**: 기존 '특이사항'에서 명칭 변경. 학생의 세부 교육 경로(도제, 군특성화 등)를 의미합니다.
+- **진로코스**: 기존 '특이사항'에서 명칭 변경. 학생의 세부 교육 경로(도제, 군특성화, 운동부, 특수교육대상자 등)를 의미합니다.
 
 ### 4.2 취업률 산정 공식
 - **취업자**: `business_type === '예'`
@@ -86,7 +87,7 @@ CareerSync는 '졸업연도'가 아닌 **'현재 학사학년도'**를 기준으
 
 ## 🚀 5. 배포 및 환경 설정
 
-- **Server Actions 필드 매핑**: 신규 학생 필드(`career_aspiration`, `military_status` 등) 추가 시 `src/app/students/actions.ts`의 `BASIC_INFO_FIELDS` 목록에 반드시 포함해야 정상적으로 DB에 저장됩니다.
+- **Server Actions 필드 매핑**: 신규 학생 필드(`career_aspiration`, `military_status`, `special_notes` 등) 추가 시 `src/app/students/actions.ts`의 `BASIC_INFO_FIELDS` 목록에 반드시 포함해야 정상적으로 DB에 저장됩니다.
 - **Revalidation**: 수정 작업 후 반드시 `router.refresh()` 또는 `revalidatePath`를 호출하여 통계 차트와의 실시간 동기화를 보장하세요.
 
 ---
@@ -98,4 +99,4 @@ CareerSync는 '졸업연도'가 아닌 **'현재 학사학년도'**를 기준으
 - **학과별 데이터 드릴다운**: 차트 항목 클릭 시 해당 조건의 학생 명단을 팝업으로 상세 조회하는 기능.
 
 ---
-*Last Updated: 2026-03-10 by bkit (Terminology & Dynamic Options Update)*
+*Last Updated: 2026-03-10 by bkit (Students & Class Management Sync Update)*

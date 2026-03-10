@@ -6,6 +6,40 @@ import { updateStudentField, bulkUpdateStudentData } from '@/app/students/action
 import { MasterCertificate } from '@/app/(dashboard)/admin/settings/actions'
 import { FieldTrainingModal } from './field-training-modal'
 
+// 행 데이터 기반 동적 진로코스 옵션 생성 함수
+const GET_CAREER_COURSE_OPTIONS = (rowData: any) => {
+  const aspiration = rowData?.career_aspiration;
+  
+  if (aspiration === '취업') {
+    return [
+      { label: '대/공기업', value: '대/공기업' },
+      { label: '공무원', value: '공무원' },
+      { label: '중견/강소기업', value: '중견/강소기업' },
+      { label: '가업승계', value: '가업승계' },
+      { label: '부사관', value: '부사관' },
+      { label: '아우스빌둥', value: '아우스빌둥' },
+      { label: '도제', value: '도제' },
+      { label: '기타(직접입력)', value: '기타(직접입력)' },
+    ];
+  }
+  
+  if (aspiration === '제외인정자') {
+    return [
+      { label: '군특성화', value: '군특성화' },
+      { label: '기술사관', value: '기술사관' },
+      { label: '운동부', value: '운동부' },
+      { label: '특수교육대상자', value: '특수교육대상자' },
+      { label: '기타(직접입력)', value: '기타(직접입력)' },
+    ];
+  }
+  
+  if (aspiration === '진학' || !aspiration) {
+    return [];
+  }
+
+  return [];
+}
+
 // 학생 관리 컬럼 정의
 const COLUMNS: ColumnConfig[] = [
   { key: 'major', label: '학과', width: 70, readOnly: true },
@@ -30,6 +64,32 @@ const COLUMNS: ColumnConfig[] = [
       if (val.includes('진학')) return 'bg-indigo-50 text-indigo-700 border-indigo-100';
       if (val.includes('부사관') || val.includes('군특성화')) return 'bg-cyan-50 text-cyan-700 border-cyan-100';
       if (val.includes('아우스빌둥') || val.includes('일학습') || val.includes('맞춤반') || val.includes('기술사관')) return 'bg-purple-50 text-purple-700 border-purple-100';
+      return 'bg-slate-50 text-slate-600 border-slate-100';
+    }
+  },
+  { 
+    key: 'special_notes', 
+    label: '진로코스 및\n특이사항', 
+    width: 100, 
+    type: 'select',
+    options: (rowData) => GET_CAREER_COURSE_OPTIONS(rowData),
+    variant: (val) => {
+      if (!val) return '';
+      if (val === '도제반' || val === '도제') return 'bg-pink-50 text-pink-700 border-pink-100';
+      if (val === '청솔반') return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+      if (val === '축구부') return 'bg-orange-50 text-orange-700 border-orange-100';
+      if (val === '검도부') return 'bg-sky-50 text-sky-700 border-sky-100';
+      if (val === '특수교육대상자') return 'bg-slate-100 text-slate-700 border-slate-200';
+      if (val === '대/공기업') return 'bg-blue-50 text-blue-700 border-blue-100';
+      if (val === '공무원') return 'bg-indigo-50 text-indigo-700 border-indigo-100';
+      if (val === '중견/강소기업') return 'bg-purple-50 text-purple-700 border-purple-100';
+      if (val === '가업승계') return 'bg-amber-50 text-amber-700 border-amber-100';
+      if (val === '부사관') return 'bg-cyan-50 text-cyan-700 border-cyan-100';
+      if (val === '아우스빌둥') return 'bg-rose-50 text-rose-700 border-rose-100';
+      if (val === '군특성화') return 'bg-teal-50 text-teal-700 border-teal-100';
+      if (val === '기술사관') return 'bg-lime-50 text-lime-700 border-lime-100';
+      if (val === '운동부') return 'bg-yellow-50 text-yellow-700 border-yellow-100';
+      if (val === '기타(직접입력)') return 'bg-violet-50 text-violet-700 border-violet-100';
       return 'bg-slate-50 text-slate-600 border-slate-100';
     }
   },
@@ -124,15 +184,14 @@ const COLUMNS: ColumnConfig[] = [
   { key: 'is_hiring_conversion', label: '채용\n전환', width: 85, readOnly: true },
   { key: 'is_returned', label: '복교', width: 60, readOnly: true },
   { key: 'field_training_action', label: '실습이력', width: 100, type: 'action' },
-  { key: 'remarks', label: '비고(특이사항)', width: 150 },
-  { key: 'certificates', label: '자격증', width: 120, type: 'multi-select' },
+  { key: 'remarks', label: '비고', width: 150 },
 ]
 
 const GROUP_HEADERS = [
-  { label: '기본 정보', colSpan: 5, className: 'bg-slate-100 text-slate-900 text-[11px]' },
+  { label: '기본 정보', colSpan: 6, className: 'bg-slate-100 text-slate-900 text-[11px]' },
   { label: '취업 현황', colSpan: 5, className: 'bg-blue-100/50 text-blue-900 text-[11px]' },
   { label: '현장실습 상세 및 결과 (최근 차수)', colSpan: 7, className: 'bg-amber-100/50 text-amber-900 text-[11px]' },
-  { label: '기기/자격', colSpan: 2, className: 'bg-slate-50 text-slate-700 text-[11px]' },
+  { label: '비고(특이사항)', colSpan: 1, className: 'bg-slate-50 text-slate-700 text-[11px]' },
 ]
 
 export function StudentTable({ 

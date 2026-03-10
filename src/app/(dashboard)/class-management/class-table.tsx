@@ -43,6 +43,7 @@ const GET_CAREER_COURSE_OPTIONS = (rowData: any) => {
       { label: '군특성화', value: '군특성화' },
       { label: '기술사관', value: '기술사관' },
       { label: '운동부', value: '운동부' },
+      { label: '특수교육대상자', value: '특수교육대상자' },
       { label: '기타(직접입력)', value: '기타(직접입력)' },
     ];
   }
