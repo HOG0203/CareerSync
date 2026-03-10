@@ -6,4 +6,4 @@ ADD COLUMN IF NOT EXISTS counseling_log TEXT,
 ADD COLUMN IF NOT EXISTS career_aspiration TEXT;
 
 COMMENT ON COLUMN public.student_employments.counseling_log IS '담임교사 상담 기록 (학반관리용)';
-COMMENT ON COLUMN public.student_employments.career_aspiration IS '기초 진로 희망 분야 (저학년용)';
+COMMENT ON COLUMN public.student_employments.career_aspiration IS '진로 희망 분야 (저학년용)';

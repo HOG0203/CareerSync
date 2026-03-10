@@ -12,7 +12,7 @@
 - **학년 선택**: 학년(1/2/3) 탭 또는 필터를 통해 해당 반의 학년별 학생 조회.
 - **상담 중심 컬럼**: 
   - `counseling_notes`: 담임교사 상담 일지 (개별 관리 데이터).
-  - `career_path`: 희망 진로 방향 (저학년 기초 진로 조사).
+  - `career_path`: 희망 진로 방향 (저학년 진로 조사).
   - `target_certificates`: 취득 목표 자격증.
 
 ## 2. 데이터베이스 및 API 설계
@@ -20,7 +20,7 @@
 ### 2.1 스키마 확장
 - `student_employments` 테이블에 저학년 상담용 필드 추가:
   - `counseling_log` (text): 개별 상담 기록.
-  - `career_aspiration` (text): 기초 진로 희망.
+  - `career_aspiration` (text): 진로 희망.
 
 ### 2.2 학반관리 필터링 로직
 - `grade`: `baseYear`와의 차이로 자동 계산.

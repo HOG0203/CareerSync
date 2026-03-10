@@ -188,7 +188,7 @@ export async function getGradeStatistics(graduationYear: number) {
   };
 
   students.forEach(s => {
-    // 1. 기초진로희망 집계
+    // 1. 진로희망 집계
     const aspiration = s.career_aspiration || '미설정';
     stats.careerAspiration[aspiration] = (stats.careerAspiration[aspiration] || 0) + 1;
 

@@ -4,5 +4,5 @@
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS career_aspiration TEXT;
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS special_notes TEXT;
 
-COMMENT ON COLUMN public.students.career_aspiration IS '기초 진로 희망';
+COMMENT ON COLUMN public.students.career_aspiration IS '진로 희망';
 COMMENT ON COLUMN public.students.special_notes IS '학생 특이사항 (청솔반, 도제 등)';

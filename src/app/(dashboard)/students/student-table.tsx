@@ -14,22 +14,13 @@ const COLUMNS: ColumnConfig[] = [
   { key: 'student_name', label: '성명', width: 65, readOnly: true },
   { 
     key: 'career_aspiration', 
-    label: '기초\n진로희망', 
+    label: '진로\n희망', 
     width: 80, 
     type: 'select',
     options: [
-      { label: '대/공기업', value: '대/공기업' },
-      { label: '일학습병행', value: '일학습병행' },
-      { label: '취업맞춤반', value: '취업맞춤반' },
-      { label: '일반취업', value: '일반취업' },
-      { label: '가업승계', value: '가업승계' },
-      { label: '부사관', value: '부사관' },
-      { label: '아우스빌둥', value: '아우스빌둥' },
-      { label: '군특성화', value: '군특성화' },
-      { label: '기술사관', value: '기술사관' },
+      { label: '취업', value: '취업' },
       { label: '진학', value: '진학' },
-      { label: '운동부', value: '운동부' },
-      { label: '기타(직접입력)', value: '기타(직접입력)' },
+      { label: '제외인정자', value: '제외인정자' },
     ],
     variant: (val) => {
       if (!val) return '';

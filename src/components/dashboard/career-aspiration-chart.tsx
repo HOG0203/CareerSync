@@ -35,9 +35,7 @@ const VIVID_COLORS = [
 const UNSETTLED_COLOR = '#cbd5e1';
 
 const GET_ORDER = (grade: number) => {
-  if (grade === 1) return ['대/공기업준비', '취업희망', '가업승계', '진학희망', '운동부'];
-  if (grade === 2) return ['대/공기업', '공무원', '중견기업', '강소기업', '가업승계', '부사관', '아우스빌둥', '군특성화', '기술사관', '진학', '운동부'];
-  return ['대/공기업', '일학습병행', '취업맞춤반', '일반취업', '가업승계', '부사관', '아우스빌둥', '군특성화', '기술사관', '진학', '운동부'];
+  return ['취업', '진학', '제외인정자'];
 };
 
 export default function CareerAspirationChart({ 
@@ -112,7 +110,7 @@ export default function CareerAspirationChart({
     <Card className="flex flex-col border-none shadow-sm bg-white/50 backdrop-blur-sm overflow-hidden h-full">
       <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
         <div className="flex flex-col gap-1">
-          <CardTitle className="text-lg font-bold text-blue-900">기초 진로 희망</CardTitle>
+          <CardTitle className="text-lg font-bold text-blue-900">진로 희망</CardTitle>
           <CardDescription>{selectedMajor === 'all' ? '전체 학과' : `${selectedMajor}`} 진로 희망 현황입니다.</CardDescription>
         </div>
         <Tabs value={viewType} onValueChange={(v: any) => setViewType(v)} className="w-auto">

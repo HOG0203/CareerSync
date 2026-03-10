@@ -11,63 +11,53 @@ interface ClassTableProps {
   masterCertificates: MasterCertificate[];
 }
 
-// 학년별 기초진로희망 옵션 생성 함수
+// 학년별 진로희망 옵션 생성 함수
 const GET_CAREER_OPTIONS = (grade: number) => {
-  if (grade === 1) {
-    return [
-      { label: '대/공기업준비', value: '대/공기업준비' },
-      { label: '취업희망', value: '취업희망' },
-      { label: '가업승계', value: '가업승계' },
-      { label: '진학희망', value: '진학희망' },
-      { label: '운동부', value: '운동부' },
-    ]
-  }
-  if (grade === 2) {
+  const options = [
+    { label: '취업', value: '취업' },
+    { label: '진학', value: '진학' },
+    { label: '제외인정자', value: '제외인정자' },
+  ];
+  return options;
+}
+
+// 행 데이터 기반 동적 진로코스 옵션 생성 함수
+const GET_CAREER_COURSE_OPTIONS = (rowData: any) => {
+  const aspiration = rowData?.career_aspiration;
+  
+  if (aspiration === '취업') {
     return [
       { label: '대/공기업', value: '대/공기업' },
       { label: '공무원', value: '공무원' },
-      { label: '중견기업', value: '중견기업' },
-      { label: '강소기업', value: '강소기업' },
+      { label: '중견/강소기업', value: '중견/강소기업' },
       { label: '가업승계', value: '가업승계' },
       { label: '부사관', value: '부사관' },
       { label: '아우스빌둥', value: '아우스빌둥' },
+      { label: '도제', value: '도제' },
+      { label: '기타(직접입력)', value: '기타(직접입력)' },
+    ];
+  }
+  
+  if (aspiration === '제외인정자') {
+    return [
       { label: '군특성화', value: '군특성화' },
       { label: '기술사관', value: '기술사관' },
-      { label: '진학', value: '진학' },
       { label: '운동부', value: '운동부' },
-    ]
+      { label: '기타(직접입력)', value: '기타(직접입력)' },
+    ];
   }
-  // 3학년 (기본값)
-  return [
-    { label: '대/공기업', value: '대/공기업' },
-    { label: '일학습병행', value: '일학습병행' },
-    { label: '취업맞춤반', value: '취업맞춤반' },
-    { label: '일반취업', value: '일반취업' },
-    { label: '가업승계', value: '가업승계' },
-    { label: '부사관', value: '부사관' },
-    { label: '아우스빌둥', value: '아우스빌둥' },
-    { label: '군특성화', value: '군특성화' },
-    { label: '기술사관', value: '기술사관' },
-    { label: '진학', value: '진학' },
-    { label: '운동부', value: '운동부' },
-    { label: '기타', value: '기타' },
-  ]
-}
+  
+  if (aspiration === '진학') {
+    return [];
+  }
 
-// 학년별 특이사항 옵션 생성 함수
-const GET_SPECIAL_NOTES_OPTIONS = (grade: number) => {
-  const common = [
+  // 기본값
+  return [
     { label: '축구부', value: '축구부' },
     { label: '검도부', value: '검도부' },
     { label: '특수교육대상자', value: '특수교육대상자' },
     { label: '기타(직접입력)', value: '기타(직접입력)' },
-  ]
-  
-  if (grade === 1) return common;
-  
-  const seniorOptions = [{ label: '청솔반', value: '청솔반' }, ...common];
-  if (grade === 2) return [{ label: '도제반', value: '도제반' }, ...seniorOptions];
-  return [{ label: '도제반', value: '도제반' }, ...seniorOptions];
+  ];
 }
 
 export function ClassTable({ initialData, masterCertificates }: ClassTableProps) {
@@ -92,7 +82,7 @@ export function ClassTable({ initialData, masterCertificates }: ClassTableProps)
       { key: 'student_name', label: '성명', width: 65, readOnly: true },
       { 
         key: 'career_aspiration', 
-        label: '기초진로희망', 
+        label: '진로희망', 
         width: 120, 
         type: 'select', 
         options: GET_CAREER_OPTIONS(currentGrade),
@@ -109,13 +99,13 @@ export function ClassTable({ initialData, masterCertificates }: ClassTableProps)
       },
       { 
         key: 'special_notes', 
-        label: '특이사항', 
+        label: '진로코스 및\n특이사항', 
         width: 100, 
         type: 'select',
-        options: GET_SPECIAL_NOTES_OPTIONS(currentGrade),
+        options: (rowData) => GET_CAREER_COURSE_OPTIONS(rowData),
         variant: (val) => {
           if (!val) return '';
-          if (val === '도제반') return 'bg-pink-50 text-pink-700 border-pink-100';
+          if (val === '도제반' || val === '도제') return 'bg-pink-50 text-pink-700 border-pink-100';
           if (val === '청솔반') return 'bg-emerald-50 text-emerald-700 border-emerald-100';
           if (val === '축구부') return 'bg-orange-50 text-orange-700 border-orange-100';
           if (val === '검도부') return 'bg-sky-50 text-sky-700 border-sky-100';
@@ -183,7 +173,7 @@ export function ClassTable({ initialData, masterCertificates }: ClassTableProps)
 
   const groupHeaders = React.useMemo(() => [
     { label: '학생 기본 정보', colSpan: 2, className: 'bg-slate-100 text-slate-900 text-[11px]' },
-    { label: '진로 및 특이사항', colSpan: 2, className: 'bg-blue-50 text-blue-900 text-[11px]' },
+    { label: '진로 및\n진로코스', colSpan: 2, className: 'bg-blue-50 text-blue-900 text-[11px]' },
     { label: '취득 자격', colSpan: 1, className: 'bg-amber-50 text-amber-900 text-[11px]' },
     { label: '취업 상세 및 의견', colSpan: 3, className: 'bg-emerald-50 text-emerald-900 text-[11px]' },
     { 

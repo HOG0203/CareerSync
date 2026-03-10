@@ -18,7 +18,7 @@
   - 관리자/비담임: 3학년(기본값) 자동 선택.
 
 ### [Step 3] 1·2학년 전용 시각화 컴포넌트
-- **CareerAspirationChart**: `Recharts.PieChart`. 학급관리에서 입력한 기초진로희망 비중.
+- **CareerAspirationChart**: `Recharts.PieChart`. 학급관리에서 입력한 진로희망 비중.
 - **CertificateStatusChart**: **3학년과 동일한 디자인**. 보유 개수별(0~6개 이상) 분포.
 - **MilitaryStatusChart**: `Recharts.PieChart` (Donut). 학급관리에서 입력한 **병역희망(`military_status`)** 비중.
 
@@ -30,7 +30,7 @@
 
 | 지표명 | 소스 컬럼 (students 테이블) | 시각화 방식 |
 | :--- | :--- | :--- |
-| **기초진로희망** | `career_aspiration` | Pie Chart (분포) |
+| **진로희망** | `career_aspiration` | Pie Chart (분포) |
 | **자격증 현황** | `certificates` (JSONB) | Grade 3 동일 (분포) |
 | **병역 희망** | **`military_status`** | Donut Chart (비중) |
 
