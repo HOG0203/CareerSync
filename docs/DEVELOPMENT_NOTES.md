@@ -1,12 +1,12 @@
-# CareerSync 개발 가이드 및 참고사항 (Reference)
+# 대공커리어싱크 개발 가이드 및 참고사항 (Reference)
 
-이 문서는 CareerSync 프로젝트의 핵심 비즈니스 로직과 개발 규칙을 담고 있습니다. 새로운 기능을 추가하거나 수정할 때 반드시 참조하세요.
+이 문서는 대공커리어싱크 프로젝트의 핵심 비즈니스 로직과 개발 규칙을 담고 있습니다. 새로운 기능을 추가하거나 수정할 때 반드시 참조하세요.
 
 ---
 
 ## 📅 1. 학사학년도 및 학년 공식 (Academic Logic)
 
-CareerSync는 '졸업연도'가 아닌 **'현재 학사학년도'**를 기준으로 학생의 학년을 계산합니다.
+대공커리어싱크는 '졸업연도'가 아닌 **'현재 학사학년도'**를 기준으로 학생의 학년을 계산합니다.
 
 - **기본 공식**: `Grade = 4 - (GraduationYear - AcademicYear)`
 - **조회 공식 (데이터 패칭 시)**: `GraduationYear = AcademicYear + (4 - Grade)`
@@ -99,4 +99,4 @@ CareerSync는 '졸업연도'가 아닌 **'현재 학사학년도'**를 기준으
 - **학과별 데이터 드릴다운**: 차트 항목 클릭 시 해당 조건의 학생 명단을 팝업으로 상세 조회하는 기능.
 
 ---
-*Last Updated: 2026-03-10 by bkit (Students & Class Management Sync Update)*
+*Last Updated: 2026-03-10 by bkit (Branding Update: 대공커리어싱크)*

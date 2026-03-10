@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     default: 'CareerSync - 취업 및 현장실습 통합 관리'
   },
   description: '졸업생 취업 이력, 현장실습 데이터, 자격증 취득 현황을 체계적으로 관리하는 학교 행정 전문 솔루션입니다.',
-  keywords: ['취업관리', '현장실습', '학생관리', '커리어싱크', '직업계고'],
+  keywords: ['취업관리', '현장실습', '학생관리', '대공커리어싱크', '직업계고'],
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
