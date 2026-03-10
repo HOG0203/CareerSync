@@ -47,17 +47,12 @@ const GET_CAREER_COURSE_OPTIONS = (rowData: any) => {
     ];
   }
   
-  if (aspiration === '진학') {
+  if (aspiration === '진학' || !aspiration) {
     return [];
   }
 
-  // 기본값
-  return [
-    { label: '축구부', value: '축구부' },
-    { label: '검도부', value: '검도부' },
-    { label: '특수교육대상자', value: '특수교육대상자' },
-    { label: '기타(직접입력)', value: '기타(직접입력)' },
-  ];
+  // 기본값 (예상치 못한 값이나 기타 경우를 위한 안전장치, 실제로는 위 조건에서 대부분 걸러짐)
+  return [];
 }
 
 export function ClassTable({ initialData, masterCertificates }: ClassTableProps) {
@@ -110,7 +105,17 @@ export function ClassTable({ initialData, masterCertificates }: ClassTableProps)
           if (val === '축구부') return 'bg-orange-50 text-orange-700 border-orange-100';
           if (val === '검도부') return 'bg-sky-50 text-sky-700 border-sky-100';
           if (val === '특수교육대상자') return 'bg-slate-100 text-slate-700 border-slate-200';
-          return 'bg-amber-50 text-amber-700 border-amber-100';
+          if (val === '대/공기업') return 'bg-blue-50 text-blue-700 border-blue-100';
+          if (val === '공무원') return 'bg-indigo-50 text-indigo-700 border-indigo-100';
+          if (val === '중견/강소기업') return 'bg-purple-50 text-purple-700 border-purple-100';
+          if (val === '가업승계') return 'bg-amber-50 text-amber-700 border-amber-100';
+          if (val === '부사관') return 'bg-cyan-50 text-cyan-700 border-cyan-100';
+          if (val === '아우스빌둥') return 'bg-rose-50 text-rose-700 border-rose-100';
+          if (val === '군특성화') return 'bg-teal-50 text-teal-700 border-teal-100';
+          if (val === '기술사관') return 'bg-lime-50 text-lime-700 border-lime-100';
+          if (val === '운동부') return 'bg-yellow-50 text-yellow-700 border-yellow-100';
+          if (val === '기타(직접입력)') return 'bg-violet-50 text-violet-700 border-violet-100';
+          return 'bg-slate-50 text-slate-600 border-slate-100';
         }
       },
       { key: 'certificates', label: '취득자격증', width: 150, type: 'multi-select' },
