@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Target, Award, Briefcase } from 'lucide-react';
 import CareerAspirationChart from './career-aspiration-chart';
+import CareerCourseChart from './career-course-chart';
 import MilitaryStatusChart from './military-status-chart';
 import CertificateStatusChart from './certificate-status-chart';
 import { StudentEmploymentData } from '@/lib/types';
@@ -96,10 +97,11 @@ export default function LowerGradeView({
       {/* 차트 섹션 - selectedMajor 전달 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 min-w-0 overflow-hidden">
          <CareerAspirationChart data={filteredData} grade={grade} selectedMajor={selectedMajor} />
-         <MilitaryStatusChart data={filteredData} selectedMajor={selectedMajor} />
+         <CareerCourseChart data={filteredData} grade={grade} selectedMajor={selectedMajor} />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:gap-6 min-w-0 overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 min-w-0 overflow-hidden">
+         <MilitaryStatusChart data={filteredData} selectedMajor={selectedMajor} />
          <CertificateStatusChart 
            data={filteredData} 
            selectedMajor={selectedMajor} 

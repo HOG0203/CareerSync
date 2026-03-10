@@ -9,6 +9,7 @@ import ClassFieldTrainingChart from './class-field-training-chart';
 import MajorFieldTrainingChart from './major-field-training-chart';
 import CertificateStatusChart from './certificate-status-chart';
 import CareerAspirationChart from './career-aspiration-chart';
+import CareerCourseChart from './career-course-chart';
 import { StudentEmploymentData } from '@/lib/types';
 
 interface Grade3ViewProps {
@@ -82,12 +83,17 @@ export default function Grade3View({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 min-w-0 overflow-hidden">
          <CareerAspirationChart data={filteredData} grade={grade} selectedMajor={selectedMajor} />
-         <CompanyTypeChart data={filteredData} selectedMajor={selectedMajor} />
+         <CareerCourseChart data={filteredData} grade={grade} selectedMajor={selectedMajor} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 min-w-0 overflow-hidden">
          <MajorEmploymentChart data={filteredData} selectedMajor={selectedMajor} />
+         <CompanyTypeChart data={filteredData} selectedMajor={selectedMajor} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 min-w-0 overflow-hidden">
          <CertificateStatusChart data={filteredData} selectedMajor={selectedMajor} />
+         <ClassEmploymentChart data={filteredData} selectedMajor={selectedMajor} />
       </div>
     </div>
   );
