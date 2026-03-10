@@ -88,7 +88,7 @@ export default function CareerCourseChart({
     const isFiltered = selectedMajor !== 'all';
     const groupKey = isFiltered ? 'class_info' : 'major';
     
-    // 데이터가 존재하는 코환 목록 추출
+    // 데이터가 존재하는 코스 목록 추출
     const existingCourses = Array.from(new Set(data.map(s => getStudentCourse(s))))
       .filter(c => data.some(s => getStudentCourse(s) === c))
       .sort((a, b) => {
@@ -149,7 +149,7 @@ export default function CareerCourseChart({
       <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
         <div className="flex flex-col gap-1">
           <CardTitle className="text-lg font-bold text-indigo-900">희망 진로 코스</CardTitle>
-          <CardDescription>{selectedMajor === 'all' ? '전체 학과' : `${selectedMajor}`} 진로 코환(세부) 현황입니다.</CardDescription>
+          <CardDescription>{selectedMajor === 'all' ? '전체 학과' : `${selectedMajor}`} 진로 코스(세부) 현황입니다.</CardDescription>
         </div>
         <Tabs value={viewType} onValueChange={(v: any) => setViewType(v)} className="w-auto">
           <TabsList className="grid w-full grid-cols-2 h-8">
