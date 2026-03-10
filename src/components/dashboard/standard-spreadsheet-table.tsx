@@ -387,7 +387,25 @@ export function StandardSpreadsheetTable({ data: initialData, columns, onSave, o
   const handleCopy = React.useCallback(async () => { if (!selectionStart || !selectionEnd) return; const minR = Math.min(selectionStart.row, selectionEnd.row), maxR = Math.max(selectionStart.row, selectionEnd.row); const minC = Math.min(selectionStart.col, selectionEnd.col), maxC = Math.max(selectionStart.col, selectionEnd.col); let text = ""; for (let r = minR; r <= maxR; r++) { const rowData = filteredData[r]; if (!rowData) continue; const line = []; for (let c = minC; c <= maxC; c++) { const val = rowData[columns[c].key]; line.push(Array.isArray(val) ? val.join(', ') : (val || '')); } text += line.join('\t') + (r === maxR ? "" : "\n"); } try { await navigator.clipboard.writeText(text); toast({ title: '복사 완료' }); } catch (err) { toast({ variant: 'destructive', title: '복사 실패' }); } }, [selectionStart, selectionEnd, filteredData, columns, toast]);
   const handlePaste = React.useCallback(async () => { if (!selectionStart) return; try { const text = await navigator.clipboard.readText(); if (!text) return; const cb = text.split(/\r?\n/).filter(line => line.length > 0).map(row => row.split('\t')); const cbH = cb.length, cbW = cb[0].length; const selEnd = selectionEnd || selectionStart; const minR = Math.min(selectionStart.row, selEnd.row), maxR = Math.max(selectionStart.row, selEnd.row), minC = Math.min(selectionStart.col, selEnd.col), maxC = Math.max(selectionStart.col, selEnd.col); const tMaxR = (selectionStart.row === selEnd.row && selectionStart.col === selEnd.col) ? minR + cbH - 1 : maxR; const tMaxC = (selectionStart.row === selEnd.row && selectionStart.col === selEnd.col) ? minC + cbW - 1 : maxC; const updates: any[] = []; const historyUpdates: any[] = []; const newData = [...data]; for (let r = minR; r <= tMaxR; r++) { const rowData = filteredData[r]; if (!rowData) continue; const dIdx = newData.findIndex(s => s.id === rowData.id); if (dIdx === -1) continue; const rO = r - minR, cbR = rO % cbH; for (let c = minC; c <= tMaxC; c++) { const config = columns[c]; if (!config || config.readOnly || config.type === 'action') continue; const cO = c - minC, cbC = cO % cbW; let val = cb[cbR][cbC]; if (val === undefined) continue; let finalVal: any = val.trim(); if (config.type === 'multi-select') finalVal = finalVal ? finalVal.split(',').map((v:any) => v.trim()) : []; if (newData[dIdx][config.key] !== finalVal) { historyUpdates.push({ id: rowData.id, field: config.key, oldValue: newData[dIdx][config.key] }); newData[dIdx] = { ...newData[dIdx], [config.key]: finalVal }; updates.push({ id: rowData.id, field: config.key, value: finalVal }); } } } if (updates.length > 0) { recordHistory(historyUpdates); setData(newData); const result = await onBulkSave(updates); if (result.success) toast({ title: '붙여넣기 완료' }); else toast({ variant: 'destructive', title: '저장 실패', description: result.error }); } } catch (err) { toast({ variant: 'destructive', title: '붙여넣기 실패' }); } }, [selectionStart, selectionEnd, filteredData, columns, data, onBulkSave, toast, recordHistory]);
   const handleDelete = React.useCallback(async () => { if (editingCell || !selectionStart || !selectionEnd) return; const minR = Math.min(selectionStart.row, selectionEnd.row), maxR = Math.max(selectionStart.row, selectionEnd.row), minC = Math.min(selectionStart.col, selectionEnd.col), maxC = Math.max(selectionStart.col, selectionEnd.col); const updates: any[] = []; const hUpdates: any[] = []; const newData = [...data]; for (let r = minR; r <= maxR; r++) { const rowData = filteredData[r]; if (!rowData) continue; const dIdx = newData.findIndex(s => s.id === rowData.id); if (dIdx === -1) continue; for (let c = minC; c <= maxC; c++) { const config = columns[c]; if (config.readOnly || config.type === 'action') continue; const emptyVal = config.key === 'certificates' ? [] : ''; if (newData[dIdx][config.key] !== emptyVal) { hUpdates.push({ id: rowData.id, field: config.key, oldValue: newData[dIdx][config.key] }); newData[dIdx] = { ...newData[dIdx], [config.key]: emptyVal }; updates.push({ id: rowData.id, field: config.key, value: emptyVal }); } } } if (updates.length > 0) { recordHistory(hUpdates); setData(newData); const result = await onBulkSave(updates); if (result.success) toast({ title: '셀 지우기 완료' }); else toast({ variant: 'destructive', title: '삭제 실패' }); } }, [editingCell, selectionStart, selectionEnd, filteredData, columns, data, onBulkSave, toast, recordHistory]);
-  const handleSaveInternal = React.useCallback(async (id: any, field: any, value: any) => { const rIdx = filteredData.findIndex(r => r.id === id); const cIdx = columns.findIndex(c => c.key === field); if (value === 'OPEN_PICKER') { if (rIdx !== -1) setEditingCell({ row: rIdx, col: cIdx }); setIsPickerOpen(true); return { success: true }; } const student = data.find(s => s.id === id); if (student && student[field] !== value) recordHistory([{ id, field, oldValue: student[field] }]); setEditingCell(null); setData(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s)); setDetailData((prev: any) => (prev && prev.id === id) ? { ...prev, [field]: value } : prev); return onSave(id, field, value); }, [onSave, filteredData, columns, data, recordHistory]);
+  const handleSaveInternal = React.useCallback(async (id: any, field: any, value: any) => { 
+    const rIdx = filteredData.findIndex(r => r.id === id); 
+    const cIdx = columns.findIndex(c => c.key === field); 
+    if (value === 'OPEN_PICKER') { 
+      if (rIdx !== -1) setEditingCell({ row: rIdx, col: cIdx }); 
+      setIsPickerOpen(true); 
+      return { success: true }; 
+    } 
+    
+    // 'CLEARED' 또는 빈 문자열인 경우 실제 null로 변환하여 저장
+    const finalValue = (value === 'CLEARED' || value === '') ? null : value;
+    
+    const student = data.find(s => s.id === id); 
+    if (student && student[field] !== finalValue) recordHistory([{ id, field, oldValue: student[field] }]); 
+    setEditingCell(null); 
+    setData(prev => prev.map(s => s.id === id ? { ...s, [field]: finalValue } : s)); 
+    setDetailData((prev: any) => (prev && prev.id === id) ? { ...prev, [field]: finalValue } : prev); 
+    return onSave(id, field, finalValue); 
+  }, [onSave, filteredData, columns, data, recordHistory]);
   const handleKeyDown = React.useCallback((e: React.KeyboardEvent) => { if (editingCell) return; if (e.ctrlKey && e.key === 'c') { e.preventDefault(); handleCopy(); return; } if (e.ctrlKey && e.key === 'v') { e.preventDefault(); handlePaste(); return; } if (e.ctrlKey && e.key === 'z') { e.preventDefault(); handleUndo(); return; } if (e.ctrlKey && e.key === 'y') { e.preventDefault(); handleRedo(); return; } if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); handleDelete(); return; } let { row, col } = selectionEnd || selectionStart || { row: 0, col: 0 }; switch (e.key) { case 'ArrowUp': row = Math.max(0, row - 1); break; case 'ArrowDown': row = Math.min(filteredData.length - 1, row + 1); break; case 'ArrowLeft': col = Math.max(0, col - 1); break; case 'ArrowRight': col = Math.min(columns.length - 1, col + 1); break; case 'Enter': if (selectionStart) { const config = columns[selectionStart.col]; if (config.type === 'multi-select') { setEditingCell({row: selectionStart.row, col: selectionStart.col}); setIsPickerOpen(true); } else setEditingCell({ row: selectionStart.row, col: selectionStart.col }); } return; case 'Escape': setSelectionStart(null); setSelectionEnd(null); return; default: return; } e.preventDefault(); if (e.shiftKey) setSelectionEnd({ row, col }); else { setSelectionStart({ row, col }); setSelectionEnd({ row, col }); } if (containerRef.current) { const targetY = row * ROW_HEIGHT + HEADER_HEIGHT; const curS = containerRef.current.scrollTop; if (targetY < curS + HEADER_HEIGHT) containerRef.current.scrollTop = targetY - HEADER_HEIGHT; else if (targetY + ROW_HEIGHT > curS + containerHeight) containerRef.current.scrollTop = targetY + ROW_HEIGHT - containerHeight; } }, [editingCell, selectionStart, selectionEnd, filteredData, columns, HEADER_HEIGHT, containerHeight, handleDelete, handleCopy, handlePaste, handleUndo, handleRedo]);
 
   return (
@@ -420,10 +438,44 @@ export function StandardSpreadsheetTable({ data: initialData, columns, onSave, o
         <div className="grid grid-cols-1 gap-3 lg:hidden p-1 overflow-y-auto">
           {filteredData.map((row) => {
             const titleCol = columns.find(c => c.key.includes('name')) || columns[1];
-            const subTitleCol = columns.find(c => c.key.includes('number')) || columns[0];
             const statusCol = columns.find(c => c.key.includes('status') || c.key.includes('aspiration'));
-            const infoCols = columns.filter(c => c.key !== titleCol?.key && c.key !== subTitleCol?.key && c.key !== statusCol?.key && c.type !== 'action' && c.key !== 'certificates').slice(0, 4);
-            return (<div key={row.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm active:scale-[0.98] transition-transform cursor-pointer" onClick={() => setDetailData(row)}><div className="flex items-start justify-between mb-3"><div className="flex items-center gap-3"><div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold shrink-0">{String(row[titleCol?.key || ''] || '?')[0]}</div><div className="min-w-0"><h3 className="font-bold text-slate-900 truncate">{row[titleCol?.key || ''] || '이름 없음'}</h3><p className="text-[11px] text-slate-500 truncate">{subTitleCol?.label}: {row[subTitleCol?.key || ''] || '-'}</p></div></div>{statusCol && <Badge className={cn("text-[10px] px-2 py-0.5 shrink-0", statusCol.variant?.(row[statusCol.key]))}>{row[statusCol.key] || '미설정'}</Badge>}</div><div className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-50 pt-3">{infoCols.map(col => (<div key={col.key} className="space-y-0.5 min-w-0"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate">{col.label}</p><p className="text-xs font-semibold text-slate-700 truncate">{row[col.key] || '-'}</p></div>))}</div><div className="mt-3 flex items-center justify-between text-slate-400"><div className="flex gap-1 overflow-hidden">{normalizeCertificates(row?.certificates || []).slice(0, 2).map((cert, i) => (<span key={i} className="text-[8px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-sm whitespace-nowrap">{cert}</span>))}{normalizeCertificates(row?.certificates || []).length > 2 && (<span className="text-[8px] text-slate-400">+{normalizeCertificates(row?.certificates || []).length - 2}</span>)}</div><ChevronRight className="h-4 w-4" /></div></div>);
+            
+            // 헤더에 이미 표시된 정보(학과, 반, 번호, 성명)와 액션/자격증을 제외한 나머지 정보 중 상위 6개 추출
+            const infoCols = columns.filter(c => 
+              c.key !== 'major' && 
+              c.key !== 'class_info' && 
+              c.key !== 'student_number' && 
+              c.key !== titleCol?.key && 
+              c.key !== statusCol?.key && 
+              c.type !== 'action' && 
+              c.key !== 'certificates'
+            ).slice(0, 6);
+
+            return (
+              <div key={row.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm active:scale-[0.98] transition-transform cursor-pointer" onClick={() => setDetailData(row)}>
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold shrink-0">
+                      {String(row[titleCol?.key || ''] || '?')[0]}
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-slate-900 truncate">{row[titleCol?.key || ''] || '이름 없음'}</h3>
+                      <p className="text-[11px] text-slate-500 truncate">
+                        {row.major || ''} {row.class_info ? `${row.class_info}반` : ''} {row.student_number ? `${row.student_number}번` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  {statusCol && <Badge className={cn("text-[10px] px-2 py-0.5 shrink-0", statusCol.variant?.(row[statusCol.key]))}>{row[statusCol.key] || '미설정'}</Badge>}
+                </div>
+                <div className="grid grid-cols-3 gap-x-2 gap-y-3 border-t border-slate-50 pt-3">
+                  {infoCols.map(col => (
+                    <div key={col.key} className="space-y-0.5 min-w-0">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate">{col.label}</p>
+                      <p className="text-xs font-semibold text-slate-700 truncate">{row[col.key] || '-'}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center justify-between text-slate-400"><div className="flex gap-1 overflow-hidden">{normalizeCertificates(row?.certificates || []).slice(0, 2).map((cert, i) => (<span key={i} className="text-[8px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-sm whitespace-nowrap">{cert}</span>))}{normalizeCertificates(row?.certificates || []).length > 2 && (<span className="text-[8px] text-slate-400">+{normalizeCertificates(row?.certificates || []).length - 2}</span>)}</div><ChevronRight className="h-4 w-4" /></div></div>);
           })}
           {filteredData.length === 0 && <div className="text-center py-20 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200"><p className="text-sm text-slate-400">검색 결과가 없습니다.</p></div>}
         </div>
