@@ -228,7 +228,7 @@ const COLUMNS: ColumnConfig[] = [
   { key: 'is_hiring_conversion', label: '채용\n전환', width: 85, readOnly: true },
   { key: 'is_returned', label: '복교', width: 60, readOnly: true },
   { key: 'field_training_action', label: '실습이력', width: 100, type: 'action' },
-  { key: 'remarks', label: '비고', width: 150 },
+  { key: 'personal_remarks', label: '비고(특이사항)', width: 150 },
 ]
 
 const GROUP_HEADERS = [

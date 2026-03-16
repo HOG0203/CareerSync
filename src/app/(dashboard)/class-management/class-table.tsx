@@ -214,7 +214,7 @@ export function ClassTable({ initialData, masterCertificates }: ClassTableProps)
       baseCols.push({ key: 'top_size', label: '상의', width: 50 });
     }
 
-    baseCols.push({ key: 'personal_remarks', label: '비고(행정)', width: 150 });
+    baseCols.push({ key: 'personal_remarks', label: '비고(특이사항)', width: 150 });
     baseCols.push({ key: 'counseling_log_action', label: '상담일지', width: 100, type: 'action' });
 
     return baseCols;
