@@ -27,6 +27,7 @@ export type StudentEmploymentData = {
   shoe_size?: string;
   top_size?: string;
   personal_remarks?: string;
+  career_course?: string;
 };
 
 export type FieldTrainingRecord = {

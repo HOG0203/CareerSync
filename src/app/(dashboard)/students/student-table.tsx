@@ -6,7 +6,7 @@ import { updateStudentField, bulkUpdateStudentData } from '@/app/students/action
 import { MasterCertificate } from '@/app/(dashboard)/admin/settings/actions'
 import { FieldTrainingModal } from './field-training-modal'
 
-// 행 데이터 기반 동적 진로코스 옵션 생성 함수
+// 행 데이터 기반 동적 기업유형 옵션 생성 함수
 const GET_CAREER_COURSE_OPTIONS = (rowData: any) => {
   const aspiration = rowData?.career_aspiration;
   
@@ -17,24 +17,46 @@ const GET_CAREER_COURSE_OPTIONS = (rowData: any) => {
       { label: '중견/강소기업', value: '중견/강소기업' },
       { label: '가업승계', value: '가업승계' },
       { label: '부사관', value: '부사관' },
-      { label: '아우스빌둥', value: '아우스빌둥' },
-      { label: '도제', value: '도제' },
       { label: '기타(직접입력)', value: '기타(직접입력)' },
     ];
   }
   
+  // 제외인정자나 진학일 경우 기업유형 선택 안함
+  return [];
+}
+
+// 행 데이터 기반 동적 세부 진로코스 옵션 생성 함수
+const GET_SPECIFIC_COURSE_OPTIONS = (rowData: any) => {
+  const aspiration = rowData?.career_aspiration;
+
+  if (aspiration === '취업') {
+    return [
+      { label: '청솔반', value: '청솔반' },
+      { label: '취업맞춤반', value: '취업맞춤반' },
+      { label: '반도체아카데미반', value: '반도체아카데미반' },
+      { label: '혁신인재반', value: '혁신인재반' },
+      { label: '계약학과', value: '계약학과' },
+      { label: '도제반', value: '도제반' },
+      { label: '아우스빌둥', value: '아우스빌둥' },
+      { label: '기타(직접입력)', value: '기타(직접입력)' },
+    ];
+  }
+
   if (aspiration === '제외인정자') {
     return [
       { label: '군특성화', value: '군특성화' },
       { label: '기술사관', value: '기술사관' },
       { label: '운동부', value: '운동부' },
-      { label: '특수교육대상자', value: '특수교육대상자' },
       { label: '기타(직접입력)', value: '기타(직접입력)' },
     ];
   }
-  
-  if (aspiration === '진학' || !aspiration) {
-    return [];
+
+  if (aspiration === '진학') {
+    return [
+      { label: '전문대학', value: '전문대학' },
+      { label: '4년제대학', value: '4년제대학' },
+      { label: '기타(직접입력)', value: '기타(직접입력)' },
+    ];
   }
 
   return [];
@@ -48,7 +70,7 @@ const COLUMNS: ColumnConfig[] = [
   { key: 'student_name', label: '성명', width: 65, readOnly: true },
   { 
     key: 'career_aspiration', 
-    label: '진로\n희망', 
+    label: '진로희망', 
     width: 80, 
     type: 'select',
     options: [
@@ -69,7 +91,7 @@ const COLUMNS: ColumnConfig[] = [
   },
   { 
     key: 'special_notes', 
-    label: '진로 코스', 
+    label: '희망\n기업유형', 
     width: 100, 
     type: 'select',
     options: (rowData) => GET_CAREER_COURSE_OPTIONS(rowData),
@@ -85,6 +107,28 @@ const COLUMNS: ColumnConfig[] = [
       if (val === '중견/강소기업') return 'bg-purple-50 text-purple-700 border-purple-100';
       if (val === '가업승계') return 'bg-amber-50 text-amber-700 border-amber-100';
       if (val === '부사관') return 'bg-cyan-50 text-cyan-700 border-cyan-100';
+      if (val === '아우스빌둥') return 'bg-rose-50 text-rose-700 border-rose-100';
+      if (val === '군특성화') return 'bg-teal-50 text-teal-700 border-teal-100';
+      if (val === '기술사관') return 'bg-lime-50 text-lime-700 border-lime-100';
+      if (val === '운동부') return 'bg-yellow-50 text-yellow-700 border-yellow-100';
+      if (val === '기타(직접입력)') return 'bg-violet-50 text-violet-700 border-violet-100';
+      return 'bg-slate-50 text-slate-600 border-slate-100';
+    }
+  },
+  { 
+    key: 'career_course', 
+    label: '희망\n진로코스', 
+    width: 120, 
+    type: 'select',
+    options: (rowData) => GET_SPECIFIC_COURSE_OPTIONS(rowData),
+    variant: (val) => {
+      if (!val) return '';
+      if (val === '청솔반') return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+      if (val === '취업맞춤반') return 'bg-amber-50 text-amber-700 border-amber-100';
+      if (val === '반도체아카데미반') return 'bg-blue-50 text-blue-700 border-blue-100';
+      if (val === '혁신인재반') return 'bg-indigo-50 text-indigo-700 border-indigo-100';
+      if (val === '계약학과') return 'bg-purple-50 text-purple-700 border-purple-100';
+      if (val === '도제반' || val === '도제') return 'bg-pink-50 text-pink-700 border-pink-100';
       if (val === '아우스빌둥') return 'bg-rose-50 text-rose-700 border-rose-100';
       if (val === '군특성화') return 'bg-teal-50 text-teal-700 border-teal-100';
       if (val === '기술사관') return 'bg-lime-50 text-lime-700 border-lime-100';
@@ -188,7 +232,7 @@ const COLUMNS: ColumnConfig[] = [
 ]
 
 const GROUP_HEADERS = [
-  { label: '기본 정보', colSpan: 6, className: 'bg-slate-100 text-slate-900 text-[11px]' },
+  { label: '기본 정보', colSpan: 7, className: 'bg-slate-100 text-slate-900 text-[11px]' },
   { label: '취업 현황', colSpan: 5, className: 'bg-blue-100/50 text-blue-900 text-[11px]' },
   { label: '현장실습 상세 및 결과 (최근 차수)', colSpan: 7, className: 'bg-amber-100/50 text-amber-900 text-[11px]' },
   { label: '비고(특이사항)', colSpan: 1, className: 'bg-slate-50 text-slate-700 text-[11px]' },

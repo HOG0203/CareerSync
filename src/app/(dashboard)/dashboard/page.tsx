@@ -113,31 +113,33 @@ export default async function DashboardPage({
 
   return (
     <div className="flex flex-col h-full gap-4 lg:gap-6">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between shrink-0 gap-4 px-1">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-2xl lg:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
-            <LayoutDashboard className="h-7 w-7 lg:h-8 lg:w-8 text-indigo-600" />
+      <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between shrink-0 gap-4 px-1">
+        <div className="flex flex-col gap-1 min-w-0 items-start">
+          <h2 className="text-2xl lg:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2 whitespace-nowrap">
+            <LayoutDashboard className="h-7 w-7 lg:h-8 lg:w-8 text-indigo-600 shrink-0" />
             종합 통계 대시보드
           </h2>
-          <div className="flex flex-col gap-0.5 text-muted-foreground text-[10px] lg:text-xs font-medium leading-relaxed">
-            <p>학교 전체의 진로 및 취업 현황을 실시간 통계로 분석합니다.</p>
-            <p className="text-indigo-600 font-bold">
+          <div className="flex flex-col gap-0.5 text-muted-foreground text-[10px] lg:text-xs font-medium leading-relaxed items-start">
+            <p className="whitespace-nowrap">학교 전체의 진로 및 취업 현황을 실시간 통계로 분석합니다.</p>
+            <p className="text-indigo-600 font-bold whitespace-nowrap">
               {ay}학년도 {grade}학년 {selectedMajor !== 'all' ? `${selectedMajor} ` : '전체 학과 '}
               {selectedClass !== 'all' ? `${selectedClass}반 ` : ''}
               분석 결과
             </p>
           </div>
         </div>
-        <div className="shrink-0 scale-95 lg:scale-100 origin-left lg:origin-right">
-          <DashboardFilters 
-            graduationYears={graduationYears} 
-            majors={majors} 
-            classes={classes} 
-            statuses={statuses} 
-            defaultYear={selectedYear}
-            baseYear={settings.baseYear}
-            hideGrade={false}
-          />
+        <div className="shrink-0 xl:scale-100 origin-left xl:origin-bottom-right overflow-x-auto w-full xl:w-auto">
+          <div className="flex justify-start xl:justify-end">
+            <DashboardFilters 
+              graduationYears={graduationYears} 
+              majors={majors} 
+              classes={classes} 
+              statuses={statuses} 
+              defaultYear={selectedYear}
+              baseYear={settings.baseYear}
+              hideGrade={false}
+            />
+          </div>
         </div>
       </div>
 

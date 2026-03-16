@@ -24,7 +24,7 @@ const normalizeDate = (dateStr: string | null | undefined): string | null => {
 const BASIC_INFO_FIELDS = [
   'student_id', 'student_name', 'graduation_year', 'major', 'class_info', 
   'student_number', 'shoe_size', 'top_size', 'personal_remarks', 'certificates',
-  'career_aspiration', 'military_status', 'special_notes'
+  'career_aspiration', 'military_status', 'special_notes', 'career_course'
 ];
 
 /**

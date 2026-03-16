@@ -114,12 +114,12 @@ export default async function ClassManagementPage({
   return (
     <div className="flex flex-col h-full gap-4 sm:gap-6">
       <div className="flex items-center justify-between shrink-0 px-1">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
-            <Users className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
+        <div className="flex flex-col gap-1 min-w-0">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2 whitespace-nowrap">
+            <Users className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600 shrink-0" />
             학반 관리
           </h2>
-          <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed">
+          <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed whitespace-nowrap overflow-hidden text-ellipsis">
             {isAdmin ? '관리자 권한으로 전교생 학반 세부 사항을 관리합니다.' : '담당 학반 학생들의 세부 사항을 관리 및 수정합니다.'}
           </p>
         </div>

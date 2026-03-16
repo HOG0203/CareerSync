@@ -98,25 +98,25 @@ export default async function StudentsPage({
 
   return (
     <div className="flex flex-col h-[calc(100vh-135px)] lg:h-[calc(100vh-95px)] overflow-hidden">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between shrink-0 mb-3 lg:mb-5 px-1">
-        <div className="flex flex-col lg:flex-row lg:items-center flex-1 w-full">
-          <div className="flex flex-col mb-3 lg:mb-0">
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
-              <Users className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
-              학생 취업 현황
-              <span className="text-[10px] sm:text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full whitespace-nowrap">3학년 통합관리</span>
-            </h2>
-            <div className="flex flex-col gap-0.5 text-muted-foreground text-[10px] sm:text-xs font-medium leading-relaxed">
-              <p>졸업 예정자들의 취업 이력과 현장실습 데이터를 통합 관리합니다.</p>
-              <p className="text-blue-600 font-bold">
-                {parseInt(selectedYear) - 1}학년도 3학년 {params.major && params.major !== 'all' ? `${params.major} ` : '전체 학과 '}
-                {params.class && params.class !== 'all' ? `${params.class}반 ` : ''}
-                총 {filteredData.length}명 조회 중
-              </p>
-            </div>
+      <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between shrink-0 mb-3 lg:mb-5 px-1 gap-4">
+        <div className="flex flex-col gap-1 min-w-0">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2 whitespace-nowrap">
+            <Users className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600 shrink-0" />
+            학생 취업 현황
+            <span className="text-[10px] sm:text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full whitespace-nowrap">3학년 통합관리</span>
+          </h2>
+          <div className="flex flex-col gap-0.5 text-muted-foreground text-[10px] sm:text-xs font-medium leading-relaxed">
+            <p className="whitespace-nowrap overflow-hidden text-ellipsis">졸업 예정자들의 취업 이력과 현장실습 데이터를 통합 관리합니다.</p>
+            <p className="text-blue-600 font-bold whitespace-nowrap">
+              {parseInt(selectedYear) - 1}학년도 3학년 {params.major && params.major !== 'all' ? `${params.major} ` : '전체 학과 '}
+              {params.class && params.class !== 'all' ? `${params.class}반 ` : ''}
+              총 {filteredData.length}명 조회 중
+            </p>
           </div>
-          
-          <div className="bg-slate-100/50 p-1 rounded-xl border border-slate-200 w-full sm:w-auto sm:ml-auto flex-shrink-0">
+        </div>
+        
+        <div className="bg-slate-100/50 p-1 rounded-xl border border-slate-200 shrink-0 overflow-x-auto w-full xl:w-auto">
+          <div className="flex justify-start xl:justify-end">
             <DashboardFilters 
               graduationYears={graduationYears}
               majors={majors}
