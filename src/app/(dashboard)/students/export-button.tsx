@@ -15,17 +15,26 @@ export function ExportButton({ data, filename = '학생_취업_현황.csv' }: Ex
 
     // 1. 헤더 정의 (출력 순서 및 명칭)
     const headers = [
+      { key: 'student_id', label: '학번' },
       { key: 'graduation_year', label: '졸업연도' },
       { key: 'major', label: '학과' },
-      { key: 'class_info', label: '학반' },
+      { key: 'class_info', label: '반' },
       { key: 'student_number', label: '번호' },
       { key: 'student_name', label: '성명' },
-      { key: 'is_desiring_employment', label: '취업희망' },
+      { key: 'career_aspiration', label: '진로희망' },
+      { key: 'special_notes', label: '희망 기업유형' },
+      { key: 'career_course', label: '희망 진로코스' },
+      { key: 'is_desiring_employment', label: '취업희망여부' },
+      { key: 'business_type', label: '취업여부(사업구분)' },
       { key: 'employment_status', label: '취업구분' },
       { key: 'company_type', label: '기업구분' },
-      { key: 'business_type', label: '사업구분' },
       { key: 'company', label: '회사명' },
+      { key: 'certificates', label: '취득자격증' },
+      { key: 'military_status', label: '병역희망' },
+      { key: 'shoe_size', label: '신발사이즈' },
+      { key: 'top_size', label: '상의사이즈' },
       { key: 'has_field_training', label: '현장실습 실시유무' },
+      { key: 'latest_training_company', label: '실습처(회사명)' },
       { key: 'start_date', label: '현장실습 시작일' },
       { key: 'end_date', label: '현장실습 종료일' },
       { key: 'training_stipend_status', label: '지원금 신청' },
@@ -33,7 +42,8 @@ export function ExportButton({ data, filename = '학생_취업_현황.csv' }: Ex
       { key: 'conversion_date', label: '채용전환일' },
       { key: 'is_returned', label: '복교 유무' },
       { key: 'return_to_school_reason', label: '복교사유' },
-      { key: 'remarks', label: '비고' },
+      { key: 'remarks', label: '취업비고' },
+      { key: 'personal_remarks', label: '개인비고' },
     ];
 
     // 2. CSV 데이터 생성

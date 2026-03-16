@@ -60,7 +60,7 @@ export function ImportButton() {
   }
 
   const downloadTemplate = () => {
-    const headers = "학번,졸업연도,학과,학반,번호,성명,취업희망,취업구분,기업구분,사업구분,회사명,현장실습 실시유무,현장실습 시작일,현장실습 종료일,지원금 신청,채용전환,채용전환일,복교 유무,복교사유,비고"
+    const headers = "학번,졸업연도,학과,반,번호,성명,진로희망,희망 기업유형,희망 진로코스,취업희망여부,취업여부(사업구분),취업구분,기업구분,회사명,취득자격증,병역희망,신발사이즈,상의사이즈,현장실습 실시유무,실습처(회사명),현장실습 시작일,현장실습 종료일,지원금 신청,채용전환,채용전환일,복교 유무,복교사유,취업비고,개인비고"
     const BOM = '\uFEFF';
     const blob = new Blob([BOM + headers], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')

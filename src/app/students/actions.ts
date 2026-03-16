@@ -86,7 +86,7 @@ export async function uploadStudentsCSV(csvData: string) {
 
     const student_id = values[0] || await getNextStudentId(supabase, graduation_year)
 
-    // 1. students 테이블 UPSERT
+    // 1. students 테이블 UPSERT (기본 인적사항 + 진로 방향 + 사이즈 등)
     const { data: student, error: sError } = await supabase
       .from('students')
       .upsert({
@@ -95,38 +95,46 @@ export async function uploadStudentsCSV(csvData: string) {
         major: values[2],
         class_info: values[3],
         student_number: values[4],
-        student_name: values[5]
+        student_name: values[5],
+        career_aspiration: values[6],
+        special_notes: values[7],
+        career_course: values[8],
+        certificates: values[14] ? values[14].split(';').map(c => c.trim()) : [],
+        military_status: values[15],
+        shoe_size: values[16],
+        top_size: values[17],
+        personal_remarks: values[28]
       }, { onConflict: 'student_id' })
       .select('id, graduation_year, major, class_info, student_number')
       .single()
 
     if (sError || !student) continue;
 
-    // 2. student_employments 테이블 UPSERT (실습 관련 컬럼 제외)
+    // 2. student_employments 테이블 UPSERT (취업 상세 정보)
     await supabase.from('student_employments').upsert({
       id: student.id,
-      is_desiring_employment: values[6] || '예',
-      employment_status: values[7],
-      company_type: values[8],
-      business_type: values[9],
-      company: values[10],
-      remarks: values[19]
+      is_desiring_employment: values[9] || '예',
+      business_type: values[10] || '아니오',
+      employment_status: values[11],
+      company_type: values[12],
+      company: values[13],
+      remarks: values[27]
     }, { onConflict: 'id' })
 
-    // 3. field_training_records (1차 실습 정보) - 실습 시작일 또는 종료일이 있는 경우에만 생성
-    const startDate = normalizeDate(values[12]);
-    const endDate = normalizeDate(values[13]);
+    // 3. field_training_records (1차 실습 정보)
+    const startDate = normalizeDate(values[20]);
+    const endDate = normalizeDate(values[21]);
     if (startDate || endDate) {
       await supabase.from('field_training_records').upsert({
         student_id: student.id,
         training_order: 1,
-        company: values[10] || '미지정',
+        company: values[19] || values[13] || '미지정',
         start_date: startDate,
         end_date: endDate,
-        stipend_status: values[14] || 'X',
-        hiring_status: values[15] === 'O' ? '채용전환' : (values[17] === 'O' ? '복교' : '진행중'),
-        conversion_date: normalizeDate(values[16]),
-        return_reason: values[18]
+        stipend_status: values[22] || 'X',
+        hiring_status: values[23] === 'O' || values[23] === '예' || values[23] === '채용전환' ? '채용전환' : (values[25] === 'O' || values[25] === '예' || values[25] === '복교' ? '복교' : '진행중'),
+        conversion_date: normalizeDate(values[24]),
+        return_reason: values[26]
       }, { onConflict: 'student_id, training_order' })
     }
 
