@@ -35,10 +35,12 @@ const VIVID_COLORS = [
   '#8b5cf6', // 기타 (Violet)
 ];
 
-// 범례 및 정렬 순서 정의 (취업 하위 -> 진학 -> 제외인정자 하위)
+// 범례 및 정렬 순서 정의 (취업 하위 -> 진학 -> 미설정/제외인정자 -> 특수 코스)
 const COURSE_ORDER = [
   '대/공기업', '공무원', '중견/강소기업', '가업승계', '부사관', '아우스빌둥', '도제',
-  '진학', // 진로희망이 진학인 경우
+  '진학', 
+  '미설정', 
+  '제외인정자', 
   '군특성화', '기술사관', '운동부', '특수교육대상자', '기타(직접입력)'
 ];
 
@@ -55,8 +57,17 @@ export default function CareerCourseChart({
 
   // 학생의 진로 코스를 결정하는 헬퍼 함수
   const getStudentCourse = (student: StudentEmploymentData) => {
+    // 1. 진로희망이 '제외인정자'인 경우 -> 무조건 '제외인정자'
+    if (student.career_aspiration === '제외인정자') return '제외인정자';
+    
+    // 2. 진로희망이 '진학'인 경우 -> '진학'
     if (student.career_aspiration === '진학') return '진학';
-    return student.special_notes || '미설정';
+    
+    // 3. 진로희망이 '취업' 또는 미정인 경우 중 기업유형이 없는 경우 -> '미설정'
+    if (!student.special_notes) return '미설정';
+    
+    // 4. 그 외 설정된 기업유형 값 반환
+    return student.special_notes;
   };
 
   // 1. 도넛 차트용 전체 집계 데이터
@@ -71,8 +82,6 @@ export default function CareerCourseChart({
       .map(([name, value]) => ({ name, value }))
       .filter(d => d.value > 0)
       .sort((a, b) => {
-        if (a.name === '미설정') return 1;
-        if (b.name === '미설정') return -1;
         const indexA = COURSE_ORDER.indexOf(a.name);
         const indexB = COURSE_ORDER.indexOf(b.name);
         
@@ -92,8 +101,6 @@ export default function CareerCourseChart({
     const existingCourses = Array.from(new Set(data.map(s => getStudentCourse(s))))
       .filter(c => data.some(s => getStudentCourse(s) === c))
       .sort((a, b) => {
-        if (a === '미설정') return 1;
-        if (b === '미설정') return -1;
         const indexA = COURSE_ORDER.indexOf(a);
         const indexB = COURSE_ORDER.indexOf(b);
         if (indexA !== -1 && indexB !== -1) return indexA - indexB;
@@ -128,8 +135,6 @@ export default function CareerCourseChart({
     const config: ChartConfig = { value: { label: '학생 수' } };
     const activeCourses = Array.from(new Set(data.map(s => getStudentCourse(s))))
       .sort((a, b) => {
-        if (a === '미설정') return 1;
-        if (b === '미설정') return -1;
         const indexA = COURSE_ORDER.indexOf(a);
         const indexB = COURSE_ORDER.indexOf(b);
         if (indexA !== -1 && indexB !== -1) return indexA - indexB;
@@ -138,7 +143,9 @@ export default function CareerCourseChart({
 
     activeCourses.forEach((opt) => {
       const globalIdx = COURSE_ORDER.indexOf(opt);
-      const color = opt === '미설정' ? '#cbd5e1' : VIVID_COLORS[globalIdx % VIVID_COLORS.length] || VIVID_COLORS[0];
+      let color = VIVID_COLORS[globalIdx % VIVID_COLORS.length] || VIVID_COLORS[0];
+      if (opt === '제외인정자') color = '#94a3b8'; // Slate-400
+      if (opt === '미설정') color = '#cbd5e1'; // Slate-300
       config[opt] = { label: opt, color };
     });
     return config;
