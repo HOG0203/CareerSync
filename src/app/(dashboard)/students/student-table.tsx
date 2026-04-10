@@ -150,6 +150,42 @@ const COLUMNS: ColumnConfig[] = [
     }
   },
   { 
+    key: 'employment_status', label: '진로\n코스', width: 100, type: 'select', 
+    options: [
+      { label: '청솔반', value: '청솔반' }, 
+      { label: '취업맞춤반', value: '취업맞춤반' }, 
+      { label: '반도체아카데미반', value: '반도체아카데미반' }, 
+      { label: '혁신인재반', value: '혁신인재반' }, 
+      { label: '계약학과', value: '계약학과' }, 
+      { label: '도제반', value: '도제반' }, 
+      { label: '아우스빌둥', value: '아우스빌둥' },
+      { label: '일반취업', value: '일반취업' }, 
+      { label: '기술사관', value: '기술사관' }, 
+      { label: '군특성화', value: '군특성화' }, 
+      { label: '운동부', value: '운동부' },
+      { label: '진학', value: '진학' },
+      { label: '기타(직접입력)', value: '기타(직접입력)' }
+    ],
+    variant: (val) => {
+      switch (val) {
+        case '청솔반': return 'bg-emerald-50 text-emerald-700 border-emerald-100'
+        case '취업맞춤반': return 'bg-amber-50 text-amber-700 border-amber-100'
+        case '반도체아카데미반': return 'bg-blue-50 text-blue-700 border-blue-100'
+        case '혁신인재반': return 'bg-indigo-50 text-indigo-700 border-indigo-100'
+        case '계약학과': return 'bg-purple-50 text-purple-700 border-purple-100'
+        case '도제반': return 'bg-pink-50 text-pink-700 border-pink-100'
+        case '아우스빌둥': return 'bg-sky-100 text-sky-700 border-sky-200'
+        case '일반취업': return 'bg-blue-50 text-blue-700 border-blue-100'
+        case '기술사관': return 'bg-cyan-50 text-cyan-700 border-cyan-100'
+        case '군특성화': return 'bg-indigo-50 text-indigo-700 border-indigo-100'
+        case '운동부': return 'bg-yellow-50 text-yellow-700 border-yellow-100'
+        case '진학': return 'bg-indigo-50 text-indigo-700 border-indigo-100'
+        case '기타(직접입력)': return 'bg-violet-50 text-violet-700 border-violet-100'
+        default: return val ? 'bg-slate-50 text-slate-600 border-slate-100' : ''
+      }
+    }
+  },
+  { 
     key: 'business_type', 
     label: '취업\n여부', 
     width: 80,
@@ -164,34 +200,6 @@ const COLUMNS: ColumnConfig[] = [
         case '예': return 'bg-emerald-100 text-emerald-700 border-emerald-200'
         case '아니오': return 'bg-rose-100 text-rose-700 border-rose-200'
         case '제외인정자': return 'bg-slate-100 text-slate-700 border-slate-200'
-        default: return val ? 'bg-slate-50 text-slate-600 border-slate-100' : ''
-      }
-    }
-  },
-  { 
-    key: 'employment_status', label: '취업\n구분', width: 100, type: 'select', 
-    options: [
-      { label: '일반취업', value: '일반취업' }, 
-      { label: '청솔반', value: '청솔반' }, 
-      { label: '취업맞춤반', value: '취업맞춤반' }, 
-      { label: '일학습병행', value: '일학습병행' }, 
-      { label: '군특성화', value: '군특성화' }, 
-      { label: '기술사관', value: '기술사관' }, 
-      { label: '도제', value: '도제' }, 
-      { label: '아우스빌둥', value: '아우스빌둥' },
-      { label: '면접진행중', value: '면접진행중' }
-    ],
-    variant: (val) => {
-      switch (val) {
-        case '일반취업': return 'bg-blue-50 text-blue-700 border-blue-100'
-        case '청솔반': return 'bg-emerald-50 text-emerald-700 border-emerald-100'
-        case '취업맞춤반': return 'bg-amber-50 text-amber-700 border-amber-100'
-        case '일학습병행': return 'bg-purple-50 text-purple-700 border-purple-100'
-        case '군특성화': return 'bg-indigo-50 text-indigo-700 border-indigo-100'
-        case '기술사관': return 'bg-cyan-50 text-cyan-700 border-cyan-100'
-        case '도제': return 'bg-pink-50 text-pink-700 border-pink-100'
-        case '면접진행중': return 'bg-orange-100 text-orange-800 border-orange-200'
-        case '아우스빌둥': return 'bg-sky-100 text-sky-700 border-sky-200'
         default: return val ? 'bg-slate-50 text-slate-600 border-slate-100' : ''
       }
     }

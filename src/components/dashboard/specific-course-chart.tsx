@@ -25,19 +25,19 @@ const VIVID_COLORS = [
   '#3b82f6', // 반도체아카데미반 (Blue)
   '#6366f1', // 혁신인재반 (Indigo)
   '#a855f7', // 계약학과 (Purple)
-  '#ec4899', // 도제반 (Pink)
+  '#db2777', // 도제반 (Pink)
   '#f43f5e', // 아우스빌둥 (Rose)
-  '#14b8a6', // 군특성화 (Teal)
-  '#84cc16', // 기술사관 (Lime)
+  '#2563eb', // 일반취업 (Blue-Deep)
+  '#06b6d4', // 기술사관 (Cyan)
+  '#0d9488', // 군특성화 (Teal)
   '#eab308', // 운동부 (Yellow)
-  '#8b5cf6', // 전문대학 (Violet)
-  '#4f46e5', // 4년제대학 (Indigo-Deep)
-  '#94a3b8', // 기타 (Slate)
+  '#4f46e5', // 진학 (Indigo-Deep)
+  '#8b5cf6', // 기타(직접입력) (Violet)
 ];
 
 const COURSE_ORDER = [
-  '청솔반', '취업맞춤반', '반도체아카데미반', '혁신인재반', '계약학과', '도제반', '아우스빌둥',
-  '군특성화', '기술사관', '운동부', '전문대학', '4년제대학', '기타(직접입력)'
+  '청솔반', '취업맞춤반', '반도체아카데미반', '혁신인재반', '계약학과', '도제반', '아우스빌둥', 
+  '일반취업', '기술사관', '군특성화', '운동부', '진학', '기타(직접입력)'
 ];
 
 export default function SpecificCourseChart({ 
@@ -52,7 +52,7 @@ export default function SpecificCourseChart({
   // 1. 도넛 차트용 전체 집계 데이터
   const formattedPieData = React.useMemo(() => {
     const counts = data.reduce((acc, student) => {
-      const course = student.career_course || '미설정';
+      const course = student.employment_status || '미설정';
       acc[course] = (acc[course] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -75,8 +75,8 @@ export default function SpecificCourseChart({
     const isFiltered = selectedMajor !== 'all';
     const groupKey = isFiltered ? 'class_info' : 'major';
     
-    const existingCourses = Array.from(new Set(data.map(s => s.career_course || '미설정')))
-      .filter(c => data.some(s => (s.career_course || '미설정') === c))
+    const existingCourses = Array.from(new Set(data.map(s => s.employment_status || '미설정')))
+      .filter(c => data.some(s => (s.employment_status || '미설정') === c))
       .sort((a, b) => {
         if (a === '미설정') return 1;
         if (b === '미설정') return -1;
@@ -100,7 +100,7 @@ export default function SpecificCourseChart({
             const groupStudents = data.filter((s: any) => s[groupKey] === group);
             const row: any = { group };
             existingCourses.forEach(course => {
-                row[course] = groupStudents.filter(s => (s.career_course || '미설정') === course).length;
+                row[course] = groupStudents.filter(s => (s.employment_status || '미설정') === course).length;
             });
             return row;
         }),
@@ -110,7 +110,7 @@ export default function SpecificCourseChart({
 
   const chartConfig = React.useMemo(() => {
     const config: ChartConfig = { value: { label: '학생 수' } };
-    const activeCourses = Array.from(new Set(data.map(s => s.career_course || '미설정')))
+    const activeCourses = Array.from(new Set(data.map(s => s.employment_status || '미설정')))
       .sort((a, b) => {
         const indexA = COURSE_ORDER.indexOf(a);
         const indexB = COURSE_ORDER.indexOf(b);
@@ -130,8 +130,8 @@ export default function SpecificCourseChart({
     <Card className="flex flex-col border-none shadow-sm bg-white/50 backdrop-blur-sm overflow-hidden h-full">
       <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
         <div className="flex flex-col gap-1">
-          <CardTitle className="text-lg font-bold text-emerald-900">희망 진로코스</CardTitle>
-          <CardDescription>{selectedMajor === 'all' ? '전체 학과' : `${selectedMajor}`} 진로코스 상세 현황입니다.</CardDescription>
+          <CardTitle className="text-lg font-bold text-emerald-900">진로코스</CardTitle>
+          <CardDescription>{selectedMajor === 'all' ? '전체 학과' : `${selectedMajor}`} 진로코스 현황입니다.</CardDescription>
         </div>
         <Tabs value={viewType} onValueChange={(v: any) => setViewType(v)} className="w-auto">
           <TabsList className="grid w-full grid-cols-2 h-8">
