@@ -11,8 +11,8 @@ export const metadata: Metadata = {
   description: '반별/학생별 취업 현황 그리드뷰',
 };
 
-const getCompanyTypeVariant = (type?: string, status?: string) => {
-  if (status === '미취업' || !status) return 'bg-white text-black border-gray-200';
+const getCompanyTypeVariant = (type?: string, businessType?: string) => {
+  if (businessType !== '예') return 'bg-white text-black border-gray-200';
   
   switch (type) {
     case '대기업':
@@ -182,7 +182,7 @@ export default async function EmploymentStatusPage({
                       key={student.id}
                       student={student}
                       idx={idx}
-                      variant={getCompanyTypeVariant(student.company_type, student.employment_status)}
+                      variant={getCompanyTypeVariant(student.company_type, student.business_type)}
                     />
                   ))}
                   {Array.from({ length: Math.max(0, 24 - students.length) }).map((_, i) => (

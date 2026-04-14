@@ -45,14 +45,27 @@ export function StudentGridCell({ student, idx, variant }: StudentGridCellProps)
         sideOffset={5}
       >
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between border-b pb-1 mb-1">
-            <span className="font-bold text-[13px] text-blue-900">{student.student_name}</span>
-            <span className={cn(
-              "text-[9px] px-1.5 py-0.5 rounded-full font-bold",
-              student.is_desiring_employment === '예' ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
-            )}>
-              희망: {student.is_desiring_employment || '미정'}
-            </span>
+          <div className="flex flex-col gap-1 border-b pb-1 mb-1">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-[13px] text-blue-900">{student.student_name}</span>
+              <span className={cn(
+                "text-[9px] px-1.5 py-0.5 rounded-full font-bold",
+                student.is_desiring_employment === '예' ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
+              )}>
+                희망: {student.is_desiring_employment || '미정'}
+              </span>
+            </div>
+            <div className="flex items-center justify-end">
+              <span className={cn(
+                "text-[9px] px-1.5 py-0.5 rounded-full font-bold",
+                student.business_type === '예' ? "bg-blue-100 text-blue-700" : 
+                student.business_type === '아니오' ? "bg-rose-100 text-rose-700" :
+                student.business_type === '제외인정자' ? "bg-slate-100 text-slate-700" :
+                "bg-slate-100 text-slate-600"
+              )}>
+                취업: {student.business_type || '미정'}
+              </span>
+            </div>
           </div>
           <div className="space-y-1 text-slate-600">
             <p className="flex justify-between"><span className="text-slate-400 font-medium">취업구분</span> <span className="font-semibold text-slate-700">{student.employment_status || '-'}</span></p>
