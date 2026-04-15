@@ -244,6 +244,7 @@ export function FieldTrainingModal({ isOpen, onClose, student }: FieldTrainingMo
                           <Popover 
                             open={openPopovers[`${recordKey}-start`]} 
                             onOpenChange={(open) => togglePopover(`${recordKey}-start`, open)}
+                            modal={true}
                           >
                             <PopoverTrigger asChild>
                               <Button variant="outline" className={cn("w-full h-8 sm:h-9 justify-start text-left font-normal text-[10px] sm:text-xs", !record.start_date && "text-muted-foreground")}>
@@ -251,7 +252,12 @@ export function FieldTrainingModal({ isOpen, onClose, student }: FieldTrainingMo
                                 {record.start_date || "선택"}
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0 z-[150]" align="start">
+                            <PopoverContent 
+                              className="w-auto p-0 z-[151]" 
+                              align="start"
+                              side="bottom"
+                              avoidCollisions={false}
+                            >
                               <Calendar 
                                 mode="single" 
                                 selected={safeParseDate(record.start_date)} 
@@ -268,6 +274,7 @@ export function FieldTrainingModal({ isOpen, onClose, student }: FieldTrainingMo
                           <Popover 
                             open={openPopovers[`${recordKey}-end`]} 
                             onOpenChange={(open) => togglePopover(`${recordKey}-end`, open)}
+                            modal={true}
                           >
                             <PopoverTrigger asChild>
                               <Button variant="outline" className={cn("w-full h-8 sm:h-9 justify-start text-left font-normal text-[10px] sm:text-xs", !record.end_date && "text-muted-foreground")}>
@@ -275,7 +282,12 @@ export function FieldTrainingModal({ isOpen, onClose, student }: FieldTrainingMo
                                 {record.end_date || "선택"}
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0 z-[150]" align="start">
+                            <PopoverContent 
+                              className="w-auto p-0 z-[151]" 
+                              align="start"
+                              side="bottom"
+                              avoidCollisions={false}
+                            >
                               <Calendar 
                                 mode="single" 
                                 selected={safeParseDate(record.end_date)} 
@@ -310,6 +322,7 @@ export function FieldTrainingModal({ isOpen, onClose, student }: FieldTrainingMo
                           <Popover 
                             open={openPopovers[`${recordKey}-conv`]} 
                             onOpenChange={(open) => togglePopover(`${recordKey}-conv`, open)}
+                            modal={true}
                           >
                             <PopoverTrigger asChild>
                               <Button variant="outline" className={cn("w-full h-8 sm:h-9 justify-start text-left font-normal text-[10px] sm:text-xs border-blue-200 bg-blue-50/30", !record.conversion_date && "text-muted-foreground")}>
@@ -317,7 +330,12 @@ export function FieldTrainingModal({ isOpen, onClose, student }: FieldTrainingMo
                                 {record.conversion_date || "선택"}
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0 z-[150]" align="start">
+                            <PopoverContent 
+                              className="w-auto p-0 z-[151]" 
+                              align="start"
+                              side="bottom"
+                              avoidCollisions={false}
+                            >
                               <Calendar 
                                 mode="single" 
                                 selected={safeParseDate(record.conversion_date)} 

@@ -28,6 +28,7 @@ export type StudentEmploymentData = {
   top_size?: string;
   personal_remarks?: string;
   career_course?: string;
+  labor_education_status?: string;
 };
 
 export type FieldTrainingRecord = {

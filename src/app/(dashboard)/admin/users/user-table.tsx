@@ -144,6 +144,32 @@ export function UserTable({ initialProfiles, graduationYears, fullClassMapping, 
     }
   };
 
+  const handleClearAssign = async () => {
+    if (!selectedProfile) return;
+
+    const data = {
+      year: null,
+      major: null,
+      className: null,
+      grade: null
+    };
+
+    const result = await updateAssignedClass(selectedProfile.id, data);
+    if (result.success) {
+      setProfiles(prev => prev.map(p => p.id === selectedProfile.id ? { 
+        ...p, 
+        assigned_year: null, 
+        assigned_major: null, 
+        assigned_class: null,
+        assigned_grade: null
+      } : p));
+      toast({ title: '담당 학반 배정 해제 완료' });
+      setIsAssignOpen(false);
+    } else {
+      toast({ variant: 'destructive', title: '해제 실패', description: result.error });
+    }
+  };
+
   const handleDelete = async (userId: string) => {
     const result = await deleteUser(userId);
     if (result.success) {
@@ -435,9 +461,14 @@ export function UserTable({ initialProfiles, graduationYears, fullClassMapping, 
               </div>
             )}
           </div>
-          <DialogFooter className="p-4 bg-slate-50 border-t flex flex-row gap-2 mt-0">
-            <Button variant="ghost" onClick={() => setIsAssignOpen(false)} className="flex-1 rounded-xl h-11 px-0">취소</Button>
-            <Button onClick={handleAssignSave} className="flex-1 bg-indigo-600 hover:bg-indigo-700 rounded-xl font-bold h-11 px-0 shadow-lg shadow-indigo-100">설정 저장</Button>
+          <DialogFooter className="p-4 bg-slate-50 border-t flex flex-col sm:flex-row gap-2 mt-0">
+            <div className="flex flex-row gap-2 w-full">
+              <Button variant="ghost" onClick={() => setIsAssignOpen(false)} className="flex-1 rounded-xl h-11 px-0">취소</Button>
+              {selectedProfile?.assigned_year && (
+                <Button variant="outline" onClick={handleClearAssign} className="flex-1 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-xl h-11 px-0 font-bold">배정 해제</Button>
+              )}
+              <Button onClick={handleAssignSave} className="flex-1 bg-indigo-600 hover:bg-indigo-700 rounded-xl font-bold h-11 px-0 shadow-lg shadow-indigo-100">설정 저장</Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

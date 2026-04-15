@@ -1,0 +1,63 @@
+# bkit-gemini v2.0.3 - Dynamic Level Policy
+# Balanced policy for fullstack development
+# Auto-generated for Gemini CLI v0.31.0+ Project-Level Policy Engine (Tier 3)
+# Generated: 2026-04-08
+
+[[rule]]
+toolName = "write_file"
+decision = "allow"
+priority = 10
+
+[[rule]]
+toolName = "replace"
+decision = "allow"
+priority = 10
+
+[[rule]]
+toolName = "run_shell_command"
+decision = "allow"
+priority = 10
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "rm -rf"
+decision = "deny"
+deny_message = "Recursive force-delete is blocked for safety."
+priority = 100
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "git push --force"
+decision = "deny"
+deny_message = "Force-push is blocked for safety."
+priority = 100
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "git reset --hard"
+decision = "ask_user"
+priority = 50
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "docker system prune"
+decision = "ask_user"
+priority = 50
+
+[[rule]]
+toolName = "write_file"
+modes = ["plan"]
+decision = "ask_user"
+priority = 60
+
+[[rule]]
+toolName = "replace"
+modes = ["plan"]
+decision = "ask_user"
+priority = 60
+
+[[rule]]
+toolName = "run_shell_command"
+modes = ["plan"]
+decision = "ask_user"
+priority = 60

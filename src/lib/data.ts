@@ -88,6 +88,7 @@ export async function getAssignedStudentDetails(major: string, classInfo: string
     return {
       ...s,
       ...s.student_employments,
+      training_records: studentTrainings,
       counseling_logs: s.student_counseling_logs || [],
       has_field_training: latestTraining ? 'O' : '',
       latest_training_company: latestTraining?.company,
@@ -125,6 +126,7 @@ function flattenStudentData(students: any[], employments: any[], trainings: any[
     return {
       ...student,
       ...employment,
+      training_records: studentTrainings,
       has_field_training: latestTraining ? 'O' : '',
       latest_training_company: latestTraining?.company,
       start_date: latestTraining?.start_date,
