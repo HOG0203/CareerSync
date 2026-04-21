@@ -223,3 +223,77 @@ export async function getCurrentUserProfile() {
 
   return profile;
 }
+
+/**
+ * 모든 학생의 성적 데이터를 가져옵니다. (페이징 제한 없이 전량 조회)
+ */
+export async function getAllStudentScores() {
+  const supabase = await createClient();
+  const allData: any[] = [];
+  const PAGE_SIZE = 1000;
+  let from = 0;
+  let to = PAGE_SIZE - 1;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from('student_scores')
+      .select(`
+        *,
+        students (
+          student_name,
+          student_number,
+          major,
+          class_info,
+          graduation_year
+        )
+      `)
+      .order('academic_year', { ascending: false })
+      .order('grade', { ascending: false })
+      .order('semester', { ascending: false })
+      .order('id', { ascending: true }) // [결정적 정렬 추가] 중복/누락 방지의 핵심
+      .range(from, to);
+
+    if (error) {
+      console.error('Error fetching student scores batch:', error);
+      break;
+    }
+
+    if (data && data.length > 0) {
+      allData.push(...data);
+      if (data.length < PAGE_SIZE) {
+        hasMore = false;
+      } else {
+        from += PAGE_SIZE;
+        to += PAGE_SIZE;
+      }
+    } else {
+      hasMore = false;
+    }
+    
+    // 무한 루프 방지 안전장치 (최대 5만건)
+    if (allData.length > 50000) break;
+  }
+
+  return allData;
+}
+
+/**
+ * 성취도별 점수 가중치 설정을 가져옵니다.
+ */
+export async function getAchievementScores(): Promise<Record<string, number>> {
+  const supabase = await createClient()
+  
+  try {
+    const { data, error } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'achievement_scores')
+      .single()
+
+    if (error) throw error
+    return data.value as Record<string, number>
+  } catch (error) {
+    return { "A": 5, "B": 4, "C": 3, "D": 2, "E": 1 }
+  }
+}

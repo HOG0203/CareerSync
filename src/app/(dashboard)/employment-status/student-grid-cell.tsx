@@ -62,12 +62,14 @@ export function StudentGridCell({ student, idx, variant }: StudentGridCellProps)
               <p className="text-xs text-blue-800 font-black uppercase tracking-tight">취업 상세</p>
               <span className={cn(
                 "text-[9px] px-2 py-0.5 rounded-full font-black",
-                student.business_type === '예' ? "bg-blue-100 text-blue-700" : 
-                student.business_type === '아니오' ? "bg-rose-100 text-rose-700" :
+                student.business_type === '취업' ? "bg-emerald-100 text-emerald-700" : 
+                student.business_type === '미취업' ? "bg-rose-100 text-rose-700" :
+                student.business_type === '면접중' ? "bg-amber-100 text-amber-700" :
+                student.business_type === '현장실습중' ? "bg-blue-100 text-blue-700" :
                 student.business_type === '제외인정자' ? "bg-slate-100 text-slate-700" :
-                "bg-slate-100 text-slate-600"
+                "bg-slate-50 text-slate-400"
               )}>
-                취업: {student.business_type || '미정'}
+                현황: {student.business_type || '미결정'}
               </span>
             </div>
             <div className="space-y-1.5 text-slate-600">

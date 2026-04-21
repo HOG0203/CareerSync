@@ -19,6 +19,7 @@ import {
   Grid3X3,
   BookUser,
   UserPlus,
+  GraduationCap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { logout } from '@/app/login/actions';
@@ -42,6 +43,8 @@ export default function Nav({ isAdmin = false }: { isAdmin?: boolean }) {
     ? [
         ...baseMenuItems, 
         { href: '/admin/students', label: '학생 등록 및 진급 관리', icon: UserPlus },
+        { href: '/admin/grades', label: '성적 일괄 입력', icon: GraduationCap },
+        { href: '/admin/grades/summary', label: '성적 총괄 현황', icon: LayoutDashboard },
         { href: '/admin/users', label: '사용자 관리', icon: ShieldAlert },
         { href: '/admin/settings', label: '설정', icon: Settings },
       ]

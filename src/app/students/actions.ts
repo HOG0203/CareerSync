@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { getSystemSettings } from '../admin/settings/actions'
+import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions'
 
 const normalizeDate = (dateStr: string | null | undefined): string | null => {
   if (!dateStr || dateStr.trim() === '') return null

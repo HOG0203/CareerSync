@@ -11,7 +11,9 @@ import {
   Users,
   UserCog,
   ShieldCheck,
-  ClipboardList
+  ShieldAlert,
+  ClipboardList,
+  GraduationCap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -21,11 +23,14 @@ export function MobileBottomTab({ isAdmin = false }: { isAdmin?: boolean }) {
   const tabs = [
     { href: '/dashboard', label: '홈', icon: LayoutDashboard },
     { href: '/employment-status', label: '현황', icon: Grid3X3 },
+    { href: '/labor-education', label: '인권', icon: ShieldAlert },
     { href: '/students', label: '취업', icon: ClipboardList }, // 학생 취업 및 현장실습 현황 (공통)
     { href: '/class-management', label: '학반', icon: BookUser },
     ...(isAdmin ? [
-      { href: '/admin/students', label: '학생', icon: UserPlus }, // 학생 등록 및 진급 관리
-      { href: '/admin/users', label: '사용자', icon: UserCog }, // 사용자 관리
+      { href: '/admin/students', label: '학생', icon: UserPlus },
+      { href: '/admin/grades', label: '성적', icon: GraduationCap },
+      { href: '/admin/grades/summary', label: '현황', icon: LayoutDashboard },
+      { href: '/admin/users', label: '사용자', icon: UserCog },
       { href: '/admin/settings', label: '설정', icon: Settings }
     ] : []),
   ];

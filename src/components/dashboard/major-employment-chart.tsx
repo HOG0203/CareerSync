@@ -23,6 +23,9 @@ const CHART_COLORS = {
   취업: '#10b981',      // Emerald-500
   미취업: '#ef4444',    // Red-500
   제외인정자: '#94a3b8', // Slate-400
+  면접중: '#f59e0b',      // Amber-500
+  현장실습중: '#3b82f6',   // Blue-500
+  미결정: '#cbd5e1',    // Slate-300 (미설정)
 };
 
 export default function MajorEmploymentChart({ 
@@ -50,21 +53,22 @@ export default function MajorEmploymentChart({
     
     return groups.map((group) => {
       const groupStudents = data.filter((s: any) => s[groupKey] === group);
-      const 취업 = groupStudents.filter((s) => s.business_type === '예').length;
-      const 미취업 = groupStudents.filter((s) => s.business_type === '아니오').length;
+      const 취업 = groupStudents.filter((s) => s.business_type === '취업').length;
+      const 미취업 = groupStudents.filter((s) => s.business_type === '미취업').length;
       const 제외인정자 = groupStudents.filter((s) => s.business_type === '제외인정자').length;
+      const 면접중 = groupStudents.filter((s) => s.business_type === '면접중').length;
+      const 현장실습중 = groupStudents.filter((s) => s.business_type === '현장실습중').length;
+      const 미결정 = groupStudents.filter((s) => !s.business_type).length;
       
-      return { group, 취업, 미취업, 제외인정자 };
+      return { group, 취업, 미취업, 제외인정자, 면접중, 현장실습중, 미결정 };
     });
   }, [data, selectedMajor]);
 
   // 2. 전체 분포 도넛 차트 데이터
   const formattedPieData = React.useMemo(() => {
     const counts = data.reduce((acc, s) => {
-      if (s.business_type === '예' || s.business_type === '아니오' || s.business_type === '제외인정자') {
-        const status = s.business_type === '예' ? '취업' : s.business_type === '제외인정자' ? '제외인정자' : '미취업';
-        acc[status] = (acc[status] || 0) + 1;
-      }
+      const status = s.business_type || '미결정';
+      acc[status] = (acc[status] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
@@ -72,13 +76,19 @@ export default function MajorEmploymentChart({
       { name: '취업', value: counts['취업'] || 0 },
       { name: '미취업', value: counts['미취업'] || 0 },
       { name: '제외인정자', value: counts['제외인정자'] || 0 },
+      { name: '면접중', value: counts['면접중'] || 0 },
+      { name: '현장실습중', value: counts['현장실습중'] || 0 },
+      { name: '미결정', value: counts['미결정'] || 0 },
     ].filter(d => d.value > 0);
   }, [data]);
 
   const chartConfig = {
     취업: { label: '취업', color: CHART_COLORS.취업 },
     미취업: { label: '미취업', color: CHART_COLORS.미취업 },
+    면접중: { label: '면접중', color: CHART_COLORS.면접중 },
+    현장실습중: { label: '현장실습중', color: CHART_COLORS.현장실습중 },
     제외인정자: { label: '제외인정자', color: CHART_COLORS.제외인정자 },
+    미결정: { label: '미결정', color: CHART_COLORS.미결정 },
   } satisfies ChartConfig;
 
   return (
@@ -151,7 +161,10 @@ export default function MajorEmploymentChart({
               <Legend verticalAlign="bottom" align="center" iconType="circle" layout="horizontal" wrapperStyle={{ fontSize: '10px', paddingTop: '20px' }} />
               <Bar dataKey="취업" stackId="a" fill={CHART_COLORS.취업} barSize={20} />
               <Bar dataKey="미취업" stackId="a" fill={CHART_COLORS.미취업} barSize={20} />
-              <Bar dataKey="제외인정자" stackId="a" fill={CHART_COLORS.제외인정자} barSize={20} radius={[0, 4, 4, 0]} />
+              <Bar dataKey="제외인정자" stackId="a" fill={CHART_COLORS.제외인정자} barSize={20} />
+              <Bar dataKey="면접중" stackId="a" fill={CHART_COLORS.면접중} barSize={20} />
+              <Bar dataKey="현장실습중" stackId="a" fill={CHART_COLORS.현장실습중} barSize={20} />
+              <Bar dataKey="미결정" stackId="a" fill={CHART_COLORS.미결정} barSize={20} radius={[0, 4, 4, 0]} />
             </BarChart>
           </ChartContainer>
         )}

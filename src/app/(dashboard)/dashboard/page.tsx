@@ -70,11 +70,11 @@ export default async function DashboardPage({
       
       // 현재 선택된 반까지 만족하는 상태 카운트
       if (selectedClass === 'all' || student.class_info === selectedClass) {
-        const status = student.business_type || '아니오';
+        const status = student.business_type || '미결정';
         statusCounts[status] = (statusCounts[status] || 0) + 1;
         
         // 최종 필터링 데이터
-        if (selectedStatus === 'all' || (student.business_type || '아니오') === selectedStatus) {
+        if (selectedStatus === 'all' || (student.business_type || '미결정') === selectedStatus) {
           filteredData.push(student);
         }
       }
@@ -101,9 +101,9 @@ export default async function DashboardPage({
 
   if (grade === 3) {
     for (const s of filteredData) {
-      if (s.business_type === '예') employedStudents++;
+      if (s.business_type === '취업') employedStudents++;
       if (s.business_type === '제외인정자') excludingStudents++;
-      if (s.has_field_training === 'O') trainingStudents++;
+      if (s.has_field_training === 'O' || s.business_type === '현장실습중') trainingStudents++;
       if (['대기업', '공기업', '공무원'].includes(s.company_type || '')) majorCompanyStudents++;
     }
   }

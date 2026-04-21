@@ -187,20 +187,24 @@ const COLUMNS: ColumnConfig[] = [
   },
   { 
     key: 'business_type', 
-    label: '취업\n여부', 
+    label: '취업\n현황', 
     width: 80,
     type: 'select',
     options: [
-      { label: '예', value: '예' },
-      { label: '아니오', value: '아니오' },
-      { label: '제외인정자', value: '제외인정자' }
+      { label: '취업', value: '취업' },
+      { label: '미취업', value: '미취업' },
+      { label: '제외인정자', value: '제외인정자' },
+      { label: '면접중', value: '면접중' },
+      { label: '현장실습중', value: '현장실습중' }
     ],
     variant: (val) => {
       switch (val) {
-        case '예': return 'bg-emerald-100 text-emerald-700 border-emerald-200'
-        case '아니오': return 'bg-rose-100 text-rose-700 border-rose-200'
+        case '취업': return 'bg-emerald-100 text-emerald-700 border-emerald-200'
+        case '미취업': return 'bg-rose-100 text-rose-700 border-rose-200'
         case '제외인정자': return 'bg-slate-100 text-slate-700 border-slate-200'
-        default: return val ? 'bg-slate-50 text-slate-600 border-slate-100' : ''
+        case '면접중': return 'bg-amber-100 text-amber-700 border-amber-200'
+        case '현장실습중': return 'bg-blue-100 text-blue-700 border-blue-200'
+        default: return 'bg-slate-50 text-slate-400 border-slate-100' // '미결정' (미설정) 스타일
       }
     }
   },
