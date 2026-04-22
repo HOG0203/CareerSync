@@ -12,10 +12,10 @@ export const metadata: Metadata = {
 };
 
 const getCompanyTypeVariant = (type?: string, businessType?: string) => {
-  if (businessType === '면접중') return 'bg-amber-100 text-amber-900 border-amber-200';
+  if (businessType === '채용진행중') return 'bg-amber-100 text-amber-900 border-amber-200';
   if (businessType === '현장실습중') return 'bg-blue-100 text-blue-900 border-blue-200';
   if (businessType !== '취업') return 'bg-white text-black border-gray-200';
-  
+
   switch (type) {
     case '대기업':
     case '공기업':
@@ -26,13 +26,14 @@ const getCompanyTypeVariant = (type?: string, businessType?: string) => {
     case '중견기업':
       return 'bg-purple-600 text-white border-purple-700';
     case '중소기업':
-      return 'bg-cyan-500 text-white border-cyan-600';
+      return 'bg-cyan-50 text-cyan-500 text-white border-cyan-600';
     case '연계교육':
       return 'bg-orange-500 text-white border-orange-600';
     default:
       return 'bg-emerald-500 text-white border-emerald-600';
   }
 };
+
 
 const MAJOR_MAP: Record<string, string> = {
   '자동화기계과': '기계',
@@ -157,7 +158,7 @@ export default async function EmploymentStatusPage({
             <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-cyan-500 rounded-sm shrink-0"></div> 중소기업</div>
             <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-orange-500 rounded-sm shrink-0"></div> 연계교육</div>
             <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-sm shrink-0"></div> 기타</div>
-            <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-amber-400 rounded-sm shrink-0 border border-amber-500"></div> 면접중</div>
+            <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-amber-400 rounded-sm shrink-0 border border-amber-500"></div> 채용진행중</div>
             <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-blue-400 rounded-sm shrink-0 border border-blue-500"></div> 현장실습중</div>
           </div>
         </div>

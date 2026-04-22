@@ -21,10 +21,10 @@ import { LayoutGrid, PieChart as PieChartIcon } from 'lucide-react';
 
 const CHART_COLORS = {
   취업: '#10b981',      // Emerald-500
+  채용진행중: '#f59e0b',      // Amber-500
+  현장실습중: '#3b82f6',   // Blue-500
   미취업: '#ef4444',    // Red-500
   제외인정자: '#94a3b8', // Slate-400
-  면접중: '#f59e0b',      // Amber-500
-  현장실습중: '#3b82f6',   // Blue-500
   미결정: '#cbd5e1',    // Slate-300 (미설정)
 };
 
@@ -56,11 +56,11 @@ export default function MajorEmploymentChart({
       const 취업 = groupStudents.filter((s) => s.business_type === '취업').length;
       const 미취업 = groupStudents.filter((s) => s.business_type === '미취업').length;
       const 제외인정자 = groupStudents.filter((s) => s.business_type === '제외인정자').length;
-      const 면접중 = groupStudents.filter((s) => s.business_type === '면접중').length;
+      const 채용진행중 = groupStudents.filter((s) => s.business_type === '채용진행중').length;
       const 현장실습중 = groupStudents.filter((s) => s.business_type === '현장실습중').length;
       const 미결정 = groupStudents.filter((s) => !s.business_type).length;
       
-      return { group, 취업, 미취업, 제외인정자, 면접중, 현장실습중, 미결정 };
+      return { group, 취업, 미취업, 제외인정자, 채용진행중, 현장실습중, 미결정 };
     });
   }, [data, selectedMajor]);
 
@@ -76,7 +76,7 @@ export default function MajorEmploymentChart({
       { name: '취업', value: counts['취업'] || 0 },
       { name: '미취업', value: counts['미취업'] || 0 },
       { name: '제외인정자', value: counts['제외인정자'] || 0 },
-      { name: '면접중', value: counts['면접중'] || 0 },
+      { name: '채용진행중', value: counts['채용진행중'] || 0 },
       { name: '현장실습중', value: counts['현장실습중'] || 0 },
       { name: '미결정', value: counts['미결정'] || 0 },
     ].filter(d => d.value > 0);
@@ -85,7 +85,7 @@ export default function MajorEmploymentChart({
   const chartConfig = {
     취업: { label: '취업', color: CHART_COLORS.취업 },
     미취업: { label: '미취업', color: CHART_COLORS.미취업 },
-    면접중: { label: '면접중', color: CHART_COLORS.면접중 },
+    채용진행중: { label: '채용진행중', color: CHART_COLORS.채용진행중 },
     현장실습중: { label: '현장실습중', color: CHART_COLORS.현장실습중 },
     제외인정자: { label: '제외인정자', color: CHART_COLORS.제외인정자 },
     미결정: { label: '미결정', color: CHART_COLORS.미결정 },
@@ -162,7 +162,7 @@ export default function MajorEmploymentChart({
               <Bar dataKey="취업" stackId="a" fill={CHART_COLORS.취업} barSize={20} />
               <Bar dataKey="미취업" stackId="a" fill={CHART_COLORS.미취업} barSize={20} />
               <Bar dataKey="제외인정자" stackId="a" fill={CHART_COLORS.제외인정자} barSize={20} />
-              <Bar dataKey="면접중" stackId="a" fill={CHART_COLORS.면접중} barSize={20} />
+              <Bar dataKey="채용진행중" stackId="a" fill={CHART_COLORS.채용진행중} barSize={20} />
               <Bar dataKey="현장실습중" stackId="a" fill={CHART_COLORS.현장실습중} barSize={20} />
               <Bar dataKey="미결정" stackId="a" fill={CHART_COLORS.미결정} barSize={20} radius={[0, 4, 4, 0]} />
             </BarChart>
