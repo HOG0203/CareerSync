@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, X, Save, Settings2, Calendar, Award, Layers, Loader2 } from 'lucide-react';
+import { Plus, X, Save, Settings2, Calendar, Award, Layers, Loader2, Trophy, FileUp, Trash2 } from 'lucide-react';
 import { 
   getMasterCertificates, 
   updateMasterCertificates, 
@@ -26,10 +26,19 @@ import {
   updateSystemSettings,
   MasterCertificate
 } from './actions';
+import { 
+  getAchievementScores, 
+  updateAchievementScores 
+} from '../grades/actions';
+import { GradeImportClient } from '../grades/grade-import-client';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 export default function AdminSettingsPage() {
   const [certs, setCerts] = React.useState<MasterCertificate[]>([]);
+  const [achievementWeights, setAchievementWeights] = React.useState<Record<string, number>>({
+    "A": 5, "B": 4, "C": 3, "D": 2, "E": 1
+  });
   const [newCertName, setNewCertName] = React.useState('');
   const [newCertLevels, setNewCertLevels] = React.useState('');
   const [baseYear, setBaseYear] = React.useState<number>(new Date().getFullYear());
@@ -39,6 +48,7 @@ export default function AdminSettingsPage() {
   React.useEffect(() => {
     getMasterCertificates().then(setCerts);
     getSystemSettings().then(settings => setBaseYear(settings.baseYear));
+    getAchievementScores().then(setAchievementWeights);
   }, []);
 
   const addCert = () => {
@@ -58,15 +68,20 @@ export default function AdminSettingsPage() {
   const handleSaveAll = async () => {
     setIsPending(true);
     try {
-      const [certResult, settingsResult] = await Promise.all([
+      const [certResult, settingsResult, weightResult] = await Promise.all([
         updateMasterCertificates(certs),
-        updateSystemSettings({ baseYear })
+        updateSystemSettings({ baseYear }),
+        updateAchievementScores(achievementWeights)
       ]);
 
-      if (certResult.success && settingsResult.success) {
-        toast({ title: '설정 저장 완료', description: '자격증 및 시스템 설정이 갱신되었습니다.' });
+      if (certResult.success && settingsResult.success && weightResult.success) {
+        toast({ title: '설정 저장 완료', description: '모든 시스템 설정이 갱신되었습니다.' });
       } else {
-        toast({ variant: 'destructive', title: '저장 실패', description: certResult.error || settingsResult.error });
+        toast({ 
+          variant: 'destructive', 
+          title: '저장 실패', 
+          description: certResult.error || settingsResult.error || (weightResult as any).error 
+        });
       }
     } catch (error) {
       toast({ variant: 'destructive', title: '저장 중 오류 발생' });
@@ -75,7 +90,6 @@ export default function AdminSettingsPage() {
     }
   };
 
-  // 현재 연도 기준 앞뒤 5년씩
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 11 }, (_, i) => currentYear - 5 + i);
 
@@ -87,7 +101,7 @@ export default function AdminSettingsPage() {
             <Settings2 className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
             시스템 설정
           </h2>
-          <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed">자격증 목록 및 급수 체계, 학사학년도를 통합 관리합니다.</p>
+          <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed">학사학년도, 자격증, 인증제 설정을 통합 관리합니다.</p>
         </div>
         <Button 
           onClick={handleSaveAll} 
@@ -95,20 +109,22 @@ export default function AdminSettingsPage() {
           className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-100 h-11 px-8 w-full sm:w-auto font-bold"
         >
           {isPending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
-          설정 저장하기
+          전체 설정 저장하기
         </Button>
       </div>
 
-      <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
-        {/* 학사학년도 설정 */}
-        <Card className="border-none shadow-md bg-white overflow-hidden lg:col-span-1 rounded-2xl">
+      {/* 데스크톱 2열 (lg:grid-cols-2), 모바일 1열 구성 */}
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
+        
+        {/* 1. 학사학년도 설정 */}
+        <Card className="border-none shadow-md bg-white overflow-hidden rounded-2xl flex flex-col">
           <CardHeader className="bg-slate-50/80 border-b py-4">
             <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 text-slate-800">
               <Calendar className="h-5 w-5 text-blue-500" />
               학사학년도 설정
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-6">
+          <CardContent className="pt-6 flex-1">
             <div className="space-y-4">
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-bold text-slate-600">시스템 기준 학사학년도</label>
@@ -122,31 +138,24 @@ export default function AdminSettingsPage() {
               <div className="p-4 rounded-xl bg-blue-50 border border-blue-100 space-y-3">
                 <p className="text-[11px] text-blue-700 leading-relaxed font-semibold">
                   💡 **입력 가이드**<br/>
-                  실제 졸업하는 해보다 **1년 앞선 연도**를 입력하세요.<br/>
-                  예: 현재 3학년이 2027년 초에 졸업한다면, 기준 학년도는 **2026**입니다.
+                  실제 졸업하는 해보다 **1년 앞선 연도**를 입력하세요. (예: 3학년이 2027년 졸업이면 2026 선택)
                 </p>
-                <div className="text-[10px] text-slate-500 italic border-t pt-2.5 border-blue-100 space-y-1">
-                  <p className="font-bold text-slate-600">현재 설정: {baseYear}학년도 기준</p>
-                  <p>• 3학년: {baseYear + 1}년 졸업 예정자</p>
-                  <p>• 2학년: {baseYear + 2}년 졸업 예정자</p>
-                  <p>• 1학년: {baseYear + 3}년 졸업 예정자</p>
-                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* 자격증 관리 */}
-        <Card className="border-none shadow-md bg-white overflow-hidden lg:col-span-2 rounded-2xl">
+        {/* 2. 자격증 및 급수 마스터 관리 */}
+        <Card className="border-none shadow-md bg-white overflow-hidden rounded-2xl flex flex-col lg:row-span-2">
           <CardHeader className="bg-slate-50/80 border-b py-4">
             <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 text-slate-800">
               <Award className="h-5 w-5 text-blue-500" />
               자격증 및 급수 마스터 관리
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-6 space-y-6 px-4 sm:px-6">
+          <CardContent className="pt-6 space-y-6">
             <div className="flex flex-col gap-4 p-4 rounded-2xl bg-blue-50/30 border border-blue-100/50">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-blue-700">자격증 명칭</label>
                   <Input 
@@ -165,20 +174,20 @@ export default function AdminSettingsPage() {
                     className="h-11 bg-white border-slate-200 rounded-xl"
                   />
                 </div>
+                <Button onClick={addCert} className="w-full h-11 bg-blue-600 hover:bg-blue-700 rounded-xl font-bold shadow-md shadow-blue-100">
+                  <Plus className="h-5 w-5 mr-1.5" /> 자격증 추가하기
+                </Button>
               </div>
-              <Button onClick={addCert} className="h-11 bg-blue-600 hover:bg-blue-700 rounded-xl font-bold shadow-md shadow-blue-100">
-                <Plus className="h-5 w-5 mr-1.5" /> 자격증 추가하기
-              </Button>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-[500px] overflow-auto pr-1 custom-scrollbar">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[600px] overflow-auto pr-1 custom-scrollbar">
               {certs.map((cert) => (
-                <div key={cert.name} className="group flex flex-col p-2.5 rounded-xl border border-slate-100 bg-white hover:border-blue-200 hover:shadow-sm transition-all relative">
+                <div key={cert.name} className="group flex flex-col p-3 rounded-xl border border-slate-100 bg-white hover:border-blue-200 hover:shadow-sm transition-all relative">
                   <div className="flex items-start justify-between mb-1.5">
                     <span className="font-bold text-slate-800 text-[12px] leading-tight break-all mr-4">{cert.name}</span>
                     <button 
                       onClick={() => removeCert(cert.name)} 
-                      className="absolute top-1.5 right-1.5 opacity-100 sm:opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all"
+                      className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -194,6 +203,51 @@ export default function AdminSettingsPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 3. 옥저인증제 관리 (성취도 가중치 전용) */}
+        <Card className="border-none shadow-md bg-white overflow-hidden rounded-2xl flex flex-col">
+          <CardHeader className="bg-indigo-50/80 border-b py-4">
+            <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 text-indigo-800">
+              <Trophy className="h-5 w-5 text-indigo-500" />
+              옥저인증제 관리
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="space-y-6">
+              {/* 가중치 설정 */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-indigo-400" />
+                  <label className="text-sm font-bold text-slate-600">성취도별 인증 점수 가중치</label>
+                </div>
+                <div className="grid grid-cols-5 gap-2">
+                  {['A', 'B', 'C', 'D', 'E'].map(grade => (
+                    <div key={grade} className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase text-center block">{grade}</label>
+                      <Input 
+                        type="number" 
+                        value={achievementWeights[grade] || 0} 
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0;
+                          setAchievementWeights(prev => ({ ...prev, [grade]: val }));
+                        }}
+                        className="h-9 px-1 text-center font-bold border-slate-200 focus:border-indigo-500 rounded-lg"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-slate-400 italic">※ 위 설정은 상단 [전체 설정 저장하기] 클릭 시 반영됩니다.</p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-100">
+                <p className="text-[11px] text-indigo-700 leading-relaxed font-semibold">
+                  💡 **인증 점수 계산 방식**<br/>
+                  성취도(A~E) 점수와 과목별 학점을 가중치로 하여 100점 만점으로 환산합니다.
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>

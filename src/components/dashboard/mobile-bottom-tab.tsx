@@ -29,7 +29,7 @@ export function MobileBottomTab({ isAdmin = false }: { isAdmin?: boolean }) {
     ...(isAdmin ? [
       { href: '/admin/students', label: '학생', icon: UserPlus },
       { href: '/admin/grades', label: '성적', icon: GraduationCap },
-      { href: '/admin/grades/summary', label: '현황', icon: LayoutDashboard },
+      { href: '/admin/grades/summary', label: '인증', icon: LayoutDashboard },
       { href: '/admin/users', label: '사용자', icon: UserCog },
       { href: '/admin/settings', label: '설정', icon: Settings }
     ] : []),

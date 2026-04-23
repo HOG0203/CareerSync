@@ -5,59 +5,32 @@ import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { 
   FileUp, 
-  CheckCircle2, 
   AlertCircle, 
   Loader2, 
   User, 
-  Settings2, 
-  Trophy, 
   Trash2,
-  Info
+  Info,
+  GraduationCap
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { 
   uploadStudentScores, 
   matchStudents, 
-  getAchievementScores, 
-  updateAchievementScores,
   deleteAllStudentScores,
   ParsedGradeData 
 } from './actions';
 import { cn } from '@/lib/utils';
-import { Input } from '@/components/ui/input';
 
 export function GradeImportClient() {
   const [isParsing, setIsParsing] = React.useState(false);
   const [isUploading, setIsUploading] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const [targetGrade, setTargetGrade] = React.useState<number>(3); // 기본값 3학년
   const [parsedData, setParsedData] = React.useState<ParsedGradeData[]>([]);
   const [studentMatchMap, setStudentMatchMap] = React.useState<Record<string, { id: string; major: string; classInfo: string }>>({});
   const [detectedFileInfo, setDetectedFileInfo] = React.useState<{ major: string, classInfo: string } | null>(null);
-  const [achievementWeights, setAchievementWeights] = React.useState<Record<string, number>>({
-    "A": 5, "B": 4, "C": 3, "D": 2, "E": 1
-  });
   const [fileName, setFileName] = React.useState<string | null>(null);
   const { toast } = useToast();
-
-  React.useEffect(() => {
-    async function loadWeights() {
-      const weights = await getAchievementScores();
-      setAchievementWeights(weights);
-    }
-    loadWeights();
-  }, []);
-
-  const handleWeightChange = (grade: string, val: string) => {
-    const num = parseInt(val) || 0;
-    setAchievementWeights(prev => ({ ...prev, [grade]: num }));
-  };
-
-  const saveWeights = async () => {
-    const res = await updateAchievementScores(achievementWeights);
-    if (res.success) {
-      toast({ title: "설정 저장 완료", description: "성취도별 점수 가중치가 저장되었습니다." });
-    }
-  };
 
   const handleDeleteAll = async () => {
     if (!confirm('정말로 모든 학생의 성적 데이터를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
@@ -123,13 +96,10 @@ export function GradeImportClient() {
           const isHeader = num === '번호' || name === '성명' || (num && isNaN(Number(num)));
           const hasValidNumber = num !== null && num !== undefined && num !== '' && !isNaN(Number(num));
 
-          // [핵심 수정] 새로운 번호가 감지되면 즉시 학생 컨텍스트 교체
           if (hasValidNumber && !isHeader) {
             const newNum = num.toString().trim();
-            // 번호가 바뀌었거나, 이름이 새로 제공된 경우
             if (newNum !== currentStudentNumber || (name && name.toString().trim() !== "")) {
               currentStudentNumber = newNum;
-              // 이름이 없으면 일단 비워두어 이전 학생 데이터가 섞이는 것을 원천 차단
               currentStudentName = name ? name.toString().trim() : ""; 
               isCareerElective = false;
               lastGrade = 3; 
@@ -143,7 +113,6 @@ export function GradeImportClient() {
             continue;
           }
 
-          // 이름 정보가 아직 없는 경우(첫 행 파싱 등) 다음 행에서 찾기 위해 대기
           if (!currentStudentName && !isHeader && hasValidNumber && name) {
             currentStudentName = name.toString().trim();
           }
@@ -154,7 +123,6 @@ export function GradeImportClient() {
             if (gradeVal && !isNaN(parseInt(gradeVal))) lastGrade = parseInt(gradeVal);
             if (semesterVal && !isNaN(parseInt(semesterVal))) lastSemester = parseInt(semesterVal);
 
-            const curriculum = row[4]?.toString().trim();
             const subject = row[5]?.toString().trim();
             const credits = row[6];
             const scoreStr = (row[7] || "").toString().trim();
@@ -174,16 +142,6 @@ export function GradeImportClient() {
                   score = parseFloat(match[1]);
                   averageScore = parseFloat(match[2]);
                   if (match[3]) standardDeviation = parseFloat(match[3]);
-                } else if (!isAchievementInScoreCell) {
-                  const s = row[7]?.toString().trim();
-                  const a = row[8]?.toString().trim();
-                  const d = row[9]?.toString().trim();
-                  if (s && !isNaN(Number(s))) score = Number(s);
-                  if (a && !isNaN(Number(a))) averageScore = Number(a);
-                  if (d) {
-                    const dMatch = d.match(/[\d.]+/);
-                    if (dMatch) standardDeviation = Number(dMatch[0]);
-                  }
                 }
               } else {
                 achievement = isAchievementInScoreCell ? scoreStr : (row[8] ? row[8].toString().trim().split('(')[0] : null);
@@ -215,14 +173,13 @@ export function GradeImportClient() {
           }
         }
 
-        // DB 매칭 정보 가져오기
         const uniqueKeys = Array.from(new Set(rawStudents.map(s => `${s.major}_${s.classInfo}_${s.studentNumber}_${s.studentName}`)))
           .map(k => {
             const parts = k.split('_');
             return { major: parts[0], classInfo: parts[1], number: parts[2], name: parts[3] };
           });
 
-        const matchResult = await matchStudents(uniqueKeys, 2026, 3);
+        const matchResult = await matchStudents(uniqueKeys, 2026, targetGrade);
         const newMatchMap = matchResult.matchMap || {};
         setStudentMatchMap(newMatchMap);
 
@@ -247,7 +204,7 @@ export function GradeImportClient() {
     if (parsedData.length === 0) return;
     setIsUploading(true);
     try {
-      const result = await uploadStudentScores(parsedData, 2026, 3);
+      const result = await uploadStudentScores(parsedData, 2026, targetGrade);
       if (result.error) {
         toast({ variant: "destructive", title: "저장 실패", description: result.error });
       } else {
@@ -262,64 +219,70 @@ export function GradeImportClient() {
   };
 
   const groupedWithScores = React.useMemo(() => {
-    const groups: Record<string, { items: ParsedGradeData[], totalScore: number, maxPossibleScore: number, finalScore: number }> = {};
-    const maxWeight = Math.max(...Object.values(achievementWeights), 0);
-
+    const groups: Record<string, { items: ParsedGradeData[], count: number }> = {};
     parsedData.forEach(item => {
       const key = `${item.major}_${item.classInfo}_${item.studentNumber}_${item.studentName}`;
-      if (!groups[key]) groups[key] = { items: [], totalScore: 0, maxPossibleScore: 0, finalScore: 0 };
-
+      if (!groups[key]) groups[key] = { items: [], count: 0 };
       groups[key].items.push(item);
-      const credits = item.credits || 0;
-      if (item.achievement && achievementWeights[item.achievement.toUpperCase()]) {
-        const weight = achievementWeights[item.achievement.toUpperCase()];
-        groups[key].totalScore += (weight * credits);
-      }
-      groups[key].maxPossibleScore += (maxWeight * credits);
+      groups[key].count++;
     });
 
-    const studentsArray = Object.entries(groups).map(([key, data]) => {
+    return Object.entries(groups).map(([key, data]) => {
       const parts = key.split('_');
-      const number = parseInt(parts[2]) || 0;
-      const ratioScore = data.maxPossibleScore > 0 ? (data.totalScore / data.maxPossibleScore) * 100 : 0;
-      return { key, number, ...data, finalScore: parseFloat(ratioScore.toFixed(2)) };
-    });
-
-    studentsArray.sort((a, b) => b.finalScore - a.finalScore);
-    studentsArray.forEach((student, index) => { (student as any).rank = index + 1; });
-    studentsArray.sort((a, b) => a.number - b.number);
-
-    return studentsArray as unknown as { key: string; items: ParsedGradeData[]; totalScore: number; maxPossibleScore: number; finalScore: number; rank: number }[];
-  }, [parsedData, achievementWeights]);
+      return { key, number: parseInt(parts[2]) || 0, ...data };
+    }).sort((a, b) => a.number - b.number);
+  }, [parsedData]);
 
   return (
     <div className="p-6 space-y-8">
+      {/* 데이터 초기화 섹션 */}
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Settings2 className="h-5 w-5 text-slate-500" />
-            <h3 className="font-bold text-slate-800 text-sm">성취도별 점수 가중치 설정</h3>
+            <Trash2 className="h-5 w-5 text-rose-500" />
+            <h3 className="font-bold text-slate-800 text-sm">성적 데이터 초기화</h3>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleDeleteAll} disabled={isDeleting} className="h-8 text-xs font-bold border-rose-200 text-rose-600 hover:bg-rose-50">
-              {isDeleting ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Trash2 className="mr-1 h-3 w-3" />}
-              데이터 전체 초기화
-            </Button>
-            <Button variant="outline" size="sm" onClick={saveWeights} className="h-8 text-xs font-bold border-indigo-200 text-indigo-600 hover:bg-indigo-50">
-              설정 저장
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" onClick={handleDeleteAll} disabled={isDeleting} className="h-8 text-xs font-bold border-rose-200 text-rose-600 hover:bg-rose-50">
+            {isDeleting ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Trash2 className="mr-1 h-3 w-3" />}
+            데이터 전체 삭제
+          </Button>
         </div>
-        <div className="grid grid-cols-5 gap-4">
-          {['A', 'B', 'C', 'D', 'E'].map(grade => (
-            <div key={grade} className="space-y-1.5">
-              <label className="text-[11px] font-black text-slate-500 ml-1 uppercase">{grade}등급 점수</label>
-              <Input type="number" value={achievementWeights[grade] || 0} onChange={(e) => handleWeightChange(grade, e.target.value)} className="h-9 font-bold text-center" />
-            </div>
-          ))}
-        </div>
+        <p className="text-[11px] text-slate-500">
+          시스템에 저장된 모든 학생의 성적 데이터를 영구적으로 삭제합니다. 이 작업은 되돌릴 수 없습니다. 가중치 설정은 [시스템 설정] 페이지를 이용해주세요.
+        </p>
       </div>
 
+      {/* 학년 선택 섹션 */}
+      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+        <div className="flex items-center gap-2 mb-4">
+          <GraduationCap className="h-5 w-5 text-indigo-500" />
+          <h3 className="font-bold text-slate-800 text-sm">업로드 대상 학생 현재 학년 설정</h3>
+        </div>
+        <div className="flex gap-2">
+          {[1, 2, 3].map((g) => (
+            <Button
+              key={g}
+              variant={targetGrade === g ? "default" : "outline"}
+              onClick={() => {
+                setTargetGrade(g);
+                setParsedData([]);
+              }}
+              className={cn(
+                "flex-1 h-12 font-black text-base",
+                targetGrade === g ? "bg-indigo-600 hover:bg-indigo-700 text-white" : "text-slate-400"
+              )}
+            >
+              현재 {g}학년
+            </Button>
+          ))}
+        </div>
+        <p className="text-[11px] text-slate-500 mt-3 flex items-center gap-1.5 font-medium">
+          <Info className="h-3.5 w-3.5 text-indigo-500" />
+          선택한 학년에 해당하는 학생들을 DB에서 찾아 성적을 매칭합니다.
+        </p>
+      </div>
+
+      {/* 파일 업로드 섹션 */}
       <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-lg p-10 bg-slate-50/50 hover:bg-slate-50 transition-colors">
         <input type="file" id="xlsx-upload" className="hidden" accept=".xlsx, .xls" onChange={handleFileUpload} disabled={isParsing || isUploading} />
         <label htmlFor="xlsx-upload" className="flex flex-col items-center cursor-pointer">
@@ -349,7 +312,7 @@ export function GradeImportClient() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 gap-8">
+          <div className="grid grid-cols-1 gap-4">
             {groupedWithScores.map((student) => {
               const [major, classInfo, number, name] = student.key.split('_');
               const match = studentMatchMap[student.key];
@@ -360,13 +323,11 @@ export function GradeImportClient() {
                   <div className={cn("px-4 py-3 border-b flex items-center justify-between", isMatched ? "bg-slate-50" : "bg-rose-50")}>
                     <div className="flex items-center gap-4">
                       <User className={cn("h-5 w-5", isMatched ? "text-slate-400" : "text-rose-400")} />
-                      <div className="flex flex-col">
+                      <div className="flex flex-col text-left">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-slate-800 text-base">{name}</span>
                           <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-md font-black">{number}번</span>
-                          <span className={cn("text-xs font-black", student.rank === 1 ? "text-amber-500" : "text-indigo-600")}>
-                            {student.rank}위 ({student.finalScore}점 / 100)
-                          </span>
+                          <span className="text-[10px] text-indigo-500 font-bold">{targetGrade}학년 대상</span>
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
                           {isMatched ? <span className="text-[10px] text-slate-500 font-bold">{match.major} • {match.classInfo}</span> : <span className="text-[10px] text-rose-500 font-bold text-[9px]">DB 매칭 실패 (ID 미확보)</span>}
@@ -382,7 +343,6 @@ export function GradeImportClient() {
                         <th className="px-4 py-2 font-medium">과목명</th>
                         <th className="px-4 py-2 font-medium text-center">학점</th>
                         <th className="px-4 py-2 font-medium text-center text-indigo-600">원점수</th>
-                        <th className="px-4 py-2 font-medium text-center">과목평균</th>
                         <th className="px-4 py-2 font-medium text-center">성취도</th>
                         <th className="px-4 py-2 font-medium text-center">석차등급</th>
                       </tr>
@@ -394,7 +354,6 @@ export function GradeImportClient() {
                           <td className="px-4 py-2 font-semibold text-slate-800">{item.subject}</td>
                           <td className="px-4 py-2 text-center text-slate-600 font-medium">{item.credits ?? '-'}</td>
                           <td className="px-4 py-2 text-center font-bold text-indigo-600">{item.score ?? '-'}</td>
-                          <td className="px-4 py-2 text-center text-slate-500">{item.averageScore ?? '-'}</td>
                           <td className="px-4 py-2 text-center">
                             <span className={cn("px-2 py-0.5 rounded-full font-bold", item.achievement === 'A' ? "bg-emerald-50 text-emerald-600" : item.achievement === 'B' ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-500")}>
                               {item.achievement}

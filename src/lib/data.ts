@@ -33,87 +33,48 @@ export async function getFilteredStudentData(graduationYear: string): Promise<St
 
   const flattened = flattenStudentData(students, employments || [], trainings || []);
 
-  // 사용자 정의 학과 순서(MAJOR_SORT_ORDER)에 따라 재정렬
   return flattened.sort((a, b) => {
     const indexA = MAJOR_SORT_ORDER.indexOf(a.major || '');
     const indexB = MAJOR_SORT_ORDER.indexOf(b.major || '');
-    
-    // 학과 순서가 다르면 학과 순서대로
-    if (indexA !== indexB) {
-      return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
-    }
-    
-    // 학과가 같으면 반, 번호 순으로 정렬
+    if (indexA !== indexB) return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
     if (a.class_info !== b.class_info) return (a.class_info || '').localeCompare(b.class_info || '');
     return (a.student_number || '').localeCompare(b.student_number || '', undefined, { numeric: true });
   });
 }
 
-/**
- * [복구] 특정 교사에게 할당된 학생들의 상세 정보 및 상담 로그를 가져옵니다.
- */
 export async function getAssignedStudentDetails(major: string, classInfo: string, graduationYear: number) {
   const supabase = await createClient();
-  
-  // 1. 기본 학생 정보 및 취업 정보 가져오기
   const { data: students, error } = await supabase
     .from('students')
-    .select(`
-      *,
-      student_employments (*),
-      student_counseling_logs (*)
-    `)
-    .eq('major', major)
-    .eq('class_info', classInfo)
-    .eq('graduation_year', graduationYear)
-    .order('student_number');
+    .select('*, student_employments (*), student_counseling_logs (*)')
+    .eq('major', major).eq('class_info', classInfo).eq('graduation_year', graduationYear).order('student_number');
 
-  if (error) {
-    console.error('Error fetching assigned students:', error);
-    return [];
-  }
+  if (error) return [];
 
-  // 2. 실습 이력 가져오기
-  const { data: trainings } = await supabase
-    .from('field_training_records')
-    .select('*')
-    .in('student_id', students.map(s => s.id))
-    .order('training_order', { ascending: false });
+  const { data: trainings } = await supabase.from('field_training_records').select('*').in('student_id', students.map(s => s.id)).order('training_order', { ascending: false });
 
-  // 3. 데이터 평탄화 (flatten) 및 정렬
   return students.map(s => {
     const studentTrainings = (trainings || []).filter(t => t.student_id === s.id);
     const latestTraining = studentTrainings[0];
-
     return {
-      ...s,
-      ...s.student_employments,
-      training_records: studentTrainings,
-      counseling_logs: s.student_counseling_logs || [],
+      ...s, ...s.student_employments, training_records: studentTrainings, counseling_logs: s.student_counseling_logs || [],
       has_field_training: latestTraining ? 'O' : '',
       latest_training_company: latestTraining?.company,
       start_date: latestTraining?.start_date,
       end_date: latestTraining?.end_date,
       training_stipend_status: latestTraining?.stipend_status,
       is_hiring_conversion: latestTraining?.hiring_status === '채용전환' ? latestTraining?.conversion_date : '',
-      conversion_date: latestTraining?.conversion_date,
       is_returned: latestTraining?.hiring_status === '복교' ? 'O' : '',
-      return_to_school_reason: latestTraining?.return_reason
     };
   }).sort((a, b) => (a.student_number || '').localeCompare(b.student_number || '', undefined, { numeric: true }));
 }
 
-/**
- * [복구] 호환성을 위한 단일 학생 데이터 취득 함수
- */
 export async function getStudentEmploymentData(id: string): Promise<StudentEmploymentData | null> {
   const supabase = await createClient();
   const { data: student } = await supabase.from('students').select('*').eq('id', id).single();
   if (!student) return null;
-
   const { data: employment } = await supabase.from('student_employments').select('*').eq('id', id).single();
   const { data: trainings } = await supabase.from('field_training_records').select('*').eq('student_id', id).order('training_order', { ascending: false });
-
   return flattenStudentData([student], [employment || {}], trainings || [])[0];
 }
 
@@ -122,20 +83,15 @@ function flattenStudentData(students: any[], employments: any[], trainings: any[
     const employment = employments.find(e => e.id === student.id) || {};
     const studentTrainings = trainings.filter(t => t.student_id === student.id);
     const latestTraining = studentTrainings[0];
-
     return {
-      ...student,
-      ...employment,
-      training_records: studentTrainings,
+      ...student, ...employment, training_records: studentTrainings,
       has_field_training: latestTraining ? 'O' : '',
       latest_training_company: latestTraining?.company,
       start_date: latestTraining?.start_date,
       end_date: latestTraining?.end_date,
       training_stipend_status: latestTraining?.stipend_status,
       is_hiring_conversion: latestTraining?.hiring_status === '채용전환' ? latestTraining?.conversion_date : '',
-      conversion_date: latestTraining?.conversion_date,
       is_returned: latestTraining?.hiring_status === '복교' ? 'O' : '',
-      return_to_school_reason: latestTraining?.return_reason
     };
   });
 }
@@ -148,16 +104,9 @@ export async function getGraduationYears() {
   return years.sort((a, b) => b - a);
 }
 
-/**
- * [복구/추가] 모든 학생의 기본 정보를 가져옵니다 (사용자 관리 페이지용).
- */
 export async function getAllStudentBaseData(): Promise<StudentEmploymentData[]> {
   const supabase = await createClient();
-  const { data: students, error } = await supabase
-    .from('students')
-    .select('id, graduation_year, major, class_info, student_number, student_name')
-    .order('graduation_year', { ascending: false });
-
+  const { data: students, error } = await supabase.from('students').select('id, graduation_year, major, class_info, student_number, student_name').order('graduation_year', { ascending: false });
   if (error) return [];
   return students as any[];
 }
@@ -168,129 +117,151 @@ export async function getProfiles() {
   return data || [];
 }
 
-/**
- * 학년별 주요 지표(진로희망, 자격증, 병역희망) 통계를 가져옵니다.
- */
 export async function getGradeStatistics(graduationYear: number) {
   const supabase = await createClient();
-  
-  const { data: students, error } = await supabase
-    .from('students')
-    .select('career_aspiration, certificates, military_status, major, class_info')
-    .eq('graduation_year', graduationYear);
-
+  const { data: students, error } = await supabase.from('students').select('career_aspiration, certificates, military_status, major, class_info').eq('graduation_year', graduationYear);
   if (error || !students) return null;
-
-  const stats = {
-    careerAspiration: {} as Record<string, number>,
-    militaryStatus: {} as Record<string, number>,
-    certificateDistribution: {
-      '0개': 0, '1개': 0, '2개': 0, '3개': 0, '4개': 0, '5개': 0, '6개 이상': 0
-    }
-  };
-
+  const stats = { careerAspiration: {} as Record<string, number>, militaryStatus: {} as Record<string, number>, certificateDistribution: { '0개': 0, '1개': 0, '2개': 0, '3개': 0, '4개': 0, '5개': 0, '6개 이상': 0 } };
   students.forEach(s => {
-    // 1. 진로희망 집계
     const aspiration = s.career_aspiration || '미설정';
     stats.careerAspiration[aspiration] = (stats.careerAspiration[aspiration] || 0) + 1;
-
-    // 2. 병역희망 집계
     const military = s.military_status || '미설정';
     stats.militaryStatus[military] = (stats.militaryStatus[military] || 0) + 1;
-
-    // 3. 자격증 분포 집계 (3학년 디자인 호환)
     const certCount = Array.isArray(s.certificates) ? s.certificates.length : 0;
-    if (certCount >= 6) stats.certificateDistribution['6개 이상']++;
-    else stats.certificateDistribution[`${certCount}개` as keyof typeof stats.certificateDistribution]++;
+    if (certCount >= 6) stats.certificateDistribution['6개 이상']++; else stats.certificateDistribution[`${certCount}개` as keyof typeof stats.certificateDistribution]++;
   });
-
   return stats;
 }
 
-/**
- * 현재 로그인한 사용자의 프로필 정보를 가져옵니다.
- */
 export async function getCurrentUserProfile() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, role, assigned_year, assigned_major, assigned_class, assigned_grade')
-    .eq('id', user.id)
-    .single();
-
+  const { data: profile } = await supabase.from('profiles').select('id, role, assigned_year, assigned_major, assigned_class, assigned_grade').eq('id', user.id).single();
   return profile;
 }
 
 /**
- * 모든 학생의 성적 데이터를 가져옵니다. (페이징 제한 없이 전량 조회)
+ * [최적화] 모든 학생의 성적 데이터를 가져옵니다.
  */
 export async function getAllStudentScores() {
   const supabase = await createClient();
-  const allData: any[] = [];
+  const allStudents: any[] = [];
+  let sFrom = 0;
+  let sHasMore = true;
+  while (sHasMore) {
+    const { data } = await supabase.from('students').select('id, student_name, student_number, major, class_info, graduation_year').range(sFrom, sFrom + 999);
+    if (!data || data.length === 0) { sHasMore = false; }
+    else { allStudents.push(...data); if (data.length < 1000) sHasMore = false; else sFrom += 1000; }
+  }
+  const studentMap = allStudents.reduce((acc, s) => { acc[s.id] = s; return acc; }, {} as Record<string, any>);
+  const { count } = await supabase.from('student_scores').select('*', { count: 'exact', head: true });
+  if (!count) return [];
   const PAGE_SIZE = 1000;
+  const CHUNK_SIZE = 5;
+  const totalPages = Math.ceil(count / PAGE_SIZE);
+  const allScores: any[] = [];
+  for (let i = 0; i < totalPages; i += CHUNK_SIZE) {
+    const promises = [];
+    for (let j = i; j < Math.min(i + CHUNK_SIZE, totalPages); j++) {
+      promises.push(supabase.from('student_scores').select('*').order('id', { ascending: true }).range(j * PAGE_SIZE, (j * PAGE_SIZE) + PAGE_SIZE - 1));
+    }
+    const results = await Promise.all(promises);
+    results.forEach(res => { if (res.data) allScores.push(...res.data); });
+  }
+  return allScores.map(score => ({ ...score, students: studentMap[score.student_id] || null }));
+}
+
+/**
+ * [초고속 요약] 특정 졸업연도 학생들의 석차 및 성취도를 사전 계산합니다. (1000건 제한 해제)
+ */
+export async function getYearlyRankingsSummary(graduationYear: number) {
+  const supabase = await createClient();
+  
+  // 1. 해당 졸업연도 학생 정보 조회
+  const { data: students } = await supabase
+    .from('students')
+    .select('id, student_name, student_number, major, class_info, graduation_year')
+    .eq('graduation_year', graduationYear);
+
+  if (!students || students.length === 0) return {};
+
+  const studentIds = students.map(s => s.id);
+
+  // 2. 해당 학생들의 성적 데이터 전량 수집 (1000건 제한 우회)
+  const allScores: any[] = [];
   let from = 0;
-  let to = PAGE_SIZE - 1;
   let hasMore = true;
 
   while (hasMore) {
     const { data, error } = await supabase
       .from('student_scores')
-      .select(`
-        *,
-        students (
-          student_name,
-          student_number,
-          major,
-          class_info,
-          graduation_year
-        )
-      `)
-      .order('academic_year', { ascending: false })
-      .order('grade', { ascending: false })
-      .order('semester', { ascending: false })
-      .order('id', { ascending: true }) // [결정적 정렬 추가] 중복/누락 방지의 핵심
-      .range(from, to);
+      .select('student_id, credits, achievement')
+      .in('student_id', studentIds)
+      .range(from, from + 999);
 
-    if (error) {
-      console.error('Error fetching student scores batch:', error);
-      break;
-    }
-
-    if (data && data.length > 0) {
-      allData.push(...data);
-      if (data.length < PAGE_SIZE) {
-        hasMore = false;
-      } else {
-        from += PAGE_SIZE;
-        to += PAGE_SIZE;
-      }
-    } else {
+    if (error || !data || data.length === 0) {
       hasMore = false;
+    } else {
+      allScores.push(...data);
+      if (data.length < 1000) hasMore = false;
+      else from += 1000;
     }
-    
-    // 무한 루프 방지 안전장치 (최대 5만건)
-    if (allData.length > 50000) break;
+    if (allScores.length > 50000) break;
   }
 
-  return allData;
+  const weights = await getAchievementScores();
+  const maxWeight = Math.max(...Object.values(weights), 0);
+
+  // 3. 학생별 통계 집계 초기화
+  const stats: Record<string, any> = {};
+  students.forEach(s => {
+    stats[s.id] = { 
+      id: s.id, name: s.student_name, number: s.student_number, 
+      major: s.major, classInfo: s.class_info, currentGrade: (4 - (s.graduation_year - 2026)),
+      rawScore: 0, maxPossible: 0, subjectCount: 0,
+      gradeCounts: { "A": 0, "B": 0, "C": 0, "D": 0, "E": 0 }
+    };
+  });
+
+  // 4. 수집된 모든 성적으로 요약 계산
+  allScores.forEach(record => {
+    const s = stats[record.student_id];
+    if (!s) return;
+    const credits = record.credits || 0;
+    const ach = record.achievement?.toUpperCase();
+    if (ach && weights[ach]) {
+      s.rawScore += (weights[ach] * credits);
+      if (s.gradeCounts.hasOwnProperty(ach)) s.gradeCounts[ach]++;
+    }
+    s.maxPossible += (maxWeight * credits);
+    s.subjectCount++;
+  });
+
+  const rankingList = Object.values(stats).map((s: any) => ({
+    ...s,
+    finalScore: s.maxPossible > 0 ? parseFloat(((s.rawScore / s.maxPossible) * 100).toFixed(2)) : 0
+  })).sort((a, b) => b.finalScore - a.finalScore);
+
+  const resultMap: Record<string, any> = {};
+  rankingList.forEach((student, idx) => {
+    const sameClass = rankingList.filter(s => s.major === student.major && s.classInfo === student.classInfo);
+    resultMap[student.id] = {
+      ...student,
+      totalRank: idx + 1,
+      schoolTotal: rankingList.length,
+      classRank: sameClass.findIndex(s => s.id === student.id) + 1,
+      classTotal: sameClass.length
+    };
+  });
+
+  return resultMap;
 }
 
-/**
- * 성취도별 점수 가중치 설정을 가져옵니다.
- */
 export async function getAchievementScores(): Promise<Record<string, number>> {
   const supabase = await createClient()
-  
   try {
-    const { data, error } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'achievement_scores')
-      .single()
-
+    const { data, error } = await supabase.from('system_settings').select('value').eq('key', 'achievement_scores').single();
     if (error) throw error
     return data.value as Record<string, number>
   } catch (error) {

@@ -147,7 +147,7 @@ export async function uploadStudentScores(
   }
 
   revalidatePath('/admin/grades');
-  revalidatePath('/admin/grades/summary');
+  revalidatePath('/admin/grades/summary/grades');
   return { success: true, results };
 }
 

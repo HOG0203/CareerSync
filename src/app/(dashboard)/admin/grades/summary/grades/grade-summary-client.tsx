@@ -3,138 +3,73 @@
 import * as React from 'react';
 import { 
   Search, 
-  Filter, 
   Trophy, 
   User, 
   ChevronRight,
-  TrendingUp,
   Download,
-  AlertCircle
+  Loader2
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { MAJOR_SORT_ORDER } from '@/lib/types';
+import { getStudentScoresById } from '@/app/students/actions';
 
 import { 
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import { GradeImportModal } from './grade-import-modal';
 
-interface ScoreRecord {
+interface StudentSummary {
   id: string;
-  student_id: string;
-  academic_year: number;
-  grade: number;
-  semester: number;
-  subject: string;
-  score: number | null;
-  average_score: number | null;
-  standard_deviation: number | null;
-  credits: number | null;
-  achievement: string | null;
-  rank_grade: string | null;
-  students: {
-    student_name: string;
-    student_number: string;
-    major: string;
-    class_info: string;
-    graduation_year: number;
-  };
+  name: string;
+  number: string;
+  major: string;
+  classInfo: string;
+  currentGrade: number;
+  finalScore: number;
+  subjectCount: number;
+  gradeCounts: Record<string, number>;
+  totalRank: number;
+  schoolTotal: number;
+  classRank: number;
+  classTotal: number;
 }
 
 export function GradeSummaryClient({ 
-  initialScores, 
-  weights,
-  allDuplicates = []
+  initialSummaries, 
+  weights
 }: { 
-  initialScores: ScoreRecord[], 
-  weights: Record<string, number>,
-  allDuplicates?: any[]
+  initialSummaries: StudentSummary[], 
+  weights: Record<string, number>
 }) {
   const [searchTerm, setSearchText] = React.useState('');
   const [selectedMajor, setSelectedMajor] = React.useState('all');
   const [selectedClass, setSelectedClass] = React.useState('all');
+  const [selectedGrade, setSelectedGrade] = React.useState<number>(3); 
   const [selectedStudentId, setSelectedStudentId] = React.useState<string | null>(null);
-  const [showDuplicateAnalysis, setShowDuplicateAnalysis] = React.useState(false);
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [detailedScores, setDetailedScores] = React.useState<any[]>([]);
+  const [isDetailLoading, setIsDetailedLoading] = React.useState(false);
+  const PAGE_SIZE = 50;
+
   const [sortConfig, setSortConfig] = React.useState<{ key: string, direction: 'asc' | 'desc' } | null>({
     key: 'totalRank',
     direction: 'asc'
   });
-  
-  const maxWeight = Math.max(...Object.values(weights), 0);
 
-  // [핵심] UUID(student_id) 기반 데이터 그룹화
-  const processedData = React.useMemo(() => {
-    const studentGroups: Record<string, {
-      id: string; // UUID
-      name: string;
-      number: string;
-      major: string;
-      classInfo: string;
-      totalWeightedScore: number;
-      maxPossibleScore: number;
-      subjectCount: number;
-      gradeCounts: Record<string, number>;
-      records: ScoreRecord[];
-    }> = {};
-
-    initialScores.forEach(record => {
-      const sid = record.student_id; // DB 고유 UUID
-      if (!sid) return;
-
-      if (!studentGroups[sid]) {
-        // 첫 발견 시 해당 학생 정보로 그룹 초기화
-        const sInfo = record.students || {};
-        studentGroups[sid] = {
-          id: sid,
-          name: sInfo.student_name || '미상',
-          number: sInfo.student_number || '0',
-          major: sInfo.major || '미지정',
-          classInfo: sInfo.class_info || '미정',
-          totalWeightedScore: 0,
-          maxPossibleScore: 0,
-          subjectCount: 0,
-          gradeCounts: { "A": 0, "B": 0, "C": 0, "D": 0, "E": 0 },
-          records: []
-        };
-      }
-
-      // 오직 해당 UUID와 정확히 일치하는 레코드만 추가
-      studentGroups[sid].records.push(record);
-      studentGroups[sid].subjectCount++;
-      
-      const credits = record.credits || 0;
-      if (record.achievement) {
-        const ach = record.achievement.toUpperCase();
-        if (weights[ach]) {
-          const weight = weights[ach];
-          studentGroups[sid].totalWeightedScore += (weight * credits);
-        }
-        if (studentGroups[sid].gradeCounts[ach] !== undefined) {
-          studentGroups[sid].gradeCounts[ach]++;
-        }
-      }
-      studentGroups[sid].maxPossibleScore += (maxWeight * credits);
-    });
-
-    const studentsArray = Object.values(studentGroups).map(s => {
-      const finalScore = s.maxPossibleScore > 0 
-        ? parseFloat(((s.totalWeightedScore / s.maxPossibleScore) * 100).toFixed(2))
-        : 0;
-      return { ...s, finalScore };
-    });
-
-    studentsArray.sort((a, b) => b.finalScore - a.finalScore);
-    studentsArray.forEach((s, i) => { (s as any).totalRank = i + 1; });
-
-    let filtered = studentsArray.filter(s => {
+  // [속도 최적화] 필터링 연산
+  const filteredData = React.useMemo(() => {
+    let filtered = initialSummaries.filter(s => {
+      const matchGrade = s.currentGrade === selectedGrade;
       const matchMajor = selectedMajor === 'all' || s.major === selectedMajor;
       const matchClass = selectedClass === 'all' || s.classInfo === selectedClass;
       const matchSearch = s.name.includes(searchTerm) || s.number.includes(searchTerm);
-      return matchMajor && matchClass && matchSearch;
+      return matchGrade && matchMajor && matchClass && matchSearch;
     });
 
     if (sortConfig) {
@@ -148,8 +83,32 @@ export function GradeSummaryClient({
       });
     }
 
-    return filtered as any[];
-  }, [initialScores, weights, searchTerm, selectedMajor, selectedClass, sortConfig]);
+    return filtered;
+  }, [initialSummaries, searchTerm, selectedMajor, selectedClass, selectedGrade, sortConfig]);
+
+  // 상세 성적을 모달 열릴 때만 가져옴 (On-demand)
+  React.useEffect(() => {
+    if (selectedStudentId) {
+      setIsDetailedLoading(true);
+      getStudentScoresById(selectedStudentId).then(scores => {
+        setDetailedScores(scores);
+        setIsDetailedLoading(false);
+      });
+    } else {
+      setDetailedScores([]);
+    }
+  }, [selectedStudentId]);
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedMajor, selectedClass, selectedGrade, sortConfig]);
+
+  const paginatedData = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    return filteredData.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [filteredData, currentPage]);
+
+  const totalPages = Math.ceil(filteredData.length / PAGE_SIZE);
 
   const handleSort = (key: string) => {
     setSortConfig(current => {
@@ -158,94 +117,54 @@ export function GradeSummaryClient({
     });
   };
 
-  const majors = Array.from(new Set(initialScores.map(s => s.students?.major))).filter(Boolean).sort((a, b) => {
-    const idxA = MAJOR_SORT_ORDER.indexOf(a);
-    const idxB = MAJOR_SORT_ORDER.indexOf(b);
-    return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
-  });
+  const majors = React.useMemo(() => {
+    const allMajors = Array.from(new Set(initialSummaries.map(s => s.major))).filter(Boolean);
+    return allMajors.sort((a, b) => {
+      const idxA = MAJOR_SORT_ORDER.indexOf(a);
+      const idxB = MAJOR_SORT_ORDER.indexOf(b);
+      return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+    });
+  }, [initialSummaries]);
 
   const availableClasses = React.useMemo(() => {
     if (selectedMajor === 'all') return [];
-    const classes = new Set(initialScores.filter(s => s.students?.major === selectedMajor).map(s => s.students?.class_info));
+    const classes = new Set(initialSummaries.filter(s => s.major === selectedMajor).map(s => s.classInfo));
     return Array.from(classes).sort();
-  }, [initialScores, selectedMajor]);
+  }, [initialSummaries, selectedMajor]);
 
   const selectedStudent = React.useMemo(() => 
-    selectedStudentId ? processedData.find(s => s.id === selectedStudentId) : null
-  , [selectedStudentId, processedData]);
+    selectedStudentId ? initialSummaries.find(s => s.id === selectedStudentId) : null
+  , [selectedStudentId, initialSummaries]);
 
   const groupedDetails = React.useMemo(() => {
-    if (!selectedStudent) return null;
-    const groups: Record<string, (ScoreRecord & { isDuplicate?: boolean })[]> = {};
-    const seen = new Set<string>();
-    selectedStudent.records.forEach(r => {
+    if (detailedScores.length === 0) return null;
+    const groups: Record<string, any[]> = {};
+    detailedScores.forEach(r => {
       const semesterKey = `${r.grade}학년 ${r.semester}학기`;
-      const duplicateKey = `${r.academic_year}_${r.grade}_${r.semester}_${r.subject}`;
-      const recordWithStatus = { ...r, isDuplicate: seen.has(duplicateKey) };
-      seen.add(duplicateKey);
       if (!groups[semesterKey]) groups[semesterKey] = [];
-      groups[semesterKey].push(recordWithStatus);
+      groups[semesterKey].push(r);
     });
     return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [selectedStudent]);
+  }, [detailedScores]);
 
   return (
     <div className="flex flex-col h-full">
-      {allDuplicates.length > 0 && (
-        <div className="px-4 pt-4">
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3 shadow-sm">
-            <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <h3 className="text-sm font-bold text-amber-800">데이터 정합성 주의 (중복 발견)</h3>
-              <p className="text-xs text-amber-700 mt-1">
-                현재 DB에 동일 학생/학기/과목으로 저장된 중복 데이터가 <span className="font-black text-rose-600 underline">{allDuplicates.length}건</span> 있습니다.
-              </p>
-              <div className="mt-3 flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => setShowDuplicateAnalysis(!showDuplicateAnalysis)} className="h-7 text-[10px] font-black border-amber-300 text-amber-700 hover:bg-amber-100">
-                  {showDuplicateAnalysis ? '분석 패널 닫기' : '중복 내역 전체 분석하기'}
-                </Button>
-              </div>
-              {showDuplicateAnalysis && (
-                <div className="mt-4 bg-white rounded-lg border border-amber-200 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
-                  <div className="max-h-[300px] overflow-auto">
-                    <table className="w-full text-[11px] text-left">
-                      <thead className="bg-slate-50 text-slate-500 sticky top-0 border-b">
-                        <tr>
-                          <th className="px-3 py-2 font-bold uppercase tracking-tighter">학생 정보</th>
-                          <th className="px-3 py-2 font-bold uppercase tracking-tighter text-center">학년/학기</th>
-                          <th className="px-3 py-2 font-bold uppercase tracking-tighter">과목명</th>
-                          <th className="px-3 py-2 font-bold uppercase tracking-tighter text-center">중복 횟수</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {allDuplicates.map((d, i) => (
-                          <tr key={i} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-3 py-2">
-                              <span className="font-bold text-slate-800">{d.name}</span>
-                              <span className="text-slate-400 ml-1">({d.major} {d.classInfo} {d.number}번)</span>
-                            </td>
-                            <td className="px-3 py-2 text-center text-slate-500">{d.year}년 {d.grade}학년 {d.sem}학기</td>
-                            <td className="px-3 py-2 font-bold text-indigo-600">{d.subject}</td>
-                            <td className="px-3 py-2 text-center">
-                              <span className="bg-rose-500 text-white px-1.5 py-0.5 rounded-full font-black text-[9px]">{d.count}회 반복됨</span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <div className="px-4 pt-4 flex justify-end">
+        <GradeImportModal />
+      </div>
 
       <div className="p-4 border-b bg-slate-50/50 flex flex-wrap items-center gap-4">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input placeholder="학생 이름 또는 번호 검색..." className="pl-9 bg-white border-slate-200" value={searchTerm} onChange={(e) => setSearchText(e.target.value)} />
         </div>
+
+        <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+          {[1, 2, 3].map(g => (
+            <Button key={g} variant={selectedGrade === g ? 'secondary' : 'ghost'} size="sm" onClick={() => setSelectedGrade(g)} className={cn("h-8 px-3 text-xs font-black", selectedGrade === g && "text-indigo-600 bg-indigo-50")}>{g}학년</Button>
+          ))}
+        </div>
+
         <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
           <Button variant={selectedMajor === 'all' ? 'default' : 'outline'} size="sm" onClick={() => { setSelectedMajor('all'); setSelectedClass('all'); }} className={cn("h-8 text-xs font-bold shrink-0", selectedMajor === 'all' && "bg-indigo-600 hover:bg-indigo-700")}>
             전체 학과
@@ -273,16 +192,16 @@ export function GradeSummaryClient({
         <table className="w-full text-sm text-left border-collapse">
           <thead className="bg-slate-50 text-slate-500 sticky top-0 z-10 border-b">
             <tr>
-              <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider text-center w-16 cursor-pointer hover:bg-slate-100" onClick={() => handleSort('totalRank')}>석차 {sortConfig?.key === 'totalRank' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+              <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider text-center w-16 cursor-pointer hover:bg-slate-100" onClick={() => handleSort('totalRank')}>석차</th>
               <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider">학생 정보</th>
-              <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider text-center cursor-pointer hover:bg-slate-100" onClick={() => handleSort('finalScore')}>환산 점수 {sortConfig?.key === 'finalScore' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
-              <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider text-center cursor-pointer hover:bg-slate-100" onClick={() => handleSort('subjectCount')}>이수 과목 {sortConfig?.key === 'subjectCount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+              <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider text-center cursor-pointer hover:bg-slate-100" onClick={() => handleSort('finalScore')}>환산 점수</th>
+              <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider text-center">이수 과목</th>
               <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider text-center">성취도 분포 (A-E)</th>
               <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider text-right w-10"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
-            {processedData.map((student) => (
+            {paginatedData.map((student) => (
               <tr key={student.id} className="hover:bg-indigo-50/30 transition-colors group cursor-pointer" onClick={() => setSelectedStudentId(student.id)}>
                 <td className="px-6 py-4 text-center">
                   <div className="flex flex-col items-center">
@@ -298,7 +217,7 @@ export function GradeSummaryClient({
                   <div className="flex items-center gap-3">
                     <div className="h-9 w-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-indigo-100 transition-colors"><User className="h-5 w-5" /></div>
                     <div className="flex flex-col">
-                      <span className="font-bold text-slate-900">{student.name}</span>
+                      <span className="font-bold text-slate-900">{student.name} <span className="text-[9px] text-indigo-400 ml-1">({student.currentGrade}학년)</span></span>
                       <span className="text-[10px] text-slate-500 font-medium">{student.major} • {student.classInfo} • {student.number}번</span>
                     </div>
                   </div>
@@ -336,8 +255,12 @@ export function GradeSummaryClient({
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-xl bg-slate-100 flex items-center justify-center"><User className="h-6 w-6 text-slate-400" /></div>
                 <div className="flex flex-col text-left">
-                  <DialogTitle className="text-xl font-black flex items-center gap-2 text-slate-900">{selectedStudent?.name} <span className="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full font-bold">{selectedStudent?.number}번</span></DialogTitle>
-                  <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">{selectedStudent?.major} • {selectedStudent?.classInfo} • {selectedStudent?.finalScore}점</p>
+                  <DialogTitle className="text-xl font-black flex items-center gap-2 text-slate-900">
+                    {selectedStudent?.name} <span className="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full font-bold">{selectedStudent?.number}번</span>
+                  </DialogTitle>
+                  <DialogDescription className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">
+                    {selectedStudent?.major} • {selectedStudent?.classInfo} • {selectedStudent?.finalScore}점
+                  </DialogDescription>
                 </div>
               </div>
               <div className="text-right hidden sm:block">
@@ -346,9 +269,14 @@ export function GradeSummaryClient({
               </div>
             </div>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50">
-            {groupedDetails?.map(([semesterKey, records]) => (
-              <div key={semesterKey} className="space-y-3">
+          <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
+            {isDetailLoading ? (
+              <div className="h-64 flex flex-col items-center justify-center gap-4">
+                <Loader2 className="h-8 w-8 text-indigo-500 animate-spin" />
+                <p className="text-sm font-bold text-slate-400">상세 성적을 불러오는 중...</p>
+              </div>
+            ) : groupedDetails?.map(([semesterKey, records]) => (
+              <div key={semesterKey} className="mb-8 last:mb-0 space-y-3">
                 <h4 className="font-black text-slate-800 flex items-center gap-2 text-sm border-l-4 border-indigo-500 pl-3">{semesterKey} <span className="text-[10px] text-slate-400 font-bold bg-white px-1.5 py-0.5 rounded border border-slate-200">{records.length} Subjects</span></h4>
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                   <table className="w-full text-xs text-left">
@@ -364,10 +292,8 @@ export function GradeSummaryClient({
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {records.map((r, i) => (
-                        <tr key={i} className={cn("transition-colors", r.isDuplicate ? "bg-rose-50/50 hover:bg-rose-100/50" : "hover:bg-slate-50/50")}>
-                          <td className="px-4 py-3 font-bold text-slate-700 flex items-center gap-2">
-                            {r.subject} {r.isDuplicate && <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-rose-500 text-[9px] text-white font-black animate-pulse"><AlertCircle className="h-2 w-2" /> 중복 의심</span>}
-                          </td>
+                        <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-4 py-3 font-bold text-slate-700">{r.subject}</td>
                           <td className="px-4 py-3 text-center font-medium text-slate-500">{r.credits || '-'}</td>
                           <td className="px-4 py-3 text-center font-black text-indigo-600 text-sm">{r.score || '-'}</td>
                           <td className="px-4 py-3 text-center text-slate-400 font-medium">{r.average_score || '-'}</td>
@@ -388,10 +314,27 @@ export function GradeSummaryClient({
         </DialogContent>
       </Dialog>
 
+      {totalPages > 1 && (
+        <div className="p-4 bg-white border-t flex items-center justify-center gap-1 shrink-0">
+          <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} className="h-8 px-2">이전</Button>
+          <div className="flex items-center gap-1 mx-4">
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let pageNum;
+              if (totalPages <= 5) pageNum = i + 1;
+              else if (currentPage <= 3) pageNum = i + 1;
+              else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+              else pageNum = currentPage - 2 + i;
+              return (<Button key={pageNum} variant={currentPage === pageNum ? "default" : "ghost"} size="sm" onClick={() => setCurrentPage(pageNum)} className={cn("h-8 w-8 p-0 font-bold text-xs", currentPage === pageNum && "bg-indigo-600")}>{pageNum}</Button>);
+            })}
+          </div>
+          <Button variant="outline" size="sm" disabled={currentPage === totalPages} onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} className="h-8 px-2">다음</Button>
+        </div>
+      )}
+
       <div className="p-4 bg-white border-t flex items-center justify-between text-[11px] font-bold text-slate-500">
         <div className="flex items-center gap-6">
-          <span>조회 인원: <span className="text-indigo-600">{processedData.length}명</span></span>
-          <span>전체 평균: <span className="text-indigo-600">{processedData.length > 0 ? (processedData.reduce((acc, s) => acc + s.finalScore, 0) / processedData.length).toFixed(2) : 0}점</span></span>
+          <span>조회 인원: <span className="text-indigo-600">{filteredData.length}명</span></span>
+          <span>전체 평균: <span className="text-indigo-600">{filteredData.length > 0 ? (filteredData.reduce((acc, s) => acc + s.finalScore, 0) / filteredData.length).toFixed(2) : 0}점</span></span>
         </div>
         <Button variant="ghost" size="sm" className="h-7 text-[10px] gap-1 font-black text-slate-400 hover:text-indigo-600"><Download className="h-3 w-3" /> 엑셀 다운로드 (준비중)</Button>
       </div>
