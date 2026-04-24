@@ -1,12 +1,17 @@
 import { 
   getAchievementScores, 
   getCurrentUserProfile, 
-  getYearlyRankingsSummary 
+  getYearlyRankingsSummary
 } from '@/lib/data';
+import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { redirect } from 'next/navigation';
 import { GradeSummaryClient } from './grade-summary-client';
 
-export default async function GradeSummaryPage() {
+export default async function GradeSummaryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ grade?: string }>;
+}) {
   const profile = await getCurrentUserProfile();
 
   // 관리자만 접근 가능
@@ -14,26 +19,35 @@ export default async function GradeSummaryPage() {
     redirect('/dashboard');
   }
 
-  // 전 학년(1, 2, 3학년)의 요약 데이터를 병렬로 초고속 조회
-  // 2026년 기준: 3학년(2026졸업), 2학년(2027졸업), 1학년(2028졸업)
-  const [summary3, summary2, summary1, weights] = await Promise.all([
-    getYearlyRankingsSummary(2026),
-    getYearlyRankingsSummary(2027),
-    getYearlyRankingsSummary(2028),
+  // 시스템 설정에서 기준 학사학년도 가져오기 (정확한 경로에서 임포트)
+  const settings = await getSystemSettings();
+  const baseYear = settings.baseYear;
+
+  // URL 파라미터에서 학년 정보를 읽음 (기본값 3학년)
+  const { grade } = await searchParams;
+  const selectedGradeNum = grade ? parseInt(grade) : 3;
+  
+  /**
+   * [계산 로직]
+   * 현재 3학년 = baseYear + 1년 졸업
+   * 현재 2학년 = baseYear + 2년 졸업
+   * 현재 1학년 = baseYear + 3년 졸업
+   */
+  const targetGradYear = baseYear + (4 - selectedGradeNum);
+
+  // 선택된 학년의 요약 데이터만 서버에서 가져옴
+  const [summaryMap, weights] = await Promise.all([
+    getYearlyRankingsSummary(targetGradYear, baseYear),
     getAchievementScores()
   ]);
 
-  // 모든 학년의 요약 정보를 하나의 리스트로 통합
-  const allStudentSummaries = [
-    ...Object.values(summary3),
-    ...Object.values(summary2),
-    ...Object.values(summary1)
-  ];
+  const studentSummaries = Object.values(summaryMap);
 
   return (
     <GradeSummaryClient 
-      initialSummaries={allStudentSummaries} 
-      weights={weights} 
+      initialSummaries={studentSummaries as any[]} 
+      weights={weights}
+      currentGrade={selectedGradeNum} 
     />
   );
 }

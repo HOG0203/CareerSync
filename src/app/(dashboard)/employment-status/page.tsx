@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import { getFilteredStudentData, getGraduationYears, StudentEmploymentData } from '@/lib/data';
+import { getFilteredStudentData, getGraduationYears, StudentEmploymentData, getYearlyRankingsSummary } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import EmploymentStatusFilters from './employment-status-filters';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
@@ -11,11 +11,18 @@ export const metadata: Metadata = {
   description: '반별/학생별 취업 현황 그리드뷰',
 };
 
+/**
+ * 범례와 100% 일치하는 색상 매핑 함수
+ */
 const getCompanyTypeVariant = (type?: string, businessType?: string) => {
-  if (businessType === '채용진행중') return 'bg-amber-100 text-amber-900 border-amber-200';
-  if (businessType === '현장실습중') return 'bg-blue-100 text-blue-900 border-blue-200';
+  // 1순위: 특수 상태 (채용진행, 현장실습) -> 약간 더 진한 파스텔톤 배경
+  if (businessType === '채용진행중') return 'bg-amber-100/80 text-amber-900 border-amber-300 border-x';
+  if (businessType === '현장실습중') return 'bg-blue-100/80 text-blue-900 border-blue-300 border-x';
+  
+  // 2순위: 취업이 아닌 경우 -> 흰색 유지
   if (businessType !== '취업') return 'bg-white text-black border-gray-200';
 
+  // 3순위: 취업자인 경우 기업 유형별 색상 적용
   switch (type) {
     case '대기업':
     case '공기업':
@@ -26,7 +33,7 @@ const getCompanyTypeVariant = (type?: string, businessType?: string) => {
     case '중견기업':
       return 'bg-purple-600 text-white border-purple-700';
     case '중소기업':
-      return 'bg-cyan-50 text-cyan-500 text-white border-cyan-600';
+      return 'bg-cyan-500 text-white border-cyan-600';
     case '연계교육':
       return 'bg-orange-500 text-white border-orange-600';
     default:
@@ -55,7 +62,6 @@ const getShortClassName = (major: string, classInfo: string) => {
   return `${shortMajor} ${classInfo}`;
 };
 
-// 학과 정렬 순서 정의
 const SORT_ORDER = [
   '자동화기계과',
   '친환경자동차과',
@@ -78,51 +84,40 @@ export default async function EmploymentStatusPage({
 }) {
   const params = await searchParams;
 
-  // 1. 기반 설정 패칭
   const [graduationYears, settings] = await Promise.all([
     getGraduationYears(),
     getSystemSettings()
   ]);
 
-  // 학사학년도(AY)와 학년(Grade) 기반 졸업연도 계산
   const ay = params.ay ? parseInt(params.ay) : settings.baseYear;
   const grade = params.grade ? parseInt(params.grade) : 3;
   const calculatedGradYear = (ay + (4 - grade)).toString();
-
-  // 기본 조회 졸업연도 결정
   const defaultGradYear = (settings.baseYear + 1).toString();
   const selectedYear = params.year || calculatedGradYear || defaultGradYear;
 
-  // 2. 타겟 데이터 패칭 (해당 학년의 데이터만 DB에서 직접 필터링하여 가져옴)
-  const allData = await getFilteredStudentData(selectedYear);
+  const [allData, rankingMap] = await Promise.all([
+    getFilteredStudentData(selectedYear),
+    getYearlyRankingsSummary(parseInt(selectedYear), settings.baseYear)
+  ]);
 
-  // 학사학년도 표시용
   const displayAY = params.ay ? parseInt(params.ay) : (parseInt(selectedYear) - (4 - grade));
 
-  // 3. 필터링 및 그룹화 로직 최적화
   const groupedData: Record<string, StudentEmploymentData[]> = {};
-  
   for (const student of allData) {
     const major = student.major || '';
     const classInfo = student.class_info || '';
     const displayClassName = getShortClassName(major, classInfo);
-    
     if (!groupedData[displayClassName]) groupedData[displayClassName] = [];
     groupedData[displayClassName].push(student);
   }
 
-  // 3. 정렬 로직 최적화
-  // 미리 학과별 순서 맵을 생성하여 조회 성능 향상
   const majorOrderMap = new Map(SORT_ORDER.map((m, i) => [MAJOR_MAP[m] || m, i]));
 
   const classNames = Object.keys(groupedData).sort((a, b) => {
-    // 그룹명 "기계 3-1"에서 "기계" 부분만 추출
     const majorA = a.split(' ')[0];
     const majorB = b.split(' ')[0];
-    
     const orderA = majorOrderMap.get(majorA) ?? 999;
     const orderB = majorOrderMap.get(majorB) ?? 999;
-    
     if (orderA !== orderB) return orderA - orderB;
     return a.localeCompare(b, 'ko');
   });
@@ -130,7 +125,6 @@ export default async function EmploymentStatusPage({
   return (
     <div className="flex flex-col h-full gap-4 sm:gap-6">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between shrink-0 gap-4 px-1">
-        {/* 좌측: 제목 및 부제목 */}
         <div className="flex flex-col gap-1">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
             <Grid3X3 className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
@@ -141,7 +135,6 @@ export default async function EmploymentStatusPage({
           </p>
         </div>
         
-        {/* 우측: 필터 및 범례 */}
         <div className="flex flex-col items-start sm:items-end gap-3 sm:gap-2">
           <div className="shrink-0 scale-90 sm:scale-100 origin-left sm:origin-right">
             <EmploymentStatusFilters 
@@ -188,6 +181,7 @@ export default async function EmploymentStatusPage({
                       student={student}
                       idx={idx}
                       variant={getCompanyTypeVariant(student.company_type, student.business_type)}
+                      rankingSummary={rankingMap[student.id]}
                     />
                   ))}
                   {Array.from({ length: Math.max(0, 24 - students.length) }).map((_, i) => (

@@ -173,9 +173,9 @@ export async function getAllStudentScores() {
 }
 
 /**
- * [초고속 요약] 특정 졸업연도 학생들의 석차 및 성취도를 사전 계산합니다. (1000건 제한 해제)
+ * [초고속 요약] 특정 졸업연도 학생들의 석차 및 성취도를 사전 계산합니다.
  */
-export async function getYearlyRankingsSummary(graduationYear: number) {
+export async function getYearlyRankingsSummary(graduationYear: number, baseYear: number = 2026) {
   const supabase = await createClient();
   
   // 1. 해당 졸업연도 학생 정보 조회
@@ -188,7 +188,7 @@ export async function getYearlyRankingsSummary(graduationYear: number) {
 
   const studentIds = students.map(s => s.id);
 
-  // 2. 해당 학생들의 성적 데이터 전량 수집 (1000건 제한 우회)
+  // 2. 해당 학생들의 성적 데이터 전량 수집
   const allScores: any[] = [];
   let from = 0;
   let hasMore = true;
@@ -216,9 +216,12 @@ export async function getYearlyRankingsSummary(graduationYear: number) {
   // 3. 학생별 통계 집계 초기화
   const stats: Record<string, any> = {};
   students.forEach(s => {
+    // [학년 계산 공식 수정] 4 - (졸업연도 - 학사학년도)
+    const currentGrade = 4 - (s.graduation_year - baseYear);
+
     stats[s.id] = { 
       id: s.id, name: s.student_name, number: s.student_number, 
-      major: s.major, classInfo: s.class_info, currentGrade: (4 - (s.graduation_year - 2026)),
+      major: s.major, classInfo: s.class_info, currentGrade,
       rawScore: 0, maxPossible: 0, subjectCount: 0,
       gradeCounts: { "A": 0, "B": 0, "C": 0, "D": 0, "E": 0 }
     };

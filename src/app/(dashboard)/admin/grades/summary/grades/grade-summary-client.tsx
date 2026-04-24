@@ -9,6 +9,7 @@ import {
   Download,
   Loader2
 } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -42,15 +43,18 @@ interface StudentSummary {
 
 export function GradeSummaryClient({ 
   initialSummaries, 
-  weights
+  weights,
+  currentGrade // 서버에서 결정된 학년
 }: { 
   initialSummaries: StudentSummary[], 
-  weights: Record<string, number>
+  weights: Record<string, number>,
+  currentGrade: number
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [searchTerm, setSearchText] = React.useState('');
   const [selectedMajor, setSelectedMajor] = React.useState('all');
   const [selectedClass, setSelectedClass] = React.useState('all');
-  const [selectedGrade, setSelectedGrade] = React.useState<number>(3); 
   const [selectedStudentId, setSelectedStudentId] = React.useState<string | null>(null);
   const [currentPage, setCurrentPage] = React.useState(1);
   const [detailedScores, setDetailedScores] = React.useState<any[]>([]);
@@ -62,14 +66,20 @@ export function GradeSummaryClient({
     direction: 'asc'
   });
 
-  // [속도 최적화] 필터링 연산
+  // 학년 변경 시 URL 업데이트 (서버 리로딩 유도)
+  const handleGradeChange = (grade: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('grade', grade.toString());
+    router.push(`/admin/grades/summary/grades?${params.toString()}`);
+  };
+
+  // 클라이언트 사이드 필터링 (학과, 반, 검색어)
   const filteredData = React.useMemo(() => {
     let filtered = initialSummaries.filter(s => {
-      const matchGrade = s.currentGrade === selectedGrade;
       const matchMajor = selectedMajor === 'all' || s.major === selectedMajor;
       const matchClass = selectedClass === 'all' || s.classInfo === selectedClass;
       const matchSearch = s.name.includes(searchTerm) || s.number.includes(searchTerm);
-      return matchGrade && matchMajor && matchClass && matchSearch;
+      return matchMajor && matchClass && matchSearch;
     });
 
     if (sortConfig) {
@@ -84,9 +94,9 @@ export function GradeSummaryClient({
     }
 
     return filtered;
-  }, [initialSummaries, searchTerm, selectedMajor, selectedClass, selectedGrade, sortConfig]);
+  }, [initialSummaries, searchTerm, selectedMajor, selectedClass, sortConfig]);
 
-  // 상세 성적을 모달 열릴 때만 가져옴 (On-demand)
+  // 상세 성적 온디맨드 로딩
   React.useEffect(() => {
     if (selectedStudentId) {
       setIsDetailedLoading(true);
@@ -99,9 +109,10 @@ export function GradeSummaryClient({
     }
   }, [selectedStudentId]);
 
+  // 필터 변경 시 1페이지로 리셋
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedMajor, selectedClass, selectedGrade, sortConfig]);
+  }, [searchTerm, selectedMajor, selectedClass, sortConfig]);
 
   const paginatedData = React.useMemo(() => {
     const startIndex = (currentPage - 1) * PAGE_SIZE;
@@ -159,9 +170,18 @@ export function GradeSummaryClient({
           <Input placeholder="학생 이름 또는 번호 검색..." className="pl-9 bg-white border-slate-200" value={searchTerm} onChange={(e) => setSearchText(e.target.value)} />
         </div>
 
+        {/* 현재 학년 필터 - 서버 사이드 연동 */}
         <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
           {[1, 2, 3].map(g => (
-            <Button key={g} variant={selectedGrade === g ? 'secondary' : 'ghost'} size="sm" onClick={() => setSelectedGrade(g)} className={cn("h-8 px-3 text-xs font-black", selectedGrade === g && "text-indigo-600 bg-indigo-50")}>{g}학년</Button>
+            <Button 
+              key={g} 
+              variant={currentGrade === g ? 'secondary' : 'ghost'} 
+              size="sm" 
+              onClick={() => handleGradeChange(g)} 
+              className={cn("h-8 px-3 text-xs font-black", currentGrade === g && "text-indigo-600 bg-indigo-50")}
+            >
+              {g}학년
+            </Button>
           ))}
         </div>
 
@@ -275,41 +295,47 @@ export function GradeSummaryClient({
                 <Loader2 className="h-8 w-8 text-indigo-500 animate-spin" />
                 <p className="text-sm font-bold text-slate-400">상세 성적을 불러오는 중...</p>
               </div>
-            ) : groupedDetails?.map(([semesterKey, records]) => (
-              <div key={semesterKey} className="mb-8 last:mb-0 space-y-3">
-                <h4 className="font-black text-slate-800 flex items-center gap-2 text-sm border-l-4 border-indigo-500 pl-3">{semesterKey} <span className="text-[10px] text-slate-400 font-bold bg-white px-1.5 py-0.5 rounded border border-slate-200">{records.length} Subjects</span></h4>
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                  <table className="w-full text-xs text-left">
-                    <thead className="bg-slate-50/50 text-slate-400 border-b">
-                      <tr>
-                        <th className="px-4 py-2.5 font-bold uppercase tracking-wider">과목명</th>
-                        <th className="px-4 py-2.5 font-bold uppercase tracking-wider text-center">학점</th>
-                        <th className="px-4 py-2.5 font-bold uppercase tracking-wider text-center text-indigo-600">원점수</th>
-                        <th className="px-4 py-2.5 font-bold uppercase tracking-wider text-center">과목평균</th>
-                        <th className="px-4 py-2.5 font-bold uppercase tracking-wider text-center">성취도</th>
-                        <th className="px-4 py-2.5 font-bold uppercase tracking-wider text-center">석차등급</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {records.map((r, i) => (
-                        <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-4 py-3 font-bold text-slate-700">{r.subject}</td>
-                          <td className="px-4 py-3 text-center font-medium text-slate-500">{r.credits || '-'}</td>
-                          <td className="px-4 py-3 text-center font-black text-indigo-600 text-sm">{r.score || '-'}</td>
-                          <td className="px-4 py-3 text-center text-slate-400 font-medium">{r.average_score || '-'}</td>
-                          <td className="px-4 py-3 text-center">
-                            <span className={cn("px-2.5 py-1 rounded-full font-black text-[10px]", r.achievement === 'A' ? "bg-emerald-100 text-emerald-700" : r.achievement === 'B' ? "bg-blue-100 text-blue-700" : r.achievement === 'C' ? "bg-amber-100 text-amber-700" : r.achievement === 'D' ? "bg-orange-100 text-orange-700" : r.achievement === 'E' ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-500")}>
-                              {r.achievement || 'P'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-center font-black text-slate-700">{r.rank_grade ? `${r.rank_grade}등급` : '-'}</td>
+            ) : (
+              groupedDetails ? groupedDetails.map(([semesterKey, records]) => (
+                <div key={semesterKey} className="mb-8 last:mb-0 space-y-3">
+                  <h4 className="font-black text-slate-800 flex items-center gap-2 text-sm border-l-4 border-indigo-500 pl-3">{semesterKey} <span className="text-[10px] text-slate-400 font-bold bg-white px-1.5 py-0.5 rounded border border-slate-200">{records.length} Subjects</span></h4>
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50/50 text-slate-400 border-b">
+                        <tr>
+                          <th className="px-4 py-2.5 font-bold uppercase tracking-wider">과목명</th>
+                          <th className="px-4 py-2.5 font-bold uppercase tracking-wider text-center">학점</th>
+                          <th className="px-4 py-2.5 font-bold uppercase tracking-wider text-center text-indigo-600">원점수</th>
+                          <th className="px-4 py-2.5 font-bold uppercase tracking-wider text-center">과목평균</th>
+                          <th className="px-4 py-2.5 font-bold uppercase tracking-wider text-center">성취도</th>
+                          <th className="px-4 py-2.5 font-bold uppercase tracking-wider text-center">석차등급</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {records.map((r, i) => (
+                          <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-3 font-bold text-slate-700">{r.subject}</td>
+                            <td className="px-4 py-3 text-center font-medium text-slate-500">{r.credits || '-'}</td>
+                            <td className="px-4 py-3 text-center font-black text-indigo-600 text-sm">{r.score || '-'}</td>
+                            <td className="px-4 py-3 text-center text-slate-400 font-medium">{r.average_score || '-'}</td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={cn("px-2.5 py-1 rounded-full font-black text-[10px]", r.achievement === 'A' ? "bg-emerald-100 text-emerald-700" : r.achievement === 'B' ? "bg-blue-100 text-blue-700" : r.achievement === 'C' ? "bg-amber-100 text-amber-700" : r.achievement === 'D' ? "bg-orange-100 text-orange-700" : r.achievement === 'E' ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-500")}>
+                                {r.achievement || 'P'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center font-black text-slate-700">{r.rank_grade ? `${r.rank_grade}등급` : '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )) : (
+                <div className="h-64 flex flex-col items-center justify-center text-slate-400 italic">
+                  기록된 성적 데이터가 없습니다.
+                </div>
+              )
+            )}
           </div>
         </DialogContent>
       </Dialog>
