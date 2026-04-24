@@ -104,7 +104,8 @@ export default async function DashboardPage({
       if (s.business_type === '취업') employedStudents++;
       if (s.business_type === '제외인정자') excludingStudents++;
       if (s.has_field_training === 'O' || s.business_type === '현장실습중') trainingStudents++;
-      if (['대기업', '공기업', '공무원'].includes(s.company_type || '')) majorCompanyStudents++;
+      // [수정] 취업 상태가 '취업'인 경우에만 주요 기업으로 카운트
+      if (s.business_type === '취업' && ['대기업', '공기업', '공무원'].includes(s.company_type || '')) majorCompanyStudents++;
     }
   }
 

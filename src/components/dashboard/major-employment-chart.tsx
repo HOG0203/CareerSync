@@ -23,6 +23,7 @@ const CHART_COLORS = {
   취업: '#10b981',      // Emerald-500
   채용진행중: '#f59e0b',      // Amber-500
   현장실습중: '#3b82f6',   // Blue-500
+  도제OJT: '#0ea5e9',    // Sky-500
   미취업: '#ef4444',    // Red-500
   제외인정자: '#94a3b8', // Slate-400
   미결정: '#cbd5e1',    // Slate-300 (미설정)
@@ -58,9 +59,10 @@ export default function MajorEmploymentChart({
       const 제외인정자 = groupStudents.filter((s) => s.business_type === '제외인정자').length;
       const 채용진행중 = groupStudents.filter((s) => s.business_type === '채용진행중').length;
       const 현장실습중 = groupStudents.filter((s) => s.business_type === '현장실습중').length;
+      const 도제OJT = groupStudents.filter((s) => s.business_type === '도제OJT').length;
       const 미결정 = groupStudents.filter((s) => !s.business_type).length;
       
-      return { group, 취업, 미취업, 제외인정자, 채용진행중, 현장실습중, 미결정 };
+      return { group, 취업, 미취업, 제외인정자, 채용진행중, 현장실습중, 도제OJT, 미결정 };
     });
   }, [data, selectedMajor]);
 
@@ -78,6 +80,7 @@ export default function MajorEmploymentChart({
       { name: '제외인정자', value: counts['제외인정자'] || 0 },
       { name: '채용진행중', value: counts['채용진행중'] || 0 },
       { name: '현장실습중', value: counts['현장실습중'] || 0 },
+      { name: '도제OJT', value: counts['도제OJT'] || 0 },
       { name: '미결정', value: counts['미결정'] || 0 },
     ].filter(d => d.value > 0);
   }, [data]);
@@ -87,6 +90,7 @@ export default function MajorEmploymentChart({
     미취업: { label: '미취업', color: CHART_COLORS.미취업 },
     채용진행중: { label: '채용진행중', color: CHART_COLORS.채용진행중 },
     현장실습중: { label: '현장실습중', color: CHART_COLORS.현장실습중 },
+    도제OJT: { label: '도제OJT', color: CHART_COLORS.도제OJT },
     제외인정자: { label: '제외인정자', color: CHART_COLORS.제외인정자 },
     미결정: { label: '미결정', color: CHART_COLORS.미결정 },
   } satisfies ChartConfig;
@@ -119,7 +123,6 @@ export default function MajorEmploymentChart({
         ) : viewType === 'pie' ? (
           <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[300px] w-full animate-in fade-in zoom-in-95 duration-300">
             <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-              <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
               <Pie
                 data={formattedPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="55%" outerRadius="75%" paddingAngle={5}
                 startAngle={180} endAngle={-180} strokeWidth={1} stroke="#fff" labelLine={true}
@@ -129,6 +132,7 @@ export default function MajorEmploymentChart({
                   <Cell key={`cell-${entry.name}`} fill={CHART_COLORS[entry.name as keyof typeof CHART_COLORS]} />
                 ))}
               </Pie>
+              <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
               <Legend verticalAlign="bottom" align="center" iconType="circle" layout="horizontal" wrapperStyle={{ fontSize: '10px', paddingTop: '30px' }} />
             </PieChart>
           </ChartContainer>
@@ -164,6 +168,7 @@ export default function MajorEmploymentChart({
               <Bar dataKey="제외인정자" stackId="a" fill={CHART_COLORS.제외인정자} barSize={20} />
               <Bar dataKey="채용진행중" stackId="a" fill={CHART_COLORS.채용진행중} barSize={20} />
               <Bar dataKey="현장실습중" stackId="a" fill={CHART_COLORS.현장실습중} barSize={20} />
+              <Bar dataKey="도제OJT" stackId="a" fill={CHART_COLORS.도제OJT} barSize={20} />
               <Bar dataKey="미결정" stackId="a" fill={CHART_COLORS.미결정} barSize={20} radius={[0, 4, 4, 0]} />
             </BarChart>
           </ChartContainer>

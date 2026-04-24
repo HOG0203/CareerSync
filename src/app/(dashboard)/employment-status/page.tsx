@@ -15,9 +15,10 @@ export const metadata: Metadata = {
  * 범례와 100% 일치하는 색상 매핑 함수
  */
 const getCompanyTypeVariant = (type?: string, businessType?: string) => {
-  // 1순위: 특수 상태 (채용진행, 현장실습) -> 약간 더 진한 파스텔톤 배경
+  // 1순위: 특수 상태 (채용진행, 현장실습, 도제OJT) -> 파스텔톤 배경으로 미확정(진행중) 표시
   if (businessType === '채용진행중') return 'bg-amber-100/80 text-amber-900 border-amber-300 border-x';
   if (businessType === '현장실습중') return 'bg-blue-100/80 text-blue-900 border-blue-300 border-x';
+  if (businessType === '도제OJT') return 'bg-emerald-100/80 text-emerald-900 border-emerald-300 border-x';
   
   // 2순위: 취업이 아닌 경우 -> 흰색 유지
   if (businessType !== '취업') return 'bg-white text-black border-gray-200';
@@ -153,6 +154,7 @@ export default async function EmploymentStatusPage({
             <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-sm shrink-0"></div> 기타</div>
             <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-amber-400 rounded-sm shrink-0 border border-amber-500"></div> 채용진행중</div>
             <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-blue-400 rounded-sm shrink-0 border border-blue-500"></div> 현장실습중</div>
+            <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-emerald-100 rounded-sm shrink-0 border border-emerald-500"></div> 도제OJT</div>
           </div>
         </div>
       </div>

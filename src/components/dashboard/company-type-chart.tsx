@@ -44,7 +44,7 @@ export default function CompanyTypeChart({
   // 1. 도넛 차트용 전체 집계 데이터 (취업자 대상)
   const formattedPieData = React.useMemo(() => {
     const counts = data.reduce((acc, student) => {
-      if (student.business_type === '예') {
+      if (student.business_type === '취업') {
         const type = student.company_type || '기타';
         acc[type] = (acc[type] || 0) + 1;
       }
@@ -72,7 +72,7 @@ export default function CompanyTypeChart({
     });
 
     return groups.map(group => {
-      const groupStudents = data.filter(s => s[groupKey] === group && s.business_type === '예');
+      const groupStudents = data.filter(s => s[groupKey] === group && s.business_type === '취업');
       const row: any = { group };
       COMPANY_TYPES.forEach(type => {
         row[type] = groupStudents.filter(s => (s.company_type || '기타') === type).length;

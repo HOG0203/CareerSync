@@ -199,7 +199,8 @@ const COLUMNS: ColumnConfig[] = [
       { label: '미취업', value: '미취업' },
       { label: '제외인정자', value: '제외인정자' },
       { label: '채용진행중', value: '채용진행중' },
-      { label: '현장실습중', value: '현장실습중' }
+      { label: '현장실습중', value: '현장실습중' },
+      { label: '도제OJT', value: '도제OJT' }
     ],
     variant: (val) => {
       switch (val) {
@@ -208,6 +209,7 @@ const COLUMNS: ColumnConfig[] = [
         case '제외인정자': return 'bg-slate-100 text-slate-700 border-slate-200'
         case '채용진행중': return 'bg-amber-100 text-amber-700 border-amber-200'
         case '현장실습중': return 'bg-blue-100 text-blue-700 border-blue-200'
+        case '도제OJT': return 'bg-sky-100 text-sky-700 border-sky-200'
         default: return 'bg-slate-50 text-slate-400 border-slate-100' // '미결정' (미설정) 스타일
       }
     }
