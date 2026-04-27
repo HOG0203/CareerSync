@@ -241,6 +241,43 @@ export async function getYearlyRankingsSummary(graduationYear: number, baseYear:
     s.subjectCount++;
   });
 
+  // 5. 출결 데이터 수집 및 집계 (상세 정보 포함)
+  const { data: attendance } = await supabase
+    .from('student_attendance')
+    .select('student_id, grade, semester, school_days, remarks, absent_unexcused, late_unexcused, early_unexcused, out_unexcused, absent_disease, late_disease, early_disease, out_disease, absent_other, late_other, early_other, out_other')
+    .in('student_id', studentIds);
+
+  (attendance || []).forEach(record => {
+    const s = stats[record.student_id];
+    if (!s) return;
+    
+    // 개별 레코드 저장 (상세 모달용)
+    if (!s.attnRecords) s.attnRecords = [];
+    s.attnRecords.push(record);
+
+    if (!s.attendance) {
+      s.attendance = {
+        unexcused: { absent: 0, late: 0, early: 0, out: 0 },
+        disease: { absent: 0, late: 0, early: 0, out: 0 },
+        other: { absent: 0, late: 0, early: 0, out: 0 }
+      };
+    }
+    s.attendance.unexcused.absent += record.absent_unexcused || 0;
+    s.attendance.unexcused.late += record.late_unexcused || 0;
+    s.attendance.unexcused.early += record.early_unexcused || 0;
+    s.attendance.unexcused.out += record.out_unexcused || 0;
+
+    s.attendance.disease.absent += record.absent_disease || 0;
+    s.attendance.disease.late += record.late_disease || 0;
+    s.attendance.disease.early += record.early_disease || 0;
+    s.attendance.disease.out += record.out_disease || 0;
+
+    s.attendance.other.absent += record.absent_other || 0;
+    s.attendance.other.late += record.late_other || 0;
+    s.attendance.other.early += record.early_other || 0;
+    s.attendance.other.out += record.out_other || 0;
+  });
+
   const rankingList = Object.values(stats).map((s: any) => ({
     ...s,
     finalScore: s.maxPossible > 0 ? parseFloat(((s.rawScore / s.maxPossible) * 100).toFixed(2)) : 0
@@ -254,7 +291,9 @@ export async function getYearlyRankingsSummary(graduationYear: number, baseYear:
       totalRank: idx + 1,
       schoolTotal: rankingList.length,
       classRank: sameClass.findIndex(s => s.id === student.id) + 1,
-      classTotal: sameClass.length
+      classTotal: sameClass.length,
+      attendance: student.attendance || null,
+      attnRecords: student.attnRecords || [] // 상세 기록 리스트 추가
     };
   });
 
