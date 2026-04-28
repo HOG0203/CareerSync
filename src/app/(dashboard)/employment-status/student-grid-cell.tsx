@@ -11,7 +11,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription
+  DialogDescription,
+  DialogTrigger
 } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
 import { StudentEmploymentData } from '@/lib/data';
@@ -24,10 +25,12 @@ import {
   ExternalLink,
   Loader2,
   User,
-  ClipboardList
+  ClipboardList,
+  MessageSquare
 } from 'lucide-react';
 import { getStudentScoresById } from '@/app/students/actions';
 import { Button } from '@/components/ui/button';
+import { CounselingModal } from '@/app/(dashboard)/class-management/counseling-modal';
 
 interface StudentGridCellProps {
   student: StudentEmploymentData;
@@ -39,6 +42,7 @@ interface StudentGridCellProps {
 export function StudentGridCell({ student, idx, variant, rankingSummary }: StudentGridCellProps) {
   const [isGradeModalOpen, setIsGradeModalOpen] = React.useState(false);
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = React.useState(false);
+  const [isCounselingModalOpen, setIsCounselingModalOpen] = React.useState(false);
   const [detailedScores, setDetailedScores] = React.useState<any[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
 
@@ -73,7 +77,7 @@ export function StudentGridCell({ student, idx, variant, rankingSummary }: Stude
     return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
   }, [detailedScores]);
 
-  // 출결 학년별 그룹화 (랭킹서머리에 이미 집계된 기록 사용)
+  // 출결 학년별 그룹화
   const attendanceByGrade = React.useMemo(() => {
     if (!rankingSummary?.attnRecords) return null;
     return (rankingSummary.attnRecords as any[]).sort((a, b) => a.grade - b.grade);
@@ -132,12 +136,15 @@ export function StudentGridCell({ student, idx, variant, rankingSummary }: Stude
                 </span>
               </div>
               <div className="space-y-1 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                <div className="flex items-center text-[9px] font-bold text-slate-500 gap-1 flex-wrap">
-                  <span>진로코스</span>
-                  <span className="text-slate-800">{student.employment_status || '미정'}</span>
-                  <span className="text-slate-300 mx-0.5">|</span>
-                  <span>기업구분</span>
-                  <span className="text-blue-600">{student.company_type || '미분류'}</span>
+                <div className="grid grid-cols-2 gap-x-3 text-[10px]">
+                  <p className="flex justify-between">
+                    <span className="text-slate-400">진로코스</span> 
+                    <span className="font-bold text-slate-700 text-right">{student.employment_status || '미정'}</span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="text-slate-400 pl-2">기업구분</span> 
+                    <span className="font-black text-blue-600 text-right">{student.company_type || '미분류'}</span>
+                  </p>
                 </div>
                 <div className="pt-1 border-t border-slate-200 mt-1">
                   <p className="text-[9px] text-slate-400 font-bold uppercase mb-0.5">취업처</p>
@@ -163,12 +170,17 @@ export function StudentGridCell({ student, idx, variant, rankingSummary }: Stude
                     )}>{student.is_hiring_conversion ? '채용전환' : student.is_returned === 'O' ? '복교' : student.has_field_training === 'O' ? '진행중' : '-'}</span></p>
                     <p className="flex justify-between"><span className="text-slate-400 pl-2">지원금</span> <span className="font-bold text-slate-700">{student.training_stipend_status || '-'}</span></p>
                   </div>
-                  <div className="pt-1 border-t border-emerald-100 mt-1">
-                    <p className="text-[9px] text-slate-500 mb-1">기간: {student.start_date || '?'} ~ {student.end_date || '?'}</p>
-                    <p className="text-[9px] text-emerald-500 font-bold uppercase mb-0.5">실습처</p>
-                    <p className="font-black text-emerald-700 text-[17px] leading-tight truncate">
-                      {student.latest_training_company || '미정'}
+                  <div className="pt-1 border-t border-emerald-100 mt-1 space-y-1">
+                    <p className="flex justify-between text-[10px]">
+                      <span className="text-slate-400">실습기간</span>
+                      <span className="font-bold text-slate-700 text-right">{student.start_date || '?'} ~ {student.end_date || '?'}</span>
                     </p>
+                    <div className="pt-1 border-t border-emerald-100/50">
+                      <p className="text-[9px] text-emerald-500 font-bold uppercase mb-0.5">실습처</p>
+                      <p className="font-black text-emerald-700 text-[17px] leading-tight truncate">
+                        {student.latest_training_company || '미정'}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -190,7 +202,7 @@ export function StudentGridCell({ student, idx, variant, rankingSummary }: Stude
                 </Button>
               </div>
 
-              {rankingSummary ? (
+              {rankingSummary && rankingSummary.subjectCount > 0 ? (
                 <div className="space-y-1 bg-slate-50 p-2 rounded-lg border border-slate-100">
                   <div className="grid grid-cols-2 gap-x-3 text-[10px]">
                     <p className="flex justify-between">
@@ -216,7 +228,7 @@ export function StudentGridCell({ student, idx, variant, rankingSummary }: Stude
                     </p>
                     <div className="flex flex-wrap gap-1">
                       {Object.entries(rankingSummary.gradeCounts || {}).map(([grade, count]) => (
-                        <div key={grade} className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-200 min-w-[36px] justify-center">
+                        <div key={grade} className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-100 min-w-[36px] justify-center">
                           <span className={cn(
                             "text-[9px] font-black",
                             grade === 'A' ? "text-emerald-600" :
@@ -255,7 +267,7 @@ export function StudentGridCell({ student, idx, variant, rankingSummary }: Stude
                 <div className="bg-slate-50 p-1 rounded-lg border border-slate-100 overflow-hidden">
                   <table className="w-full text-[9px] border-collapse">
                     <thead>
-                      <tr className="text-slate-400 font-black uppercase text-[7px] border-b border-slate-200">
+                      <tr className="text-slate-400 font-black uppercase text-[9px] border-b border-slate-200">
                         <th className="py-0.5 text-left">구분</th>
                         <th className="py-0.5">결석</th><th className="py-0.5">지각</th><th className="py-0.5">조퇴</th><th className="py-0.5">결과</th>
                       </tr>
@@ -298,6 +310,19 @@ export function StudentGridCell({ student, idx, variant, rankingSummary }: Stude
                 </div>
               </div>
             )}
+
+            {/* [추가] 학생상담일지 보기 버튼 - 콤팩트하게 조정 */}
+            <div className="pt-2 flex justify-center">
+              <Button 
+                variant="outline"
+                size="sm"
+                onClick={() => setIsCounselingModalOpen(true)}
+                className="px-3 h-7 text-[9px] font-black text-blue-600 border-blue-200 hover:bg-blue-50 gap-1 shadow-sm"
+              >
+                <MessageSquare className="h-3 w-3" />
+                상담일지 보기
+              </Button>
+            </div>
 
             {student.remarks && (
               <div className="mt-2 p-2 bg-amber-50/50 rounded-lg text-[10px] text-amber-700 italic border-l-2 border-amber-200 leading-relaxed">
@@ -485,6 +510,19 @@ export function StudentGridCell({ student, idx, variant, rankingSummary }: Stude
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* 상담 일지 모달 */}
+      <CounselingModal 
+        isOpen={isCounselingModalOpen}
+        onClose={() => setIsCounselingModalOpen(false)}
+        student={{
+          id: student.id,
+          student_name: student.student_name,
+          major: student.major,
+          class_info: student.class_info,
+          student_number: student.student_number || ''
+        }}
+      />
     </>
   );
 }
