@@ -37,9 +37,10 @@ interface StudentGridCellProps {
   idx: number;
   variant: string;
   rankingSummary?: any; // 부모로부터 전달받은 사전 계산된 성적/출결 요약
+  userProfile?: any; // 권한 확인을 위한 사용자 프로필
 }
 
-export function StudentGridCell({ student, idx, variant, rankingSummary }: StudentGridCellProps) {
+export function StudentGridCell({ student, idx, variant, rankingSummary, userProfile }: StudentGridCellProps) {
   const [isGradeModalOpen, setIsGradeModalOpen] = React.useState(false);
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = React.useState(false);
   const [isCounselingModalOpen, setIsCounselingModalOpen] = React.useState(false);
@@ -54,6 +55,29 @@ export function StudentGridCell({ student, idx, variant, rankingSummary }: Stude
       default: return 'bg-transparent';
     }
   };
+
+  // 권한 확인: 관리자이거나, 해당 학생의 학과/반/졸업연도가 일치하는 담임교사인지 체크
+  const hasCounselingAccess = React.useMemo(() => {
+    if (!userProfile) return false;
+    if (userProfile.role === 'admin') return true;
+    
+    // 담임교사 권한 체크 (학과, 반, 졸업연도 정보 정규화 후 비교)
+    const userMajor = (userProfile.assigned_major || '').replace(/과|공업계/g, '').trim();
+    const userClass = (userProfile.assigned_class || '').replace(/반|학년/g, '').trim();
+    const userYear = userProfile.assigned_year;
+    
+    const studentMajor = (student.major || '').replace(/과|공업계/g, '').trim();
+    const studentClass = (student.class_info || '').replace(/반|학년/g, '').trim();
+    const studentYear = student.graduation_year;
+
+    // 학과/반 정보가 없는 경우(담임 아님) 접근 불가
+    if (!userMajor || !userClass) return false;
+
+    return userProfile.role === 'teacher' && 
+           userMajor === studentMajor && 
+           userClass === studentClass &&
+           userYear === studentYear;
+  }, [userProfile, student]);
 
   // 모달 열릴 때 상세 성적 조회
   React.useEffect(() => {
@@ -228,7 +252,7 @@ export function StudentGridCell({ student, idx, variant, rankingSummary }: Stude
                     </p>
                     <div className="flex flex-wrap gap-1">
                       {Object.entries(rankingSummary.gradeCounts || {}).map(([grade, count]) => (
-                        <div key={grade} className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-100 min-w-[36px] justify-center">
+                        <div key={grade} className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-200 min-w-[36px] justify-center">
                           <span className={cn(
                             "text-[9px] font-black",
                             grade === 'A' ? "text-emerald-600" :
@@ -311,18 +335,20 @@ export function StudentGridCell({ student, idx, variant, rankingSummary }: Stude
               </div>
             )}
 
-            {/* [추가] 학생상담일지 보기 버튼 - 콤팩트하게 조정 */}
-            <div className="pt-2 flex justify-center">
-              <Button 
-                variant="outline"
-                size="sm"
-                onClick={() => setIsCounselingModalOpen(true)}
-                className="px-3 h-7 text-[9px] font-black text-blue-600 border-blue-200 hover:bg-blue-50 gap-1 shadow-sm"
-              >
-                <MessageSquare className="h-3 w-3" />
-                상담일지 보기
-              </Button>
-            </div>
+            {/* [추가] 학생상담일지 보기 버튼 - 권한 확인 로직 적용 */}
+            {hasCounselingAccess && (
+              <div className="pt-2 flex justify-center">
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsCounselingModalOpen(true)}
+                  className="px-3 h-7 text-[9px] font-black text-blue-600 border-blue-200 hover:bg-blue-50 gap-1 shadow-sm"
+                >
+                  <MessageSquare className="h-3 w-3" />
+                  상담일지 보기
+                </Button>
+              </div>
+            )}
 
             {student.remarks && (
               <div className="mt-2 p-2 bg-amber-50/50 rounded-lg text-[10px] text-amber-700 italic border-l-2 border-amber-200 leading-relaxed">
@@ -484,9 +510,9 @@ export function StudentGridCell({ student, idx, variant, rankingSummary }: Stude
                         <td className={cn("px-2 py-4 border-r text-center", r.early_disease > 0 ? "text-blue-500" : "text-slate-300")}>{r.early_disease}</td>
                         <td className={cn("px-2 py-4 text-center", r.out_disease > 0 ? "text-blue-500" : "text-slate-300")}>{r.out_disease}</td>
                         <td className={cn("px-2 py-4 border-r text-center", r.absent_other > 0 ? "text-slate-600" : "text-slate-300")}>{r.absent_other}</td>
-                        <td className={cn("px-2 py-4 border-r text-center", r.late_other > 0 ? "text-slate-500" : "text-slate-300")}>{r.late_other}</td>
-                        <td className={cn("px-2 py-4 border-r text-center", r.early_other > 0 ? "text-slate-500" : "text-slate-300")}>{r.early_other}</td>
-                        <td className={cn("px-2 py-4 text-center", r.out_other > 0 ? "text-slate-500" : "text-slate-300")}>{r.out_other}</td>
+                        <td className={cn("px-2 py-2 border-r text-center", r.late_other > 0 ? "text-slate-500" : "text-slate-300")}>{r.late_other}</td>
+                        <td className={cn("px-2 py-2 border-r text-center", r.early_other > 0 ? "text-slate-500" : "text-slate-300")}>{r.early_other}</td>
+                        <td className={cn("px-2 py-2 text-center", r.out_other > 0 ? "text-slate-500" : "text-slate-300")}>{r.out_other}</td>
                       </tr>
                     ))}
                   </tbody>

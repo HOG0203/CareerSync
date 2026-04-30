@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import { getFilteredStudentData, getGraduationYears, StudentEmploymentData, getYearlyRankingsSummary } from '@/lib/data';
+import { getFilteredStudentData, getGraduationYears, StudentEmploymentData, getYearlyRankingsSummary, getCurrentUserProfile } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import EmploymentStatusFilters from './employment-status-filters';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
@@ -15,15 +15,15 @@ export const metadata: Metadata = {
  * 범례와 100% 일치하는 색상 매핑 함수
  */
 const getCompanyTypeVariant = (type?: string, businessType?: string) => {
-  // 1순위: 특수 상태 (채용진행, 현장실습, 도제OJT) -> 파스텔톤 배경으로 미확정(진행중) 표시
-  if (businessType === '채용진행중') return 'bg-amber-100/80 text-amber-900 border-amber-300 border-x';
-  if (businessType === '현장실습중') return 'bg-blue-100/80 text-blue-900 border-blue-300 border-x';
-  if (businessType === '도제OJT') return 'bg-emerald-100/80 text-emerald-900 border-emerald-300 border-x';
-  
+  // 1순위: 특수 상태 (채용진행, 현장실습, 도제OJT) -> 범례와 동일한 색상 적용
+  if (businessType === '채용진행중') return 'bg-amber-100 text-amber-950 border-amber-500 border-x';
+  if (businessType === '현장실습중') return 'bg-blue-400 text-white border-blue-500 border-x';
+  if (businessType === '도제OJT') return 'bg-emerald-100 text-emerald-900 border-emerald-500 border-x';
+
   // 2순위: 취업이 아닌 경우 -> 흰색 유지
   if (businessType !== '취업') return 'bg-white text-black border-gray-200';
 
-  // 3순위: 취업자인 경우 기업 유형별 색상 적용
+  // 3순위: 취업자인 경우 기업 유형별 색상 적용 (범례와 1:1 매칭)
   switch (type) {
     case '대기업':
     case '공기업':
@@ -85,9 +85,10 @@ export default async function EmploymentStatusPage({
 }) {
   const params = await searchParams;
 
-  const [graduationYears, settings] = await Promise.all([
+  const [graduationYears, settings, userProfile] = await Promise.all([
     getGraduationYears(),
-    getSystemSettings()
+    getSystemSettings(),
+    getCurrentUserProfile()
   ]);
 
   const ay = params.ay ? parseInt(params.ay) : settings.baseYear;
@@ -152,7 +153,7 @@ export default async function EmploymentStatusPage({
             <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-cyan-500 rounded-sm shrink-0"></div> 중소기업</div>
             <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-orange-500 rounded-sm shrink-0"></div> 연계교육</div>
             <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-sm shrink-0"></div> 기타</div>
-            <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-amber-400 rounded-sm shrink-0 border border-amber-500"></div> 채용진행중</div>
+            <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-amber-100 rounded-sm shrink-0 border border-amber-500"></div> 채용진행중</div>
             <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-blue-400 rounded-sm shrink-0 border border-blue-500"></div> 현장실습중</div>
             <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-emerald-100 rounded-sm shrink-0 border border-emerald-500"></div> 도제OJT</div>
           </div>
@@ -184,6 +185,7 @@ export default async function EmploymentStatusPage({
                       idx={idx}
                       variant={getCompanyTypeVariant(student.company_type, student.business_type)}
                       rankingSummary={rankingMap[student.id]}
+                      userProfile={userProfile}
                     />
                   ))}
                   {Array.from({ length: Math.max(0, 24 - students.length) }).map((_, i) => (
