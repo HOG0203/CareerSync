@@ -13,7 +13,8 @@ import {
   ShieldCheck,
   ShieldAlert,
   ClipboardList,
-  GraduationCap
+  GraduationCap,
+  Factory
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +24,7 @@ export function MobileBottomTab({ isAdmin = false }: { isAdmin?: boolean }) {
   const tabs = [
     { href: '/dashboard', label: '홈', icon: LayoutDashboard },
     { href: '/employment-status', label: '현황', icon: Grid3X3 },
+    { href: '/company-info', label: '업체', icon: Factory },
     { href: '/labor-education', label: '인권', icon: ShieldAlert },
     { href: '/students', label: '취업', icon: ClipboardList }, // 학생 취업 및 현장실습 현황 (공통)
     { href: '/class-management', label: '학반', icon: BookUser },

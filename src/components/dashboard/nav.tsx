@@ -20,6 +20,7 @@ import {
   BookUser,
   UserPlus,
   GraduationCap,
+  Factory,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { logout } from '@/app/login/actions';
@@ -27,6 +28,7 @@ import { logout } from '@/app/login/actions';
 const baseMenuItems = [
   { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
   { href: '/employment-status', label: '취업현황', icon: Grid3X3 },
+  { href: '/company-info', label: '업체정보', icon: Factory },
   { href: '/labor-education', label: '노동인권교육', icon: ShieldAlert },
   { href: '/students', label: '취업상세데이터', icon: Users },
   { href: '/class-management', label: '학반 관리', icon: BookUser },
