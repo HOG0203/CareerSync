@@ -137,10 +137,22 @@ export async function upsertCompany(companyData: CompanyData) {
 }
 
 /**
- * 기업 정보 삭제
+ * 기업 정보 삭제 (Admin Only)
  */
 export async function deleteCompany(id: string) {
   const supabase = createClient();
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: '로그인이 필요합니다.' };
+  
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+    
+  if (profile?.role !== 'admin') return { error: '관리자 권한이 필요합니다.' };
+
   const { error } = await supabase.from('companies').delete().eq('id', id);
   return { error };
 }

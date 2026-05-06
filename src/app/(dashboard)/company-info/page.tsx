@@ -56,6 +56,7 @@ export default function CompanyInfoPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [isDetailsLoading, setIsDetailsLoading] = React.useState(false);
   const [isAdmin, setIsAdmin] = React.useState(false);
+  const [isTeacher, setIsTeacher] = React.useState(false);
   
   // 정렬 상태
   const [employeeSort, setEmployeeSort] = React.useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'student_name', direction: 'asc' });
@@ -70,15 +71,16 @@ export default function CompanyInfoPage() {
   const supabase = createClient();
 
   React.useEffect(() => {
-    checkAdmin();
+    checkRole();
     loadCompanies();
   }, []);
 
-  const checkAdmin = async () => {
+  const checkRole = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single();
       setIsAdmin(data?.role === 'admin');
+      setIsTeacher(data?.role === 'teacher');
     }
   };
 
@@ -196,6 +198,12 @@ export default function CompanyInfoPage() {
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
             <Factory className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
             업체정보
+            {isAdmin && (
+              <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-black uppercase">관리자 모드</span>
+            )}
+            {isTeacher && !isAdmin && (
+              <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-black uppercase">조회 모드</span>
+            )}
           </h2>
           <p className="text-muted-foreground text-xs sm:text-sm font-medium">
             학교 협력 기업 상세 정보 및 취업/실습 현황 관리
