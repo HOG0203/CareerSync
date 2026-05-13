@@ -31,7 +31,9 @@ import {
   Info,
   ChevronUp,
   ChevronDown,
-  ArrowUpDown
+  ArrowUpDown,
+  CheckCircle2,
+  ChevronRight
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -43,6 +45,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -58,6 +61,9 @@ export default function CompanyInfoPage() {
   const [isAdmin, setIsAdmin] = React.useState(false);
   const [isTeacher, setIsTeacher] = React.useState(false);
   
+  // 모바일 탭 상태
+  const [mobileTab, setMobileTab] = React.useState<'list' | 'details'>('list');
+
   // 정렬 상태
   const [employeeSort, setEmployeeSort] = React.useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'student_name', direction: 'asc' });
   const [traineeSort, setTraineeSort] = React.useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'student_name', direction: 'asc' });
@@ -72,8 +78,16 @@ export default function CompanyInfoPage() {
 
   React.useEffect(() => {
     checkRole();
-    loadCompanies();
   }, []);
+
+  // 검색어 변경 시 자동 검색 (Debounce)
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      loadCompanies(search);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const checkRole = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -97,12 +111,13 @@ export default function CompanyInfoPage() {
   };
 
   const handleSelectCompany = async (companyName: string) => {
+    // 모바일에서는 즉시 상세 탭으로 전환하여 클릭 피드백 제공
+    setMobileTab('details');
+    
     setIsDetailsLoading(true);
     const details = await getCompanyDetails(companyName);
     setSelectedCompany(details);
     setIsDetailsLoading(false);
-    
-    // 모바일에서는 스크롤 아래로 이동 로직 추가 가능
   };
 
   const handleUpsert = async () => {
@@ -222,9 +237,22 @@ export default function CompanyInfoPage() {
         )}
       </div>
 
+      {/* 모바일 전용 탭 스위처 */}
+      <div className="lg:hidden shrink-0">
+        <Tabs value={mobileTab} onValueChange={(v) => setMobileTab(v as any)} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 h-10 p-1 bg-slate-100 rounded-xl">
+            <TabsTrigger value="list" className="rounded-lg font-bold text-xs">업체 목록</TabsTrigger>
+            <TabsTrigger value="details" className="rounded-lg font-bold text-xs">상세 정보</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-0">
         {/* 왼쪽: 업체 목록 및 검색 */}
-        <div className="lg:col-span-4 flex flex-col gap-4 min-h-0">
+        <div className={cn(
+          "lg:col-span-4 flex flex-col gap-4 min-h-0",
+          mobileTab !== 'list' && "hidden lg:flex"
+        )}>
           <Card className="shrink-0">
             <CardContent className="p-4">
               <form onSubmit={handleSearch} className="relative">
@@ -262,20 +290,33 @@ export default function CompanyInfoPage() {
                       key={company.id}
                       onClick={() => handleSelectCompany(company.name)}
                       className={cn(
-                        "p-4 cursor-pointer hover:bg-slate-50 transition-colors group",
-                        selectedCompany?.company?.name === company.name && "bg-blue-50 border-r-4 border-blue-500"
+                        "p-4 cursor-pointer hover:bg-slate-50 transition-all group relative",
+                        selectedCompany?.company?.name === company.name 
+                          ? "bg-blue-50/80 border-l-4 border-blue-600 shadow-sm" 
+                          : "border-l-4 border-transparent"
                       )}
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="min-w-0">
-                          <p className="font-bold text-sm text-slate-900 truncate group-hover:text-blue-600">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className={cn(
+                            "font-bold text-sm truncate transition-colors",
+                            selectedCompany?.company?.name === company.name ? "text-blue-700" : "text-slate-900 group-hover:text-blue-600"
+                          )}>
                             {company.name}
                           </p>
                           <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
-                            <span className="bg-slate-100 px-1.5 py-0.5 rounded">{company.industry || '업종미지정'}</span>
+                            <span className={cn(
+                              "px-1.5 py-0.5 rounded",
+                              selectedCompany?.company?.name === company.name ? "bg-blue-100 text-blue-600" : "bg-slate-100"
+                            )}>
+                              {company.industry || '업종미지정'}
+                            </span>
                             <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {company.location || '소재지미정'}</span>
                           </div>
                         </div>
+                        {selectedCompany?.company?.name === company.name && (
+                          <ChevronRight className="h-4 w-4 text-blue-500 shrink-0 animate-in slide-in-from-left-1 duration-200" />
+                        )}
                       </div>
                     </div>
                   ))}
@@ -290,7 +331,10 @@ export default function CompanyInfoPage() {
         </div>
 
         {/* 오른쪽: 상세 정보 및 학생 현황 */}
-        <div className="lg:col-span-8 flex flex-col gap-6 overflow-y-auto pr-1">
+        <div className={cn(
+          "lg:col-span-8 flex flex-col gap-6 overflow-y-auto pr-1",
+          mobileTab !== 'details' && "hidden lg:flex"
+        )}>
           {isDetailsLoading ? (
             <div className="h-full flex flex-col items-center justify-center bg-white rounded-xl border border-dashed gap-4">
               <Loader2 className="h-10 w-10 text-blue-500 animate-spin" />
@@ -304,15 +348,16 @@ export default function CompanyInfoPage() {
                 <CardHeader className="pb-4">
                   <div className="flex items-start justify-between">
                     <div className="space-y-1">
-                      <div className="flex items-center gap-3">
-                        <CardTitle className="text-2xl font-black text-slate-900">{selectedCompany.company?.name}</CardTitle>
-                        <span className="bg-blue-100 text-blue-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
+                      <div className="flex items-center flex-wrap gap-2 sm:gap-3">
+                        <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 shrink-0" />
+                        <CardTitle className="text-xl sm:text-2xl font-black text-slate-900 break-all">{selectedCompany.company?.name}</CardTitle>
+                        <span className="bg-blue-100 text-blue-700 text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
                           {selectedCompany.company?.company_type || '기업형태'}
                         </span>
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-slate-500 font-medium">
-                        <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-blue-500" /> {selectedCompany.company?.location || '소재지 미등록'}</span>
-                        <span className="flex items-center gap-1.5"><Briefcase className="h-4 w-4 text-emerald-500" /> {selectedCompany.company?.industry || '업종 미등록'}</span>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 text-[11px] sm:text-sm text-slate-500 font-medium">
+                        <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500" /> {selectedCompany.company?.location || '소재지 미등록'}</span>
+                        <span className="flex items-center gap-1.5"><Briefcase className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-500" /> {selectedCompany.company?.industry || '업종 미등록'}</span>
                       </div>
                     </div>
                     {isAdmin && (
@@ -494,7 +539,7 @@ export default function CompanyInfoPage() {
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0 border-none shadow-2xl rounded-2xl overflow-hidden flex flex-col">
           <DialogHeader className="p-6 bg-slate-900 text-white">
             <DialogTitle className="text-xl font-black">기업 상세 정보 편집</DialogTitle>
-            <p className="text-slate-400 text-xs mt-1">기업의 최신 채용 및 기업 정보를 업데이트합니다.</p>
+            <DialogDescription className="text-slate-400 text-xs mt-1">기업의 최신 채용 및 기업 정보를 업데이트합니다.</DialogDescription>
           </DialogHeader>
           
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 bg-white">

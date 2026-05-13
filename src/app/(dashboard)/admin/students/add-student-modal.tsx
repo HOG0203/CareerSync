@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -85,7 +86,7 @@ export function AddStudentModal({ isOpen, onClose, baseYear, majors }: AddStuden
             </div>
             <div>
               <DialogTitle className="text-xl font-bold">신규 학생 등록</DialogTitle>
-              <p className="text-indigo-100 text-xs mt-1">개별 학생 정보를 시스템에 추가합니다.</p>
+              <DialogDescription className="text-indigo-100 text-xs mt-1">개별 학생 정보를 시스템에 추가합니다.</DialogDescription>
             </div>
           </div>
         </DialogHeader>
@@ -109,13 +110,13 @@ export function AddStudentModal({ isOpen, onClose, baseYear, majors }: AddStuden
                   value={formData.graduation_year} 
                   onValueChange={(v) => setFormData(prev => ({ ...prev, graduation_year: v }))}
                 >
-                  <SelectTrigger className="h-10 border-slate-200">
+                  <SelectTrigger id="graduation_year" className="h-10 border-slate-200 focus:ring-indigo-500">
                     <SelectValue placeholder="연도 선택" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={(baseYear + 1).toString()}>3학년 ({(baseYear + 1)}년 졸업)</SelectItem>
-                    <SelectItem value={(baseYear + 2).toString()}>2학년 ({(baseYear + 2)}년 졸업)</SelectItem>
-                    <SelectItem value={(baseYear + 3).toString()}>1학년 ({(baseYear + 3)}년 졸업)</SelectItem>
+                    {[baseYear - 1, baseYear, baseYear + 1, baseYear + 2].map(year => (
+                      <SelectItem key={year} value={year.toString()}>{year}년 (예정)</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -127,12 +128,12 @@ export function AddStudentModal({ isOpen, onClose, baseYear, majors }: AddStuden
                 value={formData.major} 
                 onValueChange={(v) => setFormData(prev => ({ ...prev, major: v }))}
               >
-                <SelectTrigger className="h-10 border-slate-200">
+                <SelectTrigger id="major" className="h-10 border-slate-200 focus:ring-indigo-500">
                   <SelectValue placeholder="학과 선택" />
                 </SelectTrigger>
                 <SelectContent>
-                  {majors.map(m => (
-                    <SelectItem key={m} value={m}>{m}</SelectItem>
+                  {majors.map(major => (
+                    <SelectItem key={major} value={major}>{major}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -143,7 +144,7 @@ export function AddStudentModal({ isOpen, onClose, baseYear, majors }: AddStuden
                 <Label htmlFor="class_info" className="text-xs font-bold text-slate-500">반 (숫자만) *</Label>
                 <Input 
                   id="class_info" 
-                  placeholder="예: 1" 
+                  placeholder="1" 
                   value={formData.class_info}
                   onChange={(e) => setFormData(prev => ({ ...prev, class_info: e.target.value }))}
                   className="h-10 border-slate-200 focus:ring-indigo-500"
@@ -153,7 +154,7 @@ export function AddStudentModal({ isOpen, onClose, baseYear, majors }: AddStuden
                 <Label htmlFor="student_number" className="text-xs font-bold text-slate-500">번호 (숫자만) *</Label>
                 <Input 
                   id="student_number" 
-                  placeholder="예: 15" 
+                  placeholder="1" 
                   value={formData.student_number}
                   onChange={(e) => setFormData(prev => ({ ...prev, student_number: e.target.value }))}
                   className="h-10 border-slate-200 focus:ring-indigo-500"
@@ -162,15 +163,15 @@ export function AddStudentModal({ isOpen, onClose, baseYear, majors }: AddStuden
             </div>
           </div>
 
-          <DialogFooter className="p-4 bg-slate-50 border-t gap-2 mt-0">
-            <Button type="button" variant="ghost" onClick={onClose} className="h-10 font-medium px-6 text-slate-500">취소</Button>
+          <DialogFooter className="p-4 bg-slate-50 border-t flex flex-row gap-2">
+            <Button type="button" variant="ghost" onClick={onClose} className="flex-1 h-11 font-bold">취소</Button>
             <Button 
               type="submit" 
               disabled={isSubmitting}
-              className="bg-indigo-600 hover:bg-indigo-700 h-10 px-10 font-bold shadow-lg shadow-indigo-100 gap-2"
+              className="flex-1 bg-indigo-600 hover:bg-indigo-700 h-11 font-bold shadow-lg shadow-indigo-100"
             >
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              학생 등록하기
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+              등록 완료
             </Button>
           </DialogFooter>
         </form>

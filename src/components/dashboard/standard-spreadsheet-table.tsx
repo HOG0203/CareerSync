@@ -303,7 +303,13 @@ const MobileDetailModal = ({ isOpen, onClose, data, columns, onSave, onAction }:
 
 // --- 메인 테이블 컴포넌트 ---
 export function StandardSpreadsheetTable({ data: initialData, columns, onSave, onBulkSave, onPromote, onDelete, onAction, selectedRowIds: externalSelectedRowIds, onSelectionChange, groupHeaders, searchPlaceholder = "검색...", masterCertificates = [] }: SpreadsheetTableProps) {
+  const [mounted, setMounted] = React.useState(false);
   const isMobile = useIsMobile(); const router = useRouter(); const [data, setData] = React.useState(initialData); const { toast } = useToast();
+  
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [columnFilters, setColumnFilters] = React.useState<Record<string, string[]>>({}); const [searchTerm, setSearchTerm] = React.useState('');
   const [selectionStart, setSelectionStart] = React.useState<any>(null); const [selectionEnd, setSelectionEnd] = React.useState<any>(null);
   const [editingCell, setEditingCell] = React.useState<any>(null); const [internalSelectedRowIds, setInternalSelectedRowIds] = React.useState<string[]>([]);
@@ -407,6 +413,14 @@ export function StandardSpreadsheetTable({ data: initialData, columns, onSave, o
     return onSave(id, field, finalValue); 
   }, [onSave, filteredData, columns, data, recordHistory]);
   const handleKeyDown = React.useCallback((e: React.KeyboardEvent) => { if (editingCell) return; if (e.ctrlKey && e.key === 'c') { e.preventDefault(); handleCopy(); return; } if (e.ctrlKey && e.key === 'v') { e.preventDefault(); handlePaste(); return; } if (e.ctrlKey && e.key === 'z') { e.preventDefault(); handleUndo(); return; } if (e.ctrlKey && e.key === 'y') { e.preventDefault(); handleRedo(); return; } if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); handleDelete(); return; } let { row, col } = selectionEnd || selectionStart || { row: 0, col: 0 }; switch (e.key) { case 'ArrowUp': row = Math.max(0, row - 1); break; case 'ArrowDown': row = Math.min(filteredData.length - 1, row + 1); break; case 'ArrowLeft': col = Math.max(0, col - 1); break; case 'ArrowRight': col = Math.min(columns.length - 1, col + 1); break; case 'Enter': if (selectionStart) { const config = columns[selectionStart.col]; if (config.type === 'multi-select') { setEditingCell({row: selectionStart.row, col: selectionStart.col}); setIsPickerOpen(true); } else setEditingCell({ row: selectionStart.row, col: selectionStart.col }); } return; case 'Escape': setSelectionStart(null); setSelectionEnd(null); return; default: return; } e.preventDefault(); if (e.shiftKey) setSelectionEnd({ row, col }); else { setSelectionStart({ row, col }); setSelectionEnd({ row, col }); } if (containerRef.current) { const targetY = row * ROW_HEIGHT + HEADER_HEIGHT; const curS = containerRef.current.scrollTop; if (targetY < curS + HEADER_HEIGHT) containerRef.current.scrollTop = targetY - HEADER_HEIGHT; else if (targetY + ROW_HEIGHT > curS + containerHeight) containerRef.current.scrollTop = targetY + ROW_HEIGHT - containerHeight; } }, [editingCell, selectionStart, selectionEnd, filteredData, columns, HEADER_HEIGHT, containerHeight, handleDelete, handleCopy, handlePaste, handleUndo, handleRedo]);
+
+  if (!mounted) {
+    return (
+      <div className="flex h-[400px] w-full items-center justify-center bg-slate-50/50 rounded-2xl animate-pulse">
+        <Loader2 className="h-8 w-8 animate-spin text-slate-300" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4 w-full h-full overflow-hidden">

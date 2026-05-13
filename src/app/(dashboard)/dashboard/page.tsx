@@ -10,6 +10,7 @@ import Grade3View from '@/components/dashboard/grade3-view';
 import LowerGradeView from '@/components/dashboard/lower-grade-view';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { redirect } from 'next/navigation';
+import React from 'react';
 
 export const dynamic = 'force-dynamic';
 
@@ -131,15 +132,17 @@ export default async function DashboardPage({
         </div>
         <div className="shrink-0 xl:scale-100 origin-left xl:origin-bottom-right overflow-x-auto w-full xl:w-auto">
           <div className="flex justify-start xl:justify-end">
-            <DashboardFilters 
-              graduationYears={graduationYears} 
-              majors={majors} 
-              classes={classes} 
-              statuses={statuses} 
-              defaultYear={selectedYear}
-              baseYear={settings.baseYear}
-              hideGrade={false}
-            />
+            <React.Suspense fallback={<div className="h-10 w-[450px] bg-slate-50 animate-pulse rounded-lg" />}>
+              <DashboardFilters 
+                graduationYears={graduationYears} 
+                majors={majors} 
+                classes={classes} 
+                statuses={statuses} 
+                defaultYear={selectedYear}
+                baseYear={settings.baseYear}
+                hideGrade={false}
+              />
+            </React.Suspense>
           </div>
         </div>
       </div>

@@ -252,7 +252,7 @@ const COLUMNS: ColumnConfig[] = [
 const GROUP_HEADERS = [
   { label: '기본 정보', colSpan: 7, className: 'bg-slate-100 text-slate-900 text-[11px]' },
   { label: '취업 현황', colSpan: 5, className: 'bg-blue-100/50 text-blue-900 text-[11px]' },
-  { label: '현장실습 상세 및 결과 (최근 차수)', colSpan: 7, className: 'bg-amber-100/50 text-amber-900 text-[11px]' },
+  { label: '현장실습/도제OJT 상세 및 결과 (최근 차수)', colSpan: 7, className: 'bg-amber-100/50 text-amber-900 text-[11px]' },
   { label: '비고(특이사항)', colSpan: 1, className: 'bg-slate-50 text-slate-700 text-[11px]' },
 ]
 

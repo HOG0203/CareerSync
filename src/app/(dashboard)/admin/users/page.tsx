@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/card';
 import { UserTable } from './user-table';
 import { CreateUserButton } from './create-user-button';
+import { ImportUserButton } from './import-user-button';
 import { getProfiles, getGraduationYears, getAllStudentBaseData } from '@/lib/data';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { UserCog } from 'lucide-react';
@@ -63,7 +64,8 @@ export default async function AdminUsersPage() {
           </h2>
           <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed">시스템 접속 권한 및 담당 학반 정보를 관리합니다.</p>
         </div>
-        <div className="w-full sm:w-auto">
+        <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
+          <ImportUserButton />
           <CreateUserButton />
         </div>
       </div>

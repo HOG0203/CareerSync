@@ -41,8 +41,13 @@ export default function DashboardFilters({
   hideGrade = false, // 기본값
   baseYear
 }: DashboardFiltersProps) {
+  const [mounted, setMounted] = React.useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const currentAY = searchParams.get('ay') || baseYear.toString();
   const currentGrade = searchParams.get('grade') || '3';
@@ -56,6 +61,14 @@ export default function DashboardFilters({
     years.add(baseYear);
     return Array.from(years).sort((a, b) => b - a);
   }, [graduationYears, baseYear]);
+
+  if (!mounted) {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-200 h-10 w-[450px] animate-pulse" />
+      </div>
+    );
+  }
 
   const updateFilters = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());

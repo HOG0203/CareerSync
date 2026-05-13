@@ -18,12 +18,28 @@ import Image from 'next/image';
 import ProfileSettingsModal from './profile-settings-modal';
 
 export function MobileTopBar({ isAdmin = false }: { isAdmin?: boolean }) {
+  const [mounted, setMounted] = React.useState(false);
   const avatar = PlaceHolderImages.find((img) => img.id === 'user-avatar');
   const [profileModalOpen, setProfileModalOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleLogout = async () => {
     await logout();
   };
+
+  if (!mounted) {
+    return (
+      <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between h-14 px-4 bg-white border-b border-slate-100 lg:hidden">
+        <div className="scale-90 origin-left">
+          <Logo />
+        </div>
+        <div className="h-10 w-10 rounded-full bg-slate-100 animate-pulse" />
+      </header>
+    );
+  }
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between h-14 px-4 bg-white/90 backdrop-blur-md border-b border-slate-100 lg:hidden shadow-sm">

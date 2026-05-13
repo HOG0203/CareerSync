@@ -35,11 +35,21 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Trash2, GraduationCap, KeyRound, Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Trash2, GraduationCap, KeyRound, Loader2, MoreVertical, Search, Filter } from 'lucide-react';
 import { updateUserRole, deleteUser, updateAssignedClass, resetUserPassword } from './actions';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -53,9 +63,24 @@ interface UserTableProps {
 export function UserTable({ initialProfiles, graduationYears, fullClassMapping, baseYear }: UserTableProps) {
   const isMobile = useIsMobile();
   const [profiles, setProfiles] = React.useState(initialProfiles);
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const [roleFilter, setRoleFilter] = React.useState<'all' | 'admin' | 'teacher'>('all');
   const [isAssignOpen, setIsAssignOpen] = React.useState(false);
   const [selectedProfile, setSelectedProfile] = React.useState<any>(null);
   const [isResetting, setIsResetting] = React.useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteOpen] = React.useState(false);
+  const [isResetDialogOpen, setIsResetOpen] = React.useState(false);
+
+  // 필터링된 데이터
+  const filteredProfiles = React.useMemo(() => {
+    return profiles.filter(p => {
+      const matchesSearch = 
+        p.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.username?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesRole = roleFilter === 'all' || p.role === roleFilter;
+      return matchesSearch && matchesRole;
+    });
+  }, [profiles, searchTerm, roleFilter]);
   
   // 배정용 선택 상태
   const [assignAcademicYear, setAssignAcademicYear] = React.useState<string>('');
@@ -214,6 +239,50 @@ export function UserTable({ initialProfiles, graduationYears, fullClassMapping, 
 
   return (
     <>
+      <div className="p-4 border-b space-y-4">
+        {/* 검색 및 필터 UI */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input 
+              placeholder="이름 또는 아이디로 검색..." 
+              className="pl-9 h-10 border-slate-200"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex bg-slate-100 p-1 rounded-lg shrink-0">
+            <button 
+              onClick={() => setRoleFilter('all')}
+              className={cn(
+                "px-3 py-1.5 text-xs font-bold rounded-md transition-all",
+                roleFilter === 'all' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              )}
+            >
+              전체
+            </button>
+            <button 
+              onClick={() => setRoleFilter('admin')}
+              className={cn(
+                "px-3 py-1.5 text-xs font-bold rounded-md transition-all",
+                roleFilter === 'admin' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              )}
+            >
+              관리자
+            </button>
+            <button 
+              onClick={() => setRoleFilter('teacher')}
+              className={cn(
+                "px-3 py-1.5 text-xs font-bold rounded-md transition-all",
+                roleFilter === 'teacher' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              )}
+            >
+              교직원
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* 데스크톱 테이블 뷰 */}
       <div className="hidden md:block">
         <Table>
@@ -228,7 +297,7 @@ export function UserTable({ initialProfiles, graduationYears, fullClassMapping, 
             </TableRow>
           </TableHeader>
           <TableBody>
-            {profiles.map((profile) => (
+            {filteredProfiles.map((profile) => (
               <TableRow key={profile.id} className="hover:bg-muted/10 transition-colors">
                 <TableCell className="font-medium text-blue-600">{profile.username}</TableCell>
                 <TableCell>{profile.full_name}</TableCell>
@@ -261,47 +330,25 @@ export function UserTable({ initialProfiles, graduationYears, fullClassMapping, 
                       <GraduationCap className="h-4 w-4" />
                     </Button>
 
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50" 
-                          title="비밀번호 초기화 (123123)"
-                          disabled={isResetting === profile.id}
-                        >
-                          {isResetting === profile.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="w-[95vw] max-w-[400px] rounded-2xl">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>비밀번호 초기화</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            '{profile.full_name}' 사용자의 비밀번호를 <span className="font-bold text-rose-600 underline">123123</span>으로 초기화하시겠습니까?
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel className="rounded-xl">취소</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleResetPassword(profile.id)} className="bg-amber-600 hover:bg-amber-700 rounded-xl">초기화 실행</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50" 
+                      title="비밀번호 초기화 (123123)"
+                      disabled={isResetting === profile.id}
+                      onClick={() => { setSelectedProfile(profile); setIsResetOpen(true); }}
+                    >
+                      {isResetting === profile.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+                    </Button>
 
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:text-rose-600 hover:bg-rose-50"><Trash2 className="h-4 w-4" /></Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="w-[95vw] max-w-[400px] rounded-2xl">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>계정 삭제</AlertDialogTitle>
-                          <AlertDialogDescription>'{profile.full_name}' 사용자를 삭제하시겠습니까?</AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel className="rounded-xl">취소</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDelete(profile.id)} className="bg-rose-600 hover:bg-rose-700 rounded-xl">삭제</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-rose-500 hover:text-rose-600 hover:bg-rose-50"
+                      onClick={() => { setSelectedProfile(profile); setIsDeleteOpen(true); }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -312,132 +359,165 @@ export function UserTable({ initialProfiles, graduationYears, fullClassMapping, 
 
       {/* 모바일 카드 리스트 뷰 */}
       <div className="md:hidden divide-y">
-        {profiles.map((profile) => (
-          <div key={profile.id} className="p-4 space-y-3 active:bg-slate-50 transition-colors">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold shrink-0">
-                  {profile.full_name?.[0] || '?'}
+        {filteredProfiles.length > 0 ? (
+          filteredProfiles.map((profile) => (
+            <div key={profile.id} className="p-4 space-y-3 active:bg-slate-50 transition-colors">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold shrink-0">
+                    {profile.full_name?.[0] || '?'}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900">{profile.full_name}</h3>
+                    <p className="text-xs text-blue-600 font-medium">{profile.username}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-slate-900">{profile.full_name}</h3>
-                  <p className="text-xs text-blue-600 font-medium">{profile.username}</p>
+                <div className="flex items-center gap-2">
+                  <Select defaultValue={profile.role} onValueChange={(v) => handleRoleChange(profile.id, v)}>
+                    <SelectTrigger className="h-8 w-[80px] text-[10px] rounded-lg">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin" className="text-xs">관리자</SelectItem>
+                      <SelectItem value="teacher" className="text-xs">교직원</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40 rounded-xl">
+                      <DropdownMenuLabel className="text-[10px] font-black text-slate-400 uppercase tracking-widest">관리 메뉴</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => { setSelectedProfile(profile); setIsAssignOpen(true); }} className="gap-2 font-medium">
+                        <GraduationCap className="h-4 w-4 text-blue-500" /> 담당 학반 배정
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setSelectedProfile(profile); setIsResetOpen(true); }} className="gap-2 font-medium">
+                        <KeyRound className="h-4 w-4 text-amber-500" /> 비밀번호 초기화
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => { setSelectedProfile(profile); setIsDeleteOpen(true); }} className="gap-2 font-medium text-rose-600 focus:text-rose-600 focus:bg-rose-50">
+                        <Trash2 className="h-4 w-4" /> 계정 삭제
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
-              <Select defaultValue={profile.role} onValueChange={(v) => handleRoleChange(profile.id, v)}>
-                <SelectTrigger className="h-8 w-[80px] text-[10px] rounded-lg">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin" className="text-xs">관리자</SelectItem>
-                  <SelectItem value="teacher" className="text-xs">교직원</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
 
-            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 space-y-1">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">담당 학반</p>
-              {profile.assigned_year ? (
-                <p className="text-xs font-semibold text-emerald-700">
-                  {getDisplayAY(profile.assigned_year, profile.assigned_grade)}학년도 {profile.assigned_grade || 3}학년 {profile.assigned_major} {profile.assigned_class}
-                </p>
-              ) : (
-                <p className="text-xs text-slate-400 italic">미지정</p>
-              )}
-            </div>
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 space-y-1">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">담당 학반</p>
+                {profile.assigned_year ? (
+                  <p className="text-xs font-semibold text-emerald-700">
+                    {getDisplayAY(profile.assigned_year, profile.assigned_grade)}학년도 {profile.assigned_grade || 3}학년 {profile.assigned_major} {profile.assigned_class}
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-400 italic">미지정</p>
+                )}
+              </div>
 
-            <div className="flex items-center justify-between pt-1">
-              <span className="text-[10px] text-slate-400">
-                {profile.created_at ? format(new Date(profile.created_at), 'yyyy-MM-dd') : '-'} 등록
-              </span>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs gap-1.5 border-blue-100 text-blue-600 font-bold" onClick={() => { setSelectedProfile(profile); setIsAssignOpen(true); }}>
-                  <GraduationCap className="h-3.5 w-3.5" /> 배정
-                </Button>
-
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs gap-1.5 border-amber-100 text-amber-600 font-bold" disabled={isResetting === profile.id}>
-                      {isResetting === profile.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <KeyRound className="h-3.5 w-3.5" />} 비번초기화
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent className="w-[95vw] max-w-[400px] rounded-2xl">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>비밀번호 초기화</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        '{profile.full_name}' 사용자의 비밀번호를 <span className="font-bold text-rose-600 underline">123123</span>으로 초기화하시겠습니까?
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel className="rounded-xl">취소</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => handleResetPassword(profile.id)} className="bg-amber-600 hover:bg-amber-700 rounded-xl">초기화 실행</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg border-rose-100 text-rose-500 hover:bg-rose-50">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent className="w-[95vw] max-w-[400px] rounded-2xl">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>계정 삭제</AlertDialogTitle>
-                      <AlertDialogDescription>'{profile.full_name}' 사용자를 삭제하시겠습니까?</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel className="rounded-xl">취소</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => handleDelete(profile.id)} className="bg-rose-600 hover:bg-rose-700 rounded-xl">삭제</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[10px] text-slate-400">
+                  {profile.created_at ? format(new Date(profile.created_at), 'yyyy-MM-dd') : '-'} 등록
+                </span>
+                {profile.role === 'admin' && (
+                  <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-black uppercase">Administrator</span>
+                )}
               </div>
             </div>
+          ))
+        ) : (
+          <div className="py-20 text-center text-slate-400">
+            <Search className="h-10 w-10 mx-auto mb-3 opacity-20" />
+            <p className="text-sm">검색 결과가 없습니다.</p>
           </div>
-        ))}
+        )}
       </div>
 
+      {/* 비밀번호 초기화 확인 다이얼로그 */}
+      <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetOpen}>
+        <AlertDialogContent className="w-[95vw] max-w-[400px] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>비밀번호 초기화</AlertDialogTitle>
+            <AlertDialogDescription>
+              '{selectedProfile?.full_name}' 사용자의 비밀번호를 <span className="font-bold text-rose-600 underline">123123</span>으로 초기화하시겠습니까?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">취소</AlertDialogCancel>
+            <AlertDialogAction onClick={() => selectedProfile && handleResetPassword(selectedProfile.id)} className="bg-amber-600 hover:bg-amber-700 rounded-xl text-white">초기화 실행</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 계정 삭제 확인 다이얼로그 */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteOpen}>
+        <AlertDialogContent className="w-[95vw] max-w-[400px] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>계정 삭제</AlertDialogTitle>
+            <AlertDialogDescription>'{selectedProfile?.full_name}' 사용자를 삭제하시겠습니까?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">취소</AlertDialogCancel>
+            <AlertDialogAction onClick={() => selectedProfile && handleDelete(selectedProfile.id)} className="bg-rose-600 hover:bg-rose-700 rounded-xl text-white">삭제</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
-        <DialogContent className="w-[95vw] max-w-[400px] rounded-2xl p-0 overflow-hidden border-none shadow-2xl">
-          <DialogHeader className="p-6 bg-indigo-600 text-white shrink-0">
-            <DialogTitle>담당 학반 설정</DialogTitle>
-            <DialogDescription className="text-indigo-100 text-xs">{selectedProfile?.full_name} 선생님의 담당 정보를 선택하세요.</DialogDescription>
+        <DialogContent className="sm:max-w-[450px] rounded-2xl p-0 overflow-hidden border-none shadow-2xl">
+          <DialogHeader className="p-6 bg-slate-900 text-white">
+            <DialogTitle className="flex items-center gap-2 text-xl font-black">
+              <GraduationCap className="h-6 w-6 text-blue-400" />
+              담당 학반 설정
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs mt-1">
+              {selectedProfile?.full_name} 선생님의 담당 학사 정보를 선택하세요.
+            </DialogDescription>
           </DialogHeader>
-          <div className="p-6 space-y-4 bg-white">
+
+          <div className="p-6 space-y-6 bg-white">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">1. 학년도 선택</Label>
+                <Label className="text-[11px] font-black text-slate-400 uppercase tracking-widest px-1">1. 학년도</Label>
                 <Select value={assignAcademicYear} onValueChange={(v) => { setAssignAcademicYear(v); setAssignMajor(''); setAssignClass(''); }}>
-                  <SelectTrigger className="w-full h-10 border-slate-200"><SelectValue placeholder="학년도" /></SelectTrigger>
-                  <SelectContent>
+                  <SelectTrigger className="w-full h-11 border-slate-200 rounded-xl focus:ring-blue-500">
+                    <SelectValue placeholder="학년도" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
                     {[baseYear - 2, baseYear - 1, baseYear, baseYear + 1, baseYear + 2].sort((a, b) => b - a).map(y => (
-                      <SelectItem key={y} value={String(y)}>{y}학년도</SelectItem>
+                      <SelectItem key={y} value={String(y)} className="text-sm">{y}학년도</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">2. 학년 선택</Label>
+                <Label className="text-[11px] font-black text-slate-400 uppercase tracking-widest px-1">2. 학년</Label>
                 <Select value={assignGrade} onValueChange={(v) => { setAssignGrade(v); setAssignMajor(''); setAssignClass(''); }}>
-                  <SelectTrigger className="w-full h-10 border-slate-200"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1학년</SelectItem>
-                    <SelectItem value="2">2학년</SelectItem>
-                    <SelectItem value="3">3학년</SelectItem>
+                  <SelectTrigger className="w-full h-11 border-slate-200 rounded-xl focus:ring-blue-500">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="1" className="text-sm">1학년</SelectItem>
+                    <SelectItem value="2" className="text-sm">2학년</SelectItem>
+                    <SelectItem value="3" className="text-sm">3학년</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">3. 학과 선택</Label>
+              <Label className="text-[11px] font-black text-slate-400 uppercase tracking-widest px-1">3. 학과 선택</Label>
               <Select value={assignMajor} onValueChange={(v) => { setAssignMajor(v); setAssignClass(''); }} disabled={!assignAcademicYear}>
-                <SelectTrigger className="w-full h-10 border-slate-200"><SelectValue placeholder={assignAcademicYear ? "학과 선택" : "학년도를 먼저 선택하세요"} /></SelectTrigger>
-                <SelectContent>
+                <SelectTrigger className="w-full h-11 border-slate-200 rounded-xl focus:ring-blue-500">
+                  <SelectValue placeholder={assignAcademicYear ? "학과를 선택하세요" : "학년도를 먼저 선택하세요"} />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
                   {availableMajors.length > 0 ? (
-                    availableMajors.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)
+                    availableMajors.map(m => <SelectItem key={m} value={m} className="text-sm">{m}</SelectItem>)
                   ) : (
                     <SelectItem value="none" disabled>해당 연도 데이터 없음</SelectItem>
                   )}
@@ -446,29 +526,35 @@ export function UserTable({ initialProfiles, graduationYears, fullClassMapping, 
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">4. 반 선택</Label>
+              <Label className="text-[11px] font-black text-slate-400 uppercase tracking-widest px-1">4. 반 선택</Label>
               <Select value={assignClass} onValueChange={setAssignClass} disabled={!assignMajor || assignMajor === 'none'}>
-                <SelectTrigger className="w-full h-10 border-slate-200"><SelectValue placeholder={assignMajor ? "반 선택" : "학과를 먼저 선택하세요"} /></SelectTrigger>
-                <SelectContent>
-                  {availableClasses.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                <SelectTrigger className="w-full h-11 border-slate-200 rounded-xl focus:ring-blue-500">
+                  <SelectValue placeholder={assignMajor ? "반을 선택하세요" : "학과를 먼저 선택하세요"} />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {availableClasses.map(c => <SelectItem key={c} value={c} className="text-sm">{c}반</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
 
             {calculatedGradYear && (
-              <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-[11px] text-blue-700 font-medium">
-                * 위 설정은 <span className="font-bold">{calculatedGradYear}년 졸업 예정자</span> 데이터와 연결됩니다.
+              <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 flex gap-3 animate-in fade-in slide-in-from-top-1 duration-300">
+                <div className="h-5 w-5 bg-blue-100 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-[10px] font-bold text-blue-600">i</span>
+                </div>
+                <p className="text-xs text-blue-700 leading-relaxed font-medium">
+                  위 설정은 <span className="font-black underline underline-offset-2">{calculatedGradYear}년 졸업 예정자</span> 데이터와 실시간으로 연결됩니다.
+                </p>
               </div>
             )}
           </div>
-          <DialogFooter className="p-4 bg-slate-50 border-t flex flex-col sm:flex-row gap-2 mt-0">
-            <div className="flex flex-row gap-2 w-full">
-              <Button variant="ghost" onClick={() => setIsAssignOpen(false)} className="flex-1 rounded-xl h-11 px-0">취소</Button>
-              {selectedProfile?.assigned_year && (
-                <Button variant="outline" onClick={handleClearAssign} className="flex-1 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-xl h-11 px-0 font-bold">배정 해제</Button>
-              )}
-              <Button onClick={handleAssignSave} className="flex-1 bg-indigo-600 hover:bg-indigo-700 rounded-xl font-bold h-11 px-0 shadow-lg shadow-indigo-100">설정 저장</Button>
-            </div>
+
+          <DialogFooter className="p-6 bg-slate-50 border-t flex flex-row gap-2 mt-0">
+            <Button variant="ghost" onClick={() => setIsAssignOpen(false)} className="flex-1 rounded-xl h-11 font-bold">취소</Button>
+            {selectedProfile?.assigned_year ? (
+              <Button variant="outline" onClick={handleClearAssign} className="flex-1 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 rounded-xl h-11 font-black">배정 해제</Button>
+            ) : null}
+            <Button onClick={handleAssignSave} className="flex-[1.5] bg-blue-600 hover:bg-blue-700 rounded-xl font-black h-11 shadow-lg shadow-blue-100">설정 저장</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

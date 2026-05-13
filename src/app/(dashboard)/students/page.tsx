@@ -13,6 +13,7 @@ import { redirect } from 'next/navigation';
 import { getMasterCertificates, getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 
 import DashboardFilters from '@/components/dashboard/dashboard-filters';
+import React from 'react';
 
 export const dynamic = 'force-dynamic';
 
@@ -117,16 +118,18 @@ export default async function StudentsPage({
         
         <div className="bg-slate-100/50 p-1 rounded-xl border border-slate-200 shrink-0 overflow-x-auto w-full xl:w-auto">
           <div className="flex justify-start xl:justify-end">
-            <DashboardFilters 
-              graduationYears={graduationYears}
-              majors={majors}
-              classes={classes}
-              statuses={statuses}
-              defaultYear={defaultGradYear}
-              baseUrl="/students"
-              baseYear={settings.baseYear}
-              hideGrade={true}
-            />
+            <React.Suspense fallback={<div className="h-10 w-[450px] bg-slate-50 animate-pulse rounded-lg" />}>
+              <DashboardFilters 
+                graduationYears={graduationYears}
+                majors={majors}
+                classes={classes}
+                statuses={statuses}
+                defaultYear={defaultGradYear}
+                baseUrl="/students"
+                baseYear={settings.baseYear}
+                hideGrade={true}
+              />
+            </React.Suspense>
           </div>
         </div>
       </div>

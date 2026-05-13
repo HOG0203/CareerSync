@@ -89,6 +89,91 @@ export async function createUser(formData: FormData) {
 }
 
 /**
+ * 사용자 일괄 생성 (Excel Import용)
+ */
+export async function bulkCreateUsers(users: { username: string, fullName: string, role: string }[]) {
+  const isAdmin = await checkIsAdmin()
+  if (!isAdmin) {
+    return { error: '권한이 없습니다.' }
+  }
+
+  const results = {
+    successCount: 0,
+    failures: [] as { username: string, reason: string }[]
+  }
+
+  for (const user of users) {
+    try {
+      const { username, fullName, role } = user
+      if (!username || !role) {
+        results.failures.push({ username: username || 'Unknown', reason: '아이디 또는 권한 누락' })
+        continue
+      }
+
+      const trimmedUsername = username.trim()
+      const trimmedFullName = fullName.trim() || trimmedUsername
+      const mappedRole = role === '관리자' ? 'admin' : 'teacher'
+
+      // 1. 중복 체크
+      const { data: existing } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('username', trimmedUsername)
+        .maybeSingle()
+
+      if (existing) {
+        results.failures.push({ username: trimmedUsername, reason: '이미 존재하는 아이디' })
+        continue
+      }
+
+      // 2. Auth 사용자 생성
+      const safeLocalPart = Buffer.from(trimmedUsername.toLowerCase()).toString('hex')
+      const virtualEmail = `${safeLocalPart}@${DOMAIN}`
+
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: virtualEmail,
+        password: '123123',
+        email_confirm: true,
+        user_metadata: {
+          username: trimmedUsername,
+          full_name: trimmedFullName,
+        }
+      })
+
+      if (authError) {
+        results.failures.push({ username: trimmedUsername, reason: `Auth 생성 실패: ${authError.message}` })
+        continue
+      }
+
+      // 3. Profile 생성
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .upsert({ 
+          id: authData.user.id, 
+          username: trimmedUsername,
+          full_name: trimmedFullName,
+          email: virtualEmail,
+          role: mappedRole as any,
+          updated_at: new Date().toISOString()
+        })
+
+      if (profileError) {
+        // Auth는 생성되었는데 프로필이 실패한 경우 (일단 실패로 기록)
+        results.failures.push({ username: trimmedUsername, reason: `프로필 생성 실패: ${profileError.message}` })
+        continue
+      }
+
+      results.successCount++
+    } catch (err: any) {
+      results.failures.push({ username: user.username, reason: `알 수 없는 오류: ${err.message}` })
+    }
+  }
+
+  revalidatePath('/admin/users')
+  return { success: true, count: results.successCount, failures: results.failures }
+}
+
+/**
  * 관리자용 사용자 비밀번호 초기화 (123123으로 초기화)
  */
 export async function resetUserPassword(userId: string) {

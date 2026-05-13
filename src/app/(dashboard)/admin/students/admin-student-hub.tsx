@@ -135,15 +135,17 @@ export function AdminStudentHub({
 
       <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-          <DashboardFilters 
-            graduationYears={graduationYears}
-            majors={majors}
-            classes={classes}
-            statuses={statuses}
-            defaultYear={(settings.baseYear + 1).toString()}
-            baseUrl="/admin/students"
-            baseYear={settings.baseYear}
-          />
+          <React.Suspense fallback={<div className="h-10 w-[450px] bg-slate-50 animate-pulse rounded-lg" />}>
+            <DashboardFilters 
+              graduationYears={graduationYears}
+              majors={majors}
+              classes={classes}
+              statuses={statuses}
+              defaultYear={(settings.baseYear + 1).toString()}
+              baseUrl="/admin/students"
+              baseYear={settings.baseYear}
+            />
+          </React.Suspense>
         </div>
         
         <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-l sm:border-t-0 pt-3 sm:pt-0 sm:pl-4 border-slate-100 shrink-0">

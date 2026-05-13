@@ -23,7 +23,7 @@ import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Menu, Search, LogOut, Settings } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import Nav from './nav';
 import { usePathname } from 'next/navigation';
 import { logout } from '@/app/login/actions';
@@ -74,6 +74,8 @@ export default function Header() {
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="sm:max-w-xs p-0">
+          <SheetTitle className="sr-only">모바일 메뉴</SheetTitle>
+          <SheetDescription className="sr-only">사이드바 탐색 메뉴</SheetDescription>
           <Nav />
         </SheetContent>
       </Sheet>

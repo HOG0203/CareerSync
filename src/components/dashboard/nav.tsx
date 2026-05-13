@@ -8,6 +8,14 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
+  SidebarMenuButton,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
 import {
@@ -21,67 +29,171 @@ import {
   UserPlus,
   GraduationCap,
   Factory,
+  ChevronRight,
+  ClipboardList,
+  UserCog,
+  ShieldCheck,
+  CheckCircle2,
+  Briefcase
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { logout } from '@/app/login/actions';
-
-const baseMenuItems = [
-  { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
-  { href: '/employment-status', label: '취업현황', icon: Grid3X3 },
-  { href: '/company-info', label: '업체정보', icon: Factory },
-  { href: '/labor-education', label: '노동인권교육', icon: ShieldAlert },
-  { href: '/students', label: '취업상세데이터', icon: Users },
-  { href: '/class-management', label: '학반 관리', icon: BookUser },
-];
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { cn } from '@/lib/utils';
+import * as React from 'react';
 
 export default function Nav({ isAdmin = false }: { isAdmin?: boolean }) {
+  const [mounted, setMounted] = React.useState(false);
   const pathname = usePathname();
+  const { setOpenMobile } = useSidebar();
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleLogout = async () => {
     await logout();
   };
 
-  const menuItems = isAdmin 
-    ? [
-        ...baseMenuItems, 
-        { href: '/admin/students', label: '학생 등록 및 진급 관리', icon: UserPlus },
-        { href: '/admin/grades/summary', label: '옥저인증', icon: LayoutDashboard },
-        { href: '/admin/users', label: '사용자 관리', icon: ShieldAlert },
-        { href: '/admin/settings', label: '설정', icon: Settings },
+  const closeMobile = () => {
+    setOpenMobile(false);
+  };
+
+  // 그룹 정의
+  const groups = [
+    {
+      title: "취업 및 실습 관리",
+      icon: Briefcase,
+      items: [
+        { href: '/employment-status', label: '취업현황', icon: Grid3X3 },
+        { href: '/company-info', label: '업체정보', icon: Factory },
+        { href: '/students', label: '취업상세데이터', icon: ClipboardList },
       ]
-    : baseMenuItems;
+    },
+    {
+      title: "학사 및 지도",
+      icon: GraduationCap,
+      items: [
+        { href: '/class-management', label: '학반 관리', icon: BookUser },
+        { href: '/labor-education', label: '노동인권교육', icon: ShieldAlert },
+        ...(isAdmin ? [{ href: '/admin/students', label: '학생 등록/진급', icon: UserPlus }] : []),
+      ]
+    },
+    ...(isAdmin ? [{
+      title: "시스템 관리",
+      icon: Settings,
+      items: [
+        { href: '/admin/users', label: '사용자 관리', icon: UserCog },
+        { href: '/admin/settings', label: '시스템 설정', icon: ShieldCheck },
+        { href: '/admin/grades/summary', label: '옥저인증', icon: CheckCircle2 },
+      ]
+    }] : [])
+  ];
+
+  if (!mounted) {
+    return (
+      <>
+        <SidebarHeader>
+          <Logo />
+        </SidebarHeader>
+        <SidebarContent className="p-2 gap-4">
+          <div className="h-10 w-full bg-slate-50 animate-pulse rounded-md" />
+          <div className="h-10 w-full bg-slate-50 animate-pulse rounded-md mt-4" />
+          <div className="h-10 w-full bg-slate-50 animate-pulse rounded-md mt-4" />
+        </SidebarContent>
+      </>
+    );
+  }
 
   return (
     <>
       <SidebarHeader>
         <Logo />
       </SidebarHeader>
-      <SidebarContent className="p-2">
+      <SidebarContent className="p-2 gap-4">
+        {/* 대시보드 - 최상단 단일 메뉴 */}
         <SidebarMenu>
-          {menuItems.map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <Button
-                asChild
-                variant={pathname === item.href ? 'secondary' : 'ghost'}
-                className="w-full justify-start"
-              >
-                <Link href={item.href}>
-                  <item.icon className="mr-2 h-4 w-4" />
-                  {item.label}
-                </Link>
-              </Button>
-            </SidebarMenuItem>
-          ))}
+          <SidebarMenuItem>
+            <SidebarMenuButton 
+              asChild 
+              isActive={pathname === '/dashboard'}
+              className={cn(
+                "h-10 px-3",
+                pathname === '/dashboard' ? "bg-blue-50 text-blue-600 hover:bg-blue-50 hover:text-blue-600" : ""
+              )}
+            >
+              <Link href="/dashboard" onClick={closeMobile}>
+                <LayoutDashboard className={cn("mr-2 h-4 w-4", pathname === '/dashboard' ? "text-blue-600" : "")} />
+                <span className="font-bold">대시보드</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
         </SidebarMenu>
+
+        {/* 카테고리별 그룹 */}
+        {groups.map((group) => {
+          const isAnyItemActive = group.items.some(item => pathname === item.href);
+          
+          return (
+            <Collapsible
+              key={group.title}
+              asChild
+              defaultOpen={isAnyItemActive}
+              className="group/collapsible"
+            >
+              <SidebarGroup className="p-0">
+                <SidebarMenuItem className="list-none">
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton 
+                      className={cn(
+                        "h-10 px-3 text-slate-500 hover:text-slate-900 transition-colors",
+                        isAnyItemActive && "text-slate-900"
+                      )}
+                    >
+                      <group.icon className="mr-2 h-4 w-4" />
+                      <span className="font-bold text-xs">{group.title}</span>
+                      <ChevronRight className="ml-auto h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub className="ml-4 border-l border-slate-100 pl-2">
+                      {group.items.map((item) => (
+                        <SidebarMenuSubItem key={item.href}>
+                          <SidebarMenuSubButton 
+                            asChild 
+                            isActive={pathname === item.href}
+                            className={cn(
+                              "h-9 transition-all",
+                              pathname === item.href ? "text-blue-600 font-bold bg-blue-50/50" : "text-slate-500 hover:text-slate-800"
+                            )}
+                          >
+                            <Link href={item.href} onClick={closeMobile}>
+                              <item.icon className="mr-2 h-3.5 w-3.5" />
+                              <span>{item.label}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </SidebarGroup>
+            </Collapsible>
+          );
+        })}
       </SidebarContent>
-      <SidebarFooter className="p-2">
+      <SidebarFooter className="p-2 border-t border-slate-50">
         <Button 
           variant="ghost" 
-          className="w-full justify-start"
+          className="w-full justify-start text-slate-500 hover:text-rose-600 hover:bg-rose-50 h-10 px-3 transition-colors"
           onClick={handleLogout}
         >
           <LogOut className="mr-2 h-4 w-4" />
-          로그아웃
+          <span className="font-medium">로그아웃</span>
         </Button>
       </SidebarFooter>
     </>

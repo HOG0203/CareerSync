@@ -60,7 +60,7 @@ export default function Grade3View({
 
         <Card className="bg-cyan-50/30 border-cyan-100 shadow-sm border-l-4 border-l-cyan-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
-            <CardTitle className="text-[10px] sm:text-sm font-semibold text-cyan-900">현장실습</CardTitle>
+            <CardTitle className="text-[10px] sm:text-sm font-semibold text-cyan-900">현장실습 / 도제OJT</CardTitle>
             <GraduationCap className="h-3 w-3 sm:h-4 sm:w-4 text-cyan-600" />
           </CardHeader>
           <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
