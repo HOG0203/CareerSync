@@ -259,11 +259,15 @@ const GROUP_HEADERS = [
 export function StudentTable({ 
   initialData, 
   isAdmin = false, 
-  masterCertificates = [] 
+  masterCertificates = [],
+  rankingMap = {},
+  userProfile = null
 }: { 
   initialData: any[], 
   isAdmin?: boolean,
-  masterCertificates?: MasterCertificate[]
+  masterCertificates?: MasterCertificate[],
+  rankingMap?: Record<string, any>,
+  userProfile?: any
 }) {
   const [selectedStudent, setSelectedStudent] = React.useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = React.useState(false)
@@ -312,6 +316,8 @@ export function StudentTable({
           onAction={handleAction}
           searchPlaceholder="빠른 학생 검색..."
           masterCertificates={masterCertificates}
+          rankingMap={rankingMap}
+          userProfile={userProfile}
         />
       </div>
 

@@ -114,7 +114,7 @@ export function AddStudentModal({ isOpen, onClose, baseYear, majors }: AddStuden
                     <SelectValue placeholder="연도 선택" />
                   </SelectTrigger>
                   <SelectContent>
-                    {[baseYear - 1, baseYear, baseYear + 1, baseYear + 2].map(year => (
+                    {[baseYear - 1, baseYear, baseYear + 1, baseYear + 2, baseYear + 3].map(year => (
                       <SelectItem key={year} value={year.toString()}>{year}년 (예정)</SelectItem>
                     ))}
                   </SelectContent>

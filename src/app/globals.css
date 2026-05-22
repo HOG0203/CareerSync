@@ -111,3 +111,31 @@ html {
 [data-radix-popper-content-wrapper] {
   z-index: 50 !important;
 }
+
+@keyframes highlight-neon-glow {
+  0% { 
+    outline: 4px solid #ccff00; 
+    outline-offset: -4px;
+    box-shadow: inset 0 0 10px #ccff00, 0 0 20px #ccff00;
+    filter: brightness(1.2);
+  }
+  50% { 
+    outline: 2px solid rgba(204, 255, 0, 0.5); 
+    outline-offset: -2px;
+    box-shadow: inset 0 0 5px #ccff00, 0 0 10px #ccff00;
+    filter: brightness(1);
+  }
+  100% { 
+    outline: 4px solid #ccff00; 
+    outline-offset: -4px;
+    box-shadow: inset 0 0 10px #ccff00, 0 0 20px #ccff00;
+    filter: brightness(1.2);
+  }
+}
+
+.search-highlight {
+  animation: highlight-neon-glow 1s infinite;
+  z-index: 40 !important;
+  position: relative;
+  background-clip: padding-box;
+}

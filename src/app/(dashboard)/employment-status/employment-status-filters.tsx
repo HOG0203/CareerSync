@@ -15,13 +15,14 @@ interface EmploymentStatusFiltersProps {
   graduationYears: number[];
   defaultYear: string;
   baseYear: number;
+  initialAY: string;
 }
 
-export default function EmploymentStatusFilters({ graduationYears, defaultYear, baseYear }: EmploymentStatusFiltersProps) {
+export default function EmploymentStatusFilters({ graduationYears, defaultYear, baseYear, initialAY }: EmploymentStatusFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const currentAY = searchParams.get('ay') || baseYear.toString();
+  const currentAY = searchParams.get('ay') || initialAY;
   const currentGrade = searchParams.get('grade') || '3';
 
   // 학사학년도 목록 도출

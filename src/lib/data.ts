@@ -10,28 +10,49 @@ export { MAJOR_SORT_ORDER };
 export async function getFilteredStudentData(graduationYear: string): Promise<StudentEmploymentData[]> {
   const supabase = await createClient();
   
+  // 1. 학생 및 취업 정보를 단일 조인 쿼리로 조회 (데이터 무결성 보장)
   const { data: students, error: studentError } = await supabase
     .from('students')
-    .select('*')
+    .select('*, student_employments (*)')
     .eq('graduation_year', parseInt(graduationYear))
     .order('major')
     .order('class_info')
-    .order('student_number');
+    .order('student_number')
+    .range(0, 5000); // 5000명까지 대폭 확장
 
-  if (studentError) return [];
+  if (studentError || !students) return [];
 
-  const { data: employments } = await supabase
-    .from('student_employments')
-    .select('*')
-    .in('id', students.map(s => s.id));
-
+  // 2. 실습 기록은 별도 조회 (1:N 관계이므로)
   const { data: trainings } = await supabase
     .from('field_training_records')
     .select('*')
     .in('student_id', students.map(s => s.id))
     .order('training_order', { ascending: false });
 
-  const flattened = flattenStudentData(students, employments || [], trainings || []);
+  // 3. 데이터 평탄화 (데이터 뒤섞임 방지를 위해 명시적 객체 생성)
+  const flattened = students.map(s => {
+    // Supabase Join 결과인 student_employments 배열 처리
+    const rawEmp = Array.isArray(s.student_employments) ? s.student_employments[0] : s.student_employments;
+    const { student_employments, ...studentBase } = s; // 원본 배열 제거하여 중복 방지
+    const emp = rawEmp || {}; // 데이터가 없을 경우 빈 객체 처리
+
+    const studentTrainings = (trainings || []).filter(t => t.student_id === s.id);
+    const latestTraining = studentTrainings[0];
+
+    return {
+      ...studentBase,
+      ...emp,
+      id: s.id, // ID 유지 보장
+      training_records: studentTrainings,
+      has_field_training: latestTraining ? 'O' : '',
+      latest_training_company: latestTraining?.company,
+      start_date: latestTraining?.start_date,
+      end_date: latestTraining?.end_date,
+      training_stipend_status: latestTraining?.stipend_status,
+      is_hiring_conversion: latestTraining?.hiring_status === '채용전환' ? latestTraining?.conversion_date : '',
+      is_returned: latestTraining?.hiring_status === '복교' ? 'O' : '',
+    };
+  });
 
   return flattened.sort((a, b) => {
     const indexA = MAJOR_SORT_ORDER.indexOf(a.major || '');
@@ -54,10 +75,18 @@ export async function getAssignedStudentDetails(major: string, classInfo: string
   const { data: trainings } = await supabase.from('field_training_records').select('*').in('student_id', students.map(s => s.id)).order('training_order', { ascending: false });
 
   return students.map(s => {
+    const studentEmployments = Array.isArray(s.student_employments) ? s.student_employments[0] : s.student_employments;
+    const { student_employments, ...studentBase } = s;
+    const emp = studentEmployments || {};
     const studentTrainings = (trainings || []).filter(t => t.student_id === s.id);
     const latestTraining = studentTrainings[0];
+    
     return {
-      ...s, ...s.student_employments, training_records: studentTrainings, counseling_logs: s.student_counseling_logs || [],
+      ...studentBase, 
+      ...emp, 
+      id: s.id,
+      training_records: studentTrainings, 
+      counseling_logs: s.student_counseling_logs || [],
       has_field_training: latestTraining ? 'O' : '',
       latest_training_company: latestTraining?.company,
       start_date: latestTraining?.start_date,

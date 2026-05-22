@@ -73,11 +73,11 @@ export default async function AdminStudentsPage({
       
       // 현재 선택된 반까지 만족하는 상태 카운트
       if (selectedClass === 'all' || student.class_info === selectedClass) {
-        const status = student.employment_status || '미취업';
-        statusCounts[status] = (statusCounts[status] || 0) + 1;
+        const currentStatus = student.employment_status || '미취업';
+        statusCounts[currentStatus] = (statusCounts[currentStatus] || 0) + 1;
         
         // 최종 필터링 데이터 (허브 테이블용)
-        if (selectedStatus === 'all' || student.employment_status === selectedStatus) {
+        if (selectedStatus === 'all' || currentStatus === selectedStatus) {
           filteredData.push(student);
         }
       }

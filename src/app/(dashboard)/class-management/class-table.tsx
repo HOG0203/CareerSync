@@ -9,6 +9,8 @@ import { CounselingModal } from './counseling-modal'
 interface ClassTableProps {
   initialData: any[];
   masterCertificates: MasterCertificate[];
+  rankingMap?: Record<string, any>;
+  userProfile?: any;
 }
 
 // 학년별 진로희망 옵션 생성 함수
@@ -78,7 +80,12 @@ const GET_SPECIFIC_COURSE_OPTIONS = (rowData: any) => {
   return [];
 }
 
-export function ClassTable({ initialData, masterCertificates }: ClassTableProps) {
+export function ClassTable({ 
+  initialData, 
+  masterCertificates,
+  rankingMap = {},
+  userProfile = null
+}: ClassTableProps) {
   const [selectedStudent, setSelectedStudent] = React.useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = React.useState(false)
 
@@ -261,6 +268,8 @@ export function ClassTable({ initialData, masterCertificates }: ClassTableProps)
         onAction={handleAction}
         searchPlaceholder="학반 학생 검색..."
         masterCertificates={masterCertificates}
+        rankingMap={rankingMap}
+        userProfile={userProfile}
       />
 
       <CounselingModal 

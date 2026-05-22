@@ -80,7 +80,11 @@ export default function DashboardFilters({
       params.set('ay', ay.toString());
       params.set('grade', grade.toString());
       params.set('year', gradYear.toString());
+      
+      // 학년/학년도 변경 시 세부 필터 초기화
+      params.delete('major');
       params.delete('class');
+      params.delete('status');
     } else {
       params.set(key, value);
       if (key === 'major') params.delete('class');

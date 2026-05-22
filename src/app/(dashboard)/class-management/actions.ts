@@ -52,6 +52,10 @@ export async function updatePersonalDetail(id: string, field: string, value: any
   }
 
   revalidatePath('/class-management')
+  revalidatePath('/employment-status')
+  revalidatePath('/students')
+  revalidatePath('/admin/students')
+  revalidatePath('/dashboard')
   return { success: true }
 }
 
@@ -76,6 +80,10 @@ export async function bulkUpdatePersonalDetails(updates: { id: string, field: st
   }
 
   revalidatePath('/class-management')
+  revalidatePath('/employment-status')
+  revalidatePath('/students')
+  revalidatePath('/admin/students')
+  revalidatePath('/dashboard')
   return { success: true }
 }
 
@@ -131,6 +139,7 @@ export async function promoteStudents(updates: {
   }
 
   revalidatePath('/class-management')
+  revalidatePath('/employment-status')
   revalidatePath('/students')
   revalidatePath('/admin/students')
   revalidatePath('/dashboard')
@@ -198,6 +207,10 @@ export async function addCounselingLog(studentId: string, content: string) {
   if (error) return { error: error.message }
 
   revalidatePath('/class-management')
+  revalidatePath('/employment-status')
+  revalidatePath('/students')
+  revalidatePath('/admin/students')
+  revalidatePath('/dashboard')
   return { success: true }
 }
 
@@ -220,6 +233,10 @@ export async function updateCounselingLog(logId: string, content: string) {
   if (error) return { error: error.message }
 
   revalidatePath('/class-management')
+  revalidatePath('/employment-status')
+  revalidatePath('/students')
+  revalidatePath('/admin/students')
+  revalidatePath('/dashboard')
   return { success: true }
 }
 
@@ -242,5 +259,9 @@ export async function deleteCounselingLog(logId: string) {
   if (error) return { error: error.message }
 
   revalidatePath('/class-management')
+  revalidatePath('/employment-status')
+  revalidatePath('/students')
+  revalidatePath('/admin/students')
+  revalidatePath('/dashboard')
   return { success: true }
 }

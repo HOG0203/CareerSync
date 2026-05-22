@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { getAssignedStudentDetails, getGraduationYears, getFilteredStudentData, MAJOR_SORT_ORDER } from '@/lib/data';
+import { getAssignedStudentDetails, getGraduationYears, getFilteredStudentData, MAJOR_SORT_ORDER, getYearlyRankingsSummary, getCurrentUserProfile } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -11,36 +11,50 @@ import { ClassTable } from './class-table';
 import { ShieldAlert, Users } from 'lucide-react';
 import AdminClassSelector from './admin-class-selector';
 import { getMasterCertificates, getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
+import { Suspense } from 'react';
+import { TableLoadingSkeleton } from '@/components/dashboard/loading-skeleton';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * 학반 관리 메인 페이지 (서버 컴포넌트)
+ * Suspense와 Key를 활용하여 필터 변경 시 스켈레톤 노출 보장
+ */
 export default async function ClassManagementPage({
   searchParams,
 }: {
   searchParams: Promise<{ grade?: string; major?: string; class?: string }>;
 }) {
   const params = await searchParams;
+  // 필터 값이 바뀔 때마다 Suspense가 다시 트리거되도록 고유 키 설정
+  const suspenseKey = `${params.grade || '3'}-${params.major || 'all'}-${params.class || 'all'}`;
+
+  return (
+    <Suspense key={suspenseKey} fallback={<TableLoadingSkeleton />}>
+      <ClassManagementPageContent searchParams={params} />
+    </Suspense>
+  );
+}
+
+async function ClassManagementPageContent({
+  searchParams,
+}: {
+  searchParams: { grade?: string; major?: string; class?: string };
+}) {
+  const params = searchParams;
   const supabase = await createClient();
   
   // 1. 기반 공통 데이터 병렬 패칭
-  const [userRes, settings, graduationYears, masterCertificates] = await Promise.all([
-    supabase.auth.getUser(),
+  const [settings, graduationYears, masterCertificates, userProfile] = await Promise.all([
     getSystemSettings(),
     getGraduationYears(),
-    getMasterCertificates()
+    getMasterCertificates(),
+    getCurrentUserProfile()
   ]);
 
-  const user = userRes.data.user;
-  if (!user) return null;
+  if (!userProfile) return null;
 
-  // 2. 프로필 정보 조회
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, assigned_year, assigned_major, assigned_class, assigned_grade')
-    .eq('id', user.id)
-    .single();
-
-  const isAdmin = profile?.role === 'admin';
+  const isAdmin = userProfile.role === 'admin';
 
   // 3. 학년 옵션 계산 (졸업연도 목록 기반 역산)
   const availableGradesSet = new Set<number>();
@@ -61,11 +75,11 @@ export default async function ClassManagementPage({
   // --- 권한별 타겟 정보 결정 ---
   const selectedGrade = isAdmin 
     ? (params.grade ? parseInt(params.grade) : (availableGrades.includes(3) ? 3 : (availableGrades[0] || 3)))
-    : (profile?.assigned_grade || 3);
+    : (userProfile?.assigned_grade || 3);
   
   const calculatedYear = isAdmin 
     ? settings.baseYear + (4 - selectedGrade)
-    : (profile?.assigned_year || settings.baseYear + (4 - selectedGrade));
+    : (userProfile?.assigned_year || settings.baseYear + (4 - selectedGrade));
 
   // 4. 해당 학년의 전체 데이터만 DB에서 직접 필터링하여 패칭
   const allBaseData = await getFilteredStudentData(calculatedYear.toString());
@@ -86,7 +100,7 @@ export default async function ClassManagementPage({
 
   const targetMajor = isAdmin 
     ? (params.major && availableMajors.includes(params.major) ? params.major : (availableMajors[0] || null))
-    : (profile?.assigned_major || null);
+    : (userProfile?.assigned_major || null);
 
   // 선택된 학년 + 학과에 맞는 반들 추출
   for (const s of allBaseData) {
@@ -98,15 +112,20 @@ export default async function ClassManagementPage({
 
   const targetClass = isAdmin 
     ? (params.class && availableClasses.includes(params.class) ? params.class : (availableClasses[0] || null))
-    : (profile?.assigned_class || null);
+    : (userProfile?.assigned_class || null);
 
   // --- 학생 상세 데이터 패칭 ---
   const isViewable = !!(targetMajor && targetClass);
   let studentData: any[] = [];
+  let rankingMap: Record<string, any> = {};
 
   if (isViewable) {
-    // lib/data.ts 정의: (major, classInfo, graduationYear)
-    studentData = await getAssignedStudentDetails(targetMajor!, targetClass!, calculatedYear);
+    const [details, rankings] = await Promise.all([
+      getAssignedStudentDetails(targetMajor!, targetClass!, calculatedYear),
+      getYearlyRankingsSummary(calculatedYear, settings.baseYear)
+    ]);
+    studentData = details;
+    rankingMap = rankings;
   }
 
   const displayClass = targetClass && !targetClass.includes('-') ? `${selectedGrade}-${targetClass}` : targetClass;
@@ -129,8 +148,8 @@ export default async function ClassManagementPage({
       <div className="shrink-0">
         <AdminClassSelector 
           availableGrades={availableGrades}
-          majors={isAdmin ? availableMajors : [profile?.assigned_major!]} 
-          classes={isAdmin ? availableClasses : [profile?.assigned_class!]} 
+          majors={isAdmin ? availableMajors : [userProfile?.assigned_major!]} 
+          classes={isAdmin ? availableClasses : [userProfile?.assigned_class!]} 
           isAdmin={isAdmin}
         />
       </div>
@@ -154,6 +173,8 @@ export default async function ClassManagementPage({
             <ClassTable 
               initialData={studentData} 
               masterCertificates={masterCertificates} 
+              rankingMap={rankingMap}
+              userProfile={userProfile}
             />
           </CardContent>
         </Card>

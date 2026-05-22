@@ -5,10 +5,9 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { getFilteredStudentData, getGraduationYears, MAJOR_SORT_ORDER } from '@/lib/data';
+import { getFilteredStudentData, getGraduationYears, MAJOR_SORT_ORDER, getYearlyRankingsSummary, getCurrentUserProfile } from '@/lib/data';
 import { Users } from 'lucide-react';
 import { StudentTable } from './student-table';
-import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { getMasterCertificates, getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 
@@ -23,28 +22,21 @@ export default async function StudentsPage({
   searchParams: Promise<{ year?: string; major?: string; class?: string; status?: string; ay?: string; grade?: string }>;
 }) {
   const params = await searchParams;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
+
+  // 1. 기반 설정 및 사용자 프로필 패칭
+  const [settings, graduationYears, masterCertificates, userProfile] = await Promise.all([
+    getSystemSettings(),
+    getGraduationYears(),
+    getMasterCertificates(),
+    getCurrentUserProfile()
+  ]);
+
+  if (!userProfile) {
     redirect('/login');
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single();
-
-  const isAdmin = profile?.role === 'admin';
-  const isTeacher = profile?.role === 'teacher';
-
-  // 1. 기반 설정 패칭
-  const [settings, graduationYears, masterCertificates] = await Promise.all([
-    getSystemSettings(),
-    getGraduationYears(),
-    getMasterCertificates()
-  ]);
+  const isAdmin = userProfile.role === 'admin';
+  const isTeacher = userProfile.role === 'teacher';
 
   // 학사학년도(AY)와 학년(Grade) 기반 졸업연도 계산
   const ay = params.ay ? parseInt(params.ay) : settings.baseYear;
@@ -55,15 +47,20 @@ export default async function StudentsPage({
   const defaultGradYear = (settings.baseYear + 1).toString();
   const selectedYear = params.year || calculatedGradYear || defaultGradYear;
 
-  // 2. 타겟 데이터 패칭 (해당 학년의 데이터만 DB에서 직접 필터링하여 가져옴)
-  let allStudentData = await getFilteredStudentData(selectedYear);
+  // 2. 타겟 데이터 및 랭킹 요약 패칭
+  const [rawStudentData, rankingMap] = await Promise.all([
+    getFilteredStudentData(selectedYear),
+    getYearlyRankingsSummary(parseInt(selectedYear), settings.baseYear)
+  ]);
   
+  let allStudentData = rawStudentData;
+
   // 교직원일 경우 본인 담당 학반 데이터만 추출 (관리자는 전체)
-  if (isTeacher && profile.assigned_year) {
+  if (isTeacher && userProfile.assigned_year) {
     allStudentData = allStudentData.filter(s => 
-      s.graduation_year === profile.assigned_year &&
-      s.major === profile.assigned_major &&
-      s.class_info === profile.assigned_class
+      s.graduation_year === userProfile.assigned_year &&
+      s.major === userProfile.assigned_major &&
+      s.class_info === userProfile.assigned_class
     );
   }
 
@@ -141,6 +138,8 @@ export default async function StudentsPage({
               initialData={filteredData} 
               isAdmin={isAdmin} 
               masterCertificates={masterCertificates} 
+              rankingMap={rankingMap}
+              userProfile={userProfile}
             />
           </div>
         </CardContent>

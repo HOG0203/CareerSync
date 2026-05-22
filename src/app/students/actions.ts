@@ -115,7 +115,11 @@ export async function updateStudentField(id: string, field: string, value: any) 
     const { data: student } = await supabase.from('students').select('*').eq('id', id).single();
     if (student) await syncAcademicHistory(supabase, id, student, settings.baseYear);
   }
-  revalidatePath('/students'); revalidatePath('/admin/students'); revalidatePath('/class-management');
+  revalidatePath('/students'); 
+  revalidatePath('/admin/students'); 
+  revalidatePath('/class-management');
+  revalidatePath('/employment-status');
+  revalidatePath('/dashboard');
   return { success: true }
 }
 
@@ -127,7 +131,11 @@ export async function bulkUpdateStudentData(updates: { id: string, field: string
     else if (update.value === '' || update.value === 'CLEARED' || (Array.isArray(update.value) && update.value.length === 0)) fv = null;
     await supabase.from(BASIC_INFO_FIELDS.includes(update.field) ? 'students' : 'student_employments').update({ [update.field]: fv, updated_at: new Date().toISOString() }).eq('id', update.id);
   }
-  revalidatePath('/students'); revalidatePath('/admin/students'); revalidatePath('/class-management');
+  revalidatePath('/students'); 
+  revalidatePath('/admin/students'); 
+  revalidatePath('/class-management');
+  revalidatePath('/employment-status');
+  revalidatePath('/dashboard');
   return { success: true }
 }
 
@@ -137,7 +145,11 @@ export async function createStudent(data: { graduation_year: number, major: stri
   if (error || !newStudent) return { error: error?.message }
   await supabase.from('student_employments').insert([{ id: newStudent.id }])
   await syncAcademicHistory(supabase, newStudent.id, newStudent, settings.baseYear)
-  revalidatePath('/admin/students'); revalidatePath('/students'); revalidatePath('/class-management');
+  revalidatePath('/admin/students'); 
+  revalidatePath('/students'); 
+  revalidatePath('/class-management');
+  revalidatePath('/employment-status');
+  revalidatePath('/dashboard');
   return { success: true }
 }
 
@@ -146,7 +158,11 @@ export async function deleteStudents(ids: string[]) {
   await supabase.from('student_employments').delete().in('id', ids)
   const { error } = await supabase.from('students').delete().in('id', ids)
   if (error) return { error: error.message }
-  revalidatePath('/admin/students'); revalidatePath('/students'); revalidatePath('/class-management');
+  revalidatePath('/admin/students'); 
+  revalidatePath('/students'); 
+  revalidatePath('/class-management');
+  revalidatePath('/employment-status');
+  revalidatePath('/dashboard');
   return { success: true }
 }
 

@@ -33,6 +33,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useRouter } from 'next/navigation'
+import { StudentPopover } from './student-popover'
 
 export interface ColumnConfig {
   key: string
@@ -57,6 +58,8 @@ interface SpreadsheetTableProps {
   groupHeaders?: { label: string; colSpan: number; className?: string }[]
   searchPlaceholder?: string
   masterCertificates?: any[]
+  rankingMap?: Record<string, any>
+  userProfile?: any
 }
 
 const normalizeCertificates = (value: any): string[] => {
@@ -106,7 +109,7 @@ const TableHeader = React.memo(({ columns, groupHeaders, filterOptions, columnFi
 TableHeader.displayName = 'TableHeader';
 
 // --- 데이터 셀 ---
-const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, isEditing, isSelected, isFocused, onMouseDown, onMouseEnter, onStartEdit, onEndEdit, onSave, onAction }: any) => {
+const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, isEditing, isSelected, isFocused, onMouseDown, onMouseEnter, onStartEdit, onEndEdit, onSave, onAction, rankingMap, userProfile }: any) => {
   const [localValue, setLocalValue] = React.useState(value || '')
   const [isManualInput, setIsManualInput] = React.useState(false)
   const isManualRef = React.useRef(false)
@@ -190,6 +193,10 @@ const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, isEditi
       <div className="px-2 text-[11px] w-full h-full flex items-center justify-center whitespace-nowrap">
         {config.type === 'action' ? (
           <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] bg-blue-50 text-blue-600 font-bold hover:bg-blue-100" onClick={(e) => { e.stopPropagation(); onAction?.(id, field); }}>상세보기</Button>
+        ) : field === 'student_name' ? (
+          <StudentPopover student={rowData} rankingSummary={rankingMap?.[id]} userProfile={userProfile}>
+            <span className="cursor-pointer hover:text-blue-600 hover:underline font-bold transition-colors">{value || ''}</span>
+          </StudentPopover>
         ) : config.variant ? (
           <span className={cn("px-1.5 py-0.5 rounded-sm font-medium border text-[9px] leading-none whitespace-nowrap text-center", config.variant(value))}>{value === 'X' ? '' : (value || '')}</span>
         ) : (
@@ -198,22 +205,22 @@ const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, isEditi
       </div>
     </td>
   )
-}, (p, n) => p.value === n.value && p.isEditing === n.isEditing && p.isSelected === n.isSelected && p.isFocused === n.isFocused);
+}, (p, n) => p.value === n.value && p.isEditing === n.isEditing && p.isSelected === n.isSelected && p.isFocused === n.isFocused && p.rankingMap === n.rankingMap && p.userProfile === n.userProfile);
 SpreadsheetCell.displayName = 'SpreadsheetCell';
 
 // --- 데이터 행 ---
-const SpreadsheetRow = React.memo(({ row, rIdx, columns, selMinR, selMaxR, selMinC, selMaxC, selStart, editCell, onMouseDown, onMouseEnter, onStartEdit, onEndEdit, onSave, isSelectedRow, onSelectRow, onAction }: any) => {
+const SpreadsheetRow = React.memo(({ row, rIdx, columns, selMinR, selMaxR, selMinC, selMaxC, selStart, editCell, onMouseDown, onMouseEnter, onStartEdit, onEndEdit, onSave, isSelectedRow, onSelectRow, onAction, rankingMap, userProfile }: any) => {
   const isRowInSelection = rIdx >= selMinR && rIdx <= selMaxR;
   return (
     <tr className={cn("h-8 transition-none hover:bg-slate-50/50", isSelectedRow && "bg-blue-50/30")}>
       <td className="border-r border-b w-8 p-0 bg-white"><div className="flex items-center justify-center h-8"><Checkbox checked={isSelectedRow} onCheckedChange={(val) => onSelectRow(row.id, !!val)} /></div></td>
       {columns.map((col: any, cIdx: number) => (
-        <SpreadsheetCell key={col.key} id={row.id} field={col.key} value={row[col.key]} config={col} rowData={row} isSelected={isRowInSelection && cIdx >= selMinC && cIdx <= selMaxC} isFocused={selStart?.row === rIdx && selStart?.col === cIdx} isEditing={editCell?.row === rIdx && editCell?.col === cIdx} onMouseDown={(m: any) => onMouseDown(rIdx, cIdx, m)} onMouseEnter={() => onMouseEnter(rIdx, cIdx)} onStartEdit={() => onStartEdit(rIdx, cIdx)} onEndEdit={onEndEdit} onSave={onSave} onAction={onAction} />
+        <SpreadsheetCell key={col.key} id={row.id} field={col.key} value={row[col.key]} config={col} rowData={row} isSelected={isRowInSelection && cIdx >= selMinC && cIdx <= selMaxC} isFocused={selStart?.row === rIdx && selStart?.col === cIdx} isEditing={editCell?.row === rIdx && editCell?.col === cIdx} onMouseDown={(m: any) => onMouseDown(rIdx, cIdx, m)} onMouseEnter={() => onMouseEnter(rIdx, cIdx)} onStartEdit={() => onStartEdit(rIdx, cIdx)} onEndEdit={onEndEdit} onSave={onSave} onAction={onAction} rankingMap={rankingMap} userProfile={userProfile} />
       ))}
     </tr>
   );
 }, (p, n) => {
-  if (p.row !== n.row || p.isSelectedRow !== n.isSelectedRow) return false;
+  if (p.row !== n.row || p.isSelectedRow !== n.isSelectedRow || p.rankingMap !== n.rankingMap || p.userProfile !== n.userProfile) return false;
   const wasIn = p.rIdx >= p.selMinR && p.rIdx <= p.selMaxR;
   const isIn = n.rIdx >= n.selMinR && n.rIdx <= n.selMaxR;
   if (wasIn !== isIn || (isIn && (p.selMinC !== n.selMinC || p.selMaxC !== n.selMaxC))) return false;
@@ -302,7 +309,22 @@ const MobileDetailModal = ({ isOpen, onClose, data, columns, onSave, onAction }:
 }
 
 // --- 메인 테이블 컴포넌트 ---
-export function StandardSpreadsheetTable({ data: initialData, columns, onSave, onBulkSave, onPromote, onDelete, onAction, selectedRowIds: externalSelectedRowIds, onSelectionChange, groupHeaders, searchPlaceholder = "검색...", masterCertificates = [] }: SpreadsheetTableProps) {
+export function StandardSpreadsheetTable({ 
+  data: initialData, 
+  columns, 
+  onSave, 
+  onBulkSave, 
+  onPromote, 
+  onDelete, 
+  onAction, 
+  selectedRowIds: externalSelectedRowIds, 
+  onSelectionChange, 
+  groupHeaders, 
+  searchPlaceholder = "검색...", 
+  masterCertificates = [],
+  rankingMap = {},
+  userProfile = null
+}: SpreadsheetTableProps) {
   const [mounted, setMounted] = React.useState(false);
   const isMobile = useIsMobile(); const router = useRouter(); const [data, setData] = React.useState(initialData); const { toast } = useToast();
   
@@ -313,7 +335,7 @@ export function StandardSpreadsheetTable({ data: initialData, columns, onSave, o
   const [columnFilters, setColumnFilters] = React.useState<Record<string, string[]>>({}); const [searchTerm, setSearchTerm] = React.useState('');
   const [selectionStart, setSelectionStart] = React.useState<any>(null); const [selectionEnd, setSelectionEnd] = React.useState<any>(null);
   const [editingCell, setEditingCell] = React.useState<any>(null); const [internalSelectedRowIds, setInternalSelectedRowIds] = React.useState<string[]>([]);
-  const [scrollTop, setScrollTop] = React.useState(0); const [containerHeight, setContainerHeight] = React.useState(800);
+  const [scrollTop, setScrollTop] = React.useState(0); const [containerHeight, setContainerHeight] = React.useState(1200);
   const containerRef = React.useRef<HTMLDivElement>(null); const isSelectingRef = React.useRef(false); 
   const [isPickerOpen, setIsPickerOpen] = React.useState(false);
   const [detailData, setDetailData] = React.useState<any>(null);
@@ -435,15 +457,21 @@ export function StandardSpreadsheetTable({ data: initialData, columns, onSave, o
             <TableHeader columns={columns} groupHeaders={groupHeaders} filterOptions={filterOptions} columnFilters={columnFilters} onFilterChange={(k:any,v:any)=>setColumnFilters(p=>v==='RESET'?{...p,[k]:[]}:{...p,[k]:p[k]?.includes(v)?p[k].filter(x=>x!==v):[...(p[k]||[]),v]})} onSelectAll={handleSelectAll} isAllSelected={filteredData.length > 0 && filteredData.every(r => selectedRowIds.includes(r.id))} />
             <tbody>
               {(() => {
-                const start = Math.max(0, Math.floor((scrollTop) / ROW_HEIGHT) - 15);
-                const end = Math.min(filteredData.length - 1, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + 15);
+                const totalCount = filteredData.length;
+                const start = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - 100);
+                const end = Math.min(totalCount - 1, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + 100);
                 const sMinR = selectionStart && selectionEnd ? Math.min(selectionStart.row, selectionEnd.row) : -1;
                 const sMaxR = selectionStart && selectionEnd ? Math.max(selectionStart.row, selectionEnd.row) : -1;
                 const sMinC = selectionStart && selectionEnd ? Math.min(selectionStart.col, selectionEnd.col) : -1;
                 const sMaxC = selectionStart && selectionEnd ? Math.max(selectionStart.col, selectionEnd.col) : -1;
-                const rows = []; if (start > 0) rows.push(<tr key="t" style={{ height: start * ROW_HEIGHT }}><td colSpan={columns.length + 1} className="border-none"></td></tr>);
-                for (let i = start; i <= end; i++) { rows.push(<SpreadsheetRow key={filteredData[i].id} rIdx={i} row={filteredData[i]} columns={columns} selMinR={sMinR} selMaxR={sMaxR} selMinC={sMinC} selMaxC={sMaxC} selStart={selectionStart} editCell={editingCell} onMouseDown={handleMouseDown} onMouseEnter={handleMouseEnter} onStartEdit={(r:any,c:any)=>{ if(columns[c].type==='multi-select'){ setEditingCell({row:r,col:c}); setIsPickerOpen(true); } else setEditingCell({row:r,col:c}); }} onEndEdit={()=>setEditingCell(null)} onSave={handleSaveInternal} isSelectedRow={selectedRowIds.includes(filteredData[i].id)} onSelectRow={(id:any,v:any)=>syncSelected(v?[...selectedRowIds,id]:selectedRowIds.filter(x=>x!==id))} onAction={onAction} />); }
-                if (end < filteredData.length - 1) rows.push(<tr key="b" style={{ height: (filteredData.length - 1 - end) * ROW_HEIGHT }}><td colSpan={columns.length + 1} className="border-none"></td></tr>); return rows;
+                const rows = []; 
+                if (start > 0) rows.push(<tr key="t" style={{ height: start * ROW_HEIGHT }}><td colSpan={columns.length + 1} className="border-none"></td></tr>);
+                for (let i = start; i <= end; i++) { 
+                  const row = filteredData[i];
+                  if (!row) continue;
+                  rows.push(<SpreadsheetRow key={row.id} rIdx={i} row={row} columns={columns} selMinR={sMinR} selMaxR={sMaxR} selMinC={sMinC} selMaxC={sMaxC} selStart={selectionStart} editCell={editingCell} onMouseDown={handleMouseDown} onMouseEnter={handleMouseEnter} onStartEdit={(r:any,c:any)=>{ if(columns[c].type==='multi-select'){ setEditingCell({row:r,col:c}); setIsPickerOpen(true); } else setEditingCell({row:r,col:c}); }} onEndEdit={()=>setEditingCell(null)} onSave={handleSaveInternal} isSelectedRow={selectedRowIds.includes(row.id)} onSelectRow={(id:any,v:any)=>syncSelected(v?[...selectedRowIds,id]:selectedRowIds.filter(x=>x!==id))} onAction={onAction} rankingMap={rankingMap} userProfile={userProfile} />); 
+                }
+                if (end < totalCount - 1) rows.push(<tr key="b" style={{ height: (totalCount - 1 - end) * ROW_HEIGHT }}><td colSpan={columns.length + 1} className="border-none"></td></tr>); return rows;
               })()}
             </tbody>
           </table>
@@ -473,7 +501,10 @@ export function StandardSpreadsheetTable({ data: initialData, columns, onSave, o
                       {String(row[titleCol?.key || ''] || '?')[0]}
                     </div>
                     <div className="min-w-0">
-                      <h3 className="font-bold text-slate-900 truncate">{row[titleCol?.key || ''] || '이름 없음'}</h3>
+                      {/* 모바일에서도 이름 클릭 시 팝오버(또는 상세보기) 가능하게 처리 */}
+                      <StudentPopover student={row} rankingSummary={rankingMap?.[row.id]} userProfile={userProfile}>
+                        <h3 className="font-bold text-slate-900 truncate hover:text-blue-600 transition-colors">{row[titleCol?.key || ''] || '이름 없음'}</h3>
+                      </StudentPopover>
                       <p className="text-[11px] text-slate-500 truncate">
                         {row.major || ''} {row.class_info ? `${row.class_info}반` : ''} {row.student_number ? `${row.student_number}번` : ''}
                       </p>
