@@ -19,9 +19,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Menu, Search, LogOut, Settings } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import Nav from './nav';
@@ -38,23 +36,44 @@ function toTitleCase(str: string) {
   );
 }
 
-export default function Header() {
+// 경로별 브레드크럼 매핑 정의
+const ROUTE_MAP: Record<string, { group: string; label: string }> = {
+  '/dashboard': { group: '', label: '대시보드' },
+  '/employment-status': { group: '취업 및 실습 관리', label: '취업현황' },
+  '/company-info': { group: '취업 및 실습 관리', label: '업체정보' },
+  '/students': { group: '취업 및 실습 관리', label: '취업상세데이터' },
+  '/class-management': { group: '학사 및 지도', label: '학반 관리' },
+  '/labor-education': { group: '학사 및 지도', label: '노동인권교육' },
+  '/admin/students': { group: '학사 및 지도', label: '학생 등록/진급' },
+  '/admin/users': { group: '시스템 관리', label: '사용자 관리' },
+  '/admin/settings': { group: '시스템 관리', label: '시스템 설정' },
+  '/admin/grades/summary': { group: '시스템 관리', label: '옥저인증' },
+};
+
+export default function Header({ userProfile }: { userProfile?: any }) {
   const [mounted, setMounted] = React.useState(false);
-  const avatar = PlaceHolderImages.find((img) => img.id === 'user-avatar');
   const pathname = usePathname();
-  const pageTitle = toTitleCase(pathname.split('/').pop()?.replace('-', ' ') || 'Dashboard');
   const [profileModalOpen, setProfileModalOpen] = React.useState(false);
 
   React.useEffect(() => {
     setMounted(true);
   }, []);
   
-  const pageTitleTranslations: {[key: string]: string} = {
-    'Dashboard': '대시보드',
-    'Students': '학생',
-    'Reports': '보고서',
-    'Users': '사용자 관리'
-  }
+  // 현재 경로에 맞는 브레드크럼 정보 추출
+  const currentRoute = ROUTE_MAP[pathname] || { 
+    group: '', 
+    label: toTitleCase(pathname.split('/').pop()?.replace('-', ' ') || 'Dashboard') 
+  };
+
+  // 이름의 마지막 두 글자 추출 로직
+  const getDisplayInitials = (name?: string) => {
+    if (!name) return '사용자';
+    const trimmed = name.trim();
+    if (trimmed.length <= 2) return trimmed;
+    return trimmed.slice(-2);
+  };
+
+  const displayName = getDisplayInitials(userProfile?.full_name);
 
   const handleLogout = async () => {
     await logout();
@@ -81,15 +100,26 @@ export default function Header() {
       </Sheet>
       <Breadcrumb className="hidden md:flex">
         <BreadcrumbList>
+          {currentRoute.group ? (
+            <>
+              <BreadcrumbItem>
+                <span className="text-slate-400 font-medium text-[13px]">{currentRoute.group}</span>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+            </>
+          ) : pathname !== '/dashboard' ? (
+            <>
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href="/dashboard" className="text-slate-400 font-medium text-[13px]">대시보드</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+            </>
+          ) : null}
           <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href="/dashboard">대시보드</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage className="capitalize">
-              {pageTitleTranslations[pageTitle] || pageTitle}
+            <BreadcrumbPage className="font-bold text-slate-900 text-[13px]">
+              {currentRoute.label}
             </BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
@@ -107,24 +137,20 @@ export default function Header() {
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              className="relative h-10 w-10 rounded-full p-0 overflow-hidden active:scale-90 transition-transform focus-visible:ring-0 select-none touch-manipulation"
+              className="relative h-10 w-10 rounded-full p-0 overflow-hidden active:scale-95 transition-transform focus-visible:ring-0 select-none touch-manipulation group"
             >
-              <div className="h-full w-full flex items-center justify-center bg-slate-100 ring-2 ring-transparent active:ring-indigo-500 rounded-full overflow-hidden">
-                {avatar && (
-                  <Image
-                    src={avatar.imageUrl}
-                    width={40}
-                    height={40}
-                    alt="Avatar"
-                    className="h-full w-full object-cover"
-                    data-ai-hint={avatar.imageHint}
-                  />
-                )}
+              <div className="h-full w-full flex items-center justify-center bg-indigo-600 text-white ring-2 ring-transparent group-hover:ring-indigo-200 transition-all rounded-full overflow-hidden shadow-sm">
+                <span className="text-[13px] font-black tracking-tighter">
+                  {displayName}
+                </span>
               </div>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 mt-2 rounded-xl shadow-xl border-slate-100">
-            <DropdownMenuLabel className="font-bold text-slate-500 text-xs uppercase tracking-widest px-4 py-3">내 계정</DropdownMenuLabel>
+            <DropdownMenuLabel className="px-4 py-3 flex flex-col">
+              <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-0.5">내 계정</span>
+              <span className="text-slate-800 font-bold text-sm truncate">{userProfile?.full_name || '로그인 사용자'}</span>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem 
               onSelect={(e) => {

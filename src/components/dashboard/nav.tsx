@@ -155,7 +155,7 @@ export default function Nav({ isAdmin = false }: { isAdmin?: boolean }) {
                       )}
                     >
                       <group.icon className="mr-2 h-4 w-4" />
-                      <span className="font-bold text-xs">{group.title}</span>
+                      <span className="font-bold">{group.title}</span>
                       <ChevronRight className="ml-auto h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
