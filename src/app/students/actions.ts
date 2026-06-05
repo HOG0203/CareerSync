@@ -22,7 +22,7 @@ const normalizeDate = (dateStr: string | null | undefined): string | null => {
 }
 
 const BASIC_INFO_FIELDS = [
-  'student_id', 'student_name', 'graduation_year', 'major', 'class_info', 
+  'student_id', 'student_name', 'phone_number', 'graduation_year', 'major', 'class_info', 
   'student_number', 'shoe_size', 'top_size', 'personal_remarks', 'certificates',
   'career_aspiration', 'military_status', 'special_notes', 'career_course', 'labor_education_status'
 ];
@@ -82,19 +82,20 @@ export async function uploadStudentsCSV(csvData: string) {
     const student_id = values[0] || await getNextStudentId(supabase, graduation_year)
     const { data: student, error: sError } = await supabase.from('students').upsert({
       student_id, graduation_year, major: values[2], class_info: values[3], student_number: values[4], student_name: values[5],
-      career_aspiration: values[6], special_notes: values[7], career_course: values[8],
-      certificates: values[14] ? values[14].split(';').map(c => c.trim()) : [],
-      military_status: values[15], shoe_size: values[16], top_size: values[17], personal_remarks: values[28]
+      phone_number: values[6],
+      career_aspiration: values[7], special_notes: values[8], career_course: values[9],
+      certificates: values[15] ? values[15].split(';').map(c => c.trim()) : [],
+      military_status: values[16], shoe_size: values[17], top_size: values[18], personal_remarks: values[29]
     }, { onConflict: 'student_id' }).select('id, graduation_year, major, class_info, student_number').single()
     if (sError || !student) continue;
-    await supabase.from('student_employments').upsert({ id: student.id, is_desiring_employment: values[9] || '예', business_type: values[10] || '아니오', employment_status: values[11], company_type: values[12], company: values[13], remarks: values[27] }, { onConflict: 'id' })
-    const startDate = normalizeDate(values[20]);
-    const endDate = normalizeDate(values[21]);
+    await supabase.from('student_employments').upsert({ id: student.id, is_desiring_employment: values[10] || '예', business_type: values[11] || '아니오', employment_status: values[12], company_type: values[13], company: values[14], remarks: values[28] }, { onConflict: 'id' })
+    const startDate = normalizeDate(values[21]);
+    const endDate = normalizeDate(values[22]);
     if (startDate || endDate) {
       await supabase.from('field_training_records').upsert({
-        student_id: student.id, training_order: 1, company: values[19] || values[13] || '미지정', start_date: startDate, end_date: endDate, stipend_status: values[22] || 'X',
-        hiring_status: values[23] === 'O' || values[23] === '예' || values[23] === '채용전환' ? '채용전환' : (values[25] === 'O' || values[25] === '예' || values[25] === '복교' ? '복교' : '진행중'),
-        conversion_date: normalizeDate(values[24]), return_reason: values[26]
+        student_id: student.id, training_order: 1, company: values[20] || values[14] || '미지정', start_date: startDate, end_date: endDate, stipend_status: values[23] || 'X',
+        hiring_status: values[24] === 'O' || values[24] === '예' || values[24] === '채용전환' ? '채용전환' : (values[26] === 'O' || values[26] === '예' || values[26] === '복교' ? '복교' : '진행중'),
+        conversion_date: normalizeDate(values[25]), return_reason: values[27]
       }, { onConflict: 'student_id, training_order' })
     }
     await syncAcademicHistory(supabase, student.id, student, settings.baseYear)
@@ -110,7 +111,7 @@ export async function updateStudentField(id: string, field: string, value: any) 
   else if (value === '' || value === 'CLEARED' || (Array.isArray(value) && value.length === 0)) finalValue = null;
   const isBasicField = BASIC_INFO_FIELDS.includes(field);
   const { error } = await supabase.from(isBasicField ? 'students' : 'student_employments').update({ [field]: finalValue, updated_at: new Date().toISOString() }).eq('id', id)
-  if (error) return { error: error.message };
+  if (error) return { success: false, error: error.message };
   if (['major', 'class_info', 'student_number', 'graduation_year'].includes(field)) {
     const { data: student } = await supabase.from('students').select('*').eq('id', id).single();
     if (student) await syncAcademicHistory(supabase, id, student, settings.baseYear);

@@ -29,10 +29,11 @@ const COLUMNS = [
   { key: 'class_info', label: '반', width: 60, readOnly: true },
   { key: 'student_number', label: '번호', width: 60, readOnly: true },
   { key: 'student_name', label: '성명', width: 100, readOnly: true },
+  { key: 'phone_number', label: '휴대전화번호', width: 110, readOnly: true },
 ]
 
 const GROUP_HEADERS = [
-  { label: '학생 기본 인적사항', colSpan: 5, className: 'bg-slate-100 text-slate-900 text-[11px]' },
+  { label: '학생 기본 인적사항', colSpan: 6, className: 'bg-slate-100 text-slate-900 text-[11px]' },
 ]
 
 export function AdminStudentHub({ 

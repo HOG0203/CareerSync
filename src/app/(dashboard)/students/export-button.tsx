@@ -21,6 +21,7 @@ export function ExportButton({ data, filename = '학생_취업_현황.csv' }: Ex
       { key: 'class_info', label: '반' },
       { key: 'student_number', label: '번호' },
       { key: 'student_name', label: '성명' },
+      { key: 'phone_number', label: '휴대전화번호' },
       { key: 'career_aspiration', label: '진로희망' },
       { key: 'special_notes', label: '희망 기업유형' },
       { key: 'career_course', label: '희망 진로코스' },
