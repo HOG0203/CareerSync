@@ -2,6 +2,7 @@ export type StudentEmploymentData = {
   id: string;
   student_id: string;
   student_name: string;
+  phone_number?: string;
   graduation_year?: number;
   major?: string;
   class_info?: string;
@@ -29,6 +30,10 @@ export type StudentEmploymentData = {
   personal_remarks?: string;
   career_course?: string;
   labor_education_status?: string;
+  special_notes?: string;
+  desired_work_area?: string;
+  parents_opinion?: string;
+  training_records?: FieldTrainingRecord[];
 };
 
 export type FieldTrainingRecord = {

@@ -195,7 +195,7 @@ const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, isEditi
           <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] bg-blue-50 text-blue-600 font-bold hover:bg-blue-100" onClick={(e) => { e.stopPropagation(); onAction?.(id, field); }}>상세보기</Button>
         ) : field === 'student_name' ? (
           <StudentPopover student={rowData} rankingSummary={rankingMap?.[id]} userProfile={userProfile}>
-            <span className="cursor-pointer hover:text-blue-600 hover:underline font-bold transition-colors">{value || ''}</span>
+            <h3 className="font-bold text-slate-900 truncate hover:text-blue-600 transition-colors cursor-pointer underline decoration-dotted decoration-blue-300 underline-offset-4">{value || ''}</h3>
           </StudentPopover>
         ) : config.variant ? (
           <span className={cn("px-1.5 py-0.5 rounded-sm font-medium border text-[9px] leading-none whitespace-nowrap text-center", config.variant(value))}>{value === 'X' ? '' : (value || '')}</span>
@@ -447,7 +447,20 @@ export function StandardSpreadsheetTable({
   return (
     <div className="flex flex-col gap-4 w-full h-full overflow-hidden">
       <div className="flex items-center justify-between p-2 bg-muted/20 rounded-md border-dashed border shrink-0">
-        <div className="flex items-center gap-3"><Search className="h-4 w-4 text-muted-foreground ml-2" /><Input placeholder={searchPlaceholder} className="h-8 border-none bg-transparent shadow-none focus-visible:ring-0 text-xs w-[300px]" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
+        <div className="flex items-center gap-3">
+          <Search className="h-4 w-4 text-muted-foreground ml-2" />
+          <Input 
+            placeholder={searchPlaceholder} 
+            className="h-8 border-none bg-transparent shadow-none focus-visible:ring-0 text-xs w-[250px]" 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+          />
+          {(searchTerm || Object.values(columnFilters).some(v => v.length > 0)) && (
+            <Badge variant="secondary" className="h-6 bg-blue-50 text-blue-600 border-blue-100 font-bold px-2 animate-in fade-in zoom-in-95 duration-200">
+              검색 결과: {filteredData.length}명
+            </Badge>
+          )}
+        </div>
         {selectedRowIds.length > 0 && <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-2"><span className="text-xs font-bold text-blue-700 mr-2">{selectedRowIds.length}명 선택됨</span>{onPromote && <Button size="sm" className="h-8 bg-indigo-600 hover:bg-indigo-700 shadow-md" onClick={async ()=>{const r=await onPromote(selectedRowIds); if(r.success) syncSelected([]);}}>{<GraduationCap className="h-3.5 w-3.5 mr-1.5" />}진급 설정</Button>}{onDelete && <Button size="sm" variant="destructive" className="h-8 shadow-md" onClick={async ()=>{if(confirm('정말 삭제하시겠습니까?')){const r=await onDelete(selectedRowIds); if(r.success) syncSelected([]);}}}><Trash2 className="h-3.5 w-3.5 mr-1.5" />삭제</Button>}<Button size="sm" variant="outline" className="h-8" onClick={() => syncSelected([])}>선택 취소</Button></div>}
       </div>
       {!isMobile ? (

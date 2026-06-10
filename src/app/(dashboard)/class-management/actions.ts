@@ -43,7 +43,7 @@ export async function updatePersonalDetail(id: string, field: string, value: any
     .update({ [field]: (value === '' || value === 'CLEARED') ? null : value })
     .eq('id', id)
 
-  if (error) return { error: error.message }
+  if (error) return { success: false, error: error.message }
 
   // 소속 정보 변경 시 이력 동기화
   if (['major', 'class_info', 'student_number'].includes(field)) {

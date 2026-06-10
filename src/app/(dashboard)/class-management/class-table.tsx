@@ -51,6 +51,7 @@ const GET_SPECIFIC_COURSE_OPTIONS = (rowData: any) => {
       { label: '청솔반', value: '청솔반' },
       { label: '취업맞춤반', value: '취업맞춤반' },
       { label: '반도체아카데미반', value: '반도체아카데미반' },
+      { label: '중견기업반', value: '중견기업반' },
       { label: '혁신인재반', value: '혁신인재반' },
       { label: '일학습병행', value: '일학습병행' },
       { label: '계약학과', value: '계약학과' },
@@ -105,6 +106,7 @@ export function ClassTable({
     const baseCols: ColumnConfig[] = [
       { key: 'student_number', label: '번호', width: 35, readOnly: true },
       { key: 'student_name', label: '성명', width: 65, readOnly: true },
+      { key: 'phone_number', label: '휴대전화번호', width: 110 },
       { 
         key: 'career_aspiration', 
         label: '진로희망', 
@@ -230,7 +232,7 @@ export function ClassTable({
   }, [currentGrade]);
 
   const groupHeaders = React.useMemo(() => [
-    { label: '학생 기본 정보', colSpan: 2, className: 'bg-slate-100 text-slate-900 text-[11px]' },
+    { label: '학생 기본 정보', colSpan: 3, className: 'bg-slate-100 text-slate-900 text-[11px]' },
     { label: '희망 기업유형 및 진로코스', colSpan: 3, className: 'bg-blue-50 text-blue-900 text-[11px]' },
     { label: '취득 자격', colSpan: 1, className: 'bg-amber-50 text-amber-900 text-[11px]' },
     { label: '취업 상세 및 의견', colSpan: 3, className: 'bg-emerald-50 text-emerald-900 text-[11px]' },

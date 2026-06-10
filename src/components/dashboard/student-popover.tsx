@@ -130,9 +130,10 @@ export function StudentPopover({
               <span className="font-bold text-[15px] text-blue-900">{student.student_name}</span>
               <span className={cn(
                 "text-[10px] px-2 py-0.5 rounded-full font-bold",
-                (student.career_aspiration === '취업' || student.is_desiring_employment === '예') ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
+                student.is_desiring_employment === '예' ? "bg-emerald-100 text-emerald-700" : 
+                student.is_desiring_employment === '아니오' ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"
               )}>
-                희망: {student.career_aspiration || student.is_desiring_employment || '미정'}
+                희망: {student.is_desiring_employment || student.career_aspiration || '미정'}
               </span>
             </div>
 
@@ -158,11 +159,11 @@ export function StudentPopover({
                 <div className="grid grid-cols-2 gap-x-3 text-[10px]">
                   <p className="flex justify-between">
                     <span className="text-slate-400">진로코스</span> 
-                    <span className="font-bold text-slate-700 text-right">{student.career_course || student.employment_status || '미정'}</span>
+                    <span className="font-bold text-slate-700 text-right">{student.employment_status || '미정'}</span>
                   </p>
                   <p className="flex justify-between">
                     <span className="text-slate-400 pl-2">기업구분</span> 
-                    <span className="font-black text-blue-600 text-right">{student.special_notes || student.company_type || '미분류'}</span>
+                    <span className="font-black text-blue-600 text-right">{student.company_type || '미분류'}</span>
                   </p>
                 </div>
                 <div className="pt-1 border-t border-slate-200 mt-1">

@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/server';
 import { MobileTopBar } from '@/components/dashboard/mobile-top-bar';
 import { MobileBottomTab } from '@/components/dashboard/mobile-bottom-tab';
 import { redirect } from 'next/navigation';
+import { getCurrentUserProfile } from '@/lib/data';
 
 export default async function DashboardLayout({ children }: PropsWithChildren) {
   const supabase = await createClient();
@@ -20,14 +21,10 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
     redirect('/login');
   }
 
-  // 2. 관리자 여부 확인
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
+  // 2. 프로필 정보 조회
+  const userProfile = await getCurrentUserProfile();
   
-  const isAdmin = profile?.role === 'admin';
+  const isAdmin = userProfile?.role === 'admin';
 
   return (
     <SidebarProvider>
@@ -41,11 +38,11 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
 
         <SidebarInset className="flex flex-col flex-1 min-w-0 overflow-hidden">
           {/* Mobile Navigation */}
-          <MobileTopBar isAdmin={isAdmin} />
+          <MobileTopBar isAdmin={isAdmin} userProfile={userProfile} />
           
           {/* Desktop Header */}
           <div className="hidden lg:block">
-            <Header />
+            <Header userProfile={userProfile} />
           </div>
 
           <main className="flex-1 p-2 lg:p-6 lg:mt-0 mt-14 lg:mb-0 mb-16 overflow-auto min-w-0">
@@ -53,7 +50,7 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
           </main>
 
           {/* Mobile Bottom Tab */}
-          <MobileBottomTab isAdmin={isAdmin} />
+          <MobileBottomTab isAdmin={isAdmin} role={userProfile?.role} />
         </SidebarInset>
       </div>
     </SidebarProvider>
