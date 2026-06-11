@@ -35,6 +35,7 @@ const GET_SPECIFIC_COURSE_OPTIONS = (rowData: any) => {
       { label: '취업맞춤반', value: '취업맞춤반' },
       { label: '반도체아카데미반', value: '반도체아카데미반' },
       { label: '혁신인재반', value: '혁신인재반' },
+      { label: '부사관반', value: '부사관반' },
       { label: '일학습병행', value: '일학습병행' },
       { label: '계약학과', value: '계약학과' },
       { label: '도제반', value: '도제반' },
@@ -128,6 +129,7 @@ const COLUMNS: ColumnConfig[] = [
       if (val === '취업맞춤반') return 'bg-amber-50 text-amber-700 border-amber-100';
       if (val === '반도체아카데미반') return 'bg-blue-50 text-blue-700 border-blue-100';
       if (val === '혁신인재반') return 'bg-indigo-50 text-indigo-700 border-indigo-100';
+      if (val === '부사관반') return 'bg-cyan-50 text-cyan-700 border-cyan-100';
       if (val === '일학습병행') return 'bg-purple-50 text-purple-700 border-purple-100';
       if (val === '계약학과') return 'bg-purple-50 text-purple-700 border-purple-100';
       if (val === '도제반' || val === '도제') return 'bg-pink-50 text-pink-700 border-pink-100';

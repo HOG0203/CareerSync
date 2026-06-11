@@ -24,6 +24,7 @@ const VIVID_COLORS = [
   '#f59e0b', // 취업맞춤반 (Amber)
   '#3b82f6', // 반도체아카데미반 (Blue)
   '#6366f1', // 혁신인재반 (Indigo)
+  '#06b6d4', // 부사관반 (Cyan)
   '#7c3aed', // 일학습병행 (Violet-Deep)
   '#a855f7', // 계약학과 (Purple)
   '#db2777', // 도제반 (Pink)
