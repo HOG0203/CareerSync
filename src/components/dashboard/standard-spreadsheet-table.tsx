@@ -88,7 +88,7 @@ const TableHeader = React.memo(({ columns, groupHeaders, filterOptions, columnFi
           <th key={col.key} className={cn("sticky z-40 group text-center border-r border-b font-semibold p-0 hover:bg-slate-100 bg-slate-50 shadow-[0_1px_0_0_rgba(0,0,0,0.1)]", hasGroup ? "top-10" : "top-0")} style={{ minWidth: col.width, width: 'auto' }}>
             <div className="flex items-center justify-center px-2 gap-1 h-full min-h-[40px]">
               <span className="whitespace-pre-line leading-tight py-1">{col.label}</span>
-              <Popover>
+              <Popover modal={false}>
                 <PopoverTrigger asChild><button className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"><ListFilter className="h-3 w-3" /></button></PopoverTrigger>
                 <PopoverContent className="w-48 p-0 z-[50]" align="start">
                   <div className="max-h-60 overflow-y-auto p-1">
@@ -205,7 +205,16 @@ const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, isEditi
       </div>
     </td>
   )
-}, (p, n) => p.value === n.value && p.isEditing === n.isEditing && p.isSelected === n.isSelected && p.isFocused === n.isFocused && p.rankingMap === n.rankingMap && p.userProfile === n.userProfile);
+}, (p, n) => 
+  p.value === n.value && 
+  p.isEditing === n.isEditing && 
+  p.isSelected === n.isSelected && 
+  p.isFocused === n.isFocused && 
+  p.rankingMap === n.rankingMap && 
+  p.userProfile === n.userProfile &&
+  p.onMouseDown === n.onMouseDown &&
+  p.onMouseEnter === n.onMouseEnter
+);
 SpreadsheetCell.displayName = 'SpreadsheetCell';
 
 // --- 데이터 행 ---
@@ -220,7 +229,7 @@ const SpreadsheetRow = React.memo(({ row, rIdx, columns, selMinR, selMaxR, selMi
     </tr>
   );
 }, (p, n) => {
-  if (p.row !== n.row || p.isSelectedRow !== n.isSelectedRow || p.rankingMap !== n.rankingMap || p.userProfile !== n.userProfile) return false;
+  if (p.rIdx !== n.rIdx || p.row !== n.row || p.isSelectedRow !== n.isSelectedRow || p.rankingMap !== n.rankingMap || p.userProfile !== n.userProfile) return false;
   const wasIn = p.rIdx >= p.selMinR && p.rIdx <= p.selMaxR;
   const isIn = n.rIdx >= n.selMinR && n.rIdx <= n.selMaxR;
   if (wasIn !== isIn || (isIn && (p.selMinC !== n.selMinC || p.selMaxC !== n.selMaxC))) return false;

@@ -57,6 +57,13 @@ export function StudentPopover({
   const getDesireColor = (student: StudentEmploymentData) => {
     const isDesiring = student.is_desiring_employment;
     const aspiration = student.career_aspiration;
+    const isLowerGrade = student.graduation_year && student.graduation_year >= 2028;
+
+    if (isLowerGrade) {
+      if (aspiration === '취업') return 'bg-emerald-500';
+      if (aspiration === '진학') return 'bg-rose-500';
+      if (aspiration === '제외인정자') return 'bg-slate-400';
+    }
 
     if (isDesiring === '예') return 'bg-emerald-500';
     if (isDesiring === '아니오') return 'bg-rose-500';
@@ -115,7 +122,7 @@ export function StudentPopover({
 
   return (
     <>
-      <Popover>
+      <Popover modal={false}>
         <PopoverTrigger asChild>
           {children}
         </PopoverTrigger>
@@ -130,10 +137,16 @@ export function StudentPopover({
               <span className="font-bold text-[15px] text-blue-900">{student.student_name}</span>
               <span className={cn(
                 "text-[10px] px-2 py-0.5 rounded-full font-bold",
-                student.is_desiring_employment === '예' ? "bg-emerald-100 text-emerald-700" : 
-                student.is_desiring_employment === '아니오' ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"
+                (student.graduation_year && student.graduation_year >= 2028) ? (
+                  student.career_aspiration === '취업' ? "bg-emerald-100 text-emerald-700" : 
+                  student.career_aspiration === '진학' ? "bg-rose-100 text-rose-700" : 
+                  student.career_aspiration === '제외인정자' ? "bg-slate-100 text-slate-600" : "bg-slate-100 text-slate-600"
+                ) : (
+                  student.is_desiring_employment === '예' ? "bg-emerald-100 text-emerald-700" : 
+                  student.is_desiring_employment === '아니오' ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"
+                )
               )}>
-                희망: {student.is_desiring_employment || student.career_aspiration || '미정'}
+                희망: {(student.graduation_year && student.graduation_year >= 2028) ? (student.career_aspiration || '미정') : (student.is_desiring_employment || student.career_aspiration || '미정')}
               </span>
             </div>
 

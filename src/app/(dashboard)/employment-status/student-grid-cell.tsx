@@ -39,14 +39,23 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, userPro
   const getDesireColor = (student: StudentEmploymentData) => {
     const isDesiring = student.is_desiring_employment;
     const aspiration = student.career_aspiration;
+    const isLowerGrade = student.graduation_year && student.graduation_year >= 2028;
 
-    // 1. 취업희망여부(is_desiring_employment) 우선 체크 (사용자 요청 사항)
+    // 1,2학년은 진로희망(career_aspiration) 우선 적용
+    if (isLowerGrade) {
+      if (aspiration === '취업') return 'bg-emerald-500';
+      if (aspiration === '진학') return 'bg-rose-500';
+      if (aspiration === '제외인정자') return 'bg-slate-400';
+      // 진로희망이 없으면 기존 로직 폴백
+    }
+
+    // 3학년 또는 폴백 로직: 취업희망여부(is_desiring_employment) 우선 체크
     if (isDesiring === '예') return 'bg-emerald-500';
     if (isDesiring === '아니오') return 'bg-rose-500';
 
-    // 2. 진로희망 필드(career_aspiration) 보조 체크
+    // 진로희망 필드(career_aspiration) 보조 체크
     if (aspiration === '취업') return 'bg-emerald-500';
-    if (aspiration === '진학') return 'bg-rose-500'; // 진학은 취업희망 '아니오'와 동일하게 빨간색 표시
+    if (aspiration === '진학') return 'bg-rose-500'; 
     if (aspiration === '제외인정자') return 'bg-slate-400';
 
     return 'bg-transparent';
