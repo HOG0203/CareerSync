@@ -15,6 +15,7 @@ import { ImportButton } from '../../students/import-button';
 import { ExportButton } from '../../students/export-button';
 import DashboardFilters from '@/components/dashboard/dashboard-filters';
 import { AddStudentButton } from './add-student-button';
+import { PromotionImportButton } from './promotion-import-button';
 import { StandardSpreadsheetTable } from '@/components/dashboard/standard-spreadsheet-table'
 import { updateStudentField, bulkUpdateStudentData, deleteStudents } from '@/app/students/actions'
 import { MasterCertificate } from '@/app/(dashboard)/admin/settings/actions'
@@ -125,6 +126,7 @@ export function AdminStudentHub({
         </div>
         
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap border-t lg:border-none pt-3 lg:pt-0">
+          <PromotionImportButton currentData={processedData} baseYear={settings.baseYear} />
           <ImportButton />
           <ExportButton data={processedData} filename={`전교생_학생명부_${new Date().toLocaleDateString()}.csv`} />
           <AddStudentButton 
@@ -188,6 +190,7 @@ export function AdminStudentHub({
             onSelectionChange={setSelectedRowIds}
             searchPlaceholder="빠른 학생 검색..."
             masterCertificates={masterCertificates}
+            disableNamePopover={true}
           />
         </CardContent>
       </Card>

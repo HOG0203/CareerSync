@@ -20,6 +20,26 @@ async function syncAcademicHistory(studentUuid: string, info: any) {
 
   if (!grade) return
 
+  let teacherName = null;
+  if (info.major && info.class_info) {
+    const cleanMajor = info.major.replace(/과|공업계/g, '').trim();
+    const cleanClass = info.class_info.replace(/반|학년/g, '').trim();
+    
+    const { data: teachers } = await supabase
+      .from('profiles')
+      .select('username, assigned_major, assigned_class')
+      .eq('role', 'teacher');
+      
+    if (teachers) {
+      const matchedTeacher = teachers.find((t: any) => {
+        const tMajor = (t.assigned_major || '').replace(/과|공업계/g, '').trim();
+        const tClass = (t.assigned_class || '').replace(/반|학년/g, '').trim();
+        return tMajor === cleanMajor && tClass === cleanClass;
+      });
+      if (matchedTeacher) teacherName = matchedTeacher.username;
+    }
+  }
+
   await supabase
     .from('student_academic_history')
     .upsert({
@@ -28,7 +48,8 @@ async function syncAcademicHistory(studentUuid: string, info: any) {
       academic_year: settings.baseYear,
       major: info.major,
       class_info: info.class_info,
-      student_number: info.student_number
+      student_number: info.student_number,
+      teacher_name: teacherName
     }, { onConflict: 'student_id, grade' })
 }
 

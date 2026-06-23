@@ -33,6 +33,7 @@ const GET_SPECIFIC_COURSE_OPTIONS = (rowData: any) => {
     return [
       { label: '청솔반', value: '청솔반' },
       { label: '취업맞춤반', value: '취업맞춤반' },
+      { label: '중견기업반', value: '중견기업반' },
       { label: '반도체아카데미반', value: '반도체아카데미반' },
       { label: '혁신인재반', value: '혁신인재반' },
       { label: '부사관반', value: '부사관반' },
@@ -70,6 +71,7 @@ const COLUMNS: ColumnConfig[] = [
   { key: 'class_info', label: '반', width: 40, readOnly: true },
   { key: 'student_number', label: '번호', width: 40, readOnly: true },
   { key: 'student_name', label: '성명', width: 65, readOnly: true },
+  { key: 'phone_number', label: '휴대전화번호', width: 110, readOnly: true },
   { 
     key: 'career_aspiration', 
     label: '진로희망', 
@@ -106,7 +108,7 @@ const COLUMNS: ColumnConfig[] = [
       if (val === '특수교육대상자') return 'bg-slate-100 text-slate-700 border-slate-200';
       if (val === '대/공기업') return 'bg-blue-50 text-blue-700 border-blue-100';
       if (val === '공무원') return 'bg-indigo-50 text-indigo-700 border-indigo-100';
-      if (val === '중견/강소기업') return 'bg-purple-50 text-purple-700 border-purple-100';
+      if (val === '중견/강소기업') return 'bg-orange-50 text-orange-700 border-orange-100';
       if (val === '가업승계') return 'bg-amber-50 text-amber-700 border-amber-100';
       if (val === '부사관') return 'bg-cyan-50 text-cyan-700 border-cyan-100';
       if (val === '아우스빌둥') return 'bg-rose-50 text-rose-700 border-rose-100';
@@ -127,6 +129,7 @@ const COLUMNS: ColumnConfig[] = [
       if (!val) return '';
       if (val === '청솔반') return 'bg-emerald-50 text-emerald-700 border-emerald-100';
       if (val === '취업맞춤반') return 'bg-amber-50 text-amber-700 border-amber-100';
+      if (val === '중견기업반') return 'bg-orange-50 text-orange-700 border-orange-100';
       if (val === '반도체아카데미반') return 'bg-blue-50 text-blue-700 border-blue-100';
       if (val === '혁신인재반') return 'bg-indigo-50 text-indigo-700 border-indigo-100';
       if (val === '부사관반') return 'bg-cyan-50 text-cyan-700 border-cyan-100';
@@ -158,8 +161,10 @@ const COLUMNS: ColumnConfig[] = [
     options: [
       { label: '청솔반', value: '청솔반' }, 
       { label: '취업맞춤반', value: '취업맞춤반' }, 
+      { label: '중견기업반', value: '중견기업반' }, 
       { label: '반도체아카데미반', value: '반도체아카데미반' }, 
       { label: '혁신인재반', value: '혁신인재반' }, 
+      { label: '부사관반', value: '부사관반' }, 
       { label: '일학습병행', value: '일학습병행' }, 
       { label: '계약학과', value: '계약학과' }, 
       { label: '도제반', value: '도제반' }, 
@@ -175,6 +180,7 @@ const COLUMNS: ColumnConfig[] = [
       switch (val) {
         case '청솔반': return 'bg-emerald-50 text-emerald-700 border-emerald-100'
         case '취업맞춤반': return 'bg-amber-50 text-amber-700 border-amber-100'
+        case '중견기업반': return 'bg-orange-50 text-orange-700 border-orange-100'
         case '반도체아카데미반': return 'bg-blue-50 text-blue-700 border-blue-100'
         case '혁신인재반': return 'bg-indigo-50 text-indigo-700 border-indigo-100'
         case '일학습병행': return 'bg-purple-50 text-purple-700 border-purple-100'
@@ -232,7 +238,7 @@ const COLUMNS: ColumnConfig[] = [
         case '대기업': return 'bg-blue-50 text-blue-700 border-blue-100'
         case '공기업': return 'bg-indigo-50 text-indigo-700 border-indigo-100'
         case '공무원': return 'bg-slate-100 text-slate-700 border-slate-200'
-        case '중견기업': return 'bg-purple-50 text-purple-700 border-purple-100'
+        case '중견기업': return 'bg-orange-50 text-orange-700 border-orange-100'
         case '중소기업': return 'bg-cyan-50 text-cyan-700 border-cyan-100'
         case '연계교육': return 'bg-orange-50 text-orange-700 border-orange-100'
         case '부사관': return 'bg-emerald-50 text-emerald-700 border-emerald-100'
@@ -252,7 +258,7 @@ const COLUMNS: ColumnConfig[] = [
 ]
 
 const GROUP_HEADERS = [
-  { label: '기본 정보', colSpan: 7, className: 'bg-slate-100 text-slate-900 text-[11px]' },
+  { label: '기본 정보', colSpan: 8, className: 'bg-slate-100 text-slate-900 text-[11px]' },
   { label: '취업 현황', colSpan: 5, className: 'bg-blue-100/50 text-blue-900 text-[11px]' },
   { label: '현장실습/도제OJT 상세 및 결과 (최근 차수)', colSpan: 7, className: 'bg-amber-100/50 text-amber-900 text-[11px]' },
   { label: '비고(특이사항)', colSpan: 1, className: 'bg-slate-50 text-slate-700 text-[11px]' },

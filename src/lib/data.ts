@@ -7,7 +7,7 @@ export { MAJOR_SORT_ORDER };
 /**
  * 특정 졸업연도의 모든 학생 및 취업/실습 데이터를 가져와 평탄화합니다.
  */
-export async function getFilteredStudentData(graduationYear: string): Promise<StudentEmploymentData[]> {
+export async function getFilteredStudentData(graduationYear: string, baseYear?: number): Promise<StudentEmploymentData[]> {
   const supabase = await createClient();
   
   // 1. 학생 및 취업 정보를 단일 조인 쿼리로 조회 (데이터 무결성 보장)
@@ -29,6 +29,17 @@ export async function getFilteredStudentData(graduationYear: string): Promise<St
     .in('student_id', students.map(s => s.id))
     .order('training_order', { ascending: false });
 
+  // 추가: 특정 연도의 학적 이력 데이터 조회 (Time-Travel 기능)
+  let historyData: any[] = [];
+  if (baseYear) {
+    const { data: history } = await supabase
+      .from('student_academic_history')
+      .select('*')
+      .eq('academic_year', baseYear)
+      .in('student_id', students.map(s => s.id));
+    if (history) historyData = history;
+  }
+
   // 3. 데이터 평탄화 (데이터 뒤섞임 방지를 위해 명시적 객체 생성)
   const flattened = students.map(s => {
     // Supabase Join 결과인 student_employments 배열 처리
@@ -38,10 +49,19 @@ export async function getFilteredStudentData(graduationYear: string): Promise<St
 
     const studentTrainings = (trainings || []).filter(t => t.student_id === s.id);
     const latestTraining = studentTrainings[0];
+    const hist = historyData.find(h => h.student_id === s.id);
 
     return {
       ...studentBase,
       ...emp,
+      // 히스토리 정보가 있으면 우선 적용 (시간 여행 기능)
+      ...(hist ? {
+        major: hist.major,
+        class_info: hist.class_info,
+        student_number: hist.student_number,
+        teacher_name: hist.teacher_name,
+        grade: hist.grade
+      } : {}),
       id: s.id, // ID 유지 보장
       training_records: studentTrainings,
       has_field_training: latestTraining ? 'O' : '',
@@ -63,7 +83,7 @@ export async function getFilteredStudentData(graduationYear: string): Promise<St
   });
 }
 
-export async function getAssignedStudentDetails(major: string, classInfo: string, graduationYear: number) {
+export async function getAssignedStudentDetails(major: string, classInfo: string, graduationYear: number, baseYear?: number) {
   const supabase = await createClient();
   const { data: students, error } = await supabase
     .from('students')
@@ -74,16 +94,34 @@ export async function getAssignedStudentDetails(major: string, classInfo: string
 
   const { data: trainings } = await supabase.from('field_training_records').select('*').in('student_id', students.map(s => s.id)).order('training_order', { ascending: false });
 
+  let historyData: any[] = [];
+  if (baseYear) {
+    const { data: history } = await supabase
+      .from('student_academic_history')
+      .select('*')
+      .eq('academic_year', baseYear)
+      .in('student_id', students.map(s => s.id));
+    if (history) historyData = history;
+  }
+
   return students.map(s => {
     const studentEmployments = Array.isArray(s.student_employments) ? s.student_employments[0] : s.student_employments;
     const { student_employments, ...studentBase } = s;
     const emp = studentEmployments || {};
     const studentTrainings = (trainings || []).filter(t => t.student_id === s.id);
     const latestTraining = studentTrainings[0];
+    const hist = historyData.find(h => h.student_id === s.id);
     
     return {
       ...studentBase, 
       ...emp, 
+      ...(hist ? {
+        major: hist.major,
+        class_info: hist.class_info,
+        student_number: hist.student_number,
+        teacher_name: hist.teacher_name,
+        grade: hist.grade
+      } : {}),
       id: s.id,
       training_records: studentTrainings, 
       counseling_logs: s.student_counseling_logs || [],

@@ -157,6 +157,7 @@ export function CounselingModal({ isOpen, onClose, student }: CounselingModalPro
                   <div key={h.id} className={cn("flex items-center rounded-full px-2.5 py-0.5 gap-1.5 shrink-0 border shadow-sm", gradeColor)}>
                     <span className="text-[10px] font-black">{h.grade}학년</span>
                     <span className="text-[9px] font-bold opacity-80">{h.major} {h.class_info}반 {h.student_number}번</span>
+                    {h.teacher_name && <span className="text-[9px] font-medium opacity-70 ml-1">({h.teacher_name}T)</span>}
                   </div>
                 )
               })}

@@ -50,8 +50,8 @@ export default async function AdminStudentsPage({
   const selectedClass = params.class || 'all';
   const selectedStatus = params.status || 'all';
 
-  // 3. 타겟 데이터 패칭 (해당 학년의 데이터만 DB에서 직접 필터링하여 가져옴)
-  const allStudentData = await getFilteredStudentData(selectedYear);
+  // 3. 타겟 데이터 패칭 (해당 학년의 데이터만 DB에서 직접 필터링하여 가져오되, 학사학년도 기준 이력 매칭 반영)
+  const allStudentData = await getFilteredStudentData(selectedYear, settings.baseYear);
   
   console.log(`DEBUG: Fetched ${allStudentData.length} students for year ${selectedYear}`);
 

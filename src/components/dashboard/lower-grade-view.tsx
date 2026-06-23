@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Target, Award, Briefcase } from 'lucide-react';
 import CareerAspirationChart from './career-aspiration-chart';
 import CareerCourseChart from './career-course-chart';
+import SpecificCourseChart from './specific-course-chart';
 import MilitaryStatusChart from './military-status-chart';
 import CertificateStatusChart from './certificate-status-chart';
 import { StudentEmploymentData } from '@/lib/types';
@@ -32,17 +33,9 @@ export default function LowerGradeView({
   ).length;
 
   // 취업 희망 학생 계산 로직
-  const employmentDesireStudents = filteredData.filter(s => {
-    const aspiration = s.career_aspiration;
-    if (!aspiration || aspiration === '미정' || aspiration === '진로탐색중' || aspiration === '미설정' || aspiration === '진로미결정') return false;
-
-    if (grade === 2) {
-      return !['군특성화', '기술사관', '진학'].includes(aspiration);
-    } else if (grade === 1) {
-      return !['진학희망'].includes(aspiration);
-    }
-    return false;
-  }).length;
+  const employmentDesireStudents = filteredData.filter(s => 
+    s.career_aspiration === '취업'
+  ).length;
 
   const certificateHolders = filteredData.filter(s => (s.certificates?.length || 0) > 0).length;
 
@@ -98,9 +91,7 @@ export default function LowerGradeView({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 min-w-0 overflow-hidden">
          <CareerAspirationChart data={filteredData} grade={grade} selectedMajor={selectedMajor} />
          <CareerCourseChart data={filteredData} grade={grade} selectedMajor={selectedMajor} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 min-w-0 overflow-hidden">
+         <SpecificCourseChart data={filteredData} selectedMajor={selectedMajor} />
          <MilitaryStatusChart data={filteredData} selectedMajor={selectedMajor} />
          <CertificateStatusChart 
            data={filteredData} 

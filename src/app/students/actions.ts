@@ -42,6 +42,26 @@ async function syncAcademicHistory(supabase: any, studentUuid: string, info: any
 
   if (!grade) return;
 
+  let teacherName = null;
+  if (info.major && info.class_info) {
+    const cleanMajor = info.major.replace(/과|공업계/g, '').trim();
+    const cleanClass = info.class_info.replace(/반|학년/g, '').trim();
+    
+    const { data: teachers } = await supabase
+      .from('profiles')
+      .select('username, assigned_major, assigned_class')
+      .eq('role', 'teacher');
+      
+    if (teachers) {
+      const matchedTeacher = teachers.find((t: any) => {
+        const tMajor = (t.assigned_major || '').replace(/과|공업계/g, '').trim();
+        const tClass = (t.assigned_class || '').replace(/반|학년/g, '').trim();
+        return tMajor === cleanMajor && tClass === cleanClass;
+      });
+      if (matchedTeacher) teacherName = matchedTeacher.username;
+    }
+  }
+
   await supabase
     .from('student_academic_history')
     .upsert({
@@ -50,7 +70,8 @@ async function syncAcademicHistory(supabase: any, studentUuid: string, info: any
       academic_year: settings.baseYear,
       major: info.major,
       class_info: info.class_info,
-      student_number: info.student_number
+      student_number: info.student_number,
+      teacher_name: teacherName
     }, { onConflict: 'student_id, grade' })
 }
 
@@ -64,6 +85,74 @@ async function getNextStudentId(supabase: any, graduationYear: number): Promise<
     if (!isNaN(lastSequence)) nextSequence = lastSequence + 1;
   }
   return `${yearPrefix}${nextSequence.toString().padStart(3, '0')}`;
+}
+
+export async function bulkPromoteFromExcel(csvData: string) {
+  const supabase = await createClient()
+  const rows = csvData.split(/\r?\n/).filter(row => row.trim() !== '')
+  const dataRows = rows.slice(1)
+  const settings = await getSystemSettings()
+
+  let successCount = 0;
+  let errors = [];
+
+  for (const row of dataRows) {
+    const values = row.split(',').map(v => {
+      const trimmed = v.trim().replace(/^"|"$/g, '')
+      return trimmed === '' ? null : trimmed 
+    })
+    
+    // 엑셀 서식: [0]학번, [1]성명, [2]기존학과, [3]기존반, [4]기존번호, [5]신규학과, [6]신규반, [7]신규번호
+    const student_id = values[0];
+    const next_major = values[5];
+    const next_class = values[6];
+    const next_number = values[7];
+
+    if (!student_id || !next_major || !next_class || !next_number) continue;
+
+    // 학생 조회
+    const { data: student } = await supabase
+      .from('students')
+      .select('id, graduation_year')
+      .eq('student_id', student_id)
+      .single();
+
+    if (!student) {
+      errors.push(`${student_id} 학생을 찾을 수 없습니다.`);
+      continue;
+    }
+
+    // 인적사항 업데이트
+    const { error: updateError } = await supabase
+      .from('students')
+      .update({ 
+        major: next_major,
+        class_info: next_class,
+        student_number: next_number,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', student.id);
+
+    if (!updateError) {
+      successCount++;
+      await syncAcademicHistory(supabase, student.id, {
+        major: next_major,
+        class_info: next_class,
+        student_number: next_number,
+        graduation_year: student.graduation_year
+      }, settings.baseYear);
+    } else {
+      errors.push(`${student_id} 업데이트 실패: ${updateError.message}`);
+    }
+  }
+
+  revalidatePath('/class-management')
+  revalidatePath('/employment-status')
+  revalidatePath('/students')
+  revalidatePath('/admin/students')
+  revalidatePath('/dashboard')
+  
+  return { success: true, count: successCount, errors: errors.length > 0 ? errors : null }
 }
 
 export async function uploadStudentsCSV(csvData: string) {

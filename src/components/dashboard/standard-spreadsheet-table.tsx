@@ -60,6 +60,7 @@ interface SpreadsheetTableProps {
   masterCertificates?: any[]
   rankingMap?: Record<string, any>
   userProfile?: any
+  disableNamePopover?: boolean
 }
 
 const normalizeCertificates = (value: any): string[] => {
@@ -84,24 +85,49 @@ const TableHeader = React.memo(({ columns, groupHeaders, filterOptions, columnFi
       )}
       <tr className="h-10">
         <th className={cn("sticky z-40 border-r border-b w-8 bg-slate-50 shadow-[0_1px_0_0_rgba(0,0,0,0.1)]", hasGroup ? "top-10" : "top-0")}><div className="flex items-center justify-center h-10"><Checkbox checked={isAllSelected} onCheckedChange={onSelectAll} /></div></th>
-        {columns.map((col: any) => (
-          <th key={col.key} className={cn("sticky z-40 group text-center border-r border-b font-semibold p-0 hover:bg-slate-100 bg-slate-50 shadow-[0_1px_0_0_rgba(0,0,0,0.1)]", hasGroup ? "top-10" : "top-0")} style={{ minWidth: col.width, width: 'auto' }}>
-            <div className="flex items-center justify-center px-2 gap-1 h-full min-h-[40px]">
-              <span className="whitespace-pre-line leading-tight py-1">{col.label}</span>
-              <Popover modal={false}>
-                <PopoverTrigger asChild><button className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"><ListFilter className="h-3 w-3" /></button></PopoverTrigger>
-                <PopoverContent className="w-48 p-0 z-[50]" align="start">
-                  <div className="max-h-60 overflow-y-auto p-1">
-                    {(filterOptions[col.key] || []).map((val: any) => (
-                      <div key={String(val)} className="flex items-center space-x-2 p-1.5 hover:bg-muted rounded-sm cursor-pointer" onClick={() => onFilterChange(col.key, String(val))}><Checkbox checked={(columnFilters[col.key] || []).includes(String(val))} /><label className="text-[11px] cursor-pointer flex-1 truncate">{String(val)}</label></div>
-                    ))}
-                  </div>
-                  <div className="p-1 border-t"><Button variant="ghost" size="sm" className="h-6 text-[10px] w-full" onClick={() => onFilterChange(col.key, 'RESET')}>필터 해제</Button></div>
-                </PopoverContent>
-              </Popover>
-            </div>
-          </th>
-        ))}
+        {columns.map((col: any) => {
+          const isFilterActive = columnFilters[col.key] !== undefined;
+          return (
+            <th key={col.key} className={cn("sticky z-40 group text-center border-r border-b font-semibold p-0 hover:bg-slate-100 bg-slate-50 shadow-[0_1px_0_0_rgba(0,0,0,0.1)]", hasGroup ? "top-10" : "top-0")} style={{ minWidth: col.width, width: 'auto' }}>
+              <div className="flex items-center justify-center px-2 gap-1 h-full min-h-[40px]">
+                <span className="whitespace-pre-line leading-tight py-1">{col.label}</span>
+                <Popover modal={false}>
+                  <PopoverTrigger asChild>
+                    <button className={cn(
+                      "p-0.5 rounded transition-opacity", 
+                      isFilterActive 
+                        ? "opacity-100 text-blue-600 bg-blue-50" 
+                        : "opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                    )}>
+                      <ListFilter className="h-3.5 w-3.5" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-48 p-0 z-[50]" align="start">
+                    <div className="flex items-center justify-between p-1.5 border-b gap-1 bg-slate-50 select-none">
+                      <Button variant="ghost" className="h-6 text-[10px] flex-1 px-1 font-bold text-blue-600 hover:text-blue-700" onClick={() => onFilterChange(col.key, 'SELECT_ALL')}>모두 선택</Button>
+                      <div className="w-[1px] h-3 bg-slate-200" />
+                      <Button variant="ghost" className="h-6 text-[10px] flex-1 px-1 font-bold text-rose-600 hover:text-rose-700" onClick={() => onFilterChange(col.key, 'CLEAR_ALL')}>모두 해제</Button>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto p-1">
+                      {(filterOptions[col.key] || []).map((val: any) => {
+                        const isChecked = isFilterActive 
+                          ? columnFilters[col.key].includes(String(val)) 
+                          : true;
+                        return (
+                          <div key={String(val)} className="flex items-center space-x-2 p-1.5 hover:bg-muted rounded-sm cursor-pointer" onClick={() => onFilterChange(col.key, String(val))}>
+                            <Checkbox checked={isChecked} />
+                            <label className="text-[11px] cursor-pointer flex-1 truncate">{String(val)}</label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="p-1 border-t"><Button variant="ghost" size="sm" className="h-6 text-[10px] w-full" onClick={() => onFilterChange(col.key, 'RESET')}>필터 해제</Button></div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </th>
+          );
+        })}
       </tr>
     </thead>
   );
@@ -109,7 +135,7 @@ const TableHeader = React.memo(({ columns, groupHeaders, filterOptions, columnFi
 TableHeader.displayName = 'TableHeader';
 
 // --- 데이터 셀 ---
-const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, isEditing, isSelected, isFocused, onMouseDown, onMouseEnter, onStartEdit, onEndEdit, onSave, onAction, rankingMap, userProfile }: any) => {
+const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, isEditing, isSelected, isFocused, onMouseDown, onMouseEnter, onStartEdit, onEndEdit, onSave, onAction, rankingMap, userProfile, disableNamePopover }: any) => {
   const [localValue, setLocalValue] = React.useState(value || '')
   const [isManualInput, setIsManualInput] = React.useState(false)
   const isManualRef = React.useRef(false)
@@ -194,9 +220,13 @@ const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, isEditi
         {config.type === 'action' ? (
           <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] bg-blue-50 text-blue-600 font-bold hover:bg-blue-100" onClick={(e) => { e.stopPropagation(); onAction?.(id, field); }}>상세보기</Button>
         ) : field === 'student_name' ? (
-          <StudentPopover student={rowData} rankingSummary={rankingMap?.[id]} userProfile={userProfile}>
-            <h3 className="font-bold text-slate-900 truncate hover:text-blue-600 transition-colors cursor-pointer underline decoration-dotted decoration-blue-300 underline-offset-4">{value || ''}</h3>
-          </StudentPopover>
+          !disableNamePopover ? (
+            <StudentPopover student={rowData} rankingSummary={rankingMap?.[id]} userProfile={userProfile}>
+              <h3 className="font-bold text-slate-900 truncate hover:text-blue-600 transition-colors cursor-pointer underline decoration-dotted decoration-blue-300 underline-offset-4">{value || ''}</h3>
+            </StudentPopover>
+          ) : (
+            <span className="font-bold text-slate-900 truncate">{value || ''}</span>
+          )
         ) : config.variant ? (
           <span className={cn("px-1.5 py-0.5 rounded-sm font-medium border text-[9px] leading-none whitespace-nowrap text-center", config.variant(value))}>{value === 'X' ? '' : (value || '')}</span>
         ) : (
@@ -213,23 +243,24 @@ const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, isEditi
   p.rankingMap === n.rankingMap && 
   p.userProfile === n.userProfile &&
   p.onMouseDown === n.onMouseDown &&
-  p.onMouseEnter === n.onMouseEnter
+  p.onMouseEnter === n.onMouseEnter &&
+  p.disableNamePopover === n.disableNamePopover
 );
 SpreadsheetCell.displayName = 'SpreadsheetCell';
 
 // --- 데이터 행 ---
-const SpreadsheetRow = React.memo(({ row, rIdx, columns, selMinR, selMaxR, selMinC, selMaxC, selStart, editCell, onMouseDown, onMouseEnter, onStartEdit, onEndEdit, onSave, isSelectedRow, onSelectRow, onAction, rankingMap, userProfile }: any) => {
+const SpreadsheetRow = React.memo(({ row, rIdx, columns, selMinR, selMaxR, selMinC, selMaxC, selStart, editCell, onMouseDown, onMouseEnter, onStartEdit, onEndEdit, onSave, isSelectedRow, onSelectRow, onAction, rankingMap, userProfile, disableNamePopover }: any) => {
   const isRowInSelection = rIdx >= selMinR && rIdx <= selMaxR;
   return (
     <tr className={cn("h-8 transition-none hover:bg-slate-50/50", isSelectedRow && "bg-blue-50/30")}>
       <td className="border-r border-b w-8 p-0 bg-white"><div className="flex items-center justify-center h-8"><Checkbox checked={isSelectedRow} onCheckedChange={(val) => onSelectRow(row.id, !!val)} /></div></td>
       {columns.map((col: any, cIdx: number) => (
-        <SpreadsheetCell key={col.key} id={row.id} field={col.key} value={row[col.key]} config={col} rowData={row} isSelected={isRowInSelection && cIdx >= selMinC && cIdx <= selMaxC} isFocused={selStart?.row === rIdx && selStart?.col === cIdx} isEditing={editCell?.row === rIdx && editCell?.col === cIdx} onMouseDown={(m: any) => onMouseDown(rIdx, cIdx, m)} onMouseEnter={() => onMouseEnter(rIdx, cIdx)} onStartEdit={() => onStartEdit(rIdx, cIdx)} onEndEdit={onEndEdit} onSave={onSave} onAction={onAction} rankingMap={rankingMap} userProfile={userProfile} />
+        <SpreadsheetCell key={col.key} id={row.id} field={col.key} value={row[col.key]} config={col} rowData={row} isSelected={isRowInSelection && cIdx >= selMinC && cIdx <= selMaxC} isFocused={selStart?.row === rIdx && selStart?.col === cIdx} isEditing={editCell?.row === rIdx && editCell?.col === cIdx} onMouseDown={(m: any) => onMouseDown(rIdx, cIdx, m)} onMouseEnter={() => onMouseEnter(rIdx, cIdx)} onStartEdit={() => onStartEdit(rIdx, cIdx)} onEndEdit={onEndEdit} onSave={onSave} onAction={onAction} rankingMap={rankingMap} userProfile={userProfile} disableNamePopover={disableNamePopover} />
       ))}
     </tr>
   );
 }, (p, n) => {
-  if (p.rIdx !== n.rIdx || p.row !== n.row || p.isSelectedRow !== n.isSelectedRow || p.rankingMap !== n.rankingMap || p.userProfile !== n.userProfile) return false;
+  if (p.rIdx !== n.rIdx || p.row !== n.row || p.isSelectedRow !== n.isSelectedRow || p.rankingMap !== n.rankingMap || p.userProfile !== n.userProfile || p.disableNamePopover !== n.disableNamePopover) return false;
   const wasIn = p.rIdx >= p.selMinR && p.rIdx <= p.selMaxR;
   const isIn = n.rIdx >= n.selMinR && n.rIdx <= n.selMaxR;
   if (wasIn !== isIn || (isIn && (p.selMinC !== n.selMinC || p.selMaxC !== n.selMaxC))) return false;
@@ -332,7 +363,8 @@ export function StandardSpreadsheetTable({
   searchPlaceholder = "검색...", 
   masterCertificates = [],
   rankingMap = {},
-  userProfile = null
+  userProfile = null,
+  disableNamePopover = false
 }: SpreadsheetTableProps) {
   const [mounted, setMounted] = React.useState(false);
   const isMobile = useIsMobile(); const router = useRouter(); const [data, setData] = React.useState(initialData); const { toast } = useToast();
@@ -342,6 +374,91 @@ export function StandardSpreadsheetTable({
   }, []);
 
   const [columnFilters, setColumnFilters] = React.useState<Record<string, string[]>>({}); const [searchTerm, setSearchTerm] = React.useState('');
+
+  const filterOptions = React.useMemo(() => {
+    const opts: Record<string, Set<any>> = {};
+    columns.forEach(c => opts[c.key] = new Set());
+    
+    initialData.forEach(s => {
+      columns.forEach(c => {
+        // 이 열(c.key)을 제외한 다른 모든 열 필터가 이 행(s)에 충족되는지 확인
+        const matchesOtherFilters = Object.entries(columnFilters).every(([f, v]) => {
+          if (f === c.key) return true; // 현재 열 필터 조건은 무시
+          if (v === undefined) return true; // 필터가 비활성화된 경우(전체 선택) 무시
+          const rowVal = s[f];
+          const nV = (rowVal === null || rowVal === undefined || rowVal === '') ? '(빈칸)' : String(rowVal);
+          return v.includes(nV);
+        });
+
+        // 빠른 검색어 매칭 여부 확인
+        const matchesSearch = !searchTerm || columns.some(col => 
+          String(s[col.key] || '').toLowerCase().includes(searchTerm.toLowerCase())
+        );
+
+        if (matchesOtherFilters && matchesSearch) {
+          const val = s[c.key];
+          if (val === null || val === undefined || val === '') {
+            opts[c.key].add('(빈칸)');
+          } else {
+            opts[c.key].add(String(val));
+          }
+        }
+      });
+    });
+
+    const result: Record<string, any[]> = {};
+    Object.keys(opts).forEach(k => {
+      result[k] = Array.from(opts[k]).sort((a, b) => {
+        if (a === '(빈칸)') return -1;
+        if (b === '(빈칸)') return 1;
+        return a.localeCompare(b, 'ko');
+      });
+    });
+    return result;
+  }, [initialData, columns, columnFilters, searchTerm]);
+  
+  const handleFilterChange = React.useCallback((key: string, value: string) => {
+    setColumnFilters(prev => {
+      const currentOpts = filterOptions[key] || [];
+      const isFilterActive = prev[key] !== undefined;
+
+      if (value === 'RESET') {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      }
+      
+      if (value === 'SELECT_ALL') {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      }
+
+      if (value === 'CLEAR_ALL') {
+        return { ...prev, [key]: [] };
+      }
+
+      let nextSelected: string[];
+      if (!isFilterActive) {
+        nextSelected = currentOpts.map(o => String(o)).filter(x => x !== value);
+      } else {
+        const activeList = prev[key];
+        if (activeList.includes(value)) {
+          nextSelected = activeList.filter(x => x !== value);
+        } else {
+          nextSelected = [...activeList, value];
+        }
+      }
+
+      if (nextSelected.length === currentOpts.length) {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      }
+
+      return { ...prev, [key]: nextSelected };
+    });
+  }, [filterOptions]);
   const [selectionStart, setSelectionStart] = React.useState<any>(null); const [selectionEnd, setSelectionEnd] = React.useState<any>(null);
   const [editingCell, setEditingCell] = React.useState<any>(null); const [internalSelectedRowIds, setInternalSelectedRowIds] = React.useState<string[]>([]);
   const [scrollTop, setScrollTop] = React.useState(0); const [containerHeight, setContainerHeight] = React.useState(1200);
@@ -408,8 +525,18 @@ export function StandardSpreadsheetTable({
   React.useEffect(() => { if (!isSyncingRef.current) { setData(initialData); } }, [initialData]);
   React.useEffect(() => { setInternalSelectedRowIds([]); setSelectionStart(null); setSelectionEnd(null); }, [initialData]);
   
-  const filterOptions = React.useMemo(() => { const opts: Record<string, Set<any>> = {}; columns.forEach(c => opts[c.key] = new Set()); initialData.forEach(s => columns.forEach(c => { const val = s[c.key]; if (val === null || val === undefined || val === '') { opts[c.key].add('(빈칸)'); } else { opts[c.key].add(String(val)); } })); const result: Record<string, any[]> = {}; Object.keys(opts).forEach(k => result[k] = Array.from(opts[k]).sort((a, b) => { if (a === '(빈칸)') return -1; if (b === '(빈칸)') return 1; return a.localeCompare(b, 'ko'); })); return result; }, [initialData, columns]);
-  const filteredData = React.useMemo(() => data.filter(row => { const mF = Object.entries(columnFilters).every(([f, v]) => { if (!v?.length) return true; const rowVal = row[f]; const nV = (rowVal === null || rowVal === undefined || rowVal === '') ? '(빈칸)' : String(rowVal); return v.includes(nV); }); const mS = !searchTerm || columns.some(c => String(row[c.key] || '').toLowerCase().includes(searchTerm.toLowerCase())); return mF && mS; }), [data, columnFilters, searchTerm, columns]);
+
+
+  const filteredData = React.useMemo(() => data.filter(row => {
+    const mF = Object.entries(columnFilters).every(([f, v]) => {
+      if (v === undefined) return true; // 필터가 비활성화된 경우(전체 선택) 무시
+      const rowVal = row[f];
+      const nV = (rowVal === null || rowVal === undefined || rowVal === '') ? '(빈칸)' : String(rowVal);
+      return v.includes(nV);
+    });
+    const mS = !searchTerm || columns.some(c => String(row[c.key] || '').toLowerCase().includes(searchTerm.toLowerCase()));
+    return mF && mS;
+  }), [data, columnFilters, searchTerm, columns]);
 
   React.useEffect(() => { setSelectionStart(null); setSelectionEnd(null); if (containerRef.current) { const maxScroll = Math.max(0, filteredData.length * ROW_HEIGHT + HEADER_HEIGHT - containerHeight); if (containerRef.current.scrollTop > maxScroll) containerRef.current.scrollTop = 0; } }, [columnFilters, searchTerm, filteredData.length, containerHeight, HEADER_HEIGHT]);
   React.useEffect(() => { if (!containerRef.current) return; const observer = new ResizeObserver((e) => { for (let entry of e) setContainerHeight(entry.contentRect.height); }); observer.observe(containerRef.current); return () => observer.disconnect(); }, []);
@@ -476,7 +603,7 @@ export function StandardSpreadsheetTable({
         <div ref={containerRef} className="relative outline-none bg-white overflow-auto border rounded-md shadow-inner custom-scrollbar flex-1 focus-visible:ring-0" onScroll={(e)=>setScrollTop(e.currentTarget.scrollTop)} onKeyDown={handleKeyDown} tabIndex={0}>
           <table className="text-[11px] border-collapse table-auto min-w-max text-center relative border-none">
             <colgroup><col style={{ width: 32 }} />{columns.map((c, i) => <col key={i} style={{ minWidth: c.width }} />)}</colgroup>
-            <TableHeader columns={columns} groupHeaders={groupHeaders} filterOptions={filterOptions} columnFilters={columnFilters} onFilterChange={(k:any,v:any)=>setColumnFilters(p=>v==='RESET'?{...p,[k]:[]}:{...p,[k]:p[k]?.includes(v)?p[k].filter(x=>x!==v):[...(p[k]||[]),v]})} onSelectAll={handleSelectAll} isAllSelected={filteredData.length > 0 && filteredData.every(r => selectedRowIds.includes(r.id))} />
+            <TableHeader columns={columns} groupHeaders={groupHeaders} filterOptions={filterOptions} columnFilters={columnFilters} onFilterChange={handleFilterChange} onSelectAll={handleSelectAll} isAllSelected={filteredData.length > 0 && filteredData.every(r => selectedRowIds.includes(r.id))} />
             <tbody>
               {(() => {
                 const totalCount = filteredData.length;
@@ -491,7 +618,7 @@ export function StandardSpreadsheetTable({
                 for (let i = start; i <= end; i++) { 
                   const row = filteredData[i];
                   if (!row) continue;
-                  rows.push(<SpreadsheetRow key={row.id} rIdx={i} row={row} columns={columns} selMinR={sMinR} selMaxR={sMaxR} selMinC={sMinC} selMaxC={sMaxC} selStart={selectionStart} editCell={editingCell} onMouseDown={handleMouseDown} onMouseEnter={handleMouseEnter} onStartEdit={(r:any,c:any)=>{ if(columns[c].type==='multi-select'){ setEditingCell({row:r,col:c}); setIsPickerOpen(true); } else setEditingCell({row:r,col:c}); }} onEndEdit={()=>setEditingCell(null)} onSave={handleSaveInternal} isSelectedRow={selectedRowIds.includes(row.id)} onSelectRow={(id:any,v:any)=>syncSelected(v?[...selectedRowIds,id]:selectedRowIds.filter(x=>x!==id))} onAction={onAction} rankingMap={rankingMap} userProfile={userProfile} />); 
+                  rows.push(<SpreadsheetRow key={row.id} rIdx={i} row={row} columns={columns} selMinR={sMinR} selMaxR={sMaxR} selMinC={sMinC} selMaxC={sMaxC} selStart={selectionStart} editCell={editingCell} onMouseDown={handleMouseDown} onMouseEnter={handleMouseEnter} onStartEdit={(r:any,c:any)=>{ if(columns[c].type==='multi-select'){ setEditingCell({row:r,col:c}); setIsPickerOpen(true); } else setEditingCell({row:r,col:c}); }} onEndEdit={()=>setEditingCell(null)} onSave={handleSaveInternal} isSelectedRow={selectedRowIds.includes(row.id)} onSelectRow={(id:any,v:any)=>syncSelected(v?[...selectedRowIds,id]:selectedRowIds.filter(x=>x!==id))} onAction={onAction} rankingMap={rankingMap} userProfile={userProfile} disableNamePopover={disableNamePopover} />); 
                 }
                 if (end < totalCount - 1) rows.push(<tr key="b" style={{ height: (totalCount - 1 - end) * ROW_HEIGHT }}><td colSpan={columns.length + 1} className="border-none"></td></tr>); return rows;
               })()}
@@ -524,9 +651,13 @@ export function StandardSpreadsheetTable({
                     </div>
                     <div className="min-w-0">
                       {/* 모바일에서도 이름 클릭 시 팝오버(또는 상세보기) 가능하게 처리 */}
-                      <StudentPopover student={row} rankingSummary={rankingMap?.[row.id]} userProfile={userProfile}>
-                        <h3 className="font-bold text-slate-900 truncate hover:text-blue-600 transition-colors">{row[titleCol?.key || ''] || '이름 없음'}</h3>
-                      </StudentPopover>
+                      {!disableNamePopover ? (
+                        <StudentPopover student={row} rankingSummary={rankingMap?.[row.id]} userProfile={userProfile}>
+                          <h3 className="font-bold text-slate-900 truncate hover:text-blue-600 transition-colors cursor-pointer">{row[titleCol?.key || ''] || '이름 없음'}</h3>
+                        </StudentPopover>
+                      ) : (
+                        <h3 className="font-bold text-slate-900 truncate">{row[titleCol?.key || ''] || '이름 없음'}</h3>
+                      )}
                       <p className="text-[11px] text-slate-500 truncate">
                         {row.major || ''} {row.class_info ? `${row.class_info}반` : ''} {row.student_number ? `${row.student_number}번` : ''}
                       </p>
