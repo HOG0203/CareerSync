@@ -5,6 +5,7 @@ import { StudentEmploymentData } from '@/lib/data';
 import { StudentGridCell } from './student-grid-cell';
 import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { GridLoadingSkeleton } from '@/components/dashboard/loading-skeleton';
 
 interface EmploymentStatusGridProps {
   allData: StudentEmploymentData[];
@@ -143,6 +144,27 @@ function SearchHeader({ onSearch, currentSearchQuery }: SearchHeaderProps) {
 
 export function EmploymentStatusGrid({ allData, rankingMap, userProfile }: EmploymentStatusGridProps) {
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [isLoading, setIsLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleLoading = () => setIsLoading(true);
+    window.addEventListener('employment-status-loading', handleLoading);
+    return () => {
+      window.removeEventListener('employment-status-loading', handleLoading);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    setIsLoading(false);
+  }, [allData]);
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center min-h-[400px]">
+        <GridLoadingSkeleton />
+      </div>
+    );
+  }
 
   const groupedData = React.useMemo(() => {
     const grouped: Record<string, StudentEmploymentData[]> = {};

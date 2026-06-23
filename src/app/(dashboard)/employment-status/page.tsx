@@ -42,7 +42,7 @@ export default async function EmploymentStatusPage({
   const selectedYear = params.year || calculatedGradYear;
 
   const [allData, rankingMap] = await Promise.all([
-    getFilteredStudentData(selectedYear),
+    getFilteredStudentData(selectedYear, ay),
     getYearlyRankingsSummary(parseInt(selectedYear), settings.baseYear)
   ]);
 
