@@ -90,6 +90,7 @@ export default async function EmploymentStatusPage({
         allData={allData}
         rankingMap={rankingMap}
         userProfile={userProfile}
+        baseYear={ay}
       />
     </div>
   );

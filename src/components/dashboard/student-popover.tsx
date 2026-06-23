@@ -38,6 +38,7 @@ interface StudentPopoverProps {
   userProfile?: any;
   side?: 'top' | 'right' | 'bottom' | 'left';
   align?: 'start' | 'center' | 'end';
+  baseYear?: number;
 }
 
 export function StudentPopover({ 
@@ -46,7 +47,8 @@ export function StudentPopover({
   rankingSummary, 
   userProfile,
   side = 'right',
-  align = 'start'
+  align = 'start',
+  baseYear
 }: StudentPopoverProps) {
   const [isGradeModalOpen, setIsGradeModalOpen] = React.useState(false);
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = React.useState(false);
@@ -54,10 +56,13 @@ export function StudentPopover({
   const [detailedScores, setDetailedScores] = React.useState<any[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
 
+  const resolvedBaseYear = baseYear || 2026;
+  const studentGrade = student.graduation_year ? (4 - (student.graduation_year - resolvedBaseYear)) : 3;
+  const isLowerGrade = studentGrade === 1 || studentGrade === 2;
+
   const getDesireColor = (student: StudentEmploymentData) => {
     const isDesiring = student.is_desiring_employment;
     const aspiration = student.career_aspiration;
-    const isLowerGrade = student.graduation_year && student.graduation_year >= 2028;
 
     if (isLowerGrade) {
       if (aspiration === '취업') return 'bg-emerald-500';
@@ -137,7 +142,7 @@ export function StudentPopover({
               <span className="font-bold text-[15px] text-blue-900">{student.student_name}</span>
               <span className={cn(
                 "text-[10px] px-2 py-0.5 rounded-full font-bold",
-                (student.graduation_year && student.graduation_year >= 2028) ? (
+                isLowerGrade ? (
                   student.career_aspiration === '취업' ? "bg-emerald-100 text-emerald-700" : 
                   student.career_aspiration === '진학' ? "bg-rose-100 text-rose-700" : 
                   student.career_aspiration === '제외인정자' ? "bg-slate-100 text-slate-600" : "bg-slate-100 text-slate-600"
@@ -146,45 +151,70 @@ export function StudentPopover({
                   student.is_desiring_employment === '아니오' ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"
                 )
               )}>
-                희망: {(student.graduation_year && student.graduation_year >= 2028) ? (student.career_aspiration || '미정') : (student.is_desiring_employment || student.career_aspiration || '미정')}
+                희망: {isLowerGrade ? (student.career_aspiration || '미정') : (student.is_desiring_employment || student.career_aspiration || '미정')}
               </span>
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-[11px] text-blue-800 font-black uppercase tracking-tight flex items-center gap-1">
-                  <BarChart3 className="h-3 w-3" /> 취업 상세
+                  <BarChart3 className="h-3 w-3" /> {isLowerGrade ? '진로희망' : '취업 상세'}
                 </p>
-                <span className={cn(
-                  "text-[9px] px-2 py-0.5 rounded-full font-black",
-                  student.business_type === '취업' ? "bg-emerald-100 text-emerald-700" : 
-                  student.business_type === '미취업' ? "bg-rose-100 text-rose-700" :
-                  student.business_type === '채용진행중' ? "bg-amber-100 text-amber-700" :
-                  student.business_type === '현장실습중' ? "bg-blue-100 text-blue-700" :
-                  student.business_type === '도제OJT' ? "bg-emerald-50 text-emerald-600" :
-                  (student.business_type === '제외인정자' || student.career_aspiration === '제외인정자') ? "bg-slate-100 text-slate-700" :
-                  "bg-slate-50 text-slate-400"
-                )}>
-                  현황: {student.business_type || (student.career_aspiration === '진학' ? '진학희망' : '미결정')}
-                </span>
+                {!isLowerGrade && (
+                  <span className={cn(
+                    "text-[9px] px-2 py-0.5 rounded-full font-black",
+                    student.business_type === '취업' ? "bg-emerald-100 text-emerald-700" : 
+                    student.business_type === '미취업' ? "bg-rose-100 text-rose-700" :
+                    student.business_type === '채용진행중' ? "bg-amber-100 text-amber-700" :
+                    student.business_type === '현장실습중' ? "bg-blue-100 text-blue-700" :
+                    student.business_type === '도제OJT' ? "bg-emerald-50 text-emerald-600" :
+                    (student.business_type === '제외인정자' || student.career_aspiration === '제외인정자') ? "bg-slate-100 text-slate-700" :
+                    "bg-slate-50 text-slate-400"
+                  )}>
+                    현황: {student.business_type || (student.career_aspiration === '진학' ? '진학희망' : '미결정')}
+                  </span>
+                )}
               </div>
               <div className="space-y-1 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                <div className="grid grid-cols-2 gap-x-3 text-[10px]">
-                  <p className="flex justify-between">
-                    <span className="text-slate-400">진로코스</span> 
-                    <span className="font-bold text-slate-700 text-right">{student.employment_status || '미정'}</span>
-                  </p>
-                  <p className="flex justify-between">
-                    <span className="text-slate-400 pl-2">기업구분</span> 
-                    <span className="font-black text-blue-600 text-right">{student.company_type || '미분류'}</span>
-                  </p>
-                </div>
-                <div className="pt-1 border-t border-slate-200 mt-1">
-                  <p className="text-[9px] text-slate-400 font-bold uppercase mb-0.5">취업처</p>
-                  <p className="font-black text-blue-600 text-[17px] leading-tight truncate">
-                    {student.company || '미정'}
-                  </p>
-                </div>
+                {isLowerGrade ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-x-3 text-[10px]">
+                      <p className="flex justify-between">
+                        <span className="text-slate-400">희망진로코스</span> 
+                        <span className="font-bold text-slate-700 text-right">{student.career_course || '미설정'}</span>
+                      </p>
+                      <p className="flex justify-between">
+                        <span className="text-slate-400 pl-2">희망기업유형</span> 
+                        <span className="font-black text-blue-600 text-right">{student.special_notes || '미설정'}</span>
+                      </p>
+                    </div>
+                    <div className="pt-1 border-t border-slate-200 mt-1">
+                      <p className="text-[9px] text-slate-400 font-bold uppercase mb-0.5">진로희망</p>
+                      <p className="font-black text-blue-600 text-[17px] leading-tight truncate">
+                        {student.career_aspiration || '미정'}
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-x-3 text-[10px]">
+                      <p className="flex justify-between">
+                        <span className="text-slate-400">진로코스</span> 
+                        <span className="font-bold text-slate-700 text-right">{student.employment_status || '미정'}</span>
+                      </p>
+                      <p className="flex justify-between">
+                        <span className="text-slate-400 pl-2">기업구분</span> 
+                        <span className="font-black text-blue-600 text-right">{student.company_type || '미분류'}</span>
+                      </p>
+                    </div>
+                    <div className="pt-1 border-t border-slate-200 mt-1">
+                      <p className="text-[9px] text-slate-400 font-bold uppercase mb-0.5">취업처</p>
+                      <p className="font-black text-blue-600 text-[17px] leading-tight truncate">
+                        {student.company || '미정'}
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 

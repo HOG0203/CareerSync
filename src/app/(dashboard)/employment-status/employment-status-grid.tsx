@@ -11,6 +11,7 @@ interface EmploymentStatusGridProps {
   allData: StudentEmploymentData[];
   rankingMap: Record<string, any>;
   userProfile: any;
+  baseYear?: number;
 }
 
 const MAJOR_MAP: Record<string, string> = {
@@ -142,7 +143,7 @@ function SearchHeader({ onSearch, currentSearchQuery }: SearchHeaderProps) {
   );
 }
 
-export function EmploymentStatusGrid({ allData, rankingMap, userProfile }: EmploymentStatusGridProps) {
+export function EmploymentStatusGrid({ allData, rankingMap, userProfile, baseYear }: EmploymentStatusGridProps) {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
 
@@ -230,6 +231,7 @@ export function EmploymentStatusGrid({ allData, rankingMap, userProfile }: Emplo
                       rankingSummary={rankingMap[student.id]}
                       userProfile={userProfile}
                       searchQuery={searchQuery}
+                      baseYear={baseYear}
                     />
                   ))}
                   {Array.from({ length: Math.max(0, 24 - students.length) }).map((_, i) => (

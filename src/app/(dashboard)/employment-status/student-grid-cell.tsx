@@ -12,9 +12,10 @@ interface StudentGridCellProps {
   rankingSummary?: any; // 부모로부터 전달받은 사전 계산된 성적/출결 요약
   userProfile?: any; // 권한 확인을 위한 사용자 프로필
   searchQuery?: string; // 검색어 추가
+  baseYear?: number;
 }
 
-export function StudentGridCell({ student, idx, variant, rankingSummary, userProfile, searchQuery }: StudentGridCellProps) {
+export function StudentGridCell({ student, idx, variant, rankingSummary, userProfile, searchQuery, baseYear }: StudentGridCellProps) {
   // 통합 검색 매칭 여부 확인
   const isMatched = React.useMemo(() => {
     if (!searchQuery || searchQuery.trim() === '') return false;
@@ -39,7 +40,10 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, userPro
   const getDesireColor = (student: StudentEmploymentData) => {
     const isDesiring = student.is_desiring_employment;
     const aspiration = student.career_aspiration;
-    const isLowerGrade = student.graduation_year && student.graduation_year >= 2028;
+    
+    const resolvedBaseYear = baseYear || 2026;
+    const studentGrade = student.graduation_year ? (4 - (student.graduation_year - resolvedBaseYear)) : 3;
+    const isLowerGrade = studentGrade === 1 || studentGrade === 2;
 
     // 1,2학년은 진로희망(career_aspiration) 우선 적용
     if (isLowerGrade) {
@@ -66,6 +70,7 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, userPro
       student={student} 
       rankingSummary={rankingSummary} 
       userProfile={userProfile}
+      baseYear={baseYear}
     >
       <div
         className={cn(
