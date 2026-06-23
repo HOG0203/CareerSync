@@ -158,14 +158,6 @@ export function EmploymentStatusGrid({ allData, rankingMap, userProfile }: Emplo
     setIsLoading(false);
   }, [allData]);
 
-  if (isLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center min-h-[400px]">
-        <GridLoadingSkeleton />
-      </div>
-    );
-  }
-
   const groupedData = React.useMemo(() => {
     const grouped: Record<string, StudentEmploymentData[]> = {};
     for (const student of allData) {
@@ -197,6 +189,14 @@ export function EmploymentStatusGrid({ allData, rankingMap, userProfile }: Emplo
       return a.localeCompare(b, 'ko');
     });
   }, [groupedData, majorOrderMap]);
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center min-h-[400px]">
+        <GridLoadingSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full gap-4">
