@@ -178,20 +178,16 @@ export function StudentPopover({
               <div className="space-y-1 bg-slate-50 p-2 rounded-lg border border-slate-100">
                 {isLowerGrade ? (
                   <>
-                    <div className="grid grid-cols-2 gap-x-3 text-[10px]">
+                    <div className="text-[10px]">
                       <p className="flex justify-between">
-                        <span className="text-slate-400">희망진로코스</span> 
-                        <span className="font-bold text-slate-700 text-right">{student.career_course || '미설정'}</span>
-                      </p>
-                      <p className="flex justify-between">
-                        <span className="text-slate-400 pl-2">희망기업유형</span> 
+                        <span className="text-slate-400">희망기업유형</span> 
                         <span className="font-black text-blue-600 text-right">{student.special_notes || '미설정'}</span>
                       </p>
                     </div>
                     <div className="pt-1 border-t border-slate-200 mt-1">
-                      <p className="text-[9px] text-slate-400 font-bold uppercase mb-0.5">진로희망</p>
+                      <p className="text-[9px] text-slate-400 font-bold uppercase mb-0.5">희망진로코스</p>
                       <p className="font-black text-blue-600 text-[17px] leading-tight truncate">
-                        {student.career_aspiration || '미정'}
+                        {student.career_course || '미설정'}
                       </p>
                     </div>
                   </>
