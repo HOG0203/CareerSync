@@ -138,7 +138,7 @@ export default function CompanyTypeChart({
               data={formattedBarData} 
               layout="vertical"
               margin={{ left: 10, right: 30, top: 0, bottom: 0 }}
-              categoryGap={15}
+              barCategoryGap={15}
             >
               <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} opacity={0.3} />
               <XAxis type="number" hide />

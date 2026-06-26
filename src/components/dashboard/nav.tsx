@@ -66,10 +66,10 @@ export default function Nav({ isAdmin = false }: { isAdmin?: boolean }) {
   // 그룹 정의
   const groups = [
     {
-      title: "취업 및 실습 관리",
+      title: "취업진로관리",
       icon: Briefcase,
       items: [
-        { href: '/employment-status', label: '취업현황', icon: Grid3X3 },
+        { href: '/employment-status', label: '취업진로현황', icon: Grid3X3 },
         { href: '/company-info', label: '업체정보', icon: Factory },
         { href: '/students', label: '취업상세데이터', icon: ClipboardList },
       ]

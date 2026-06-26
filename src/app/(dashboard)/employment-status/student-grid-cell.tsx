@@ -13,29 +13,39 @@ interface StudentGridCellProps {
   userProfile?: any; // 권한 확인을 위한 사용자 프로필
   searchQuery?: string; // 검색어 추가
   baseYear?: number;
+  isLowerGrade?: boolean;
 }
 
-export function StudentGridCell({ student, idx, variant, rankingSummary, userProfile, searchQuery, baseYear }: StudentGridCellProps) {
+export function StudentGridCell({ student, idx, variant, rankingSummary, userProfile, searchQuery, baseYear, isLowerGrade }: StudentGridCellProps) {
   // 통합 검색 매칭 여부 확인
   const isMatched = React.useMemo(() => {
     if (!searchQuery || searchQuery.trim() === '') return false;
     
     const query = searchQuery.toLowerCase().trim();
-    const fieldsToSearch = [
-      student.student_name,
-      student.employment_status,
-      student.company_type,
-      student.business_type,
-      student.company,
-      student.latest_training_company,
-      student.major,
-      student.class_info
-    ];
+    const fieldsToSearch = isLowerGrade
+      ? [
+          student.student_name,
+          student.career_aspiration,
+          student.career_course,
+          student.special_notes,
+          student.major,
+          student.class_info
+        ]
+      : [
+          student.student_name,
+          student.employment_status,
+          student.company_type,
+          student.business_type,
+          student.company,
+          student.latest_training_company,
+          student.major,
+          student.class_info
+        ];
 
     return fieldsToSearch.some(field => 
       field?.toLowerCase().includes(query)
     );
-  }, [student, searchQuery]);
+  }, [student, searchQuery, isLowerGrade]);
 
   const getDesireColor = (student: StudentEmploymentData) => {
     const isDesiring = student.is_desiring_employment;
@@ -81,7 +91,9 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, userPro
       >
         <span className="opacity-60 text-[7px] w-2">{student.student_number || idx + 1}</span>
         <span className="flex-1 text-center font-medium truncate tracking-tighter pr-0.5">{student.student_name}</span>
-        <div className={cn("absolute right-[1px] top-[2px] bottom-[2px] w-[2.5px] rounded-full", getDesireColor(student))} />
+        {!isLowerGrade && (
+          <div className={cn("absolute right-[1px] top-[2px] bottom-[2px] w-[2.5px] rounded-full", getDesireColor(student))} />
+        )}
       </div>
     </StudentPopover>
   );

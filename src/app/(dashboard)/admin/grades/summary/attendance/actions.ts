@@ -8,6 +8,7 @@ export interface ParsedAttendanceData {
   studentName: string;
   studentNumber: string;
   gradeObtained: number;
+  semester?: number;
   schoolDays: number;
   absentDisease: number;
   absentUnexcused: number;

@@ -573,8 +573,8 @@ export function StudentPopover({
         student={{
           id: student.id,
           student_name: student.student_name,
-          major: student.major,
-          class_info: student.class_info,
+          major: student.major || '',
+          class_info: student.class_info || '',
           student_number: student.student_number || ''
         }}
       />

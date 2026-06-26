@@ -39,9 +39,9 @@ function toTitleCase(str: string) {
 // 경로별 브레드크럼 매핑 정의
 const ROUTE_MAP: Record<string, { group: string; label: string }> = {
   '/dashboard': { group: '', label: '대시보드' },
-  '/employment-status': { group: '취업 및 실습 관리', label: '취업현황' },
-  '/company-info': { group: '취업 및 실습 관리', label: '업체정보' },
-  '/students': { group: '취업 및 실습 관리', label: '취업상세데이터' },
+  '/employment-status': { group: '취업진로관리', label: '취업진로현황' },
+  '/company-info': { group: '취업진로관리', label: '업체정보' },
+  '/students': { group: '취업진로관리', label: '취업상세데이터' },
   '/class-management': { group: '학사 및 지도', label: '학반 관리' },
   '/labor-education': { group: '학사 및 지도', label: '노동인권교육' },
   '/admin/students': { group: '학사 및 지도', label: '학생 등록/진급' },

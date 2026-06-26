@@ -12,6 +12,7 @@ interface EmploymentStatusGridProps {
   rankingMap: Record<string, any>;
   userProfile: any;
   baseYear?: number;
+  grade?: number;
 }
 
 const MAJOR_MAP: Record<string, string> = {
@@ -83,12 +84,26 @@ const getCompanyTypeVariant = (type?: string, businessType?: string, careerAspir
   return 'bg-white text-black border-gray-200';
 };
 
+const getLowerGradeAspirationVariant = (aspiration?: string) => {
+  if (!aspiration) return 'bg-white text-black border-gray-200';
+  
+  const normalized = aspiration.trim();
+  
+  if (normalized === '취업') return 'bg-emerald-500 text-white border-emerald-600';
+  if (normalized === '진학') return 'bg-rose-500 text-white border-rose-600';
+  if (normalized === '제외인정자') return 'bg-slate-400 text-white border-slate-500';
+  
+  return 'bg-white text-black border-gray-200';
+};
+
 interface SearchHeaderProps {
   onSearch: (query: string) => void;
   currentSearchQuery: string;
+  isLowerGrade?: boolean;
+  matchedCount?: number;
 }
 
-function SearchHeader({ onSearch, currentSearchQuery }: SearchHeaderProps) {
+function SearchHeader({ onSearch, currentSearchQuery, isLowerGrade, matchedCount }: SearchHeaderProps) {
   const [localValue, setLocalValue] = React.useState('');
 
   const handleSearch = () => {
@@ -112,7 +127,7 @@ function SearchHeader({ onSearch, currentSearchQuery }: SearchHeaderProps) {
         <Search className="h-5 w-5 text-slate-400 group-focus-within:text-blue-500 shrink-0" />
         <Input 
           type="text"
-          placeholder="이름, 기업, 진로코스 등 검색..."
+          placeholder={isLowerGrade ? "이름, 희망진로코스, 희망기업유형 등 검색..." : "이름, 기업, 진로코스 등 검색..."}
           value={localValue}
           onChange={(e) => setLocalValue(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -135,15 +150,15 @@ function SearchHeader({ onSearch, currentSearchQuery }: SearchHeaderProps) {
         검색
       </button>
       {currentSearchQuery && (
-        <span className="text-xs font-bold text-blue-600 animate-pulse hidden sm:inline bg-blue-50 px-2 py-1 rounded-full border border-blue-100">
-          "{currentSearchQuery}" 강조 중
+        <span className="text-xs font-bold text-blue-600 animate-pulse hidden sm:inline bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100 shrink-0">
+          "{currentSearchQuery}" 강조 중 (총 {matchedCount ?? 0}명)
         </span>
       )}
     </div>
   );
 }
 
-export function EmploymentStatusGrid({ allData, rankingMap, userProfile, baseYear }: EmploymentStatusGridProps) {
+export function EmploymentStatusGrid({ allData, rankingMap, userProfile, baseYear, grade }: EmploymentStatusGridProps) {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(false);
 
@@ -191,6 +206,37 @@ export function EmploymentStatusGrid({ allData, rankingMap, userProfile, baseYea
     });
   }, [groupedData, majorOrderMap]);
 
+  const isLowerGrade = grade === 1 || grade === 2;
+
+  // 강조 검색 대상에 매칭되는 학생 수 계산
+  const matchedCount = React.useMemo(() => {
+    if (!searchQuery || searchQuery.trim() === '') return 0;
+    const query = searchQuery.toLowerCase().trim();
+    
+    return allData.filter(student => {
+      const fieldsToSearch = isLowerGrade
+        ? [
+            student.student_name,
+            student.career_aspiration,
+            student.career_course,
+            student.special_notes,
+            student.major,
+            student.class_info
+          ]
+        : [
+            student.student_name,
+            student.employment_status,
+            student.company_type,
+            student.business_type,
+            student.company,
+            student.latest_training_company,
+            student.major,
+            student.class_info
+          ];
+      return fieldsToSearch.some(field => field?.toLowerCase().includes(query));
+    }).length;
+  }, [allData, searchQuery, isLowerGrade]);
+
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center min-h-[400px]">
@@ -202,7 +248,12 @@ export function EmploymentStatusGrid({ allData, rankingMap, userProfile, baseYea
   return (
     <div className="flex flex-col h-full gap-4">
       {/* 클라이언트 사이드 검색창 (독립된 상태 관리로 타이핑 렉 제거) */}
-      <SearchHeader onSearch={setSearchQuery} currentSearchQuery={searchQuery} />
+      <SearchHeader 
+        onSearch={setSearchQuery} 
+        currentSearchQuery={searchQuery} 
+        isLowerGrade={isLowerGrade} 
+        matchedCount={matchedCount} 
+      />
 
       <div className="flex-1 overflow-x-auto overflow-y-auto bg-gray-50/50 rounded-xl border border-slate-200 shadow-sm p-2 sm:p-4">
         <div className="flex gap-px bg-gray-300 border border-gray-300 min-w-max mx-auto shadow-sm">
@@ -217,23 +268,31 @@ export function EmploymentStatusGrid({ allData, rankingMap, userProfile, baseYea
                 <div className="bg-[#f2f2f2] border-b border-gray-300 h-8 flex items-center justify-center font-bold text-[9px] sm:text-[10px] text-gray-700 px-0.5 text-center leading-tight whitespace-nowrap overflow-hidden">
                   {className}
                 </div>
-                <div className="bg-emerald-500 text-white h-6 flex items-center justify-center font-bold text-[10.5px]">
+                <div className="bg-sky-500 text-white h-6 flex items-center justify-center font-bold text-[10.5px]">
                   {totalCount}
                 </div>
 
                 <div className="flex flex-col">
-                  {students.map((student, idx) => (
-                    <StudentGridCell 
-                      key={student.id}
-                      student={student}
-                      idx={idx}
-                      variant={getCompanyTypeVariant(student.company_type, student.business_type)}
-                      rankingSummary={rankingMap[student.id]}
-                      userProfile={userProfile}
-                      searchQuery={searchQuery}
-                      baseYear={baseYear}
-                    />
-                  ))}
+                  {students.map((student, idx) => {
+                    const isLowerGrade = grade === 1 || grade === 2;
+                    const cellVariant = isLowerGrade
+                      ? getLowerGradeAspirationVariant(student.career_aspiration)
+                      : getCompanyTypeVariant(student.company_type, student.business_type);
+
+                    return (
+                      <StudentGridCell 
+                        key={student.id}
+                        student={student}
+                        idx={idx}
+                        variant={cellVariant}
+                        rankingSummary={rankingMap[student.id]}
+                        userProfile={userProfile}
+                        searchQuery={searchQuery}
+                        baseYear={baseYear}
+                        isLowerGrade={isLowerGrade}
+                      />
+                    );
+                  })}
                   {Array.from({ length: Math.max(0, 24 - students.length) }).map((_, i) => (
                     <div key={i} className="h-7 border-b border-gray-100 bg-white"></div>
                   ))}

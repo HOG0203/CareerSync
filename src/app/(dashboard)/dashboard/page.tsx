@@ -6,8 +6,7 @@ import {
 } from '@/lib/data';
 import { LayoutDashboard } from 'lucide-react';
 import DashboardFilters from '@/components/dashboard/dashboard-filters';
-import Grade3View from '@/components/dashboard/grade3-view';
-import LowerGradeView from '@/components/dashboard/lower-grade-view';
+import DashboardViewWrapper from '@/components/dashboard/dashboard-view-wrapper';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { redirect } from 'next/navigation';
 import React from 'react';
@@ -147,25 +146,17 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      {/* 학년별 조건부 뷰 전환 */}
-      {grade === 3 ? (
-        <Grade3View 
-          filteredData={filteredData}
-          selectedMajor={selectedMajor}
-          employmentRate={employmentRate}
-          employedStudents={employedStudents}
-          excludingStudents={excludingStudents}
-          trainingStudents={trainingStudents}
-          majorCompanyStudents={majorCompanyStudents}
-          grade={grade}
-        />
-      ) : (
-        <LowerGradeView 
-          filteredData={filteredData}
-          selectedMajor={selectedMajor}
-          grade={grade}
-        />
-      )}
+      {/* 학년별 조건부 뷰 전환 (로딩 스켈레톤 관리 래퍼 도입) */}
+      <DashboardViewWrapper
+        filteredData={filteredData}
+        selectedMajor={selectedMajor}
+        employmentRate={employmentRate}
+        employedStudents={employedStudents}
+        excludingStudents={excludingStudents}
+        trainingStudents={trainingStudents}
+        majorCompanyStudents={majorCompanyStudents}
+        grade={grade}
+      />
     </div>
   );
 }

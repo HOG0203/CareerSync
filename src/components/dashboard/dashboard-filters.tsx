@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { X, Calendar, GraduationCap, Building2, LayoutGrid, ListFilter } from 'lucide-react';
+import { X, Calendar, GraduationCap, Building2, LayoutGrid, ListFilter, Search } from 'lucide-react';
 import * as React from 'react';
 
 interface FilterOption {
@@ -55,6 +55,60 @@ export default function DashboardFilters({
   const currentClass = searchParams.get('class') || 'all';
   const currentStatus = searchParams.get('status') || 'all';
 
+  const [selectedAY, setSelectedAY] = React.useState(currentAY);
+  const [selectedGrade, setSelectedGrade] = React.useState(currentGrade);
+  const [selectedMajor, setSelectedMajor] = React.useState(currentMajor);
+  const [selectedClass, setSelectedClass] = React.useState(currentClass);
+  const [selectedStatus, setSelectedStatus] = React.useState(currentStatus);
+
+  // URL 변경 시 로컬 상태 동기화
+  React.useEffect(() => {
+    setSelectedAY(currentAY);
+    setSelectedGrade(currentGrade);
+    setSelectedMajor(currentMajor);
+    setSelectedClass(currentClass);
+    setSelectedStatus(currentStatus);
+  }, [currentAY, currentGrade, currentMajor, currentClass, currentStatus]);
+
+  const handleAYChange = (val: string) => {
+    setSelectedAY(val);
+    setSelectedMajor('all');
+    setSelectedClass('all');
+    setSelectedStatus('all');
+  };
+
+  const handleGradeChange = (val: string) => {
+    setSelectedGrade(val);
+    setSelectedMajor('all');
+    setSelectedClass('all');
+    setSelectedStatus('all');
+  };
+
+  const handleMajorChange = (val: string) => {
+    setSelectedMajor(val);
+    setSelectedClass('all');
+    setSelectedStatus('all');
+  };
+
+  const handleSearch = () => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('dashboard-loading'));
+    }
+    const params = new URLSearchParams();
+    const ay = parseInt(selectedAY);
+    const grade = parseInt(selectedGrade);
+    const gradYear = ay + (4 - grade);
+    
+    params.set('ay', selectedAY);
+    params.set('grade', selectedGrade);
+    params.set('year', gradYear.toString());
+    params.set('major', selectedMajor);
+    params.set('class', selectedClass);
+    params.set('status', selectedStatus);
+    
+    router.push(`${baseUrl}?${params.toString()}`);
+  };
+
   const academicYears = React.useMemo(() => {
     const years = new Set<number>();
     graduationYears.forEach(gy => years.add(gy - 1));
@@ -70,28 +124,6 @@ export default function DashboardFilters({
     );
   }
 
-  const updateFilters = (key: string, value: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    
-    if (key === 'ay' || key === 'grade') {
-      const ay = key === 'ay' ? parseInt(value) : parseInt(currentAY);
-      const grade = key === 'grade' ? parseInt(value) : parseInt(currentGrade);
-      const gradYear = ay + (4 - grade);
-      params.set('ay', ay.toString());
-      params.set('grade', grade.toString());
-      params.set('year', gradYear.toString());
-      
-      // 학년/학년도 변경 시 세부 필터 초기화
-      params.delete('major');
-      params.delete('class');
-      params.delete('status');
-    } else {
-      params.set(key, value);
-      if (key === 'major') params.delete('class');
-    }
-    router.push(`${baseUrl}?${params.toString()}`);
-  };
-
   const resetFilters = () => router.push(baseUrl);
   const hasActiveFilters = searchParams.get('ay') || searchParams.get('grade') || searchParams.get('major') || searchParams.get('class') || searchParams.get('status');
 
@@ -103,7 +135,7 @@ export default function DashboardFilters({
           <>
             <div className="flex items-center gap-1 px-1">
               <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-              <Select value={currentAY} onValueChange={(v) => updateFilters('ay', v)}>
+              <Select value={selectedAY} onValueChange={handleAYChange}>
                 <SelectTrigger className="w-[95px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 overflow-hidden">
                   <SelectValue placeholder="학년도" />
                 </SelectTrigger>
@@ -119,7 +151,7 @@ export default function DashboardFilters({
                 <div className="w-[1px] h-4 bg-slate-200" />
                 <div className="flex items-center gap-1 px-1">
                   <GraduationCap className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                  <Select value={currentGrade} onValueChange={(v) => updateFilters('grade', v)}>
+                  <Select value={selectedGrade} onValueChange={handleGradeChange}>
                     <SelectTrigger className="w-[70px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 overflow-hidden">
                       <SelectValue placeholder="학년" />
                     </SelectTrigger>
@@ -139,7 +171,7 @@ export default function DashboardFilters({
         {/* 학과 필터 */}
         <div className="flex items-center gap-1 px-1">
           <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-          <Select value={currentMajor} onValueChange={(v) => updateFilters('major', v)}>
+          <Select value={selectedMajor} onValueChange={handleMajorChange}>
             <SelectTrigger className="w-[130px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 overflow-hidden">
               <SelectValue placeholder="전체 학과" />
             </SelectTrigger>
@@ -162,7 +194,7 @@ export default function DashboardFilters({
         {/* 학반 필터 */}
         <div className="flex items-center gap-1 px-1">
           <LayoutGrid className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-          <Select value={currentClass} onValueChange={(v) => updateFilters('class', v)}>
+          <Select value={selectedClass} onValueChange={setSelectedClass}>
             <SelectTrigger className="w-[90px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 overflow-hidden">
               <SelectValue placeholder="전체 반" />
             </SelectTrigger>
@@ -185,7 +217,7 @@ export default function DashboardFilters({
         {/* 취업여부 필터 */}
         <div className="flex items-center gap-1 px-1">
           <ListFilter className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-          <Select value={currentStatus} onValueChange={(v) => updateFilters('status', v)}>
+          <Select value={selectedStatus} onValueChange={setSelectedStatus}>
             <SelectTrigger className="w-[115px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 overflow-hidden">
               <SelectValue placeholder="취업여부" />
             </SelectTrigger>
@@ -203,6 +235,14 @@ export default function DashboardFilters({
           </Select>
         </div>
       </div>
+      
+      <Button 
+        onClick={handleSearch}
+        className="h-9 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-sm transition-all active:scale-95 shrink-0"
+      >
+        <Search className="h-3.5 w-3.5" />
+        조회
+      </Button>
       
       {hasActiveFilters && (
         <Button variant="ghost" size="sm" onClick={resetFilters} className="h-9 px-2 text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50">
