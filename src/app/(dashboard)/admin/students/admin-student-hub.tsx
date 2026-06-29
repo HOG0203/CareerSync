@@ -191,6 +191,7 @@ export function AdminStudentHub({
             searchPlaceholder="빠른 학생 검색..."
             masterCertificates={masterCertificates}
             disableNamePopover={true}
+            baseYear={settings.baseYear}
           />
         </CardContent>
       </Card>

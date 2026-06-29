@@ -76,11 +76,6 @@ const getCompanyTypeVariant = (type?: string, businessType?: string, careerAspir
     }
   }
 
-  // 3순위: [추가] 2학년 등 미취업자의 경우 '진로희망'을 기반으로 연한 색상 표시
-  if (careerAspiration === '취업') return 'bg-emerald-50 text-emerald-600 border-emerald-100';
-  if (careerAspiration === '진학') return 'bg-indigo-50 text-indigo-600 border-indigo-100';
-  if (careerAspiration === '제외인정자') return 'bg-slate-100 text-slate-500 border-slate-200';
-
   return 'bg-white text-black border-gray-200';
 };
 
@@ -277,7 +272,7 @@ export function EmploymentStatusGrid({ allData, rankingMap, userProfile, baseYea
                     const isLowerGrade = grade === 1 || grade === 2;
                     const cellVariant = isLowerGrade
                       ? getLowerGradeAspirationVariant(student.career_aspiration)
-                      : getCompanyTypeVariant(student.company_type, student.business_type);
+                      : getCompanyTypeVariant(student.company_type, student.business_type, student.career_aspiration);
 
                     return (
                       <StudentGridCell 

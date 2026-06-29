@@ -269,13 +269,15 @@ export function StudentTable({
   isAdmin = false, 
   masterCertificates = [],
   rankingMap = {},
-  userProfile = null
+  userProfile = null,
+  baseYear
 }: { 
   initialData: any[], 
   isAdmin?: boolean,
   masterCertificates?: MasterCertificate[],
   rankingMap?: Record<string, any>,
-  userProfile?: any
+  userProfile?: any,
+  baseYear?: number
 }) {
   const [selectedStudent, setSelectedStudent] = React.useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = React.useState(false)
@@ -326,6 +328,7 @@ export function StudentTable({
           masterCertificates={masterCertificates}
           rankingMap={rankingMap}
           userProfile={userProfile}
+          baseYear={baseYear}
         />
       </div>
 

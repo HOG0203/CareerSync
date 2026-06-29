@@ -46,7 +46,7 @@ import {
 import { cn } from '@/lib/utils';
 import * as React from 'react';
 
-export default function Nav({ isAdmin = false }: { isAdmin?: boolean }) {
+export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolean; userProfile?: any }) {
   const [mounted, setMounted] = React.useState(false);
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
@@ -63,6 +63,9 @@ export default function Nav({ isAdmin = false }: { isAdmin?: boolean }) {
     setOpenMobile(false);
   };
 
+  const userGrade = userProfile?.assigned_grade;
+  const isLowerGradeTeacher = userProfile?.role === 'teacher' && (userGrade === 1 || userGrade === 2);
+
   // 그룹 정의
   const groups = [
     {
@@ -71,7 +74,7 @@ export default function Nav({ isAdmin = false }: { isAdmin?: boolean }) {
       items: [
         { href: '/employment-status', label: '취업진로현황', icon: Grid3X3 },
         { href: '/company-info', label: '업체정보', icon: Factory },
-        { href: '/students', label: '취업상세데이터', icon: ClipboardList },
+        ...(!isLowerGradeTeacher ? [{ href: '/students', label: '취업상세데이터', icon: ClipboardList }] : []),
       ]
     },
     {
@@ -79,7 +82,7 @@ export default function Nav({ isAdmin = false }: { isAdmin?: boolean }) {
       icon: GraduationCap,
       items: [
         { href: '/class-management', label: '학반 관리', icon: BookUser },
-        { href: '/labor-education', label: '노동인권교육', icon: ShieldAlert },
+        ...(!isLowerGradeTeacher ? [{ href: '/labor-education', label: '노동인권교육', icon: ShieldAlert }] : []),
         ...(isAdmin ? [{ href: '/admin/students', label: '학생 등록/진급', icon: UserPlus }] : []),
       ]
     },
@@ -105,6 +108,54 @@ export default function Nav({ isAdmin = false }: { isAdmin?: boolean }) {
           <div className="h-10 w-full bg-slate-50 animate-pulse rounded-md mt-4" />
           <div className="h-10 w-full bg-slate-50 animate-pulse rounded-md mt-4" />
         </SidebarContent>
+      </>
+    );
+  }
+
+  if (isLowerGradeTeacher) {
+    const flatItems = [
+      { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
+      { href: '/employment-status', label: '취업진로현황', icon: Grid3X3 },
+      { href: '/company-info', label: '업체정보', icon: Factory },
+      { href: '/class-management', label: '학반 관리', icon: BookUser },
+    ];
+
+    return (
+      <>
+        <SidebarHeader>
+          <Logo />
+        </SidebarHeader>
+        <SidebarContent className="p-2 gap-4">
+          <SidebarMenu className="gap-1.5">
+            {flatItems.map((item) => (
+              <SidebarMenuItem key={item.href}>
+                <SidebarMenuButton 
+                  asChild 
+                  isActive={pathname === item.href}
+                  className={cn(
+                    "h-10 px-3",
+                    pathname === item.href ? "bg-blue-50 text-blue-600 hover:bg-blue-50 hover:text-blue-600" : ""
+                  )}
+                >
+                  <Link href={item.href} onClick={closeMobile}>
+                    <item.icon className={cn("mr-2 h-4 w-4", pathname === item.href ? "text-blue-600" : "text-slate-500")} />
+                    <span className="font-bold">{item.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarContent>
+        <SidebarFooter className="p-2 border-t border-slate-50">
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start text-slate-500 hover:text-rose-600 hover:bg-rose-50 h-10 px-3 transition-colors"
+            onClick={handleLogout}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            <span className="font-medium">로그아웃</span>
+          </Button>
+        </SidebarFooter>
       </>
     );
   }

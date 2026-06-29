@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Select,
@@ -8,45 +9,99 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Check } from 'lucide-react';
+import { Check, Search, Loader2 } from 'lucide-react';
 
 interface AdminClassSelectorProps {
   availableGrades: number[];
-  majors: string[];
-  classes: string[];
   isAdmin?: boolean;
+  classStructure: Record<number, Record<string, string[]>>;
+  defaultGrade: number;
+  defaultMajor: string;
+  defaultClass: string;
 }
 
-export default function AdminClassSelector({ availableGrades, majors, classes, isAdmin }: AdminClassSelectorProps) {
+export default function AdminClassSelector({
+  availableGrades,
+  isAdmin,
+  classStructure,
+  defaultGrade,
+  defaultMajor,
+  defaultClass,
+}: AdminClassSelectorProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [isLoading, setIsLoading] = React.useState(false);
 
-  // URL 파라미터가 있으면 우선 사용, 없으면 3학년(목록에 있으면) 또는 첫 번째 항목 사용
-  const currentGrade = searchParams.get('grade') || (availableGrades.includes(3) ? '3' : String(availableGrades[0] || '3'));
-  const currentMajor = searchParams.get('major') || majors[0] || '';
-  const currentClass = searchParams.get('class') || classes[0] || '';
+  // 로컬 선택 상태 관리
+  const [selectedGrade, setSelectedGrade] = React.useState(String(defaultGrade));
+  const [selectedMajor, setSelectedMajor] = React.useState(defaultMajor);
+  const [selectedClass, setSelectedClass] = React.useState(defaultClass);
 
-  const updateParam = (key: string, value: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set(key, value);
-    // 학년이 바뀌면 학과/반 목록이 달라지므로 초기화
-    if (key === 'grade' && isAdmin) {
-      params.delete('major');
-      params.delete('class');
+  // URL 파라미터나 외부 props 변경 시 로컬 상태 동기화 및 로딩 상태 해제
+  React.useEffect(() => {
+    setSelectedGrade(String(defaultGrade));
+    setSelectedMajor(defaultMajor);
+    setSelectedClass(defaultClass);
+    setIsLoading(false);
+  }, [defaultGrade, defaultMajor, defaultClass]);
+
+  // 학년 변경 시 해당 학년의 첫 학과 및 첫 반 자동 선택
+  const handleGradeChange = (gradeVal: string) => {
+    setSelectedGrade(gradeVal);
+    if (isAdmin) {
+      const gNum = parseInt(gradeVal);
+      const gradeMajors = classStructure[gNum] || {};
+      const majorNames = Object.keys(gradeMajors);
+      const nextMajor = majorNames[0] || '';
+      setSelectedMajor(nextMajor);
+      
+      const nextClasses = gradeMajors[nextMajor] || [];
+      setSelectedClass(nextClasses[0] || '');
     }
-    // 학과가 바뀌면 반 목록이 달라지므로 초기화
-    if (key === 'major' && isAdmin) {
-      params.delete('class');
+  };
+
+  // 학과 변경 시 해당 학과의 첫 반 자동 선택
+  const handleMajorChange = (majorVal: string) => {
+    setSelectedMajor(majorVal);
+    if (isAdmin) {
+      const gNum = parseInt(selectedGrade);
+      const gradeMajors = classStructure[gNum] || {};
+      const nextClasses = gradeMajors[majorVal] || [];
+      setSelectedClass(nextClasses[0] || '');
     }
+  };
+
+  const handleSearch = () => {
+    setIsLoading(true);
+    const params = new URLSearchParams();
+    params.set('grade', selectedGrade);
+    params.set('major', selectedMajor);
+    params.set('class', selectedClass);
     router.push(`/class-management?${params.toString()}`);
   };
+
+  // 현재 선택된 학년 기준의 학과 목록
+  const currentMajors = React.useMemo(() => {
+    if (!isAdmin) return [defaultMajor];
+    const gNum = parseInt(selectedGrade);
+    return Object.keys(classStructure[gNum] || {});
+  }, [selectedGrade, classStructure, isAdmin, defaultMajor]);
+
+  // 현재 선택된 학년 및 학과 기준의 반 목록
+  const currentClasses = React.useMemo(() => {
+    if (!isAdmin) return [defaultClass];
+    const gNum = parseInt(selectedGrade);
+    const gradeMajors = classStructure[gNum] || {};
+    return gradeMajors[selectedMajor] || [];
+  }, [selectedGrade, selectedMajor, classStructure, isAdmin, defaultClass]);
 
   return (
     <div className="flex flex-wrap items-center gap-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100 shadow-sm">
       <div className="flex items-center gap-2">
         <span className="text-xs font-bold text-blue-700 whitespace-nowrap uppercase tracking-wider">학년</span>
-        <Select value={currentGrade} onValueChange={(v) => updateParam('grade', v)}>
+        <Select value={selectedGrade} onValueChange={handleGradeChange} disabled={!isAdmin || isLoading}>
           <SelectTrigger className="w-[120px] h-9 text-xs bg-white border-blue-200">
             <SelectValue placeholder="학년 선택" />
           </SelectTrigger>
@@ -60,12 +115,12 @@ export default function AdminClassSelector({ availableGrades, majors, classes, i
 
       <div className="flex items-center gap-2">
         <span className="text-xs font-bold text-blue-700 whitespace-nowrap uppercase tracking-wider">학과</span>
-        <Select value={currentMajor} onValueChange={(v) => updateParam('major', v)} disabled={!isAdmin}>
+        <Select value={selectedMajor} onValueChange={handleMajorChange} disabled={!isAdmin || isLoading}>
           <SelectTrigger className={cn("w-[180px] h-9 text-xs bg-white border-blue-200", !isAdmin && "bg-slate-50 opacity-80")}>
             <SelectValue placeholder="학과 선택" />
           </SelectTrigger>
           <SelectContent>
-            {majors.map(m => (
+            {currentMajors.map(m => (
               <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>
             ))}
           </SelectContent>
@@ -74,17 +129,37 @@ export default function AdminClassSelector({ availableGrades, majors, classes, i
 
       <div className="flex items-center gap-2">
         <span className="text-xs font-bold text-blue-700 whitespace-nowrap uppercase tracking-wider">반</span>
-        <Select value={currentClass} onValueChange={(v) => updateParam('class', v)} disabled={!isAdmin}>
+        <Select value={selectedClass} onValueChange={setSelectedClass} disabled={!isAdmin || isLoading}>
           <SelectTrigger className={cn("w-[100px] h-9 text-xs bg-white border-blue-200", !isAdmin && "bg-slate-50 opacity-80")}>
             <SelectValue placeholder="반 선택" />
           </SelectTrigger>
           <SelectContent>
-            {classes.sort().map(c => (
+            {currentClasses.sort().map(c => (
               <SelectItem key={c} value={c} className="text-xs">{c}반</SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
+
+      {isAdmin && (
+        <Button
+          onClick={handleSearch}
+          disabled={isLoading}
+          className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md transition-all active:scale-95 shrink-0"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              조회 중...
+            </>
+          ) : (
+            <>
+              <Search className="h-3.5 w-3.5" />
+              조회
+            </>
+          )}
+        </Button>
+      )}
       
       <div className="ml-auto flex items-center gap-4">
         {isAdmin ? (

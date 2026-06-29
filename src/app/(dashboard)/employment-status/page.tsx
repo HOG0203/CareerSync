@@ -36,17 +36,15 @@ export default async function EmploymentStatusPage({
     getCurrentUserProfile()
   ]);
 
-  // 담임 교사인 경우 해당 학년의 '3학년 시점' 학사학년도를 기본값으로 설정
-  let defaultAY = settings.baseYear;
+  // 담임 교사인 경우 해당 학년과 현재 학사학년도를 기본값으로 설정
+  const defaultAY = settings.baseYear;
+  let defaultGrade = 3;
   if (userProfile?.role === 'teacher' && userProfile.assigned_grade) {
-    // 3학년 담임 -> 현재 학사학년도 (예: 2026)
-    // 2학년 담임 -> 다음 학사학년도 (예: 2027)
-    // 1학년 담임 -> 다다음 학사학년도 (예: 2028)
-    defaultAY = settings.baseYear + (3 - userProfile.assigned_grade);
+    defaultGrade = userProfile.assigned_grade;
   }
 
   const ay = params.ay ? parseInt(params.ay) : defaultAY;
-  const grade = params.grade ? parseInt(params.grade) : 3;
+  const grade = params.grade ? parseInt(params.grade) : defaultGrade;
   const calculatedGradYear = (ay + (4 - grade)).toString();
   const selectedYear = params.year || calculatedGradYear;
 
@@ -77,6 +75,7 @@ export default async function EmploymentStatusPage({
               defaultYear={calculatedGradYear}
               baseYear={settings.baseYear}
               initialAY={ay.toString()}
+              initialGrade={grade.toString()}
             />
           </div>
           

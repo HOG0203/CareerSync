@@ -61,6 +61,7 @@ interface SpreadsheetTableProps {
   rankingMap?: Record<string, any>
   userProfile?: any
   disableNamePopover?: boolean
+  baseYear?: number
 }
 
 const normalizeCertificates = (value: any): string[] => {
@@ -135,7 +136,7 @@ const TableHeader = React.memo(({ columns, groupHeaders, filterOptions, columnFi
 TableHeader.displayName = 'TableHeader';
 
 // --- 데이터 셀 ---
-const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, isEditing, isSelected, isFocused, onMouseDown, onMouseEnter, onStartEdit, onEndEdit, onSave, onAction, rankingMap, userProfile, disableNamePopover }: any) => {
+const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, isEditing, isSelected, isFocused, onMouseDown, onMouseEnter, onStartEdit, onEndEdit, onSave, onAction, rankingMap, userProfile, disableNamePopover, baseYear }: any) => {
   const [localValue, setLocalValue] = React.useState(value || '')
   const [isManualInput, setIsManualInput] = React.useState(false)
   const isManualRef = React.useRef(false)
@@ -221,7 +222,7 @@ const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, isEditi
           <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] bg-blue-50 text-blue-600 font-bold hover:bg-blue-100" onClick={(e) => { e.stopPropagation(); onAction?.(id, field); }}>상세보기</Button>
         ) : field === 'student_name' ? (
           !disableNamePopover ? (
-            <StudentPopover student={rowData} rankingSummary={rankingMap?.[id]} userProfile={userProfile}>
+            <StudentPopover student={rowData} rankingSummary={rankingMap?.[id]} userProfile={userProfile} baseYear={baseYear}>
               <h3 className="font-bold text-slate-900 truncate hover:text-blue-600 transition-colors cursor-pointer underline decoration-dotted decoration-blue-300 underline-offset-4">{value || ''}</h3>
             </StudentPopover>
           ) : (
@@ -249,18 +250,18 @@ const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, isEditi
 SpreadsheetCell.displayName = 'SpreadsheetCell';
 
 // --- 데이터 행 ---
-const SpreadsheetRow = React.memo(({ row, rIdx, columns, selMinR, selMaxR, selMinC, selMaxC, selStart, editCell, onMouseDown, onMouseEnter, onStartEdit, onEndEdit, onSave, isSelectedRow, onSelectRow, onAction, rankingMap, userProfile, disableNamePopover }: any) => {
+const SpreadsheetRow = React.memo(({ row, rIdx, columns, selMinR, selMaxR, selMinC, selMaxC, selStart, editCell, onMouseDown, onMouseEnter, onStartEdit, onEndEdit, onSave, isSelectedRow, onSelectRow, onAction, rankingMap, userProfile, disableNamePopover, baseYear }: any) => {
   const isRowInSelection = rIdx >= selMinR && rIdx <= selMaxR;
   return (
     <tr className={cn("h-8 transition-none hover:bg-slate-50/50", isSelectedRow && "bg-blue-50/30")}>
       <td className="border-r border-b w-8 p-0 bg-white"><div className="flex items-center justify-center h-8"><Checkbox checked={isSelectedRow} onCheckedChange={(val) => onSelectRow(row.id, !!val)} /></div></td>
       {columns.map((col: any, cIdx: number) => (
-        <SpreadsheetCell key={col.key} id={row.id} field={col.key} value={row[col.key]} config={col} rowData={row} isSelected={isRowInSelection && cIdx >= selMinC && cIdx <= selMaxC} isFocused={selStart?.row === rIdx && selStart?.col === cIdx} isEditing={editCell?.row === rIdx && editCell?.col === cIdx} onMouseDown={(m: any) => onMouseDown(rIdx, cIdx, m)} onMouseEnter={() => onMouseEnter(rIdx, cIdx)} onStartEdit={() => onStartEdit(rIdx, cIdx)} onEndEdit={onEndEdit} onSave={onSave} onAction={onAction} rankingMap={rankingMap} userProfile={userProfile} disableNamePopover={disableNamePopover} />
+        <SpreadsheetCell key={col.key} id={row.id} field={col.key} value={row[col.key]} config={col} rowData={row} isSelected={isRowInSelection && cIdx >= selMinC && cIdx <= selMaxC} isFocused={selStart?.row === rIdx && selStart?.col === cIdx} isEditing={editCell?.row === rIdx && editCell?.col === cIdx} onMouseDown={(m: any) => onMouseDown(rIdx, cIdx, m)} onMouseEnter={() => onMouseEnter(rIdx, cIdx)} onStartEdit={() => onStartEdit(rIdx, cIdx)} onEndEdit={onEndEdit} onSave={onSave} onAction={onAction} rankingMap={rankingMap} userProfile={userProfile} disableNamePopover={disableNamePopover} baseYear={baseYear} />
       ))}
     </tr>
   );
 }, (p, n) => {
-  if (p.rIdx !== n.rIdx || p.row !== n.row || p.isSelectedRow !== n.isSelectedRow || p.rankingMap !== n.rankingMap || p.userProfile !== n.userProfile || p.disableNamePopover !== n.disableNamePopover) return false;
+  if (p.rIdx !== n.rIdx || p.row !== n.row || p.isSelectedRow !== n.isSelectedRow || p.rankingMap !== n.rankingMap || p.userProfile !== n.userProfile || p.disableNamePopover !== n.disableNamePopover || p.baseYear !== n.baseYear) return false;
   const wasIn = p.rIdx >= p.selMinR && p.rIdx <= p.selMaxR;
   const isIn = n.rIdx >= n.selMinR && n.rIdx <= n.selMaxR;
   if (wasIn !== isIn || (isIn && (p.selMinC !== n.selMinC || p.selMaxC !== n.selMaxC))) return false;
@@ -364,7 +365,8 @@ export function StandardSpreadsheetTable({
   masterCertificates = [],
   rankingMap = {},
   userProfile = null,
-  disableNamePopover = false
+  disableNamePopover = false,
+  baseYear
 }: SpreadsheetTableProps) {
   const [mounted, setMounted] = React.useState(false);
   const isMobile = useIsMobile(); const router = useRouter(); const [data, setData] = React.useState(initialData); const { toast } = useToast();
@@ -618,7 +620,7 @@ export function StandardSpreadsheetTable({
                 for (let i = start; i <= end; i++) { 
                   const row = filteredData[i];
                   if (!row) continue;
-                  rows.push(<SpreadsheetRow key={row.id} rIdx={i} row={row} columns={columns} selMinR={sMinR} selMaxR={sMaxR} selMinC={sMinC} selMaxC={sMaxC} selStart={selectionStart} editCell={editingCell} onMouseDown={handleMouseDown} onMouseEnter={handleMouseEnter} onStartEdit={(r:any,c:any)=>{ if(columns[c].type==='multi-select'){ setEditingCell({row:r,col:c}); setIsPickerOpen(true); } else setEditingCell({row:r,col:c}); }} onEndEdit={()=>setEditingCell(null)} onSave={handleSaveInternal} isSelectedRow={selectedRowIds.includes(row.id)} onSelectRow={(id:any,v:any)=>syncSelected(v?[...selectedRowIds,id]:selectedRowIds.filter(x=>x!==id))} onAction={onAction} rankingMap={rankingMap} userProfile={userProfile} disableNamePopover={disableNamePopover} />); 
+                  rows.push(<SpreadsheetRow key={row.id} rIdx={i} row={row} columns={columns} selMinR={sMinR} selMaxR={sMaxR} selMinC={sMinC} selMaxC={sMaxC} selStart={selectionStart} editCell={editingCell} onMouseDown={handleMouseDown} onMouseEnter={handleMouseEnter} onStartEdit={(r:any,c:any)=>{ if(columns[c].type==='multi-select'){ setEditingCell({row:r,col:c}); setIsPickerOpen(true); } else setEditingCell({row:r,col:c}); }} onEndEdit={()=>setEditingCell(null)} onSave={handleSaveInternal} isSelectedRow={selectedRowIds.includes(row.id)} onSelectRow={(id:any,v:any)=>syncSelected(v?[...selectedRowIds,id]:selectedRowIds.filter(x=>x!==id))} onAction={onAction} rankingMap={rankingMap} userProfile={userProfile} disableNamePopover={disableNamePopover} baseYear={baseYear} />); 
                 }
                 if (end < totalCount - 1) rows.push(<tr key="b" style={{ height: (totalCount - 1 - end) * ROW_HEIGHT }}><td colSpan={columns.length + 1} className="border-none"></td></tr>); return rows;
               })()}
@@ -652,7 +654,7 @@ export function StandardSpreadsheetTable({
                     <div className="min-w-0">
                       {/* 모바일에서도 이름 클릭 시 팝오버(또는 상세보기) 가능하게 처리 */}
                       {!disableNamePopover ? (
-                        <StudentPopover student={row} rankingSummary={rankingMap?.[row.id]} userProfile={userProfile}>
+                        <StudentPopover student={row} rankingSummary={rankingMap?.[row.id]} userProfile={userProfile} baseYear={baseYear}>
                           <h3 className="font-bold text-slate-900 truncate hover:text-blue-600 transition-colors cursor-pointer">{row[titleCol?.key || ''] || '이름 없음'}</h3>
                         </StudentPopover>
                       ) : (

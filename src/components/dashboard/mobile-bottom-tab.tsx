@@ -13,22 +13,32 @@ import {
 import { cn } from '@/lib/utils';
 import { useSidebar } from '@/components/ui/sidebar';
 
-export function MobileBottomTab({ isAdmin = false, role }: { isAdmin?: boolean, role?: string }) {
+export function MobileBottomTab({ isAdmin = false, role, userGrade }: { isAdmin?: boolean; role?: string; userGrade?: number }) {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
+  const isLowerGradeTeacher = role === 'teacher' && (userGrade === 1 || userGrade === 2);
 
   // 담임 선생님(teacher)과 관리자(admin)의 하단 탭 구성을 다르게 설정
-  const tabs = role === 'teacher' ? [
-    { href: '/dashboard', label: '홈', icon: LayoutDashboard },
-    { href: '/employment-status', label: '현황', icon: Grid3X3 },
-    { href: '/students', label: '취업데이터', icon: ClipboardList },
-    { href: '/class-management', label: '학반관리', icon: BookUser },
-  ] : [
-    { href: '/dashboard', label: '홈', icon: LayoutDashboard },
-    { href: '/employment-status', label: '현황', icon: Grid3X3 },
-    { href: '/company-info', label: '업체정보', icon: Factory },
-    { href: '/students', label: '취업데이터', icon: ClipboardList },
-  ];
+  const tabs = isLowerGradeTeacher
+    ? [
+        { href: '/dashboard', label: '홈', icon: LayoutDashboard },
+        { href: '/employment-status', label: '현황', icon: Grid3X3 },
+        { href: '/company-info', label: '업체정보', icon: Factory },
+        { href: '/class-management', label: '학반관리', icon: BookUser },
+      ]
+    : role === 'teacher'
+    ? [
+        { href: '/dashboard', label: '홈', icon: LayoutDashboard },
+        { href: '/employment-status', label: '현황', icon: Grid3X3 },
+        { href: '/students', label: '취업데이터', icon: ClipboardList },
+        { href: '/class-management', label: '학반관리', icon: BookUser },
+      ]
+    : [
+        { href: '/dashboard', label: '홈', icon: LayoutDashboard },
+        { href: '/employment-status', label: '현황', icon: Grid3X3 },
+        { href: '/company-info', label: '업체정보', icon: Factory },
+        { href: '/students', label: '취업데이터', icon: ClipboardList },
+      ];
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around h-16 bg-white border-t border-slate-100 pb-safe shadow-[0_-4px_12px_rgba(0,0,0,0.05)] lg:hidden px-2">
       {tabs.map((tab) => {

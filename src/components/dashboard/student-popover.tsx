@@ -39,6 +39,7 @@ interface StudentPopoverProps {
   side?: 'top' | 'right' | 'bottom' | 'left';
   align?: 'start' | 'center' | 'end';
   baseYear?: number;
+  isLowerGrade?: boolean;
 }
 
 export function StudentPopover({ 
@@ -48,7 +49,8 @@ export function StudentPopover({
   userProfile,
   side = 'right',
   align = 'start',
-  baseYear
+  baseYear,
+  isLowerGrade: propIsLowerGrade
 }: StudentPopoverProps) {
   const [isGradeModalOpen, setIsGradeModalOpen] = React.useState(false);
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = React.useState(false);
@@ -58,7 +60,7 @@ export function StudentPopover({
 
   const resolvedBaseYear = baseYear || 2026;
   const studentGrade = student.graduation_year ? (4 - (student.graduation_year - resolvedBaseYear)) : 3;
-  const isLowerGrade = studentGrade === 1 || studentGrade === 2;
+  const isLowerGrade = propIsLowerGrade !== undefined ? propIsLowerGrade : (studentGrade === 1 || studentGrade === 2);
 
   const getDesireColor = (student: StudentEmploymentData) => {
     const isDesiring = student.is_desiring_employment;
@@ -72,9 +74,6 @@ export function StudentPopover({
 
     if (isDesiring === '예') return 'bg-emerald-500';
     if (isDesiring === '아니오') return 'bg-rose-500';
-    if (aspiration === '취업') return 'bg-emerald-500';
-    if (aspiration === '진학') return 'bg-rose-500';
-    if (aspiration === '제외인정자') return 'bg-slate-400';
 
     return 'bg-transparent';
   };
@@ -148,10 +147,11 @@ export function StudentPopover({
                   student.career_aspiration === '제외인정자' ? "bg-slate-100 text-slate-600" : "bg-slate-100 text-slate-600"
                 ) : (
                   student.is_desiring_employment === '예' ? "bg-emerald-100 text-emerald-700" : 
-                  student.is_desiring_employment === '아니오' ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"
+                  student.is_desiring_employment === '아니오' ? "bg-rose-100 text-rose-700" : 
+                  "bg-slate-100 text-slate-600"
                 )
               )}>
-                희망: {isLowerGrade ? (student.career_aspiration || '미정') : (student.is_desiring_employment || student.career_aspiration || '미정')}
+                희망: {isLowerGrade ? (student.career_aspiration || '미정') : (student.is_desiring_employment || '미정')}
               </span>
             </div>
 

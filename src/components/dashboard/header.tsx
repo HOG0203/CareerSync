@@ -95,7 +95,7 @@ export default function Header({ userProfile }: { userProfile?: any }) {
         <SheetContent side="left" className="sm:max-w-xs p-0">
           <SheetTitle className="sr-only">모바일 메뉴</SheetTitle>
           <SheetDescription className="sr-only">사이드바 탐색 메뉴</SheetDescription>
-          <Nav />
+          <Nav userProfile={userProfile} isAdmin={userProfile?.role === 'admin'} />
         </SheetContent>
       </Sheet>
       <Breadcrumb className="hidden md:flex">

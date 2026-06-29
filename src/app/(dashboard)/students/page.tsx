@@ -140,6 +140,7 @@ export default async function StudentsPage({
               masterCertificates={masterCertificates} 
               rankingMap={rankingMap}
               userProfile={userProfile}
+              baseYear={ay}
             />
           </div>
         </CardContent>

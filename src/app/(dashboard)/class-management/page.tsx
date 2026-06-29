@@ -56,6 +56,55 @@ async function ClassManagementPageContent({
 
   const isAdmin = userProfile.role === 'admin';
 
+  // 관리자일 경우 학년별 학과 및 반 구조 전체 조회
+  let allCombinations: any[] = [];
+  if (isAdmin) {
+    const { data: combinations } = await supabase
+      .from('students')
+      .select('graduation_year, major, class_info')
+      .not('graduation_year', 'is', null)
+      .not('major', 'is', null)
+      .not('class_info', 'is', null);
+    if (combinations) allCombinations = combinations;
+  }
+
+  const classStructure: Record<number, Record<string, string[]>> = {};
+  if (isAdmin && allCombinations.length > 0) {
+    allCombinations.forEach((item: any) => {
+      const g = 4 - (item.graduation_year - settings.baseYear);
+      if (g >= 1 && g <= 3) {
+        if (!classStructure[g]) {
+          classStructure[g] = {};
+        }
+        const major = item.major;
+        if (!classStructure[g][major]) {
+          classStructure[g][major] = [];
+        }
+        if (!classStructure[g][major].includes(item.class_info)) {
+          classStructure[g][major].push(item.class_info);
+        }
+      }
+    });
+
+    // 학과 및 반 정렬 적용
+    Object.keys(classStructure).forEach((gStr) => {
+      const g = parseInt(gStr);
+      const majorsObj = classStructure[g];
+      const sortedMajors: Record<string, string[]> = {};
+      
+      const sortedMajorNames = Object.keys(majorsObj).sort((a, b) => {
+        const indexA = MAJOR_SORT_ORDER.indexOf(a);
+        const indexB = MAJOR_SORT_ORDER.indexOf(b);
+        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+      });
+
+      sortedMajorNames.forEach((majorName) => {
+        sortedMajors[majorName] = majorsObj[majorName].sort((a, b) => a.localeCompare(b, 'ko', { numeric: true }));
+      });
+      classStructure[g] = sortedMajors;
+    });
+  }
+
   // 3. 학년 옵션 계산 (졸업연도 목록 기반 역산)
   const availableGradesSet = new Set<number>();
   const gradeToYearMap = new Map<number, number>();
@@ -148,9 +197,11 @@ async function ClassManagementPageContent({
       <div className="shrink-0">
         <AdminClassSelector 
           availableGrades={availableGrades}
-          majors={isAdmin ? availableMajors : [userProfile?.assigned_major!]} 
-          classes={isAdmin ? availableClasses : [userProfile?.assigned_class!]} 
           isAdmin={isAdmin}
+          classStructure={classStructure}
+          defaultGrade={selectedGrade}
+          defaultMajor={targetMajor || ''}
+          defaultClass={targetClass || ''}
         />
       </div>
 
@@ -175,6 +226,7 @@ async function ClassManagementPageContent({
               masterCertificates={masterCertificates} 
               rankingMap={rankingMap}
               userProfile={userProfile}
+              baseYear={settings.baseYear}
             />
           </CardContent>
         </Card>

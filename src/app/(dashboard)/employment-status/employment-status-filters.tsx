@@ -17,14 +17,15 @@ interface EmploymentStatusFiltersProps {
   defaultYear: string;
   baseYear: number;
   initialAY: string;
+  initialGrade: string;
 }
 
-export default function EmploymentStatusFilters({ graduationYears, defaultYear, baseYear, initialAY }: EmploymentStatusFiltersProps) {
+export default function EmploymentStatusFilters({ graduationYears, defaultYear, baseYear, initialAY, initialGrade }: EmploymentStatusFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const currentAY = searchParams.get('ay') || initialAY;
-  const currentGrade = searchParams.get('grade') || '3';
+  const currentGrade = searchParams.get('grade') || initialGrade;
 
   // 로컬 상태로 선택값 관리
   const [selectedAY, setSelectedAY] = React.useState(currentAY);

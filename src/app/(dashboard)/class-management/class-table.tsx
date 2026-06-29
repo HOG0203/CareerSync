@@ -11,6 +11,7 @@ interface ClassTableProps {
   masterCertificates: MasterCertificate[];
   rankingMap?: Record<string, any>;
   userProfile?: any;
+  baseYear?: number;
 }
 
 // 학년별 진로희망 옵션 생성 함수
@@ -86,7 +87,8 @@ export function ClassTable({
   initialData, 
   masterCertificates,
   rankingMap = {},
-  userProfile = null
+  userProfile = null,
+  baseYear
 }: ClassTableProps) {
   const [selectedStudent, setSelectedStudent] = React.useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = React.useState(false)
@@ -275,6 +277,7 @@ export function ClassTable({
         masterCertificates={masterCertificates}
         rankingMap={rankingMap}
         userProfile={userProfile}
+        baseYear={baseYear}
       />
 
       <CounselingModal 

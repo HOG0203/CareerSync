@@ -32,7 +32,7 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
         {/* Desktop Sidebar */}
         <div className="hidden lg:block">
           <Sidebar>
-            <Nav isAdmin={isAdmin} />
+            <Nav isAdmin={isAdmin} userProfile={userProfile} />
           </Sidebar>
         </div>
 
@@ -50,7 +50,7 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
           </main>
 
           {/* Mobile Bottom Tab */}
-          <MobileBottomTab isAdmin={isAdmin} role={userProfile?.role} />
+          <MobileBottomTab isAdmin={isAdmin} role={userProfile?.role} userGrade={userProfile?.assigned_grade} />
         </SidebarInset>
       </div>
     </SidebarProvider>
