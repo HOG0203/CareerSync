@@ -3,9 +3,16 @@
 import * as React from 'react';
 import { StudentEmploymentData } from '@/lib/data';
 import { StudentGridCell } from './student-grid-cell';
-import { Search, X } from 'lucide-react';
+import { Search, X, Award } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { GridLoadingSkeleton } from '@/components/dashboard/loading-skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface EmploymentStatusGridProps {
   allData: StudentEmploymentData[];
@@ -28,6 +35,12 @@ const MAJOR_MAP: Record<string, string> = {
   '스마트융합섬유과': '섬유',
   '바이오화학과': '화학',
   '화학공업과': '화학',
+  '전자기계과': '기계',
+  '메카트로닉스과': '기계',
+  '모바일전자과': '전자',
+  '전자과': '전자',
+  '디자인과': '디자인',
+  '스마트디자인과': '디자인'
 };
 
 const getShortClassName = (major: string, classInfo: string, gradYear?: number) => {
@@ -57,12 +70,10 @@ const SORT_ORDER = [
 ];
 
 const getCompanyTypeVariant = (type?: string, businessType?: string, careerAspiration?: string) => {
-  // 1순위: 확정된 특수 상태 (채용진행, 현장실습, 도제OJT)
   if (businessType === '채용진행중') return 'bg-amber-100 text-amber-950 border-amber-500 border-x';
   if (businessType === '현장실습중') return 'bg-blue-400 text-white border-blue-500 border-x';
   if (businessType === '도제OJT') return 'bg-emerald-100 text-emerald-900 border-emerald-500 border-x';
 
-  // 2순위: 취업 확정 상태
   if (businessType === '취업') {
     switch (type) {
       case '대기업':
@@ -96,9 +107,11 @@ interface SearchHeaderProps {
   currentSearchQuery: string;
   isLowerGrade?: boolean;
   matchedCount?: number;
+  certFilter: string;
+  onCertFilterChange: (val: string) => void;
 }
 
-function SearchHeader({ onSearch, currentSearchQuery, isLowerGrade, matchedCount }: SearchHeaderProps) {
+function SearchHeader({ onSearch, currentSearchQuery, isLowerGrade, matchedCount, certFilter, onCertFilterChange }: SearchHeaderProps) {
   const [localValue, setLocalValue] = React.useState('');
 
   const handleSearch = () => {
@@ -117,36 +130,60 @@ function SearchHeader({ onSearch, currentSearchQuery, isLowerGrade, matchedCount
   };
 
   return (
-    <div className="flex items-center gap-2 px-1">
-      <div className="relative flex items-center bg-white rounded-lg border-2 border-slate-200 focus-within:border-blue-500 shadow-sm px-3 h-11 w-full sm:w-[400px] group transition-all">
-        <Search className="h-5 w-5 text-slate-400 group-focus-within:text-blue-500 shrink-0" />
-        <Input 
-          type="text"
-          placeholder={isLowerGrade ? "이름, 희망진로코스, 희망기업유형 등 검색..." : "이름, 기업, 진로코스 등 검색..."}
-          value={localValue}
-          onChange={(e) => setLocalValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="border-none bg-transparent shadow-none focus-visible:ring-0 text-[14px] font-medium placeholder:text-slate-400 h-full w-full pr-8"
-        />
-        {localValue && (
-          <button 
-            onClick={handleClear}
-            className="absolute right-3 p-1 hover:bg-slate-100 rounded-full transition-colors"
-          >
-            <X className="h-4 w-4 text-slate-400" />
-          </button>
-        )}
+    <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-1">
+      {/* 검색어 입력 */}
+      <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="relative flex items-center bg-white rounded-lg border-2 border-slate-200 focus-within:border-blue-500 shadow-sm px-3 h-11 w-full sm:w-[320px] group transition-all">
+          <Search className="h-5 w-5 text-slate-400 group-focus-within:text-blue-500 shrink-0" />
+          <Input 
+            type="text"
+            placeholder={isLowerGrade ? "이름, 희망진로코스 등 검색..." : "이름, 기업, 진로코스 등 검색..."}
+            value={localValue}
+            onChange={(e) => setLocalValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="border-none bg-transparent shadow-none focus-visible:ring-0 text-[14px] font-medium placeholder:text-slate-400 h-full w-full pr-8"
+          />
+          {localValue && (
+            <button 
+              onClick={handleClear}
+              className="absolute right-3 p-1 hover:bg-slate-100 rounded-full transition-colors"
+            >
+              <X className="h-4 w-4 text-slate-400" />
+            </button>
+          )}
+        </div>
+        <button
+          onClick={handleSearch}
+          className="h-11 px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md transition-all active:scale-95 shrink-0 flex items-center gap-1.5"
+        >
+          <Search className="h-4 w-4" />
+          검색
+        </button>
       </div>
-      <button
-        onClick={handleSearch}
-        className="h-11 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md transition-all active:scale-95 shrink-0 flex items-center gap-2"
-      >
-        <Search className="h-4 w-4" />
-        검색
-      </button>
-      {currentSearchQuery && (
-        <span className="text-xs font-bold text-blue-600 animate-pulse hidden sm:inline bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100 shrink-0">
-          "{currentSearchQuery}" 강조 중 (총 {matchedCount ?? 0}명)
+
+      {/* 자격증 개수 필터 */}
+      <div className="flex items-center gap-1.5 px-3 bg-white rounded-lg border-2 border-slate-200 h-11 w-full sm:w-[150px] shadow-sm">
+        <Award className="h-5 w-5 text-slate-400 shrink-0" />
+        <Select value={certFilter} onValueChange={onCertFilterChange}>
+          <SelectTrigger className="w-full h-full text-xs font-bold border-none bg-transparent shadow-none focus:ring-0 px-0">
+            <SelectValue placeholder="자격증 필터" />
+          </SelectTrigger>
+          <SelectContent position="popper" className="w-[150px]">
+            <SelectItem value="all" className="text-xs font-medium">자격증: 전체</SelectItem>
+            <SelectItem value="1+" className="text-xs font-medium">1개 이상</SelectItem>
+            <SelectItem value="2+" className="text-xs font-medium">2개 이상</SelectItem>
+            <SelectItem value="3+" className="text-xs font-medium">3개 이상</SelectItem>
+            <SelectItem value="0" className="text-xs font-medium">자격증 없음</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* 강조 배지 */}
+      {(currentSearchQuery || certFilter !== 'all') && (
+        <span className="text-xs font-bold text-blue-600 animate-pulse bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100 shrink-0 self-start sm:self-auto">
+          {certFilter !== 'all' && `[자격증: ${certFilter === '0' ? '없음' : `${certFilter} 이상`}] `}
+          {currentSearchQuery && `"${currentSearchQuery}" `}
+          강조 중 (총 {matchedCount ?? 0}명)
         </span>
       )}
     </div>
@@ -155,6 +192,7 @@ function SearchHeader({ onSearch, currentSearchQuery, isLowerGrade, matchedCount
 
 export function EmploymentStatusGrid({ allData, rankingMap, userProfile, baseYear, grade }: EmploymentStatusGridProps) {
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [certFilter, setCertFilter] = React.useState('all');
   const [isLoading, setIsLoading] = React.useState(false);
 
   React.useEffect(() => {
@@ -205,32 +243,47 @@ export function EmploymentStatusGrid({ allData, rankingMap, userProfile, baseYea
 
   // 강조 검색 대상에 매칭되는 학생 수 계산
   const matchedCount = React.useMemo(() => {
-    if (!searchQuery || searchQuery.trim() === '') return 0;
+    if ((!searchQuery || searchQuery.trim() === '') && certFilter === 'all') return 0;
+    
     const query = searchQuery.toLowerCase().trim();
     
     return allData.filter(student => {
-      const fieldsToSearch = isLowerGrade
-        ? [
-            student.student_name,
-            student.career_aspiration,
-            student.career_course,
-            student.special_notes,
-            student.major,
-            student.class_info
-          ]
-        : [
-            student.student_name,
-            student.employment_status,
-            student.company_type,
-            student.business_type,
-            student.company,
-            student.latest_training_company,
-            student.major,
-            student.class_info
-          ];
-      return fieldsToSearch.some(field => field?.toLowerCase().includes(query));
+      // 1. 자격증 개수 필터 조건 확인
+      const certsCount = student.certificates?.length || 0;
+      let certMatch = true;
+      if (certFilter === '1+') certMatch = certsCount >= 1;
+      else if (certFilter === '2+') certMatch = certsCount >= 2;
+      else if (certFilter === '3+') certMatch = certsCount >= 3;
+      else if (certFilter === '0') certMatch = certsCount === 0;
+
+      // 2. 검색어 필터 조건 확인
+      let searchMatch = true;
+      if (searchQuery && searchQuery.trim() !== '') {
+        const fieldsToSearch = isLowerGrade
+          ? [
+              student.student_name,
+              student.career_aspiration,
+              student.career_course,
+              student.special_notes,
+              student.major,
+              student.class_info
+            ]
+          : [
+              student.student_name,
+              student.employment_status,
+              student.company_type,
+              student.business_type,
+              student.company,
+              student.latest_training_company,
+              student.major,
+              student.class_info
+            ];
+        searchMatch = fieldsToSearch.some(field => field?.toLowerCase().includes(query));
+      }
+
+      return certMatch && searchMatch;
     }).length;
-  }, [allData, searchQuery, isLowerGrade]);
+  }, [allData, searchQuery, certFilter, isLowerGrade]);
 
   if (isLoading) {
     return (
@@ -248,6 +301,8 @@ export function EmploymentStatusGrid({ allData, rankingMap, userProfile, baseYea
         currentSearchQuery={searchQuery} 
         isLowerGrade={isLowerGrade} 
         matchedCount={matchedCount} 
+        certFilter={certFilter}
+        onCertFilterChange={setCertFilter}
       />
 
       <div className="flex-1 overflow-x-auto overflow-y-auto bg-gray-50/50 rounded-xl border border-slate-200 shadow-sm p-2 sm:p-4">
@@ -283,6 +338,7 @@ export function EmploymentStatusGrid({ allData, rankingMap, userProfile, baseYea
                         rankingSummary={rankingMap[student.id]}
                         userProfile={userProfile}
                         searchQuery={searchQuery}
+                        certFilter={certFilter}
                         baseYear={baseYear}
                         isLowerGrade={isLowerGrade}
                       />

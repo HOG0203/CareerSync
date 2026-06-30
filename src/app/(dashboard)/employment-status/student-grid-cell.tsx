@@ -12,40 +12,52 @@ interface StudentGridCellProps {
   rankingSummary?: any; // 부모로부터 전달받은 사전 계산된 성적/출결 요약
   userProfile?: any; // 권한 확인을 위한 사용자 프로필
   searchQuery?: string; // 검색어 추가
+  certFilter?: string; // 자격증 필터 추가
   baseYear?: number;
   isLowerGrade?: boolean;
 }
 
-export function StudentGridCell({ student, idx, variant, rankingSummary, userProfile, searchQuery, baseYear, isLowerGrade }: StudentGridCellProps) {
-  // 통합 검색 매칭 여부 확인
+export function StudentGridCell({ student, idx, variant, rankingSummary, userProfile, searchQuery, certFilter = 'all', baseYear, isLowerGrade }: StudentGridCellProps) {
+  // 통합 검색 및 자격증 필터 매칭 여부 확인
   const isMatched = React.useMemo(() => {
-    if (!searchQuery || searchQuery.trim() === '') return false;
+    if (!searchQuery && certFilter === 'all') return false;
     
-    const query = searchQuery.toLowerCase().trim();
-    const fieldsToSearch = isLowerGrade
-      ? [
-          student.student_name,
-          student.career_aspiration,
-          student.career_course,
-          student.special_notes,
-          student.major,
-          student.class_info
-        ]
-      : [
-          student.student_name,
-          student.employment_status,
-          student.company_type,
-          student.business_type,
-          student.company,
-          student.latest_training_company,
-          student.major,
-          student.class_info
-        ];
+    // 1. 자격증 개수 필터 조건 확인
+    const certsCount = student.certificates?.length || 0;
+    let certMatch = true;
+    if (certFilter === '1+') certMatch = certsCount >= 1;
+    else if (certFilter === '2+') certMatch = certsCount >= 2;
+    else if (certFilter === '3+') certMatch = certsCount >= 3;
+    else if (certFilter === '0') certMatch = certsCount === 0;
 
-    return fieldsToSearch.some(field => 
-      field?.toLowerCase().includes(query)
-    );
-  }, [student, searchQuery, isLowerGrade]);
+    // 2. 검색어 필터 조건 확인
+    let searchMatch = true;
+    if (searchQuery && searchQuery.trim() !== '') {
+      const query = searchQuery.toLowerCase().trim();
+      const fieldsToSearch = isLowerGrade
+        ? [
+            student.student_name,
+            student.career_aspiration,
+            student.career_course,
+            student.special_notes,
+            student.major,
+            student.class_info
+          ]
+        : [
+            student.student_name,
+            student.employment_status,
+            student.company_type,
+            student.business_type,
+            student.company,
+            student.latest_training_company,
+            student.major,
+            student.class_info
+          ];
+      searchMatch = fieldsToSearch.some(field => field?.toLowerCase().includes(query));
+    }
+
+    return certMatch && searchMatch;
+  }, [student, searchQuery, certFilter, isLowerGrade]);
 
   const getDesireColor = (student: StudentEmploymentData) => {
     const isDesiring = student.is_desiring_employment;
@@ -81,7 +93,14 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, userPro
         )}
       >
         <span className="opacity-60 text-[7px] w-2">{student.student_number || idx + 1}</span>
-        <span className="flex-1 text-center font-medium truncate tracking-tighter pr-0.5">{student.student_name}</span>
+        <span className="flex-1 text-center font-medium truncate tracking-tighter pr-0.5 flex items-center justify-center gap-0.5">
+          {student.student_name}
+          {student.certificates && student.certificates.length > 0 && (
+            <span className="text-[7.5px] font-black text-amber-600 bg-amber-50 px-1 border border-amber-200 rounded-sm shrink-0 scale-90 origin-center leading-none h-3.5 flex items-center justify-center">
+              {student.certificates.length}
+            </span>
+          )}
+        </span>
         {!isLowerGrade && (
           <div className={cn("absolute right-[1px] top-[2px] bottom-[2px] w-[2.5px] rounded-full", getDesireColor(student))} />
         )}

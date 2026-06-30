@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { GraduationCap, CalendarCheck } from 'lucide-react';
+import { GraduationCap, CalendarCheck, Award } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function CertificationTabs() {
@@ -19,6 +19,11 @@ export default function CertificationTabs() {
       href: '/admin/grades/summary/attendance', 
       icon: CalendarCheck 
     },
+    {
+      label: '자격증 현황',
+      href: '/admin/grades/summary/certificates',
+      icon: Award
+    }
   ];
 
   return (
