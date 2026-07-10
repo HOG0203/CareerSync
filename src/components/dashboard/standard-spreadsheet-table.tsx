@@ -27,7 +27,7 @@ import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
-import { Search, X, ListFilter, Check, Trash2, GraduationCap, Award, ChevronRight, UserPlus, Loader2, BookUser, PlusCircle } from 'lucide-react'
+import { Search, X, ListFilter, Check, Trash2, GraduationCap, Award, ChevronRight, UserPlus, Loader2, BookUser, PlusCircle, Phone } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
@@ -319,7 +319,16 @@ const MobileDetailModal = ({ isOpen, onClose, data, columns, onSave, onAction }:
               <div key={col.key} className="space-y-1.5 p-3 rounded-xl bg-white border border-slate-200 shadow-sm">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{col.label}</label>
                 {col.readOnly ? (
-                  <div className="text-sm font-semibold text-slate-700 h-10 flex items-center px-1">{data[col.key] || '-'}</div>
+                  <div className="text-sm font-semibold text-slate-700 h-10 flex items-center px-1">
+                    {col.key === 'phone_number' && data[col.key] ? (
+                      <a href={`tel:${data[col.key]}`} className="inline-flex items-center gap-1.5 text-indigo-600 hover:underline">
+                        <span>{data[col.key]}</span>
+                        <Phone className="h-4 w-4 text-indigo-500 shrink-0" />
+                      </a>
+                    ) : (
+                      data[col.key] || '-'
+                    )}
+                  </div>
                 ) : col.type === 'multi-select' ? (
                   <div className="flex flex-wrap gap-1 p-2 border border-slate-200 rounded-md bg-white min-h-10 items-center">{normalizeCertificates(data[col.key]).map((cert, i) => (<Badge key={i} variant="secondary" className="text-[10px] bg-slate-100">{cert}</Badge>))}<Button variant="ghost" size="sm" className="h-7 ml-auto text-indigo-600 font-bold hover:bg-indigo-50" onClick={() => onSave(data.id, col.key, 'OPEN_PICKER')}>수정하기</Button></div>
                 ) : col.type === 'select' ? (
@@ -659,9 +668,11 @@ export function StandardSpreadsheetTable({
                     <div className="min-w-0">
                       {/* 모바일에서도 이름 클릭 시 팝오버(또는 상세보기) 가능하게 처리 */}
                       {!disableNamePopover ? (
-                        <StudentPopover student={row} rankingSummary={rankingMap?.[row.id]} userProfile={userProfile} baseYear={baseYear}>
-                          <h3 className="font-bold text-slate-900 truncate hover:text-blue-600 transition-colors cursor-pointer">{row[titleCol?.key || ''] || '이름 없음'}</h3>
-                        </StudentPopover>
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <StudentPopover student={row} rankingSummary={rankingMap?.[row.id]} userProfile={userProfile} baseYear={baseYear}>
+                            <h3 className="font-bold text-slate-900 truncate hover:text-blue-600 transition-colors cursor-pointer">{row[titleCol?.key || ''] || '이름 없음'}</h3>
+                          </StudentPopover>
+                        </div>
                       ) : (
                         <h3 className="font-bold text-slate-900 truncate">{row[titleCol?.key || ''] || '이름 없음'}</h3>
                       )}
@@ -676,7 +687,16 @@ export function StandardSpreadsheetTable({
                   {infoCols.map(col => (
                     <div key={col.key} className="space-y-0.5 min-w-0">
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate">{col.label}</p>
-                      <p className="text-xs font-semibold text-slate-700 truncate">{row[col.key] || '-'}</p>
+                      <p className="text-xs font-semibold text-slate-700 truncate">
+                        {col.key === 'phone_number' && row[col.key] ? (
+                          <a href={`tel:${row[col.key]}`} onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-blue-600 hover:underline">
+                            <span>{row[col.key]}</span>
+                            <Phone className="h-3 w-3 text-blue-500 shrink-0" />
+                          </a>
+                        ) : (
+                          row[col.key] || '-'
+                        )}
+                      </p>
                     </div>
                   ))}
                 </div>

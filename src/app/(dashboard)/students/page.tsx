@@ -133,7 +133,7 @@ export default async function StudentsPage({
 
       <Card className="flex-1 min-h-0 shadow-sm border bg-white flex flex-col rounded-xl overflow-hidden min-w-full mb-0">
         <CardContent className="flex-1 overflow-auto p-0 relative">
-          <div className="min-w-max h-full">
+          <div className="w-full lg:min-w-max h-full">
             <StudentTable 
               initialData={filteredData} 
               isAdmin={isAdmin} 

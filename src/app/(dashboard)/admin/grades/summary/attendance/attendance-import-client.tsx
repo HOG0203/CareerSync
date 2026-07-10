@@ -26,7 +26,6 @@ export function AttendanceImportClient({ baseYear }: { baseYear: number }) {
   const [isParsing, setIsParsing] = React.useState(false);
   const [isUploading, setIsUploading] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
-  const [targetGrade, setTargetGrade] = React.useState<number>(3); 
   const [parsedData, setParsedData] = React.useState<ParsedAttendanceData[]>([]);
   const [studentMatchMap, setStudentMatchMap] = React.useState<Record<string, { id: string; major: string; classInfo: string; gradYear: number }>>({});
   const [fileNames, setFileNames] = React.useState<string[]>([]);
@@ -69,16 +68,24 @@ export function AttendanceImportClient({ baseYear }: { baseYear: number }) {
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const rawRows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as any[][];
 
-        // 1. 학과/반 정보 검색 (상단 10행 스캔)
+        // 1. 학과/학년/반 정보 검색 (상단 10행 스캔)
         let fileMajor = '';
         let fileClass = '';
+        let fileGrade = 3; // 기본값 3학년
         for (let i = 0; i < Math.min(10, rawRows.length); i++) {
           const rowText = (rawRows[i]?.join(' ') || '').replace(/\s+/g, '');
           const classMatch = rowText.match(/([가-힣]+)(\d)학년?-?(\d+)반?/);
           if (classMatch) {
             fileMajor = classMatch[1].trim();
+            fileGrade = parseInt(classMatch[2]) || 3;
             fileClass = classMatch[3].trim();
             break;
+          } else {
+            // 개별 매칭 시도
+            const gradeMatch = rowText.match(/(\d)학년/);
+            if (gradeMatch) {
+              fileGrade = parseInt(gradeMatch[1]) || 3;
+            }
           }
         }
 
@@ -131,7 +138,8 @@ export function AttendanceImportClient({ baseYear }: { baseYear: number }) {
               outOther: parseInt(row[15]) || 0,
               remarks: row[16]?.toString() || '',
               major: fileMajor,
-              classInfo: fileClass
+              classInfo: fileClass,
+              currentGrade: fileGrade
             });
           }
         }
@@ -141,13 +149,13 @@ export function AttendanceImportClient({ baseYear }: { baseYear: number }) {
       const updatedTotalData = [...parsedData, ...allNewRecords];
       
       // 4. 매칭 및 중복 제거
-      const uniqueKeys = Array.from(new Set(updatedTotalData.map(s => `${s.major}_${s.classInfo}_${s.studentNumber}_${s.studentName}`)))
+      const uniqueKeys = Array.from(new Set(updatedTotalData.map(s => `${s.major}_${s.classInfo}_${s.studentNumber}_${s.studentName}_${s.currentGrade}`)))
         .map(k => {
           const parts = k.split('_');
-          return { major: parts[0], classInfo: parts[1], number: parts[2], name: parts[3] };
+          return { major: parts[0], classInfo: parts[1], number: parts[2], name: parts[3], currentGrade: parseInt(parts[4]) };
         });
 
-      const matchResult = await matchStudentsForAttendance(uniqueKeys, baseYear, targetGrade);
+      const matchResult = await matchStudentsForAttendance(uniqueKeys, baseYear);
       const newMatchMap = matchResult.matchMap || {};
       setStudentMatchMap(newMatchMap);
 
@@ -170,7 +178,7 @@ export function AttendanceImportClient({ baseYear }: { baseYear: number }) {
     if (parsedData.length === 0) return;
     setIsUploading(true);
     try {
-      const result = await uploadStudentAttendance(parsedData, baseYear, targetGrade);
+      const result = await uploadStudentAttendance(parsedData, baseYear);
       if (result.error) {
         toast({ variant: "destructive", title: "저장 실패", description: result.error });
       } else {
@@ -228,25 +236,6 @@ export function AttendanceImportClient({ baseYear }: { baseYear: number }) {
         <p className="text-[11px] text-slate-500">시스템에 저장된 모든 학생의 출결 데이터를 영구적으로 삭제하거나 미리보기를 비웁니다.</p>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-        <div className="flex items-center gap-2 mb-4">
-          <GraduationCap className="h-5 w-5 text-indigo-500" />
-          <h3 className="font-bold text-slate-800 text-sm">업로드 대상 학생 현재 학년 설정</h3>
-        </div>
-        <div className="flex gap-2">
-          {[1, 2, 3].map((g) => (
-            <Button
-              key={g}
-              variant={targetGrade === g ? "default" : "outline"}
-              onClick={() => { setTargetGrade(g); setParsedData([]); setFileNames([]); }}
-              className={cn("flex-1 h-12 font-black text-base", targetGrade === g ? "bg-indigo-600 hover:bg-indigo-700 text-white" : "text-slate-400")}
-            >
-              현재 {g}학년
-            </Button>
-          ))}
-        </div>
-      </div>
-
       <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-lg p-10 bg-slate-50/50 hover:bg-slate-50 transition-colors relative">
         <input type="file" id="xlsx-upload-attn" className="hidden" accept=".xlsx, .xls" onChange={handleFileUpload} disabled={isParsing || isUploading} multiple />
         <label htmlFor="xlsx-upload-attn" className="flex flex-col items-center cursor-pointer w-full">
@@ -302,7 +291,7 @@ export function AttendanceImportClient({ baseYear }: { baseYear: number }) {
                           )}
                         </div>
                         <div className="text-[10px] text-slate-500 font-medium mt-0.5">
-                          {group.major.replace('공업계', '')} • {group.classInfo.replace('반', '')}반
+                          {group.items[0]?.currentGrade}학년 • {group.major.replace('공업계', '')} • {group.classInfo.replace('반', '')}반
                         </div>
                       </div>
                     </div>

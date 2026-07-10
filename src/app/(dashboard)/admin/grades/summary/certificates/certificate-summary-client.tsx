@@ -6,7 +6,8 @@ import {
   User, 
   Award,
   Loader2,
-  Edit2
+  Edit2,
+  Download
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
@@ -150,6 +151,12 @@ export function CertificateSummaryClient({
     }
   };
 
+  const handleDownloadExcel = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    const ay = params.get('ay') || '';
+    window.location.href = `/api/admin/grades/summary/certificates/download${ay ? `?ay=${ay}` : ''}`;
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* 상단 액션 바 */}
@@ -168,7 +175,18 @@ export function CertificateSummaryClient({
           ))}
         </div>
 
-        <CertificateImportModal />
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleDownloadExcel}
+            className="border-slate-200 text-slate-700 font-bold gap-2 hover:bg-slate-50 h-9 text-xs shadow-sm"
+          >
+            <Download className="h-4 w-4" />
+            현황 양식 다운로드
+          </Button>
+          <CertificateImportModal />
+        </div>
       </div>
 
       {/* 필터 세션 */}

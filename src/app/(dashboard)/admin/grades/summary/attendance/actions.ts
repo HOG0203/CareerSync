@@ -25,61 +25,73 @@ export interface ParsedAttendanceData {
   remarks: string;
   major: string;
   classInfo: string;
+  currentGrade: number;
 }
 
 /**
  * 엑셀 데이터의 학생 정보를 시스템 내 UUID와 매칭합니다. (매칭 로직 대폭 강화)
  */
 export async function matchStudentsForAttendance(
-  uniqueKeys: { major: string; classInfo: string; number: string; name: string }[],
-  academicYear: number,
-  currentGrade: number
+  uniqueKeys: { major: string; classInfo: string; number: string; name: string; currentGrade: number }[],
+  academicYear: number
 ) {
   const supabase = await createClient();
-  const graduationYear = academicYear + (4 - currentGrade);
-
-  // 해당 학년(기수)의 전체 학생 명단 확보
-  const { data: students, error } = await supabase
-    .from('students')
-    .select('id, student_name, student_number, major, class_info, graduation_year')
-    .eq('graduation_year', graduationYear);
-
-  if (error) return { error: error.message };
-
   const matchMap: Record<string, { id: string; major: string; classInfo: string; gradYear: number }> = {};
-  
+
+  // 학년별로 키 그룹화하여 Supabase 쿼리 최소화 및 분기 처리
+  const keysByGrade: Record<number, typeof uniqueKeys> = {};
   uniqueKeys.forEach(key => {
-    // [정규화] 엑셀 데이터
-    const targetName = key.name.replace(/\s+/g, '');
-    const targetNum = parseInt(key.number).toString();
-    const targetClass = key.classInfo.replace(/반|학년/g, '').trim();
-    const targetMajor = key.major.replace(/과|공업계/g, '').trim();
-
-    const match = students?.find(s => {
-      // [정규화] DB 데이터
-      const dbName = (s.student_name || '').replace(/\s+/g, '');
-      const dbNum = parseInt(s.student_number || '0').toString();
-      const dbClass = (s.class_info || '').replace(/반|학년/g, '').trim();
-      const dbMajor = (s.major || '').replace(/과|공업계/g, '').trim();
-
-      // 이름과 번호는 필수 일치, 학과와 반은 포함 관계 확인
-      const nameMatch = dbName === targetName;
-      const numMatch = dbNum === targetNum;
-      const classMatch = dbClass === targetClass || dbClass.includes(targetClass) || targetClass.includes(dbClass);
-      const majorMatch = dbMajor === targetMajor || dbMajor.includes(targetMajor) || targetMajor.includes(dbMajor);
-
-      return nameMatch && numMatch && classMatch && majorMatch;
-    });
-
-    if (match) {
-      matchMap[`${key.major}_${key.classInfo}_${key.number}_${key.name}`] = {
-        id: match.id,
-        major: match.major,
-        classInfo: match.class_info,
-        gradYear: match.graduation_year
-      };
+    if (!keysByGrade[key.currentGrade]) {
+      keysByGrade[key.currentGrade] = [];
     }
+    keysByGrade[key.currentGrade].push(key);
   });
+
+  for (const gradeStr of Object.keys(keysByGrade)) {
+    const currentGrade = parseInt(gradeStr);
+    const graduationYear = academicYear + (4 - currentGrade);
+
+    // 해당 학년(기수)의 전체 학생 명단 확보
+    const { data: students, error } = await supabase
+      .from('students')
+      .select('id, student_name, student_number, major, class_info, graduation_year')
+      .eq('graduation_year', graduationYear);
+
+    if (error || !students) continue;
+
+    keysByGrade[currentGrade].forEach(key => {
+      // [정규화] 엑셀 데이터
+      const targetName = key.name.replace(/\s+/g, '');
+      const targetNum = parseInt(key.number).toString();
+      const targetClass = key.classInfo.replace(/반|학년/g, '').trim();
+      const targetMajor = key.major.replace(/과|공업계/g, '').trim();
+
+      const match = students.find(s => {
+        // [정규화] DB 데이터
+        const dbName = (s.student_name || '').replace(/\s+/g, '');
+        const dbNum = parseInt(s.student_number || '0').toString();
+        const dbClass = (s.class_info || '').replace(/반|학년/g, '').trim();
+        const dbMajor = (s.major || '').replace(/과|공업계/g, '').trim();
+
+        // 이름과 번호는 필수 일치, 학과와 반은 포함 관계 확인
+        const nameMatch = dbName === targetName;
+        const numMatch = dbNum === targetNum;
+        const classMatch = dbClass === targetClass || dbClass.includes(targetClass) || targetClass.includes(dbClass);
+        const majorMatch = dbMajor === targetMajor || dbMajor.includes(targetMajor) || targetMajor.includes(dbMajor);
+
+        return nameMatch && numMatch && classMatch && majorMatch;
+      });
+
+      if (match) {
+        matchMap[`${key.major}_${key.classInfo}_${key.number}_${key.name}`] = {
+          id: match.id,
+          major: match.major,
+          classInfo: match.class_info,
+          gradYear: match.graduation_year
+        };
+      }
+    });
+  }
 
   return { matchMap };
 }
@@ -89,14 +101,13 @@ export async function matchStudentsForAttendance(
  */
 export async function uploadStudentAttendance(
   data: ParsedAttendanceData[],
-  baseAcademicYear: number,
-  currentGradeAtUpload: number
+  baseAcademicYear: number
 ) {
   const supabase = await createClient();
   
   const upsertData = data.filter(d => d.studentId).map(d => {
-    // 실제 발생 연도 계산
-    const actualYear = baseAcademicYear - (currentGradeAtUpload - d.gradeObtained);
+    // 실제 발생 연도 계산 (개별 학생의 업로드 시점 학년 d.currentGrade 기준 적용)
+    const actualYear = baseAcademicYear - (d.currentGrade - d.gradeObtained);
 
     return {
       student_id: d.studentId,

@@ -25,7 +25,6 @@ export function GradeImportClient() {
   const [isParsing, setIsParsing] = React.useState(false);
   const [isUploading, setIsUploading] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
-  const [targetGrade, setTargetGrade] = React.useState<number>(3); // 기본값 3학년
   const [parsedData, setParsedData] = React.useState<ParsedGradeData[]>([]);
   const [studentMatchMap, setStudentMatchMap] = React.useState<Record<string, { id: string; major: string; classInfo: string }>>({});
   const [detectedFileInfo, setDetectedFileInfo] = React.useState<{ major: string, classInfo: string } | null>(null);
@@ -71,13 +70,21 @@ export function GradeImportClient() {
 
         let fileMajor = '';
         let fileClass = '';
+        let fileGrade = 3; // 기본값 3학년
         const headerRowText = rawRows[2]?.join(' ') || '';
         const classMatch = headerRowText.match(/([가-힣]+)\s*(\d)학년?\s*-?\s*(\d+)반?/);
         
         if (classMatch) {
           fileMajor = classMatch[1].trim();
           fileClass = classMatch[3].trim() + '반';
+          fileGrade = parseInt(classMatch[2]) || 3;
           setDetectedFileInfo({ major: fileMajor, classInfo: fileClass });
+        } else {
+          // 개별 매칭 시도
+          const gradeMatch = headerRowText.match(/(\d)학년/);
+          if (gradeMatch) {
+            fileGrade = parseInt(gradeMatch[1]) || 3;
+          }
         }
 
         const rawStudents: any[] = [];
@@ -167,19 +174,20 @@ export function GradeImportClient() {
                 achievement,
                 rankGrade: finalRankGrade,
                 major: fileMajor,
-                classInfo: fileClass
+                classInfo: fileClass,
+                currentGrade: fileGrade
               });
             }
           }
         }
 
-        const uniqueKeys = Array.from(new Set(rawStudents.map(s => `${s.major}_${s.classInfo}_${s.studentNumber}_${s.studentName}`)))
+        const uniqueKeys = Array.from(new Set(rawStudents.map(s => `${s.major}_${s.classInfo}_${s.studentNumber}_${s.studentName}_${s.currentGrade}`)))
           .map(k => {
             const parts = k.split('_');
-            return { major: parts[0], classInfo: parts[1], number: parts[2], name: parts[3] };
+            return { major: parts[0], classInfo: parts[1], number: parts[2], name: parts[3], currentGrade: parseInt(parts[4]) };
           });
 
-        const matchResult = await matchStudents(uniqueKeys, 2026, targetGrade);
+        const matchResult = await matchStudents(uniqueKeys, 2026);
         const newMatchMap = matchResult.matchMap || {};
         setStudentMatchMap(newMatchMap);
 
@@ -204,7 +212,7 @@ export function GradeImportClient() {
     if (parsedData.length === 0) return;
     setIsUploading(true);
     try {
-      const result = await uploadStudentScores(parsedData, 2026, targetGrade);
+      const result = await uploadStudentScores(parsedData, 2026);
       if (result.error) {
         toast({ variant: "destructive", title: "저장 실패", description: result.error });
       } else {
@@ -249,36 +257,6 @@ export function GradeImportClient() {
         </div>
         <p className="text-[11px] text-slate-500">
           시스템에 저장된 모든 학생의 성적 데이터를 영구적으로 삭제합니다. 이 작업은 되돌릴 수 없습니다. 가중치 설정은 [시스템 설정] 페이지를 이용해주세요.
-        </p>
-      </div>
-
-      {/* 학년 선택 섹션 */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-        <div className="flex items-center gap-2 mb-4">
-          <GraduationCap className="h-5 w-5 text-indigo-500" />
-          <h3 className="font-bold text-slate-800 text-sm">업로드 대상 학생 현재 학년 설정</h3>
-        </div>
-        <div className="flex gap-2">
-          {[1, 2, 3].map((g) => (
-            <Button
-              key={g}
-              variant={targetGrade === g ? "default" : "outline"}
-              onClick={() => {
-                setTargetGrade(g);
-                setParsedData([]);
-              }}
-              className={cn(
-                "flex-1 h-12 font-black text-base",
-                targetGrade === g ? "bg-indigo-600 hover:bg-indigo-700 text-white" : "text-slate-400"
-              )}
-            >
-              현재 {g}학년
-            </Button>
-          ))}
-        </div>
-        <p className="text-[11px] text-slate-500 mt-3 flex items-center gap-1.5 font-medium">
-          <Info className="h-3.5 w-3.5 text-indigo-500" />
-          선택한 학년에 해당하는 학생들을 DB에서 찾아 성적을 매칭합니다.
         </p>
       </div>
 
@@ -327,7 +305,7 @@ export function GradeImportClient() {
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-slate-800 text-base">{name}</span>
                           <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-md font-black">{number}번</span>
-                          <span className="text-[10px] text-indigo-500 font-bold">{targetGrade}학년 대상</span>
+                          <span className="text-[10px] text-indigo-500 font-bold">{student.items[0]?.currentGrade}학년 대상</span>
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
                           {isMatched ? <span className="text-[10px] text-slate-500 font-bold">{match.major} • {match.classInfo}</span> : <span className="text-[10px] text-rose-500 font-bold text-[9px]">DB 매칭 실패 (ID 미확보)</span>}
