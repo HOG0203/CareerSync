@@ -58,11 +58,13 @@ interface AttendanceRecord {
 export function AttendanceTableClient({ 
   initialData,
   currentGrade,
-  baseYear
+  baseYear,
+  isAdmin = false
 }: { 
   initialData: AttendanceRecord[],
   currentGrade: number,
-  baseYear: number
+  baseYear: number,
+  isAdmin?: boolean
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -74,7 +76,7 @@ export function AttendanceTableClient({
   const handleGradeChange = (grade: number) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('grade', grade.toString());
-    router.push(`/admin/grades/summary/attendance?${params.toString()}`);
+    router.push(`/admin/certification/attendance?${params.toString()}`);
   };
 
   // 학생별 데이터 그룹화 및 필터링
@@ -174,7 +176,7 @@ export function AttendanceTableClient({
           <Calendar className="h-5 w-5 text-indigo-600" />
           <h2 className="font-black text-slate-800 tracking-tight text-lg">전교생 출결 현황</h2>
         </div>
-        <AttendanceImportModal baseYear={baseYear} />
+        {isAdmin && <AttendanceImportModal baseYear={baseYear} />}
       </div>
 
       <div className="p-4 border-b flex flex-wrap items-center gap-4 bg-white sticky top-0 z-20">

@@ -11,8 +11,8 @@ export default async function CertificateSummaryPage({
 }) {
   const profile = await getCurrentUserProfile();
 
-  // 관리자 권한 확인
-  if (profile?.role !== 'admin') {
+  // 관리자, 교직원 권한 확인
+  if (profile?.role !== 'admin' && profile?.role !== 'teacher') {
     redirect('/dashboard');
   }
 
@@ -30,6 +30,7 @@ export default async function CertificateSummaryPage({
     <CertificateSummaryClient 
       initialSummaries={summaries}
       currentGrade={selectedGradeNum}
+      isAdmin={profile?.role === 'admin'}
     />
   );
 }

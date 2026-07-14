@@ -66,7 +66,7 @@ export async function updateStudentCertificates(studentId: string, certificates:
     return { success: false, error: error.message };
   }
 
-  revalidatePath('/admin/grades/summary/certificates');
+  revalidatePath('/admin/certification/certificates');
   revalidatePath('/employment-status');
   revalidatePath('/students');
   return { success: true };
@@ -246,7 +246,7 @@ export async function importUploadedCertificates(rawRows: any[][]) {
       studentCerts
     );
 
-    revalidatePath('/admin/grades/summary/certificates');
+    revalidatePath('/admin/certification/certificates');
     revalidatePath('/employment-status');
     revalidatePath('/students');
 

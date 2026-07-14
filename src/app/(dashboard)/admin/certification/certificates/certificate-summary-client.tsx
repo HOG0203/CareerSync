@@ -28,10 +28,12 @@ import { CertificateImportModal } from './certificate-import-modal';
 
 export function CertificateSummaryClient({ 
   initialSummaries, 
-  currentGrade
+  currentGrade,
+  isAdmin = false
 }: { 
   initialSummaries: StudentCertificateSummary[], 
-  currentGrade: number
+  currentGrade: number,
+  isAdmin?: boolean
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -49,7 +51,7 @@ export function CertificateSummaryClient({
   const handleGradeChange = (grade: number) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('grade', grade.toString());
-    router.push(`/admin/grades/summary/certificates?${params.toString()}`);
+    router.push(`/admin/certification/certificates?${params.toString()}`);
   };
 
   // 클라이언트 사이드 필터링 (학과, 반, 검색어)
@@ -154,7 +156,7 @@ export function CertificateSummaryClient({
   const handleDownloadExcel = () => {
     const params = new URLSearchParams(searchParams.toString());
     const ay = params.get('ay') || '';
-    window.location.href = `/api/admin/grades/summary/certificates/download${ay ? `?ay=${ay}` : ''}`;
+    window.location.href = `/api/admin/certification/download${ay ? `?ay=${ay}` : ''}`;
   };
 
   return (
@@ -185,7 +187,7 @@ export function CertificateSummaryClient({
             <Download className="h-4 w-4" />
             현황 양식 다운로드
           </Button>
-          <CertificateImportModal />
+          {isAdmin && <CertificateImportModal />}
         </div>
       </div>
 
@@ -259,13 +261,13 @@ export function CertificateSummaryClient({
               <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider text-center w-24">번호</th>
               <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider">학생 정보</th>
               <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider">취득 자격증 목록</th>
-              <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider text-center w-24">작업</th>
+              {isAdmin && <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider text-center w-24">작업</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
             {paginatedData.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-6 py-12 text-center text-slate-400 font-bold">
+                <td colSpan={isAdmin ? 4 : 3} className="px-6 py-12 text-center text-slate-400 font-bold">
                   등록된 자격증 데이터가 없거나 조건에 일치하는 학생이 없습니다.
                 </td>
               </tr>
@@ -305,16 +307,18 @@ export function CertificateSummaryClient({
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-center">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => startEdit(student)}
-                      className="h-8 w-8 p-0 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                  </td>
+                  {isAdmin && (
+                    <td className="px-6 py-4 text-center">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => startEdit(student)}
+                        className="h-8 w-8 p-0 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  )}
                 </tr>
               ))
             )}

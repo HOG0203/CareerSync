@@ -31,6 +31,8 @@ import { getStudentScoresById } from '@/app/students/actions';
 import { Button } from '@/components/ui/button';
 import { CounselingModal } from '@/app/(dashboard)/class-management/counseling-modal';
 
+import { useIsMobile } from '@/hooks/use-mobile';
+
 interface StudentPopoverProps {
   student: StudentEmploymentData;
   children: React.ReactNode;
@@ -47,11 +49,15 @@ export function StudentPopover({
   children, 
   rankingSummary, 
   userProfile,
-  side = 'right',
-  align = 'start',
+  side,
+  align,
   baseYear,
   isLowerGrade: propIsLowerGrade
 }: StudentPopoverProps) {
+  const isMobile = useIsMobile();
+  const resolvedSide = side || (isMobile ? 'bottom' : 'right');
+  const resolvedAlign = align || (isMobile ? 'center' : 'start');
+
   const [isGradeModalOpen, setIsGradeModalOpen] = React.useState(false);
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = React.useState(false);
   const [isCounselingModalOpen, setIsCounselingModalOpen] = React.useState(false);
@@ -131,8 +137,8 @@ export function StudentPopover({
           {children}
         </PopoverTrigger>
         <PopoverContent 
-          side={side} 
-          align={align}
+          side={resolvedSide} 
+          align={resolvedAlign}
           className="p-4 w-[300px] text-xs shadow-xl border-2 z-[100] max-h-[80vh] overflow-y-auto bg-white"
           sideOffset={5}
         >

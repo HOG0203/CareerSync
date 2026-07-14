@@ -159,7 +159,7 @@ export async function uploadStudentScores(
   }
 
   revalidatePath('/admin/grades');
-  revalidatePath('/admin/grades/summary/grades');
+  revalidatePath('/admin/certification/grades');
   return { success: true, results };
 }
 
@@ -181,7 +181,7 @@ export async function updateAchievementScores(scores: Record<string, number>) {
       key: 'achievement_scores', value: scores, updated_at: new Date().toISOString()
     });
     if (error) throw error;
-    revalidatePath('/admin/grades/summary');
+    revalidatePath('/admin/certification/grades');
     return { success: true };
   } catch (error: any) {
     return { error: error.message };
@@ -194,7 +194,7 @@ export async function deleteAllStudentScores() {
     const { error } = await supabase.from('student_scores').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     if (error) throw error;
     revalidatePath('/admin/grades');
-    revalidatePath('/admin/grades/summary');
+    revalidatePath('/admin/certification/grades');
     return { success: true };
   } catch (error: any) {
     return { error: error.message };

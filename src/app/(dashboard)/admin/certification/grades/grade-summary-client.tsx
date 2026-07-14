@@ -44,11 +44,13 @@ interface StudentSummary {
 export function GradeSummaryClient({ 
   initialSummaries, 
   weights,
-  currentGrade // 서버에서 결정된 학년
+  currentGrade, // 서버에서 결정된 학년
+  isAdmin = false
 }: { 
   initialSummaries: StudentSummary[], 
   weights: Record<string, number>,
-  currentGrade: number
+  currentGrade: number,
+  isAdmin?: boolean
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -66,11 +68,10 @@ export function GradeSummaryClient({
     direction: 'asc'
   });
 
-  // 학년 변경 시 URL 업데이트 (서버 리로딩 유도)
   const handleGradeChange = (grade: number) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('grade', grade.toString());
-    router.push(`/admin/grades/summary/grades?${params.toString()}`);
+    router.push(`/admin/certification/grades?${params.toString()}`);
   };
 
   // 클라이언트 사이드 필터링 (학과, 반, 검색어)
@@ -160,9 +161,11 @@ export function GradeSummaryClient({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 pt-4 flex justify-end">
-        <GradeImportModal />
-      </div>
+      {isAdmin && (
+        <div className="px-4 pt-4 flex justify-end">
+          <GradeImportModal />
+        </div>
+      )}
 
       <div className="p-4 border-b bg-slate-50/50 flex flex-wrap items-center gap-4">
         <div className="relative flex-1 min-w-[200px]">

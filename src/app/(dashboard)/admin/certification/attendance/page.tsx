@@ -11,7 +11,7 @@ export default async function AttendanceSummaryPage({
 }) {
   const profile = await getCurrentUserProfile();
 
-  if (profile?.role !== 'admin') {
+  if (profile?.role !== 'admin' && profile?.role !== 'teacher') {
     redirect('/dashboard');
   }
 
@@ -27,7 +27,8 @@ export default async function AttendanceSummaryPage({
     <AttendanceTableClient 
       initialData={attendanceData as any[]} 
       currentGrade={selectedGradeNum}
-      baseYear={baseYear} // 학사학년도 전달
+      baseYear={baseYear}
+      isAdmin={profile?.role === 'admin'}
     />
   );
 }

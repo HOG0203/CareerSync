@@ -139,7 +139,7 @@ export async function uploadStudentAttendance(
     .upsert(upsertData, { onConflict: 'student_id, academic_year, grade, semester' });
 
   if (error) return { error: error.message };
-  revalidatePath('/admin/grades/summary/attendance');
+  revalidatePath('/admin/certification/attendance');
   return { success: true, count: upsertData.length };
 }
 
@@ -147,7 +147,7 @@ export async function deleteAllStudentAttendance() {
   const supabase = await createClient();
   const { error } = await supabase.from('student_attendance').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   if (error) return { success: false, error: error.message };
-  revalidatePath('/admin/grades/summary/attendance');
+  revalidatePath('/admin/certification/attendance');
   return { success: true };
 }
 

@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
 import { FileUp, Settings } from 'lucide-react';
-import { GradeImportClient } from '../../grade-import-client';
+import { GradeImportClient } from '@/app/(dashboard)/admin/grades/grade-import-client';
 
 export function GradeImportModal() {
   const [open, setOpen] = React.useState(false);

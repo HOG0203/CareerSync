@@ -7,35 +7,29 @@ import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { redirect } from 'next/navigation';
 import { GradeSummaryClient } from './grade-summary-client';
 
-export default async function GradeSummaryPage({
+export default async function CertificationPage({
   searchParams,
 }: {
   searchParams: Promise<{ grade?: string }>;
 }) {
   const profile = await getCurrentUserProfile();
 
-  // 관리자만 접근 가능
-  if (profile?.role !== 'admin') {
+  // 관리자, 교직원 접근 가능
+  if (profile?.role !== 'admin' && profile?.role !== 'teacher') {
     redirect('/dashboard');
   }
 
-  // 시스템 설정에서 기준 학사학년도 가져오기 (정확한 경로에서 임포트)
+  // 시스템 설정에서 기준 학사학년도 가져오기
   const settings = await getSystemSettings();
   const baseYear = settings.baseYear;
 
-  // URL 파라미터에서 학년 정보를 읽음 (기본값 3학년)
+  // URL 파라미터에서 학년 정보 읽음 (기본값: 3학년)
   const { grade } = await searchParams;
   const selectedGradeNum = grade ? parseInt(grade) : 3;
   
-  /**
-   * [계산 로직]
-   * 현재 3학년 = baseYear + 1년 졸업
-   * 현재 2학년 = baseYear + 2년 졸업
-   * 현재 1학년 = baseYear + 3년 졸업
-   */
   const targetGradYear = baseYear + (4 - selectedGradeNum);
 
-  // 선택된 학년의 요약 데이터만 서버에서 가져옴
+  // 성적 및 가중치 데이터만 서버에서 로드
   const [summaryMap, weights] = await Promise.all([
     getYearlyRankingsSummary(targetGradYear, baseYear),
     getAchievementScores()
@@ -44,10 +38,13 @@ export default async function GradeSummaryPage({
   const studentSummaries = Object.values(summaryMap);
 
   return (
-    <GradeSummaryClient 
-      initialSummaries={studentSummaries as any[]} 
-      weights={weights}
-      currentGrade={selectedGradeNum} 
-    />
+    <div className="flex-1 min-h-0 bg-white/50 backdrop-blur-sm rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+      <GradeSummaryClient 
+        initialSummaries={studentSummaries as any[]} 
+        weights={weights}
+        currentGrade={selectedGradeNum} 
+        isAdmin={profile?.role === 'admin'}
+      />
+    </div>
   );
 }

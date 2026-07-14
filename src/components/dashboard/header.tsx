@@ -47,7 +47,10 @@ const ROUTE_MAP: Record<string, { group: string; label: string }> = {
   '/admin/students': { group: '학사 및 지도', label: '학생 등록/진급' },
   '/admin/users': { group: '시스템 관리', label: '사용자 관리' },
   '/admin/settings': { group: '시스템 관리', label: '시스템 설정' },
-  '/admin/grades/summary': { group: '시스템 관리', label: '옥저인증' },
+  '/admin/certification': { group: '옥저인재인증제', label: '인증현황' },
+  '/admin/certification/grades': { group: '옥저인재인증제', label: '성적현황' },
+  '/admin/certification/attendance': { group: '옥저인재인증제', label: '출결현황' },
+  '/admin/certification/certificates': { group: '옥저인재인증제', label: '자격증현황' },
 };
 
 export default function Header({ userProfile }: { userProfile?: any }) {
