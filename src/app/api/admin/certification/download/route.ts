@@ -109,7 +109,7 @@ function copyWorksheet(
   }
 
   // 동적 병합 영역 적용
-  const lastColLetter = targetSheet.getColumn(totalColNum + 3).letter;
+  const lastColLetter = targetSheet.getColumn(totalColNum + 4).letter;
   // 대제목 병합
   try {
     targetSheet.mergeCells(`A1:${lastColLetter}1`);
@@ -126,10 +126,12 @@ function copyWorksheet(
   const colLetter1 = targetSheet.getColumn(totalColNum + 1).letter;
   const colLetter2 = targetSheet.getColumn(totalColNum + 2).letter;
   const colLetter3 = targetSheet.getColumn(totalColNum + 3).letter;
+  const colLetter4 = targetSheet.getColumn(totalColNum + 4).letter;
   try { targetSheet.mergeCells(`${colLetter}2:${colLetter}3`); } catch (e) {}
   try { targetSheet.mergeCells(`${colLetter1}2:${colLetter1}3`); } catch (e) {}
   try { targetSheet.mergeCells(`${colLetter2}2:${colLetter2}3`); } catch (e) {}
   try { targetSheet.mergeCells(`${colLetter3}2:${colLetter3}3`); } catch (e) {}
+  try { targetSheet.mergeCells(`${colLetter4}2:${colLetter4}3`); } catch (e) {}
 }
 
 // 템플릿의 특정 열의 스타일(너비, 테두리, 배경색 등)을 대상 열로 복사하는 헬퍼 함수
@@ -272,14 +274,15 @@ export async function GET(request: NextRequest) {
         copyColumnStyles(sourceSheet, targetSheet, 7, col, 2, 11);
       }
 
-      // 2~11행에 걸쳐 통계 열 서식(합계, 취득률, 취득률(ITQ제외), 취득비율) 복제
+      // 2~11행에 걸쳐 통계 열 서식(합계, 취득률, 기능사 취득률, 기능사 취득비율, 취득비율) 복제
       copyColumnStyles(sourceSheet, targetSheet, templateTotalColNum, totalColNum, 2, 11);
       copyColumnStyles(sourceSheet, targetSheet, templateTotalColNum + 1, totalColNum + 1, 2, 11);
       copyColumnStyles(sourceSheet, targetSheet, templateTotalColNum + 2, totalColNum + 2, 2, 11);
-      copyColumnStyles(sourceSheet, targetSheet, templateTotalColNum + 3, totalColNum + 3, 2, 11);
+      copyColumnStyles(sourceSheet, targetSheet, templateTotalColNum + 3, totalColNum + 3, 2, 11); // 기능사 취득비율
+      copyColumnStyles(sourceSheet, targetSheet, templateTotalColNum + 3, totalColNum + 4, 2, 11); // 취득비율
 
       // 기존 Row 2와 Row 3에 있던 병합된 잔여 텍스트값 초기화
-      [totalColNum, totalColNum + 1, totalColNum + 2, totalColNum + 3].forEach(col => {
+      [totalColNum, totalColNum + 1, totalColNum + 2, totalColNum + 3, totalColNum + 4].forEach(col => {
         targetSheet.getRow(2).getCell(col).value = null;
         targetSheet.getRow(3).getCell(col).value = null;
       });
@@ -302,8 +305,11 @@ export async function GET(request: NextRequest) {
       targetSheet.getRow(2).getCell(totalColNum + 2).value = "기능사\n취득률";
       targetSheet.getRow(3).getCell(totalColNum + 2).value = "기능사\n취득률";
 
-      targetSheet.getRow(2).getCell(totalColNum + 3).value = "취득비율\n(자격증 \n취득수)";
-      targetSheet.getRow(3).getCell(totalColNum + 3).value = "취득비율\n(자격증 \n취득수)";
+      targetSheet.getRow(2).getCell(totalColNum + 3).value = "기능사\n취득비율";
+      targetSheet.getRow(3).getCell(totalColNum + 3).value = "기능사\n취득비율";
+
+      targetSheet.getRow(2).getCell(totalColNum + 4).value = "취득비율\n(자격증 \n취득수)";
+      targetSheet.getRow(3).getCell(totalColNum + 4).value = "취득비율\n(자격증 \n취득수)";
 
       // 해당 학년 학생들의 고유 학과 추출 및 표준 정렬 순서 적용
       const uniqueMajors = Array.from(new Set(gradeStudents.map(s => s.major).filter(Boolean) as string[]));
@@ -369,6 +375,10 @@ export async function GET(request: NextRequest) {
 
           const totalColLetter = targetSheet.getColumn(totalColNum).letter;
           const endCertColLetter = targetSheet.getColumn(totalColNum - 1).letter;
+          const craftsmanEndColNum = 7 + craftsmanCerts.length - 1;
+          const craftsmanEndColLetter = craftsmanCerts.length > 0 
+            ? targetSheet.getColumn(craftsmanEndColNum).letter 
+            : 'G';
 
           // AV: 종목 자격증 합계 공식 주입 (동적 범위 지정)
           row.getCell(totalColNum).value = { formula: `SUM(G${rowNum}:${endCertColLetter}${rowNum})` };
@@ -379,8 +389,15 @@ export async function GET(request: NextRequest) {
           // AX: 기능사 취득률 기입
           row.getCell(totalColNum + 2).value = B > 0 ? (craftsmanCertifiedCount / B) * 100 : 0;
 
-          // AY: 취득비율 (자격증 취득수) 공식 주입
-          row.getCell(totalColNum + 3).value = { formula: `IFERROR(${totalColLetter}${rowNum}/B${rowNum}*100, 0)` };
+          // AY: 기능사 취득비율 공식 주입
+          if (craftsmanCerts.length > 0) {
+            row.getCell(totalColNum + 3).value = { formula: `IFERROR(SUM(G${rowNum}:${craftsmanEndColLetter}${rowNum})/B${rowNum}*100, 0)` };
+          } else {
+            row.getCell(totalColNum + 3).value = 0;
+          }
+
+          // AZ: 전체 취득비율 (자격증 취득수) 공식 주입
+          row.getCell(totalColNum + 4).value = { formula: `IFERROR(${totalColLetter}${rowNum}/B${rowNum}*100, 0)` };
         } else {
           const endCertColLetter = targetSheet.getColumn(totalColNum - 1).letter;
           // 남는 엑셀 행 영역은 0 및 빈값 처리하여 하단 '계' 연산(SUM)에 영향이 가지 않도록 정화
@@ -399,6 +416,7 @@ export async function GET(request: NextRequest) {
           row.getCell(totalColNum + 1).value = 0;
           row.getCell(totalColNum + 2).value = 0;
           row.getCell(totalColNum + 3).value = 0;
+          row.getCell(totalColNum + 4).value = 0;
         }
       }
 
@@ -429,22 +447,33 @@ export async function GET(request: NextRequest) {
       }).length;
       totalRow.getCell(totalColNum + 2).value = totalStudentsCount > 0 ? (totalCraftsmanCertifiedCount / totalStudentsCount) * 100 : 0;
 
-      // AY11 (totalColNum + 3): 계 취득비율 공식
+      // AY11 (totalColNum + 3): 계 기능사 취득비율 공식
+      const craftsmanEndColNum = 7 + craftsmanCerts.length - 1;
+      const craftsmanEndColLetter = craftsmanCerts.length > 0 
+        ? targetSheet.getColumn(craftsmanEndColNum).letter 
+        : 'G';
+      if (craftsmanCerts.length > 0) {
+        totalRow.getCell(totalColNum + 3).value = { formula: `IFERROR(SUM(G11:${craftsmanEndColLetter}11)/B11*100, 0)` };
+      } else {
+        totalRow.getCell(totalColNum + 3).value = 0;
+      }
+
+      // AZ11 (totalColNum + 4): 계 전체 취득비율 공식
       const totalColLetter = targetSheet.getColumn(totalColNum).letter;
-      totalRow.getCell(totalColNum + 3).value = { formula: `IFERROR(${totalColLetter}11/B11*100, 0)` };
+      totalRow.getCell(totalColNum + 4).value = { formula: `IFERROR(${totalColLetter}11/B11*100, 0)` };
 
       // U13, U14 병합 영역 요약 정보 수식 연동
       const awColLetter = targetSheet.getColumn(totalColNum + 1).letter;
-      const ayColLetter = targetSheet.getColumn(totalColNum + 3).letter;
+      const ayColLetter = targetSheet.getColumn(totalColNum + 4).letter; // 전체 취득비율 열 연동
       targetSheet.getCell('AB13').value = { formula: `${awColLetter}11` };
       targetSheet.getCell('AB14').value = { formula: `${ayColLetter}11` };
 
       // 기능사 제외 취득률 컬럼은 숨기지 않고 노출함
       // targetSheet.getColumn(totalColNum + 2).hidden = true;
 
-      // used area(totalColNum+3) 이후 잔여 열의 값·스타일 완전 제거
+      // used area(totalColNum+4) 이후 잔여 열의 값·스타일 완전 제거
       // copyWorksheet가 복사한 템플릿의 색상/테두리가 남아 빈 색칸으로 보이는 문제 방지
-      for (let col = totalColNum + 4; col <= aggressiveClearTo + 5; col++) {
+      for (let col = totalColNum + 5; col <= aggressiveClearTo + 5; col++) {
         for (let rowNum = 2; rowNum <= 12; rowNum++) {
           const cell = targetSheet.getRow(rowNum).getCell(col);
           cell.value = null;
