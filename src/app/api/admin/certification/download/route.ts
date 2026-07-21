@@ -235,9 +235,13 @@ export async function GET(request: NextRequest) {
 
       // 해당 학년 학생이 실제 취득한 자격증만 추출 (count > 0인 것만 열로 구성)
       const gradeStudents = (students || []).filter(s => s.graduation_year === gradYear);
-      const gradeCertNames = Array.from(new Set(
+      const rawCertNames = Array.from(new Set(
         gradeStudents.flatMap(s => Array.isArray(s.certificates) ? s.certificates : []).filter(Boolean) as string[]
-      )).sort((a, b) => a.localeCompare(b, 'ko'));
+      ));
+      
+      const craftsmanCerts = rawCertNames.filter(name => isCraftsman(name)).sort((a, b) => a.localeCompare(b, 'ko'));
+      const nonCraftsmanCerts = rawCertNames.filter(name => !isCraftsman(name)).sort((a, b) => a.localeCompare(b, 'ko'));
+      const gradeCertNames = [...craftsmanCerts, ...nonCraftsmanCerts];
 
       const certColumns = gradeCertNames.map((certName, i) => ({ colNum: 7 + i, certName }));
       const totalColNum = 7 + gradeCertNames.length;
