@@ -6,6 +6,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { MAJOR_SORT_ORDER } from '@/lib/types';
 
+// 기능사/산업기사 여부를 판별하는 헬퍼 함수
+function isCraftsman(certName: string): boolean {
+  const clean = certName.replace(/\s+/g, '').toLowerCase();
+  return clean.includes('기능사') || clean.includes('산업기사');
+}
+
 // 기능사 접미사 매칭을 위한 검사 함수
 function matchCertificate(studentCert: string, headerName: string): boolean {
   const sCert = studentCert.replace(/\s+/g, '').toLowerCase();
@@ -286,11 +292,11 @@ export async function GET(request: NextRequest) {
       targetSheet.getRow(2).getCell(totalColNum).value = "합\n\n\n계";
       targetSheet.getRow(3).getCell(totalColNum).value = "합\n\n\n계";
 
-      targetSheet.getRow(2).getCell(totalColNum + 1).value = "취득률\n(인원\n대비)";
-      targetSheet.getRow(3).getCell(totalColNum + 1).value = "취득률\n(인원\n대비)";
+      targetSheet.getRow(2).getCell(totalColNum + 1).value = "기능사 포함\n취득률";
+      targetSheet.getRow(3).getCell(totalColNum + 1).value = "기능사 포함\n취득률";
 
-      targetSheet.getRow(2).getCell(totalColNum + 2).value = "취득률\n(ITQ\n제외)";
-      targetSheet.getRow(3).getCell(totalColNum + 2).value = "취득률\n(ITQ\n제외)";
+      targetSheet.getRow(2).getCell(totalColNum + 2).value = "기능사 제외\n취득률";
+      targetSheet.getRow(3).getCell(totalColNum + 2).value = "기능사 제외\n취득률";
 
       targetSheet.getRow(2).getCell(totalColNum + 3).value = "취득비율\n(자격증 \n취득수)";
       targetSheet.getRow(3).getCell(totalColNum + 3).value = "취득비율\n(자격증 \n취득수)";
@@ -321,11 +327,11 @@ export async function GET(request: NextRequest) {
           let cCount = 0;
           let dCount = 0;
           let eCount = 0;
-          let nonItqCertifiedCount = 0;
+          let nonCraftsmanCertifiedCount = 0;
 
           majorStudents.forEach(student => {
             const certs = student.certificates || [];
-            // 템플릿 상에 존재하는 자격증들만 유효 자격증으로 필터링 (ITQ 및 기타 비대상 자격증 제외)
+            // 템플릿 상에 존재하는 자격증들만 유효 자격증으로 필터링
             const validCerts = (Array.isArray(certs) ? certs : []).filter(Boolean);
             const certCount = validCerts.length;
 
@@ -333,7 +339,11 @@ export async function GET(request: NextRequest) {
             else if (certCount === 2) dCount++;
             else if (certCount >= 3) eCount++;
 
-            if (certCount > 0) nonItqCertifiedCount++;
+            // 기능사 제외 자격증 취득 여부 판별
+            const hasNonCraftsman = validCerts.some(c => !isCraftsman(c));
+            if (hasNonCraftsman) {
+              nonCraftsmanCertifiedCount++;
+            }
           });
 
           // 1개, 2개, 3개이상 취득자수 기입
@@ -362,8 +372,8 @@ export async function GET(request: NextRequest) {
           // AW: 취득률 (인원대비) 공식 주입 (과정원이 0인 경우 대비해 IFERROR 사용)
           row.getCell(totalColNum + 1).value = { formula: `IFERROR(F${rowNum}/B${rowNum}*100, 0)` };
 
-          // AX: ITQ 제외 취득률 기입 (DB 통계 수치 직접 기입)
-          row.getCell(totalColNum + 2).value = B > 0 ? (nonItqCertifiedCount / B) * 100 : 0;
+          // AX: 기능사 제외 취득률 기입
+          row.getCell(totalColNum + 2).value = B > 0 ? (nonCraftsmanCertifiedCount / B) * 100 : 0;
 
           // AY: 취득비율 (자격증 취득수) 공식 주입
           row.getCell(totalColNum + 3).value = { formula: `IFERROR(${totalColLetter}${rowNum}/B${rowNum}*100, 0)` };
@@ -406,13 +416,14 @@ export async function GET(request: NextRequest) {
       // AW11 (totalColNum + 1): 계 취득률 공식
       totalRow.getCell(totalColNum + 1).value = { formula: 'IFERROR(F11/B11*100, 0)' };
 
-      // AX11 (totalColNum + 2): 계 ITQ 제외 취득률 (합계)
+      // AX11 (totalColNum + 2): 계 기능사 제외 취득률 (합계)
       const totalStudentsCount = gradeStudents.length;
-      const totalNonItqCertifiedCount = gradeStudents.filter(s => {
+      const totalNonCraftsmanCertifiedCount = gradeStudents.filter(s => {
         const certs = s.certificates || [];
-        return (Array.isArray(certs) ? certs : []).filter(Boolean).length > 0;
+        const validCerts = (Array.isArray(certs) ? certs : []).filter(Boolean);
+        return validCerts.some(c => !isCraftsman(c));
       }).length;
-      totalRow.getCell(totalColNum + 2).value = totalStudentsCount > 0 ? (totalNonItqCertifiedCount / totalStudentsCount) * 100 : 0;
+      totalRow.getCell(totalColNum + 2).value = totalStudentsCount > 0 ? (totalNonCraftsmanCertifiedCount / totalStudentsCount) * 100 : 0;
 
       // AY11 (totalColNum + 3): 계 취득비율 공식
       const totalColLetter = targetSheet.getColumn(totalColNum).letter;
@@ -424,8 +435,8 @@ export async function GET(request: NextRequest) {
       targetSheet.getCell('AB13').value = { formula: `${awColLetter}11` };
       targetSheet.getCell('AB14').value = { formula: `${ayColLetter}11` };
 
-      // 취득률 (ITQ 제외) 컬럼(AX, 50번째 열) 숨김 처리 (전체 시트가 이미 ITQ를 제외하고 연산되므로 불필요한 중복 열임)
-      targetSheet.getColumn(totalColNum + 2).hidden = true;
+      // 기능사 제외 취득률 컬럼은 숨기지 않고 노출함
+      // targetSheet.getColumn(totalColNum + 2).hidden = true;
 
       // used area(totalColNum+3) 이후 잔여 열의 값·스타일 완전 제거
       // copyWorksheet가 복사한 템플릿의 색상/테두리가 남아 빈 색칸으로 보이는 문제 방지
