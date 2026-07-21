@@ -299,8 +299,8 @@ export async function GET(request: NextRequest) {
       targetSheet.getRow(2).getCell(totalColNum + 1).value = "기능사 포함\n취득률";
       targetSheet.getRow(3).getCell(totalColNum + 1).value = "기능사 포함\n취득률";
 
-      targetSheet.getRow(2).getCell(totalColNum + 2).value = "기능사 제외\n취득률";
-      targetSheet.getRow(3).getCell(totalColNum + 2).value = "기능사 제외\n취득률";
+      targetSheet.getRow(2).getCell(totalColNum + 2).value = "기능사\n취득률";
+      targetSheet.getRow(3).getCell(totalColNum + 2).value = "기능사\n취득률";
 
       targetSheet.getRow(2).getCell(totalColNum + 3).value = "취득비율\n(자격증 \n취득수)";
       targetSheet.getRow(3).getCell(totalColNum + 3).value = "취득비율\n(자격증 \n취득수)";
@@ -331,7 +331,7 @@ export async function GET(request: NextRequest) {
           let cCount = 0;
           let dCount = 0;
           let eCount = 0;
-          let nonCraftsmanCertifiedCount = 0;
+          let craftsmanCertifiedCount = 0;
 
           majorStudents.forEach(student => {
             const certs = student.certificates || [];
@@ -343,10 +343,10 @@ export async function GET(request: NextRequest) {
             else if (certCount === 2) dCount++;
             else if (certCount >= 3) eCount++;
 
-            // 기능사 제외 자격증 취득 여부 판별
-            const hasNonCraftsman = validCerts.some(c => !isCraftsman(c));
-            if (hasNonCraftsman) {
-              nonCraftsmanCertifiedCount++;
+            // 기능사 자격증 취득 여부 판별
+            const hasCraftsman = validCerts.some(c => isCraftsman(c));
+            if (hasCraftsman) {
+              craftsmanCertifiedCount++;
             }
           });
 
@@ -376,8 +376,8 @@ export async function GET(request: NextRequest) {
           // AW: 취득률 (인원대비) 공식 주입 (과정원이 0인 경우 대비해 IFERROR 사용)
           row.getCell(totalColNum + 1).value = { formula: `IFERROR(F${rowNum}/B${rowNum}*100, 0)` };
 
-          // AX: 기능사 제외 취득률 기입
-          row.getCell(totalColNum + 2).value = B > 0 ? (nonCraftsmanCertifiedCount / B) * 100 : 0;
+          // AX: 기능사 취득률 기입
+          row.getCell(totalColNum + 2).value = B > 0 ? (craftsmanCertifiedCount / B) * 100 : 0;
 
           // AY: 취득비율 (자격증 취득수) 공식 주입
           row.getCell(totalColNum + 3).value = { formula: `IFERROR(${totalColLetter}${rowNum}/B${rowNum}*100, 0)` };
@@ -420,14 +420,14 @@ export async function GET(request: NextRequest) {
       // AW11 (totalColNum + 1): 계 취득률 공식
       totalRow.getCell(totalColNum + 1).value = { formula: 'IFERROR(F11/B11*100, 0)' };
 
-      // AX11 (totalColNum + 2): 계 기능사 제외 취득률 (합계)
+      // AX11 (totalColNum + 2): 계 기능사 취득률 (합계)
       const totalStudentsCount = gradeStudents.length;
-      const totalNonCraftsmanCertifiedCount = gradeStudents.filter(s => {
+      const totalCraftsmanCertifiedCount = gradeStudents.filter(s => {
         const certs = s.certificates || [];
         const validCerts = (Array.isArray(certs) ? certs : []).filter(Boolean);
-        return validCerts.some(c => !isCraftsman(c));
+        return validCerts.some(c => isCraftsman(c));
       }).length;
-      totalRow.getCell(totalColNum + 2).value = totalStudentsCount > 0 ? (totalNonCraftsmanCertifiedCount / totalStudentsCount) * 100 : 0;
+      totalRow.getCell(totalColNum + 2).value = totalStudentsCount > 0 ? (totalCraftsmanCertifiedCount / totalStudentsCount) * 100 : 0;
 
       // AY11 (totalColNum + 3): 계 취득비율 공식
       const totalColLetter = targetSheet.getColumn(totalColNum).letter;
