@@ -40,6 +40,11 @@ next-env.d.ts
 .genkit/*
 .env*
 
+# local data files (may contain real student PII - never commit at repo root)
+/*.xlsx
+/*.xls
+/*.xlsxx
+
 # firebase
 firebase-debug.log
 firestore-debug.log
