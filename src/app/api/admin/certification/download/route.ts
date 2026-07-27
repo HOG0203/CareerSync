@@ -243,7 +243,10 @@ export async function GET(request: NextRequest) {
       
       const craftsmanCerts = rawCertNames.filter(name => isCraftsman(name)).sort((a, b) => a.localeCompare(b, 'ko'));
       const nonCraftsmanCerts = rawCertNames.filter(name => !isCraftsman(name)).sort((a, b) => a.localeCompare(b, 'ko'));
-      const gradeCertNames = [...craftsmanCerts, ...nonCraftsmanCerts];
+      let gradeCertNames = [...craftsmanCerts, ...nonCraftsmanCerts];
+      if (gradeCertNames.length === 0) {
+        gradeCertNames = ['(취득 자격증 없음)'];
+      }
 
       const certColumns = gradeCertNames.map((certName, i) => ({ colNum: 7 + i, certName }));
       const totalColNum = 7 + gradeCertNames.length;
@@ -311,111 +314,95 @@ export async function GET(request: NextRequest) {
       targetSheet.getRow(2).getCell(totalColNum + 4).value = "기능사\n취득비율";
       targetSheet.getRow(3).getCell(totalColNum + 4).value = "기능사\n취득비율";
 
-      // 해당 학년 학생들의 고유 학과 추출 및 표준 정렬 순서 적용
-      const uniqueMajors = Array.from(new Set(gradeStudents.map(s => s.major).filter(Boolean) as string[]));
-      
-      uniqueMajors.sort((a, b) => {
-        const idxA = MAJOR_SORT_ORDER.indexOf(a);
-        const idxB = MAJOR_SORT_ORDER.indexOf(b);
-        return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
-      });
+      // 학교 공식 7개 학과 순서 고정 (학생 수가 없더라도 빈 칸 방지 및 서식 유지를 위해 고정)
+      const FIXED_MAJORS = [
+        '자동화기계과',
+        '친환경자동차과',
+        '건설과',
+        '스마트공간건축과',
+        '스마트전기과',
+        '바이오화학과',
+        '스마트융합섬유과'
+      ];
 
       // 학과별 데이터 기입 (템플릿 상의 4행 ~ 10행 고정 구역 순회)
       for (let idx = 0; idx < 7; idx++) {
         const rowNum = 4 + idx;
         const row = targetSheet.getRow(rowNum);
+        const majorName = FIXED_MAJORS[idx];
+        const majorStudents = gradeStudents.filter(s => s.major === majorName);
+        const B = majorStudents.length;
 
-        if (idx < uniqueMajors.length) {
-          const majorName = uniqueMajors[idx];
-          const majorStudents = gradeStudents.filter(s => s.major === majorName);
-          const B = majorStudents.length;
+        // 학과명 & 과정원 기입
+        row.getCell(1).value = majorName;
+        row.getCell(2).value = B;
 
-          // 학과명 & 과정원 기입
-          row.getCell(1).value = majorName;
-          row.getCell(2).value = B;
+        let cCount = 0;
+        let dCount = 0;
+        let eCount = 0;
+        let craftsmanCertifiedCount = 0;
 
-          let cCount = 0;
-          let dCount = 0;
-          let eCount = 0;
-          let craftsmanCertifiedCount = 0;
+        majorStudents.forEach(student => {
+          const certs = student.certificates || [];
+          // 템플릿 상에 존재하는 자격증들만 유효 자격증으로 필터링
+          const validCerts = (Array.isArray(certs) ? certs : []).filter(Boolean);
+          const certCount = validCerts.length;
 
-          majorStudents.forEach(student => {
-            const certs = student.certificates || [];
-            // 템플릿 상에 존재하는 자격증들만 유효 자격증으로 필터링
-            const validCerts = (Array.isArray(certs) ? certs : []).filter(Boolean);
-            const certCount = validCerts.length;
+          if (certCount === 1) cCount++;
+          else if (certCount === 2) dCount++;
+          else if (certCount >= 3) eCount++;
 
-            if (certCount === 1) cCount++;
-            else if (certCount === 2) dCount++;
-            else if (certCount >= 3) eCount++;
-
-            // 기능사 자격증 취득 여부 판별
-            const hasCraftsman = validCerts.some(c => isCraftsman(c));
-            if (hasCraftsman) {
-              craftsmanCertifiedCount++;
-            }
-          });
-
-          // 1개, 2개, 3개이상 취득자수 기입
-          row.getCell(3).value = cCount;
-          row.getCell(4).value = dCount;
-          row.getCell(5).value = eCount;
-
-          // F: 계 (C + D + E) 공식 주입
-          row.getCell(6).value = { formula: `SUM(C${rowNum}:E${rowNum})` };
-
-          // G~: 각 자격증 수 계산 및 기입 (정확한 이름 매칭)
-          certColumns.forEach(({ colNum, certName }) => {
-            const count = majorStudents.filter(student => {
-              const certs = student.certificates || [];
-              return (Array.isArray(certs) ? certs : []).includes(certName);
-            }).length;
-            row.getCell(colNum).value = count;
-          });
-
-          const totalColLetter = targetSheet.getColumn(totalColNum).letter;
-          const endCertColLetter = targetSheet.getColumn(totalColNum - 1).letter;
-          const craftsmanEndColNum = 7 + craftsmanCerts.length - 1;
-          const craftsmanEndColLetter = craftsmanCerts.length > 0 
-            ? targetSheet.getColumn(craftsmanEndColNum).letter 
-            : 'G';
-
-          // AV: 종목 자격증 합계 공식 주입 (동적 범위 지정)
-          row.getCell(totalColNum).value = { formula: `SUM(G${rowNum}:${endCertColLetter}${rowNum})` };
-
-          // AW: 취득률 (인원대비) 공식 주입 (과정원이 0인 경우 대비해 IFERROR 사용)
-          row.getCell(totalColNum + 1).value = { formula: `IFERROR(F${rowNum}/B${rowNum}*100, 0)` };
-
-          // AX: 기능사 취득률 기입
-          row.getCell(totalColNum + 2).value = B > 0 ? (craftsmanCertifiedCount / B) * 100 : 0;
-
-          // AY: 자격증 취득비율 공식 주입
-          row.getCell(totalColNum + 3).value = { formula: `IFERROR(${totalColLetter}${rowNum}/B${rowNum}*100, 0)` };
-
-          // AZ: 기능사 취득비율 공식 주입
-          if (craftsmanCerts.length > 0) {
-            row.getCell(totalColNum + 4).value = { formula: `IFERROR(SUM(G${rowNum}:${craftsmanEndColLetter}${rowNum})/B${rowNum}*100, 0)` };
-          } else {
-            row.getCell(totalColNum + 4).value = 0;
+          // 기능사 자격증 취득 여부 판별
+          const hasCraftsman = validCerts.some(c => isCraftsman(c));
+          if (hasCraftsman) {
+            craftsmanCertifiedCount++;
           }
-        } else {
-          const endCertColLetter = targetSheet.getColumn(totalColNum - 1).letter;
-          // 남는 엑셀 행 영역은 0 및 빈값 처리하여 하단 '계' 연산(SUM)에 영향이 가지 않도록 정화
-          row.getCell(1).value = '';
-          row.getCell(2).value = 0;
-          row.getCell(3).value = 0;
-          row.getCell(4).value = 0;
-          row.getCell(5).value = 0;
-          row.getCell(6).value = { formula: `SUM(C${rowNum}:E${rowNum})` };
-          
-          certColumns.forEach(({ colNum }) => {
+        });
+
+        // 1개, 2개, 3개이상 취득자수 기입
+        row.getCell(3).value = cCount;
+        row.getCell(4).value = dCount;
+        row.getCell(5).value = eCount;
+
+        // F: 계 (C + D + E) 공식 주입
+        row.getCell(6).value = { formula: `SUM(C${rowNum}:E${rowNum})` };
+
+        // G~: 각 자격증 수 계산 및 기입 (정확한 이름 매칭)
+        certColumns.forEach(({ colNum, certName }) => {
+          if (certName === '(취득 자격증 없음)') {
             row.getCell(colNum).value = 0;
-          });
-          
-          row.getCell(totalColNum).value = { formula: `SUM(G${rowNum}:${endCertColLetter}${rowNum})` };
-          row.getCell(totalColNum + 1).value = 0;
-          row.getCell(totalColNum + 2).value = 0;
-          row.getCell(totalColNum + 3).value = 0;
+            return;
+          }
+          const count = majorStudents.filter(student => {
+            const certs = student.certificates || [];
+            return (Array.isArray(certs) ? certs : []).includes(certName);
+          }).length;
+          row.getCell(colNum).value = count;
+        });
+
+        const totalColLetter = targetSheet.getColumn(totalColNum).letter;
+        const endCertColLetter = targetSheet.getColumn(totalColNum - 1).letter;
+        const craftsmanEndColNum = 7 + craftsmanCerts.length - 1;
+        const craftsmanEndColLetter = craftsmanCerts.length > 0 
+          ? targetSheet.getColumn(craftsmanEndColNum).letter 
+          : 'G';
+
+        // AV: 종목 자격증 합계 공식 주입 (동적 범위 지정)
+        row.getCell(totalColNum).value = { formula: `SUM(G${rowNum}:${endCertColLetter}${rowNum})` };
+
+        // AW: 취득률 (인원대비) 공식 주입 (과정원이 0인 경우 대비해 IFERROR 사용)
+        row.getCell(totalColNum + 1).value = { formula: `IFERROR(F${rowNum}/B${rowNum}*100, 0)` };
+
+        // AX: 기능사 취득률 기입
+        row.getCell(totalColNum + 2).value = B > 0 ? (craftsmanCertifiedCount / B) * 100 : 0;
+
+        // AY: 자격증 취득비율 공식 주입
+        row.getCell(totalColNum + 3).value = { formula: `IFERROR(${totalColLetter}${rowNum}/B${rowNum}*100, 0)` };
+
+        // AZ: 기능사 취득비율 공식 주입
+        if (craftsmanCerts.length > 0) {
+          row.getCell(totalColNum + 4).value = { formula: `IFERROR(SUM(G${rowNum}:${craftsmanEndColLetter}${rowNum})/B${rowNum}*100, 0)` };
+        } else {
           row.getCell(totalColNum + 4).value = 0;
         }
       }
@@ -473,8 +460,14 @@ export async function GET(request: NextRequest) {
 
       // used area(totalColNum+4) 이후 잔여 열의 값·스타일 완전 제거
       // copyWorksheet가 복사한 템플릿의 색상/테두리가 남아 빈 색칸으로 보이는 문제 방지
-      for (let col = totalColNum + 5; col <= aggressiveClearTo + 5; col++) {
-        for (let rowNum = 2; rowNum <= 12; rowNum++) {
+      for (let col = totalColNum + 5; col <= aggressiveClearTo + 10; col++) {
+        for (let rowNum = 1; rowNum <= 20; rowNum++) {
+          // 요약 정보 영역(Row 13-14의 Col 21-26, Col 28-38)은 제외하고 클리어
+          const isSummaryLabel = (rowNum === 13 || rowNum === 14) && (col >= 21 && col <= 26);
+          const isSummaryValue = (rowNum === 13 || rowNum === 14) && (col >= 28 && col <= 38);
+          if (isSummaryLabel || isSummaryValue) {
+            continue;
+          }
           const cell = targetSheet.getRow(rowNum).getCell(col);
           cell.value = null;
           try { cell.style = {}; } catch (_) { /* 스타일 초기화 실패 무시 */ }
