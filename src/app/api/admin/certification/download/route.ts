@@ -299,17 +299,17 @@ export async function GET(request: NextRequest) {
       targetSheet.getRow(2).getCell(totalColNum).value = "합\n\n\n계";
       targetSheet.getRow(3).getCell(totalColNum).value = "합\n\n\n계";
 
-      targetSheet.getRow(2).getCell(totalColNum + 1).value = "기능사 포함\n취득률";
-      targetSheet.getRow(3).getCell(totalColNum + 1).value = "기능사 포함\n취득률";
+      targetSheet.getRow(2).getCell(totalColNum + 1).value = "자격증\n취득률";
+      targetSheet.getRow(3).getCell(totalColNum + 1).value = "자격증\n취득률";
 
       targetSheet.getRow(2).getCell(totalColNum + 2).value = "기능사\n취득률";
       targetSheet.getRow(3).getCell(totalColNum + 2).value = "기능사\n취득률";
 
-      targetSheet.getRow(2).getCell(totalColNum + 3).value = "기능사\n취득비율";
-      targetSheet.getRow(3).getCell(totalColNum + 3).value = "기능사\n취득비율";
+      targetSheet.getRow(2).getCell(totalColNum + 3).value = "자격증\n취득비율";
+      targetSheet.getRow(3).getCell(totalColNum + 3).value = "자격증\n취득비율";
 
-      targetSheet.getRow(2).getCell(totalColNum + 4).value = "취득비율\n(자격증 \n취득수)";
-      targetSheet.getRow(3).getCell(totalColNum + 4).value = "취득비율\n(자격증 \n취득수)";
+      targetSheet.getRow(2).getCell(totalColNum + 4).value = "기능사\n취득비율";
+      targetSheet.getRow(3).getCell(totalColNum + 4).value = "기능사\n취득비율";
 
       // 해당 학년 학생들의 고유 학과 추출 및 표준 정렬 순서 적용
       const uniqueMajors = Array.from(new Set(gradeStudents.map(s => s.major).filter(Boolean) as string[]));
@@ -389,15 +389,15 @@ export async function GET(request: NextRequest) {
           // AX: 기능사 취득률 기입
           row.getCell(totalColNum + 2).value = B > 0 ? (craftsmanCertifiedCount / B) * 100 : 0;
 
-          // AY: 기능사 취득비율 공식 주입
-          if (craftsmanCerts.length > 0) {
-            row.getCell(totalColNum + 3).value = { formula: `IFERROR(SUM(G${rowNum}:${craftsmanEndColLetter}${rowNum})/B${rowNum}*100, 0)` };
-          } else {
-            row.getCell(totalColNum + 3).value = 0;
-          }
+          // AY: 자격증 취득비율 공식 주입
+          row.getCell(totalColNum + 3).value = { formula: `IFERROR(${totalColLetter}${rowNum}/B${rowNum}*100, 0)` };
 
-          // AZ: 전체 취득비율 (자격증 취득수) 공식 주입
-          row.getCell(totalColNum + 4).value = { formula: `IFERROR(${totalColLetter}${rowNum}/B${rowNum}*100, 0)` };
+          // AZ: 기능사 취득비율 공식 주입
+          if (craftsmanCerts.length > 0) {
+            row.getCell(totalColNum + 4).value = { formula: `IFERROR(SUM(G${rowNum}:${craftsmanEndColLetter}${rowNum})/B${rowNum}*100, 0)` };
+          } else {
+            row.getCell(totalColNum + 4).value = 0;
+          }
         } else {
           const endCertColLetter = targetSheet.getColumn(totalColNum - 1).letter;
           // 남는 엑셀 행 영역은 0 및 빈값 처리하여 하단 '계' 연산(SUM)에 영향이 가지 않도록 정화
@@ -447,24 +447,24 @@ export async function GET(request: NextRequest) {
       }).length;
       totalRow.getCell(totalColNum + 2).value = totalStudentsCount > 0 ? (totalCraftsmanCertifiedCount / totalStudentsCount) * 100 : 0;
 
-      // AY11 (totalColNum + 3): 계 기능사 취득비율 공식
+      // AY11 (totalColNum + 3): 계 자격증 취득비율 공식
+      const totalColLetter = targetSheet.getColumn(totalColNum).letter;
+      totalRow.getCell(totalColNum + 3).value = { formula: `IFERROR(${totalColLetter}11/B11*100, 0)` };
+
+      // AZ11 (totalColNum + 4): 계 기능사 취득비율 공식
       const craftsmanEndColNum = 7 + craftsmanCerts.length - 1;
       const craftsmanEndColLetter = craftsmanCerts.length > 0 
         ? targetSheet.getColumn(craftsmanEndColNum).letter 
         : 'G';
       if (craftsmanCerts.length > 0) {
-        totalRow.getCell(totalColNum + 3).value = { formula: `IFERROR(SUM(G11:${craftsmanEndColLetter}11)/B11*100, 0)` };
+        totalRow.getCell(totalColNum + 4).value = { formula: `IFERROR(SUM(G11:${craftsmanEndColLetter}11)/B11*100, 0)` };
       } else {
-        totalRow.getCell(totalColNum + 3).value = 0;
+        totalRow.getCell(totalColNum + 4).value = 0;
       }
-
-      // AZ11 (totalColNum + 4): 계 전체 취득비율 공식
-      const totalColLetter = targetSheet.getColumn(totalColNum).letter;
-      totalRow.getCell(totalColNum + 4).value = { formula: `IFERROR(${totalColLetter}11/B11*100, 0)` };
 
       // U13, U14 병합 영역 요약 정보 수식 연동
       const awColLetter = targetSheet.getColumn(totalColNum + 1).letter;
-      const ayColLetter = targetSheet.getColumn(totalColNum + 4).letter; // 전체 취득비율 열 연동
+      const ayColLetter = targetSheet.getColumn(totalColNum + 3).letter; // 자격증 취득비율 열 연동
       targetSheet.getCell('AB13').value = { formula: `${awColLetter}11` };
       targetSheet.getCell('AB14').value = { formula: `${ayColLetter}11` };
 
