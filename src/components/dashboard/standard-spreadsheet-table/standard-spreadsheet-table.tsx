@@ -63,6 +63,7 @@ export function StandardSpreadsheetTable({
     setDetailData,
     ROW_HEIGHT,
     HEADER_HEIGHT,
+    containerHeight,
     handleMouseDown,
     handleMouseEnter,
     handleSaveInternal,
@@ -125,8 +126,9 @@ export function StandardSpreadsheetTable({
             <tbody>
               {(() => {
                 const totalCount = filteredData.length;
-                const start = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - 100);
-                const end = Math.min(totalCount - 1, Math.ceil((scrollTop + 1200) / ROW_HEIGHT) + 100);
+                // 가상 스크롤 비활성화: 모든 행을 항상 렌더링 (300명 수준은 성능 문제 없음)
+                const start = 0;
+                const end = totalCount - 1;
                 const sMinR = selectionStart && selectionEnd ? Math.min(selectionStart.row, selectionEnd.row) : -1;
                 const sMaxR = selectionStart && selectionEnd ? Math.max(selectionStart.row, selectionEnd.row) : -1;
                 const sMinC = selectionStart && selectionEnd ? Math.min(selectionStart.col, selectionEnd.col) : -1;
