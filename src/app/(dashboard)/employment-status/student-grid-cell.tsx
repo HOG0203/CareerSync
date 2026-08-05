@@ -10,6 +10,7 @@ interface StudentGridCellProps {
   idx: number;
   variant: string;
   rankingSummary?: any; // 부모로부터 전달받은 사전 계산된 성적/출결 요약
+  isRankingsLoading?: boolean; // 성적/석차 로딩 상태
   userProfile?: any; // 권한 확인을 위한 사용자 프로필
   searchQuery?: string; // 검색어 추가
   certFilter?: string; // 자격증 필터 추가
@@ -17,7 +18,7 @@ interface StudentGridCellProps {
   isLowerGrade?: boolean;
 }
 
-export function StudentGridCell({ student, idx, variant, rankingSummary, userProfile, searchQuery, certFilter = 'all', baseYear, isLowerGrade }: StudentGridCellProps) {
+export function StudentGridCell({ student, idx, variant, rankingSummary, isRankingsLoading, userProfile, searchQuery, certFilter = 'all', baseYear, isLowerGrade }: StudentGridCellProps) {
   // 통합 검색 및 자격증 필터 매칭 여부 확인
   const isMatched = React.useMemo(() => {
     if (!searchQuery && certFilter === 'all') return false;
@@ -82,6 +83,7 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, userPro
     <StudentPopover 
       student={student} 
       rankingSummary={rankingSummary} 
+      isRankingsLoading={isRankingsLoading}
       userProfile={userProfile}
       baseYear={baseYear}
     >

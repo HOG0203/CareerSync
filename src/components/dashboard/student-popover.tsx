@@ -37,6 +37,7 @@ interface StudentPopoverProps {
   student: StudentEmploymentData;
   children: React.ReactNode;
   rankingSummary?: any;
+  isRankingsLoading?: boolean;
   userProfile?: any;
   side?: 'top' | 'right' | 'bottom' | 'left';
   align?: 'start' | 'center' | 'end';
@@ -48,6 +49,7 @@ export function StudentPopover({
   student, 
   children, 
   rankingSummary, 
+  isRankingsLoading,
   userProfile,
   side,
   align,
@@ -265,7 +267,12 @@ export function StudentPopover({
                 </Button>
               </div>
 
-              {rankingSummary && rankingSummary.subjectCount > 0 ? (
+              {isRankingsLoading ? (
+                <div className="space-y-2 bg-slate-50 p-2 rounded-lg border border-slate-100 animate-pulse">
+                  <div className="h-3 bg-slate-200 rounded w-3/4 mb-1"></div>
+                  <div className="h-3 bg-slate-200 rounded w-1/2"></div>
+                </div>
+              ) : rankingSummary && rankingSummary.subjectCount > 0 ? (
                 <div className="space-y-1 bg-slate-50 p-2 rounded-lg border border-slate-100">
                   <div className="grid grid-cols-2 gap-x-3 text-[10px]">
                     <p className="flex justify-between">
@@ -325,7 +332,11 @@ export function StudentPopover({
                   상세보기 <ExternalLink className="h-2.5 w-2.5" />
                 </Button>
               </div>
-              {rankingSummary?.attendance ? (
+              {isRankingsLoading ? (
+                <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 animate-pulse">
+                  <div className="h-6 bg-slate-200 rounded w-full"></div>
+                </div>
+              ) : rankingSummary?.attendance ? (
                 <div className="bg-slate-50 p-1 rounded-lg border border-slate-100 overflow-hidden">
                   <table className="w-full text-[9px] border-collapse">
                     <thead>

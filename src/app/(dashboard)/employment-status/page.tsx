@@ -48,10 +48,7 @@ export default async function EmploymentStatusPage({
   const calculatedGradYear = (ay + (4 - grade)).toString();
   const selectedYear = params.year || calculatedGradYear;
 
-  const [allData, rankingMap] = await Promise.all([
-    getFilteredStudentData(selectedYear, ay),
-    getYearlyRankingsSummary(parseInt(selectedYear), settings.baseYear)
-  ]);
+  const allData = await getFilteredStudentData(selectedYear, ay);
 
   const displayAY = ay;
 
@@ -101,13 +98,13 @@ export default async function EmploymentStatusPage({
         </div>
       </div>
 
-      {/* 클라이언트 컴포넌트로 데이터 전달하여 즉시 검색 구현 */}
+      {/* 클라이언트 컴포넌트인 그리드 렌더링 (석차 정보는 백그라운드 fetch 처리) */}
       <EmploymentStatusGrid 
         allData={allData}
-        rankingMap={rankingMap}
         userProfile={userProfile}
-        baseYear={ay}
+        baseYear={settings.baseYear}
         grade={grade}
+        graduationYear={selectedYear}
       />
     </div>
   );

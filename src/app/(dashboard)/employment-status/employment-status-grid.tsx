@@ -13,13 +13,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { fetchYearlyRankings } from './actions';
 
 interface EmploymentStatusGridProps {
   allData: StudentEmploymentData[];
-  rankingMap: Record<string, any>;
   userProfile: any;
   baseYear?: number;
   grade?: number;
+  graduationYear: string;
 }
 
 const MAJOR_MAP: Record<string, string> = {
@@ -190,10 +191,12 @@ function SearchHeader({ onSearch, currentSearchQuery, isLowerGrade, matchedCount
   );
 }
 
-export function EmploymentStatusGrid({ allData, rankingMap, userProfile, baseYear, grade }: EmploymentStatusGridProps) {
+export function EmploymentStatusGrid({ allData, userProfile, baseYear, grade, graduationYear }: EmploymentStatusGridProps) {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [certFilter, setCertFilter] = React.useState('all');
   const [isLoading, setIsLoading] = React.useState(false);
+  const [rankingMap, setRankingMap] = React.useState<Record<string, any>>({});
+  const [isRankingsLoading, setIsRankingsLoading] = React.useState(false);
 
   React.useEffect(() => {
     const handleLoading = () => setIsLoading(true);
@@ -206,6 +209,21 @@ export function EmploymentStatusGrid({ allData, rankingMap, userProfile, baseYea
   React.useEffect(() => {
     setIsLoading(false);
   }, [allData]);
+
+  // 성적/석차 데이터를 백그라운드에서 비동기 fetch
+  React.useEffect(() => {
+    if (!graduationYear) return;
+    setIsRankingsLoading(true);
+    fetchYearlyRankings(parseInt(graduationYear), baseYear || 2026)
+      .then(rankings => {
+        setRankingMap(rankings);
+        setIsRankingsLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to load yearly rankings:', err);
+        setIsRankingsLoading(false);
+      });
+  }, [graduationYear, baseYear]);
 
   const groupedData = React.useMemo(() => {
     const grouped: Record<string, StudentEmploymentData[]> = {};
@@ -336,6 +354,7 @@ export function EmploymentStatusGrid({ allData, rankingMap, userProfile, baseYea
                         idx={idx}
                         variant={cellVariant}
                         rankingSummary={rankingMap[student.id]}
+                        isRankingsLoading={isRankingsLoading}
                         userProfile={userProfile}
                         searchQuery={searchQuery}
                         certFilter={certFilter}
