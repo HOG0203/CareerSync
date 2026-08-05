@@ -50,27 +50,15 @@ export function GridLoadingSkeleton() {
 }
 
 /**
- * 상단 필터 아래 데이터 영역 전용 로딩 스켈레톤 (회전 로더 + 카드/테이블 스켈레톤 조합)
+ * 상단 필터 아래 데이터 영역 전용 순수 펄스 스켈레톤 (카드 & 테이블 레이아웃)
  */
 export function CertificationDataSkeleton() {
   return (
-    <div className="flex-1 flex flex-col min-h-[420px] w-full bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden p-4 sm:p-6 space-y-4 animate-in fade-in duration-200">
-      {/* 데이터 영역 회전 로더 */}
-      <div className="flex flex-col items-center justify-center py-6">
-        <div className="relative">
-          <div className="absolute inset-0 rounded-full border-4 border-indigo-100 border-t-indigo-500 animate-spin" style={{ animationDuration: '1.2s' }} />
-          <div className="bg-white p-3.5 rounded-full shadow-lg border border-slate-100 relative z-10">
-            <Loader2 className="h-7 w-7 text-indigo-600 animate-spin" style={{ animationDuration: '1.8s' }} />
-          </div>
-          <div className="absolute -inset-3 bg-indigo-500/5 rounded-full blur-xl animate-pulse" />
-        </div>
-        <p className="mt-3.5 text-xs font-bold text-slate-700 tracking-tight">데이터를 정밀하게 불러오는 중입니다...</p>
-      </div>
-
+    <div className="flex-1 flex flex-col min-h-[400px] w-full bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden p-4 sm:p-6 space-y-4 animate-in fade-in duration-200">
       {/* 모바일 뷰 카드 스켈레톤 (md:hidden) */}
       <div className="md:hidden space-y-3 animate-pulse">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="p-4 bg-slate-50/80 rounded-xl border border-slate-100 space-y-2.5">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="p-4 bg-slate-50/80 rounded-xl border border-slate-100 space-y-3">
             <div className="flex justify-between items-center">
               <div className="h-4 w-28 bg-slate-200 rounded-md" />
               <div className="h-4 w-16 bg-slate-200 rounded-full" />
@@ -83,16 +71,17 @@ export function CertificationDataSkeleton() {
         ))}
       </div>
 
-      {/* 데스크톱 뷰 테이블 스켈레톤 (hidden md:block) */}
-      <div className="hidden md:block space-y-2.5 animate-pulse">
-        <div className="h-9 bg-slate-100 rounded-xl w-full" />
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-10 bg-slate-50/60 rounded-lg w-full flex items-center px-4 justify-between gap-4 border border-slate-100">
-            <div className="h-3.5 w-12 bg-slate-200 rounded" />
-            <div className="h-3.5 w-24 bg-slate-200 rounded" />
-            <div className="h-3.5 w-20 bg-slate-200 rounded" />
-            <div className="h-3.5 w-32 bg-slate-200 rounded" />
-            <div className="h-3.5 w-16 bg-slate-200 rounded" />
+      {/* 데스크톱 뷰 테이블/그리드 스켈레톤 (hidden md:block) */}
+      <div className="hidden md:block space-y-3 animate-pulse">
+        <div className="h-10 bg-slate-100 rounded-xl w-full" />
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="h-11 bg-slate-50/80 rounded-lg w-full flex items-center px-4 justify-between gap-4 border border-slate-100">
+            <div className="h-4 w-12 bg-slate-200 rounded" />
+            <div className="h-4 w-24 bg-slate-200 rounded" />
+            <div className="h-4 w-20 bg-slate-200 rounded" />
+            <div className="h-4 w-32 bg-slate-200 rounded" />
+            <div className="h-4 w-28 bg-slate-200 rounded" />
+            <div className="h-4 w-16 bg-slate-200 rounded" />
           </div>
         ))}
       </div>
