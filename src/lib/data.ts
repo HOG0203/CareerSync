@@ -17,7 +17,7 @@ export async function getDashboardStudentData(graduationYear: string): Promise<S
   const [studentsResult, trainingsResult] = await Promise.all([
     supabase
       .from('students')
-      .select('id, major, class_info, student_number, graduation_year, career_aspiration, career_course, certificates, military_status, student_employments (business_type, company_type, employment_status)')
+      .select('id, major, class_info, student_number, graduation_year, career_aspiration, career_course, certificates, military_status, special_notes, student_employments (business_type, company_type, employment_status)')
       .eq('graduation_year', gradYearInt)
       .order('major')
       .order('class_info')
