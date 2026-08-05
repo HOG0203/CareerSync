@@ -27,20 +27,11 @@ export default async function DashboardPage({
     getCurrentUserProfile()
   ]);
 
-  // 지능형 초기 학년 설정 (Smart Default)
+  // 지능형 초기 학년 및 학사학년도 설정 (In-Memory Default Fallback - 2중 HTTP 딜레이 제거)
   const defaultGrade = profile?.assigned_grade || 3;
-  const currentGradeParam = params.grade;
-  const currentAYParam = params.ay;
+  const grade = params.grade ? parseInt(params.grade) : defaultGrade;
+  const ay = params.ay ? parseInt(params.ay) : settings.baseYear;
 
-  // 초기 진입 시(파라미터 부재 시) 사용자 맞춤형으로 리다이렉트
-  if (!currentGradeParam || !currentAYParam) {
-    const targetGrade = currentGradeParam || defaultGrade;
-    const targetAY = currentAYParam || settings.baseYear;
-    redirect(`/dashboard?grade=${targetGrade}&ay=${targetAY}`);
-  }
-
-  const ay = parseInt(currentAYParam);
-  const grade = parseInt(currentGradeParam);
   const calculatedGradYear = (ay + (4 - grade)).toString();
 
   // 기본 조회 졸업연도 결정
