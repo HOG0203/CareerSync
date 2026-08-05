@@ -41,7 +41,7 @@ interface StudentSummary {
   classTotal: number;
 }
 
-import { CertificationSkeleton } from '@/components/dashboard/loading-skeleton';
+import { CertificationDataSkeleton } from '@/components/dashboard/loading-skeleton';
 
 export function GradeSummaryClient({ 
   initialSummaries, 
@@ -78,6 +78,7 @@ export function GradeSummaryClient({
       router.push(`/admin/certification/grades?${params.toString()}`);
     });
   };
+
 
 
   // 클라이언트 사이드 필터링 (학과, 반, 검색어)
@@ -164,10 +165,6 @@ export function GradeSummaryClient({
     });
     return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
   }, [detailedScores]);
-
-  if (isPending) {
-    return <CertificationSkeleton />;
-  }
 
   return (
     <div className="flex flex-col h-full bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-w-0">
@@ -266,6 +263,13 @@ export function GradeSummaryClient({
           )}
         </div>
       </div>
+
+      {/* 로딩 시 하단 데이터 영역만 회전 로더 스켈레톤 전환 */}
+      {isPending ? (
+        <CertificationDataSkeleton />
+      ) : (
+        <>
+
 
       {/* 데스크톱: 테이블 뷰 (md 이상) */}
       <div className="hidden md:block flex-1 overflow-auto">
@@ -543,7 +547,10 @@ export function GradeSummaryClient({
           <Download className="h-3 w-3" /> 엑셀 다운로드 (준비중)
         </Button>
       </div>
+        </>
+      )}
     </div>
   );
 }
+
 

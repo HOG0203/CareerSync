@@ -26,7 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import { StudentCertificateSummary, updateStudentCertificates } from './actions';
 import { CertificateImportModal } from './certificate-import-modal';
 
-import { CertificationSkeleton } from '@/components/dashboard/loading-skeleton';
+import { CertificationDataSkeleton } from '@/components/dashboard/loading-skeleton';
 
 export function CertificateSummaryClient({ 
   initialSummaries, 
@@ -165,10 +165,6 @@ export function CertificateSummaryClient({
     window.location.href = `/api/admin/certification/download${ay ? `?ay=${ay}` : ''}`;
   };
 
-  if (isPending) {
-    return <CertificationSkeleton />;
-  }
-
   return (
     <div className="flex flex-col h-full bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-w-0">
       {/* 헤더 바: 타이틀 및 버튼 */}
@@ -276,17 +272,24 @@ export function CertificateSummaryClient({
         </div>
       </div>
 
-      {/* 데스크톱: 테이블 뷰 (md 이상) */}
-      <div className="hidden md:block flex-1 overflow-auto">
-        <table className="w-full text-sm text-left border-collapse">
-          <thead className="bg-slate-50 text-slate-500 sticky top-0 z-10 border-b">
-            <tr>
-              <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider text-center w-24">번호</th>
-              <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider">학생 정보</th>
-              <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider">취득 자격증 목록</th>
-              {isAdmin && <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider text-center w-24">작업</th>}
-            </tr>
-          </thead>
+      {/* 로딩 시 하단 데이터 영역만 회전 로더 스켈레톤 전환 */}
+      {isPending ? (
+        <CertificationDataSkeleton />
+      ) : (
+        <>
+
+          {/* 데스크톱: 테이블 뷰 (md 이상) */}
+          <div className="hidden md:block flex-1 overflow-auto">
+            <table className="w-full text-sm text-left border-collapse">
+              <thead className="bg-slate-50 text-slate-500 sticky top-0 z-10 border-b">
+                <tr>
+                  <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider text-center w-24">번호</th>
+                  <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider">학생 정보</th>
+                  <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider">취득 자격증 목록</th>
+                  {isAdmin && <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider text-center w-24">작업</th>}
+                </tr>
+              </thead>
+
           <tbody className="divide-y divide-slate-100 bg-white">
             {paginatedData.length === 0 ? (
               <tr>
@@ -456,8 +459,11 @@ export function CertificateSummaryClient({
           </div>
         </div>
       )}
+        </>
+      )}
 
       {/* 자격증 직접 수정 다이얼로그 */}
+
       <Dialog open={!!editingStudent} onOpenChange={(open) => !open && setEditingStudent(null)}>
         <DialogContent className="max-w-md w-[95vw] sm:w-full bg-white p-4 sm:p-6 rounded-2xl shadow-2xl">
           <DialogHeader className="text-left">

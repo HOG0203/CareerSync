@@ -55,7 +55,7 @@ interface AttendanceRecord {
   };
 }
 
-import { CertificationSkeleton } from '@/components/dashboard/loading-skeleton';
+import { CertificationDataSkeleton } from '@/components/dashboard/loading-skeleton';
 
 export function AttendanceTableClient({ 
   initialData,
@@ -84,7 +84,6 @@ export function AttendanceTableClient({
     });
   };
 
-
   // 학생별 데이터 그룹화 및 필터링
   const studentGroups = React.useMemo(() => {
     const groups: Record<string, {
@@ -96,24 +95,26 @@ export function AttendanceTableClient({
       gradYear: number;
       records: AttendanceRecord[];
       stats: {
-        unexcused: { absent: 0, late: 0, early: 0, out: 0 },
-        disease: { absent: 0, late: 0, early: 0, out: 0 },
-        other: { absent: 0, late: 0, early: 0, out: 0 }
+        unexcused: { absent: number, late: number, early: number, out: number },
+        disease: { absent: number, late: number, early: number, out: number },
+        other: { absent: number, late: number, early: number, out: number }
       };
       hasAnyUnexcused: boolean;
     }> = {};
 
     initialData.forEach(item => {
+      const s = item.students;
+      if (!s) return;
+
       const sid = item.student_id;
       if (!groups[sid]) {
-        const s = item.students || {};
         groups[sid] = {
           id: sid,
-          name: s.student_name || '미상',
-          number: s.student_number || '0',
-          major: s.major || '미지정',
-          classInfo: s.class_info || '미정',
-          gradYear: s.graduation_year || 0,
+          name: s.student_name,
+          number: s.student_number,
+          major: s.major,
+          classInfo: s.class_info,
+          gradYear: s.graduation_year,
           records: [],
           stats: {
             unexcused: { absent: 0, late: 0, early: 0, out: 0 },
@@ -123,46 +124,60 @@ export function AttendanceTableClient({
           hasAnyUnexcused: false
         };
       }
-      groups[sid].records.push(item);
-      
-      // 통계 합산 (전 학년 통합)
-      groups[sid].stats.unexcused.absent += item.absent_unexcused;
-      groups[sid].stats.unexcused.late += item.late_unexcused;
-      groups[sid].stats.unexcused.early += item.early_unexcused;
-      groups[sid].stats.unexcused.out += item.out_unexcused;
 
-      groups[sid].stats.disease.absent += item.absent_disease;
-      groups[sid].stats.disease.late += item.late_disease;
-      groups[sid].stats.disease.early += item.early_disease;
-      groups[sid].stats.disease.out += item.out_disease;
+      const g = groups[sid];
+      g.records.push(item);
 
-      groups[sid].stats.other.absent += item.absent_other;
-      groups[sid].stats.other.late += item.late_other;
-      groups[sid].stats.other.early += item.early_other;
-      groups[sid].stats.other.out += item.out_other;
-      
-      if (item.absent_unexcused > 0 || item.late_unexcused > 0 || item.early_unexcused > 0 || item.out_unexcused > 0) {
-        groups[sid].hasAnyUnexcused = true;
+      // 통계 합산
+      g.stats.unexcused.absent += (item.absent_unexcused || 0);
+      g.stats.unexcused.late += (item.late_unexcused || 0);
+      g.stats.unexcused.early += (item.early_unexcused || 0);
+      g.stats.unexcused.out += (item.out_unexcused || 0);
+
+      g.stats.disease.absent += (item.absent_disease || 0);
+      g.stats.disease.late += (item.late_disease || 0);
+      g.stats.disease.early += (item.early_disease || 0);
+      g.stats.disease.out += (item.out_disease || 0);
+
+      g.stats.other.absent += (item.absent_other || 0);
+      g.stats.other.late += (item.late_other || 0);
+      g.stats.other.early += (item.early_other || 0);
+      g.stats.other.out += (item.out_other || 0);
+
+      if ((item.absent_unexcused || 0) > 0 || (item.late_unexcused || 0) > 0 || (item.early_unexcused || 0) > 0 || (item.out_unexcused || 0) > 0) {
+        g.hasAnyUnexcused = true;
       }
     });
 
-    return Object.values(groups)
-      .filter(g => {
-        const matchMajor = selectedMajor === 'all' || g.major === selectedMajor;
-        const matchClass = selectedClass === 'all' || g.classInfo === selectedClass;
-        const matchSearch = g.name.toLowerCase().includes(searchTerm.toLowerCase()) || g.number.includes(searchTerm);
-        return matchMajor && matchClass && matchSearch;
-      })
-      .sort((a, b) => {
-        if (a.major !== b.major) return (MAJOR_SORT_ORDER.indexOf(a.major) || 99) - (MAJOR_SORT_ORDER.indexOf(b.major) || 99);
-        if (a.classInfo !== b.classInfo) return a.classInfo.localeCompare(b.classInfo);
-        return parseInt(a.number) - parseInt(b.number);
-      });
-  }, [initialData, searchTerm, selectedMajor, selectedClass]);
+    // 클라이언트 필터링 및 정렬
+    return Object.values(groups).filter(g => {
+      const matchMajor = selectedMajor === 'all' || g.major === selectedMajor;
+      const matchClass = selectedClass === 'all' || g.classInfo === selectedClass;
+      const matchSearch = g.name.includes(searchTerm) || g.number.includes(searchTerm);
+      return matchMajor && matchClass && matchSearch;
+    }).sort((a, b) => {
+      // 학과 순 정렬
+      const idxA = MAJOR_SORT_ORDER.indexOf(a.major);
+      const idxB = MAJOR_SORT_ORDER.indexOf(b.major);
+      const majorDiff = (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+      if (majorDiff !== 0) return majorDiff;
+
+      // 학급 순 정렬
+      const classDiff = a.classInfo.localeCompare(b.classInfo, 'ko');
+      if (classDiff !== 0) return classDiff;
+
+      // 번호 순 정렬
+      return parseInt(a.number || '0') - parseInt(b.number || '0');
+    });
+  }, [initialData, selectedMajor, selectedClass, searchTerm]);
 
   const majors = React.useMemo(() => {
     const set = new Set(initialData.map(d => d.students?.major).filter(Boolean));
-    return Array.from(set).sort((a, b) => (MAJOR_SORT_ORDER.indexOf(a) || 99) - (MAJOR_SORT_ORDER.indexOf(b) || 99));
+    return Array.from(set).sort((a, b) => {
+      const idxA = MAJOR_SORT_ORDER.indexOf(a!);
+      const idxB = MAJOR_SORT_ORDER.indexOf(b!);
+      return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+    }) as string[];
   }, [initialData]);
 
   const classes = React.useMemo(() => {
@@ -174,10 +189,6 @@ export function AttendanceTableClient({
   const selectedGroup = React.useMemo(() => 
     selectedStudentId ? studentGroups.find(g => g.id === selectedStudentId) : null
   , [selectedStudentId, studentGroups]);
-
-  if (isPending) {
-    return <CertificationSkeleton />;
-  }
 
   return (
     <div className="flex flex-col h-full bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-w-0">
@@ -267,8 +278,15 @@ export function AttendanceTableClient({
         </div>
       </div>
 
-      {/* 출결 카드 목록 영역 */}
-      <div className="flex-1 overflow-auto p-3 sm:p-6">
+      {/* 로딩 시 하단 데이터 영역만 회전 로더 스켈레톤 전환 */}
+      {isPending ? (
+        <CertificationDataSkeleton />
+      ) : (
+        <>
+
+          {/* 출결 카드 목록 영역 */}
+          <div className="flex-1 overflow-auto p-3 sm:p-6">
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
           {studentGroups.map((group) => {
             return (
@@ -464,7 +482,11 @@ export function AttendanceTableClient({
         </div>
         <div className="uppercase tracking-widest opacity-50 text-[9px] sm:text-[10px]">CareerSync Attendance Grid v2.0</div>
       </div>
+        </>
+      )}
     </div>
   );
 }
+
+
 
