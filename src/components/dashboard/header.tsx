@@ -158,6 +158,7 @@ export default function Header({ userProfile }: { userProfile?: any }) {
             <DropdownMenuItem 
               onSelect={(e) => {
                 e.preventDefault();
+                (document.activeElement as HTMLElement)?.blur();
                 const closeEvent = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
                 document.dispatchEvent(closeEvent);
                 setTimeout(() => setProfileModalOpen(true), 150);

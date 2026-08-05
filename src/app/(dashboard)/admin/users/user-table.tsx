@@ -392,14 +392,41 @@ export function UserTable({ initialProfiles, graduationYears, fullClassMapping, 
                     <DropdownMenuContent align="end" className="w-40 rounded-xl">
                       <DropdownMenuLabel className="text-[10px] font-black text-slate-400 uppercase tracking-widest">관리 메뉴</DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => { setSelectedProfile(profile); setIsAssignOpen(true); }} className="gap-2 font-medium">
+                      <DropdownMenuItem 
+                        onSelect={() => { 
+                          (document.activeElement as HTMLElement)?.blur();
+                          setTimeout(() => {
+                            setSelectedProfile(profile); 
+                            setIsAssignOpen(true); 
+                          }, 50);
+                        }} 
+                        className="gap-2 font-medium cursor-pointer"
+                      >
                         <GraduationCap className="h-4 w-4 text-blue-500" /> 담당 학반 배정
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setSelectedProfile(profile); setIsResetOpen(true); }} className="gap-2 font-medium">
+                      <DropdownMenuItem 
+                        onSelect={() => { 
+                          (document.activeElement as HTMLElement)?.blur();
+                          setTimeout(() => {
+                            setSelectedProfile(profile); 
+                            setIsResetOpen(true); 
+                          }, 50);
+                        }} 
+                        className="gap-2 font-medium cursor-pointer"
+                      >
                         <KeyRound className="h-4 w-4 text-amber-500" /> 비밀번호 초기화
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => { setSelectedProfile(profile); setIsDeleteOpen(true); }} className="gap-2 font-medium text-rose-600 focus:text-rose-600 focus:bg-rose-50">
+                      <DropdownMenuItem 
+                        onSelect={() => { 
+                          (document.activeElement as HTMLElement)?.blur();
+                          setTimeout(() => {
+                            setSelectedProfile(profile); 
+                            setIsDeleteOpen(true); 
+                          }, 50);
+                        }} 
+                        className="gap-2 font-medium text-rose-600 focus:text-rose-600 focus:bg-rose-50 cursor-pointer"
+                      >
                         <Trash2 className="h-4 w-4" /> 계정 삭제
                       </DropdownMenuItem>
                     </DropdownMenuContent>

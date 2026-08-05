@@ -88,6 +88,7 @@ export function MobileTopBar({ isAdmin = false, userProfile }: { isAdmin?: boole
             <DropdownMenuItem 
               onSelect={(e) => {
                 e.preventDefault();
+                (document.activeElement as HTMLElement)?.blur();
                 setTimeout(() => setProfileModalOpen(true), 150);
               }}
               className="rounded-xl py-2.5 px-3 focus:bg-indigo-50 focus:text-indigo-700 transition-colors cursor-pointer"
