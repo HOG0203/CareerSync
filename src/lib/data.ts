@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { StudentEmploymentData, FieldTrainingRecord, MAJOR_SORT_ORDER } from './types';
+import { cache } from 'react';
+import { unstable_cache } from 'next/cache';
 
 export type { StudentEmploymentData, FieldTrainingRecord };
 export { MAJOR_SORT_ORDER };
@@ -9,36 +11,39 @@ export { MAJOR_SORT_ORDER };
  */
 export async function getFilteredStudentData(graduationYear: string, baseYear?: number): Promise<StudentEmploymentData[]> {
   const supabase = await createClient();
+  const gradYearInt = parseInt(graduationYear);
   
-  // 1. 학생 및 취업 정보를 단일 조인 쿼리로 조회 (데이터 무결성 보장)
-  const { data: students, error: studentError } = await supabase
-    .from('students')
-    .select('*, student_employments (*)')
-    .eq('graduation_year', parseInt(graduationYear))
-    .order('major')
-    .order('class_info')
-    .order('student_number')
-    .range(0, 5000); // 5000명까지 대폭 확장
+  // [최적화] Promise.all을 활용해 학생 정보, 실습 기록, 학적 이력을 병렬로 쿼리하여 네트워크 왕복 시간을 1/3로 단축
+  const [studentsResult, trainingsResult, historyResult] = await Promise.all([
+    supabase
+      .from('students')
+      .select('*, student_employments (*)')
+      .eq('graduation_year', gradYearInt)
+      .order('major')
+      .order('class_info')
+      .order('student_number')
+      .range(0, 5000),
+    supabase
+      .from('field_training_records')
+      .select('*, students!inner(graduation_year)')
+      .eq('students.graduation_year', gradYearInt)
+      .order('training_order', { ascending: false }),
+    baseYear 
+      ? supabase
+          .from('student_academic_history')
+          .select('*, students!inner(graduation_year)')
+          .eq('academic_year', baseYear)
+          .eq('students.graduation_year', gradYearInt)
+      : Promise.resolve({ data: [] as any[], error: null })
+  ]);
 
-  if (studentError || !students) return [];
-
-  // 2. 실습 기록은 별도 조회 (1:N 관계이므로)
-  const { data: trainings } = await supabase
-    .from('field_training_records')
-    .select('*')
-    .in('student_id', students.map(s => s.id))
-    .order('training_order', { ascending: false });
-
-  // 추가: 특정 연도의 학적 이력 데이터 조회 (Time-Travel 기능)
-  let historyData: any[] = [];
-  if (baseYear) {
-    const { data: history } = await supabase
-      .from('student_academic_history')
-      .select('*')
-      .eq('academic_year', baseYear)
-      .in('student_id', students.map(s => s.id));
-    if (history) historyData = history;
+  if (studentsResult.error) {
+    console.error('Error fetching students:', studentsResult.error);
+    return [];
   }
+  const students = studentsResult.data || [];
+  const trainings = trainingsResult.data || [];
+  const historyData = historyResult?.data || [];
 
   // 3. 데이터 평탄화 (데이터 뒤섞임 방지를 위해 명시적 객체 생성)
   const flattened = students.map(s => {
@@ -85,24 +90,38 @@ export async function getFilteredStudentData(graduationYear: string, baseYear?: 
 
 export async function getAssignedStudentDetails(major: string, classInfo: string, graduationYear: number, baseYear?: number) {
   const supabase = await createClient();
-  const { data: students, error } = await supabase
-    .from('students')
-    .select('*, student_employments (*), student_counseling_logs (*)')
-    .eq('major', major).eq('class_info', classInfo).eq('graduation_year', graduationYear).order('student_number');
+  
+  // [최적화] Promise.all을 활용해 학생 정보, 실습 기록, 학적 이력을 병렬로 조회
+  const [studentsResult, trainingsResult, historyResult] = await Promise.all([
+    supabase
+      .from('students')
+      .select('*, student_employments (*), student_counseling_logs (*)')
+      .eq('major', major)
+      .eq('class_info', classInfo)
+      .eq('graduation_year', graduationYear)
+      .order('student_number'),
+    supabase
+      .from('field_training_records')
+      .select('*, students!inner(graduation_year, major, class_info)')
+      .eq('students.graduation_year', graduationYear)
+      .eq('students.major', major)
+      .eq('students.class_info', classInfo)
+      .order('training_order', { ascending: false }),
+    baseYear 
+      ? supabase
+          .from('student_academic_history')
+          .select('*, students!inner(graduation_year, major, class_info)')
+          .eq('academic_year', baseYear)
+          .eq('students.graduation_year', graduationYear)
+          .eq('students.major', major)
+          .eq('students.class_info', classInfo)
+      : Promise.resolve({ data: [] as any[], error: null })
+  ]);
 
-  if (error) return [];
-
-  const { data: trainings } = await supabase.from('field_training_records').select('*').in('student_id', students.map(s => s.id)).order('training_order', { ascending: false });
-
-  let historyData: any[] = [];
-  if (baseYear) {
-    const { data: history } = await supabase
-      .from('student_academic_history')
-      .select('*')
-      .eq('academic_year', baseYear)
-      .in('student_id', students.map(s => s.id));
-    if (history) historyData = history;
-  }
+  if (studentsResult.error || !studentsResult.data) return [];
+  const students = studentsResult.data;
+  const trainings = trainingsResult.data || [];
+  const historyData = historyResult?.data || [];
 
   return students.map(s => {
     const studentEmployments = Array.isArray(s.student_employments) ? s.student_employments[0] : s.student_employments;
@@ -163,12 +182,20 @@ function flattenStudentData(students: any[], employments: any[], trainings: any[
   });
 }
 
+const getGraduationYearsCached = unstable_cache(
+  async () => {
+    const supabase = await createClient();
+    const { data } = await supabase.from('students').select('graduation_year');
+    if (!data) return [];
+    const years = Array.from(new Set(data.map(d => d.graduation_year))).filter((y): y is number => y !== null);
+    return years.sort((a, b) => b - a);
+  },
+  ['graduation-years'],
+  { revalidate: 3600, tags: ['students'] }
+);
+
 export async function getGraduationYears() {
-  const supabase = await createClient();
-  const { data } = await supabase.from('students').select('graduation_year');
-  if (!data) return [];
-  const years = Array.from(new Set(data.map(d => d.graduation_year))).filter((y): y is number => y !== null);
-  return years.sort((a, b) => b - a);
+  return getGraduationYearsCached();
 }
 
 export async function getAllStudentBaseData(): Promise<StudentEmploymentData[]> {
@@ -200,13 +227,13 @@ export async function getGradeStatistics(graduationYear: number) {
   return stats;
 }
 
-export async function getCurrentUserProfile() {
+export const getCurrentUserProfile = cache(async () => {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   const { data: profile } = await supabase.from('profiles').select('id, role, full_name, assigned_year, assigned_major, assigned_class, assigned_grade').eq('id', user.id).single();
   return profile;
-}
+});
 
 /**
  * [최적화] 모든 학생의 성적 데이터를 가져옵니다.
@@ -245,37 +272,47 @@ export async function getAllStudentScores() {
 export async function getYearlyRankingsSummary(graduationYear: number, baseYear: number = 2026) {
   const supabase = await createClient();
   
-  // 1. 해당 졸업연도 학생 정보 조회
-  const { data: students } = await supabase
-    .from('students')
-    .select('id, student_name, student_number, major, class_info, graduation_year')
-    .eq('graduation_year', graduationYear);
-
-  if (!students || students.length === 0) return {};
-
-  const studentIds = students.map(s => s.id);
-
-  // 2. 해당 학생들의 성적 데이터 전량 수집
-  const allScores: any[] = [];
-  let from = 0;
-  let hasMore = true;
-
-  while (hasMore) {
-    const { data, error } = await supabase
+  // 1. [최적화] 학생 정보 조회, 전체 성적 개수 카운트, 출결 정보 수집을 병렬로 수행하여 대기시간 단축
+  const [studentsResult, countResult, attendanceResult] = await Promise.all([
+    supabase
+      .from('students')
+      .select('id, student_name, student_number, major, class_info, graduation_year')
+      .eq('graduation_year', graduationYear),
+    supabase
       .from('student_scores')
-      .select('student_id, credits, achievement')
-      .in('student_id', studentIds)
-      .range(from, from + 999);
+      .select('student_id, students!inner(graduation_year)', { count: 'exact', head: true })
+      .eq('students.graduation_year', graduationYear),
+    supabase
+      .from('student_attendance')
+      .select('student_id, grade, semester, school_days, remarks, absent_unexcused, late_unexcused, early_unexcused, out_unexcused, absent_disease, late_disease, early_disease, out_disease, absent_other, late_other, early_other, out_other, students!inner(graduation_year)')
+      .eq('students.graduation_year', graduationYear)
+  ]);
 
-    if (error || !data || data.length === 0) {
-      hasMore = false;
-    } else {
-      allScores.push(...data);
-      if (data.length < 1000) hasMore = false;
-      else from += 1000;
-    }
-    if (allScores.length > 50000) break;
+  if (studentsResult.error || !studentsResult.data || studentsResult.data.length === 0) return {};
+  const students = studentsResult.data;
+  const studentIds = students.map(s => s.id);
+  const count = countResult.count || 0;
+
+  // 2. [최적화] 성적 데이터를 페이지 단위로 병렬 수집하여 순차 루프(while)로 인한 병목 현상 완벽 제거
+  const PAGE_SIZE = 1000;
+  const numPages = Math.ceil(count / PAGE_SIZE);
+  const promises = [];
+  for (let i = 0; i < numPages; i++) {
+    promises.push(
+      supabase
+        .from('student_scores')
+        .select('student_id, credits, achievement, students!inner(graduation_year)')
+        .eq('students.graduation_year', graduationYear)
+        .range(i * PAGE_SIZE, (i + 1) * PAGE_SIZE - 1)
+    );
   }
+
+  const results = await Promise.all(promises);
+  const allScores: any[] = [];
+  results.forEach(res => {
+    if (res.error) throw res.error;
+    if (res.data) allScores.push(...res.data);
+  });
 
   const weights = await getAchievementScores();
   const maxWeight = Math.max(...Object.values(weights), 0);
@@ -308,13 +345,8 @@ export async function getYearlyRankingsSummary(graduationYear: number, baseYear:
     s.subjectCount++;
   });
 
-  // 5. 출결 데이터 수집 및 집계 (상세 정보 포함)
-  const { data: attendance } = await supabase
-    .from('student_attendance')
-    .select('student_id, grade, semester, school_days, remarks, absent_unexcused, late_unexcused, early_unexcused, out_unexcused, absent_disease, late_disease, early_disease, out_disease, absent_other, late_other, early_other, out_other')
-    .in('student_id', studentIds);
-
-  (attendance || []).forEach(record => {
+  // 5. 출결 데이터 집계
+  (attendanceResult.data || []).forEach(record => {
     const s = stats[record.student_id];
     if (!s) return;
     
@@ -367,13 +399,21 @@ export async function getYearlyRankingsSummary(graduationYear: number, baseYear:
   return resultMap;
 }
 
+const getAchievementScoresCached = unstable_cache(
+  async (): Promise<Record<string, number>> => {
+    const supabase = await createClient()
+    try {
+      const { data, error } = await supabase.from('system_settings').select('value').eq('key', 'achievement_scores').single();
+      if (error) throw error
+      return data.value as Record<string, number>
+    } catch (error) {
+      return { "A": 5, "B": 4, "C": 3, "D": 2, "E": 1 }
+    }
+  },
+  ['achievement-scores'],
+  { revalidate: 3600, tags: ['settings'] }
+);
+
 export async function getAchievementScores(): Promise<Record<string, number>> {
-  const supabase = await createClient()
-  try {
-    const { data, error } = await supabase.from('system_settings').select('value').eq('key', 'achievement_scores').single();
-    if (error) throw error
-    return data.value as Record<string, number>
-  } catch (error) {
-    return { "A": 5, "B": 4, "C": 3, "D": 2, "E": 1 }
-  }
+  return getAchievementScoresCached();
 }

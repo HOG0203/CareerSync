@@ -8,25 +8,34 @@ export interface MasterCertificate {
   levels: string[];
 }
 
+import { unstable_cache, revalidateTag } from 'next/cache'
+
+const getSystemSettingsCached = unstable_cache(
+  async () => {
+    const supabase = await createClient()
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'base_year')
+        .single()
+
+      if (error) throw error
+      return { baseYear: (data.value as any).year }
+    } catch (error) {
+      console.error('Error reading settings from database:', error)
+      return { baseYear: 2026 }
+    }
+  },
+  ['system-settings'],
+  { revalidate: 3600, tags: ['settings'] }
+)
+
 /**
  * 시스템 설정 조회 (기준년도 등)
  */
 export async function getSystemSettings(): Promise<{ baseYear: number }> {
-  const supabase = await createClient()
-  
-  try {
-    const { data, error } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'base_year')
-      .single()
-
-    if (error) throw error
-    return { baseYear: (data.value as any).year }
-  } catch (error) {
-    console.error('Error reading settings from database:', error)
-    return { baseYear: 2026 }
-  }
+  return getSystemSettingsCached()
 }
 
 /**
@@ -46,6 +55,7 @@ export async function updateSystemSettings(settings: { baseYear: number }) {
 
     if (error) throw error
     
+    revalidateTag('settings')
     revalidatePath('/', 'layout')
     return { success: true }
   } catch (error: any) {
