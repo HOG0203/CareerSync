@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 export interface MasterCertificate {
   name: string;
@@ -12,7 +12,7 @@ import { unstable_cache, revalidateTag } from 'next/cache'
 
 const getSystemSettingsCached = unstable_cache(
   async () => {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     try {
       const { data, error } = await supabase
         .from('system_settings')

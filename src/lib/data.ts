@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { StudentEmploymentData, FieldTrainingRecord, MAJOR_SORT_ORDER } from './types';
 import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
@@ -184,7 +184,7 @@ function flattenStudentData(students: any[], employments: any[], trainings: any[
 
 const getGraduationYearsCached = unstable_cache(
   async () => {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { data } = await supabase.from('students').select('graduation_year');
     if (!data) return [];
     const years = Array.from(new Set(data.map(d => d.graduation_year))).filter((y): y is number => y !== null);
@@ -401,7 +401,7 @@ export async function getYearlyRankingsSummary(graduationYear: number, baseYear:
 
 const getAchievementScoresCached = unstable_cache(
   async (): Promise<Record<string, number>> => {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     try {
       const { data, error } = await supabase.from('system_settings').select('value').eq('key', 'achievement_scores').single();
       if (error) throw error
