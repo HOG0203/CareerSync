@@ -38,6 +38,79 @@ export async function getSystemSettings(): Promise<{ baseYear: number }> {
   return getSystemSettingsCached()
 }
 
+export interface CertificationConfig {
+  gradeWeights: Record<string, number>;
+  attendanceRules: {
+    baseScore: number;
+    unexcusedAbsentDeduct: number;
+    unexcusedLateDeduct: number;
+    maxDeductLimit: number;
+  };
+  certificateRules: {
+    basePointsPerCert: number;
+    maxCertificatePoints: number;
+  };
+}
+
+const DEFAULT_CERTIFICATION_CONFIG: CertificationConfig = {
+  gradeWeights: { "A": 5, "B": 4, "C": 3, "D": 2, "E": 1 },
+  attendanceRules: {
+    baseScore: 100,
+    unexcusedAbsentDeduct: 5,
+    unexcusedLateDeduct: 2,
+    maxDeductLimit: 50,
+  },
+  certificateRules: {
+    basePointsPerCert: 10,
+    maxCertificatePoints: 50,
+  },
+};
+
+/**
+ * 옥저인증제 종합 설정 조회 (성적, 출결, 자격증 점수)
+ */
+export async function getCertificationConfig(): Promise<CertificationConfig> {
+  const supabase = await createClient();
+  try {
+    const { data, error } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'certification_config')
+      .single();
+
+    if (error) throw error;
+    return {
+      ...DEFAULT_CERTIFICATION_CONFIG,
+      ...(data.value as Partial<CertificationConfig>),
+    };
+  } catch (error) {
+    return DEFAULT_CERTIFICATION_CONFIG;
+  }
+}
+
+/**
+ * 옥저인증제 종합 설정 저장
+ */
+export async function updateCertificationConfig(config: CertificationConfig) {
+  const supabase = await createClient();
+  try {
+    const { error } = await supabase
+      .from('system_settings')
+      .upsert({
+        key: 'certification_config',
+        value: config,
+        updated_at: new Date().toISOString(),
+      });
+
+    if (error) throw error;
+    revalidatePath('/admin/settings');
+    revalidatePath('/admin/certification/grades');
+    return { success: true };
+  } catch (error: any) {
+    return { error: error.message };
+  }
+}
+
 /**
  * 시스템 설정 저장
  */

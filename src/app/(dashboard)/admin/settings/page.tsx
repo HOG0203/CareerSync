@@ -33,26 +33,45 @@ import {
   Layers, 
   Loader2, 
   Trophy, 
-  Search 
+  Search,
+  GraduationCap
 } from 'lucide-react';
 import { 
   getMasterCertificates, 
   updateMasterCertificates, 
   getSystemSettings, 
   updateSystemSettings,
-  MasterCertificate
+  getCertificationConfig,
+  updateCertificationConfig,
+  MasterCertificate,
+  CertificationConfig
 } from './actions';
 import { 
   getAchievementScores, 
   updateAchievementScores 
 } from '../grades/actions';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 export default function AdminSettingsPage() {
   const [certs, setCerts] = React.useState<MasterCertificate[]>([]);
   const [achievementWeights, setAchievementWeights] = React.useState<Record<string, number>>({
     "A": 5, "B": 4, "C": 3, "D": 2, "E": 1
   });
+  const [certConfig, setCertConfig] = React.useState<CertificationConfig>({
+    gradeWeights: { "A": 5, "B": 4, "C": 3, "D": 2, "E": 1 },
+    attendanceRules: {
+      baseScore: 100,
+      unexcusedAbsentDeduct: 5,
+      unexcusedLateDeduct: 2,
+      maxDeductLimit: 50,
+    },
+    certificateRules: {
+      basePointsPerCert: 10,
+      maxCertificatePoints: 50,
+    },
+  });
+  const [activeCertTab, setActiveCertTab] = React.useState<'grades' | 'attendance' | 'certificates'>('grades');
   const [newCertName, setNewCertName] = React.useState('');
   const [newCertLevels, setNewCertLevels] = React.useState('');
   const [certSearch, setCertSearch] = React.useState('');
@@ -64,6 +83,12 @@ export default function AdminSettingsPage() {
     getMasterCertificates().then(setCerts);
     getSystemSettings().then(settings => setBaseYear(settings.baseYear));
     getAchievementScores().then(setAchievementWeights);
+    getCertificationConfig().then(config => {
+      setCertConfig(config);
+      if (config.gradeWeights) {
+        setAchievementWeights(config.gradeWeights);
+      }
+    });
   }, []);
 
   const addCert = () => {
@@ -83,19 +108,25 @@ export default function AdminSettingsPage() {
   const handleSaveAll = async () => {
     setIsPending(true);
     try {
-      const [certResult, settingsResult, weightResult] = await Promise.all([
+      const fullCertConfig: CertificationConfig = {
+        ...certConfig,
+        gradeWeights: achievementWeights,
+      };
+
+      const [certResult, settingsResult, weightResult, certConfigResult] = await Promise.all([
         updateMasterCertificates(certs),
         updateSystemSettings({ baseYear }),
-        updateAchievementScores(achievementWeights)
+        updateAchievementScores(achievementWeights),
+        updateCertificationConfig(fullCertConfig)
       ]);
 
-      if (certResult.success && settingsResult.success && weightResult.success) {
-        toast({ title: '설정 저장 완료', description: '모든 시스템 설정이 갱신되었습니다.' });
+      if (certResult.success && settingsResult.success && weightResult.success && certConfigResult.success) {
+        toast({ title: '설정 저장 완료', description: '모든 시스템 설정(성적, 출결, 자격증 반영 점수 포함)이 갱신되었습니다.' });
       } else {
         toast({ 
           variant: 'destructive', 
           title: '저장 실패', 
-          description: certResult.error || settingsResult.error || (weightResult as any).error 
+          description: certResult.error || settingsResult.error || (weightResult as any).error || certConfigResult.error 
         });
       }
     } catch (error) {
@@ -216,39 +247,195 @@ export default function AdminSettingsPage() {
     </div>
   );
 
-  {/* 공통 3: 옥저인증제 콘텐츠 */}
+  {/* 공통 3: 옥저인증제 통합 관리 콘텐츠 (성적, 출결, 자격증 탭 구성) */}
   const renderCertifySettingsContent = () => (
-    <div className="space-y-6">
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Layers className="h-4 w-4 text-indigo-400" />
-          <label className="text-xs sm:text-sm font-bold text-slate-600">성취도별 인증 점수 가중치</label>
-        </div>
-        <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
-          {['A', 'B', 'C', 'D', 'E'].map(grade => (
-            <div key={grade} className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase text-center block">{grade}</label>
-              <Input 
-                type="number" 
-                value={achievementWeights[grade] || 0} 
-                onChange={(e) => {
-                  const val = parseInt(e.target.value) || 0;
-                  setAchievementWeights(prev => ({ ...prev, [grade]: val }));
-                }}
-                className="h-9 px-1 text-center font-bold text-xs sm:text-sm border-slate-200 focus:border-indigo-500 rounded-lg"
-              />
-            </div>
-          ))}
-        </div>
-        <p className="text-[10px] text-slate-400 italic">※ 위 설정은 상단 [전체 설정 저장하기] 클릭 시 반영됩니다.</p>
+    <div className="space-y-5">
+      {/* 서브 탭 메뉴 */}
+      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+        <button
+          type="button"
+          onClick={() => setActiveCertTab('grades')}
+          className={cn(
+            "flex-1 py-1.5 px-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5",
+            activeCertTab === 'grades' ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-800"
+          )}
+        >
+          <GraduationCap className="h-3.5 w-3.5" />
+          성적 반영
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveCertTab('attendance')}
+          className={cn(
+            "flex-1 py-1.5 px-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5",
+            activeCertTab === 'attendance' ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-800"
+          )}
+        >
+          <Calendar className="h-3.5 w-3.5" />
+          출결 반영
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveCertTab('certificates')}
+          className={cn(
+            "flex-1 py-1.5 px-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5",
+            activeCertTab === 'certificates' ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-800"
+          )}
+        >
+          <Award className="h-3.5 w-3.5" />
+          자격증 반영
+        </button>
       </div>
 
-      <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-100">
-        <p className="text-[11px] text-indigo-700 leading-relaxed font-semibold">
-          💡 <strong>인증 점수 계산 방식</strong><br/>
-          성취도(A~E) 점수와 과목별 학점을 가중치로 하여 100점 만점으로 환산합니다.
-        </p>
-      </div>
+      {/* 탭 1: 성적 반영 점수 */}
+      {activeCertTab === 'grades' && (
+        <div className="space-y-4 animate-in fade-in-50 duration-150">
+          <div className="flex items-center gap-2">
+            <Layers className="h-4 w-4 text-blue-600" />
+            <label className="text-xs sm:text-sm font-bold text-slate-700">성취도별 인증 점수 가중치</label>
+          </div>
+          <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+            {['A', 'B', 'C', 'D', 'E'].map(grade => (
+              <div key={grade} className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase text-center block">{grade}</label>
+                <Input 
+                  type="number" 
+                  value={achievementWeights[grade] || 0} 
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 0;
+                    setAchievementWeights(prev => ({ ...prev, [grade]: val }));
+                  }}
+                  className="h-9 px-1 text-center font-bold text-xs sm:text-sm border-slate-200 focus:border-indigo-500 rounded-lg"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="p-3.5 rounded-xl bg-blue-50/60 border border-blue-100">
+            <p className="text-[11px] text-blue-700 leading-relaxed font-semibold">
+              💡 <strong>성적 인증 점수 계산 방식</strong><br/>
+              성취도(A~E) 점수와 과목별 학점을 가중치로 하여 100점 만점으로 환산합니다.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* 탭 2: 출결 반영 점수 */}
+      {activeCertTab === 'attendance' && (
+        <div className="space-y-4 animate-in fade-in-50 duration-150">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700">출결 기본 만점</label>
+              <Input 
+                type="number" 
+                value={certConfig.attendanceRules.baseScore} 
+                onChange={(e) => {
+                  const val = parseInt(e.target.value) || 0;
+                  setCertConfig(prev => ({
+                    ...prev,
+                    attendanceRules: { ...prev.attendanceRules, baseScore: val }
+                  }));
+                }}
+                className="h-9 font-bold text-xs sm:text-sm border-slate-200 rounded-lg"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700">최대 감점 한도</label>
+              <Input 
+                type="number" 
+                value={certConfig.attendanceRules.maxDeductLimit} 
+                onChange={(e) => {
+                  const val = parseInt(e.target.value) || 0;
+                  setCertConfig(prev => ({
+                    ...prev,
+                    attendanceRules: { ...prev.attendanceRules, maxDeductLimit: val }
+                  }));
+                }}
+                className="h-9 font-bold text-xs sm:text-sm border-slate-200 rounded-lg"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700">미인정 결석 감점 (회당)</label>
+              <Input 
+                type="number" 
+                value={certConfig.attendanceRules.unexcusedAbsentDeduct} 
+                onChange={(e) => {
+                  const val = parseInt(e.target.value) || 0;
+                  setCertConfig(prev => ({
+                    ...prev,
+                    attendanceRules: { ...prev.attendanceRules, unexcusedAbsentDeduct: val }
+                  }));
+                }}
+                className="h-9 font-bold text-xs sm:text-sm border-slate-200 rounded-lg text-rose-600"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700">미인정 지각/조퇴/결과 감점 (회당)</label>
+              <Input 
+                type="number" 
+                value={certConfig.attendanceRules.unexcusedLateDeduct} 
+                onChange={(e) => {
+                  const val = parseInt(e.target.value) || 0;
+                  setCertConfig(prev => ({
+                    ...prev,
+                    attendanceRules: { ...prev.attendanceRules, unexcusedLateDeduct: val }
+                  }));
+                }}
+                className="h-9 font-bold text-xs sm:text-sm border-slate-200 rounded-lg text-rose-600"
+              />
+            </div>
+          </div>
+          <div className="p-3.5 rounded-xl bg-indigo-50/60 border border-indigo-100">
+            <p className="text-[11px] text-indigo-700 leading-relaxed font-semibold">
+              💡 <strong>출결 인증 점수 계산 방식</strong><br/>
+              출결 기본 만점({certConfig.attendanceRules.baseScore}점)에서 미인정 결석/지각/조퇴/결과 차감 횟수에 따라 점수를 감점 산출합니다.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* 탭 3: 자격증 반영 점수 */}
+      {activeCertTab === 'certificates' && (
+        <div className="space-y-4 animate-in fade-in-50 duration-150">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700">자격증 1건당 취득 점수</label>
+              <Input 
+                type="number" 
+                value={certConfig.certificateRules.basePointsPerCert} 
+                onChange={(e) => {
+                  const val = parseInt(e.target.value) || 0;
+                  setCertConfig(prev => ({
+                    ...prev,
+                    certificateRules: { ...prev.certificateRules, basePointsPerCert: val }
+                  }));
+                }}
+                className="h-9 font-bold text-xs sm:text-sm border-slate-200 rounded-lg text-indigo-600"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-700">자격증 점수 최대 한도</label>
+              <Input 
+                type="number" 
+                value={certConfig.certificateRules.maxCertificatePoints} 
+                onChange={(e) => {
+                  const val = parseInt(e.target.value) || 0;
+                  setCertConfig(prev => ({
+                    ...prev,
+                    certificateRules: { ...prev.certificateRules, maxCertificatePoints: val }
+                  }));
+                }}
+                className="h-9 font-bold text-xs sm:text-sm border-slate-200 rounded-lg text-indigo-600"
+              />
+            </div>
+          </div>
+          <div className="p-3.5 rounded-xl bg-amber-50/60 border border-amber-100">
+            <p className="text-[11px] text-amber-800 leading-relaxed font-semibold">
+              💡 <strong>자격증 인증 점수 계산 방식</strong><br/>
+              취득 자격증 1건당 {certConfig.certificateRules.basePointsPerCert}점을 부여하며, 최대 {certConfig.certificateRules.maxCertificatePoints}점 한도 내에서 가산점이 포함됩니다.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 
