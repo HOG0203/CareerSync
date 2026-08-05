@@ -160,12 +160,21 @@ export function GradeSummaryClient({
   }, [detailedScores]);
 
   return (
-    <div className="flex flex-col h-full">
-      {isAdmin && (
-        <div className="px-3 pt-3 sm:px-4 sm:pt-4 flex justify-end">
-          <GradeImportModal />
+    <div className="flex flex-col h-full bg-slate-50/50">
+      {/* 헤더 바: 페이지 타이틀 및 성적 데이터 업로드 버튼 */}
+      <div className="px-3 py-3 sm:px-6 sm:py-4 border-b flex justify-between items-center bg-white min-w-0 shrink-0">
+        <div className="flex items-center gap-2 min-w-0 shrink">
+          <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600 shrink-0" />
+          <h2 className="font-black text-slate-800 tracking-tight text-base sm:text-lg whitespace-nowrap truncate">
+            성적 관리 및 석차 조회
+          </h2>
         </div>
-      )}
+        {isAdmin && (
+          <div className="shrink-0 ml-2">
+            <GradeImportModal />
+          </div>
+        )}
+      </div>
 
       {/* 필터 바 */}
       <div className="p-3 sm:p-4 border-b bg-slate-50/50 flex flex-col md:flex-row md:items-center gap-3 sm:gap-4">
