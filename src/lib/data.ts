@@ -14,10 +14,11 @@ export async function getFilteredStudentData(graduationYear: string, baseYear?: 
   const gradYearInt = parseInt(graduationYear);
   
   // [최적화] Promise.all을 활용해 학생 정보, 실습 기록, 학적 이력을 병렬로 쿼리하여 네트워크 왕복 시간을 1/3로 단축
+  // [컬럼 슬림화 최적화] 불필요한 대용량 컬럼(전화번호, 옷/신발 사이즈, 학부모 의견 등)을 제외하고 필수 데이터만 골라서 select 합니다.
   const [studentsResult, trainingsResult, historyResult] = await Promise.all([
     supabase
       .from('students')
-      .select('*, student_employments (*)')
+      .select('id, student_id, student_name, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks)')
       .eq('graduation_year', gradYearInt)
       .order('major')
       .order('class_info')
@@ -25,13 +26,13 @@ export async function getFilteredStudentData(graduationYear: string, baseYear?: 
       .range(0, 5000),
     supabase
       .from('field_training_records')
-      .select('*, students!inner(graduation_year)')
+      .select('id, student_id, training_order, company, start_date, end_date, stipend_status, hiring_status, conversion_date, students!inner(graduation_year)')
       .eq('students.graduation_year', gradYearInt)
       .order('training_order', { ascending: false }),
     baseYear 
       ? supabase
           .from('student_academic_history')
-          .select('*, students!inner(graduation_year)')
+          .select('id, student_id, major, class_info, student_number, teacher_name, grade, students!inner(graduation_year)')
           .eq('academic_year', baseYear)
           .eq('students.graduation_year', gradYearInt)
       : Promise.resolve({ data: [] as any[], error: null })
@@ -92,17 +93,18 @@ export async function getAssignedStudentDetails(major: string, classInfo: string
   const supabase = await createClient();
   
   // [최적화] Promise.all을 활용해 학생 정보, 실습 기록, 학적 이력을 병렬로 조회
+  // [컬럼 슬림화 최적화] 불필요한 대용량 컬럼(전화번호, 옷/신발 사이즈, 학부모 의견 등)을 제외하고 필수 데이터만 골라서 select 합니다.
   const [studentsResult, trainingsResult, historyResult] = await Promise.all([
     supabase
       .from('students')
-      .select('*, student_employments (*), student_counseling_logs (*)')
+      .select('id, student_id, student_name, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks), student_counseling_logs (*)')
       .eq('major', major)
       .eq('class_info', classInfo)
       .eq('graduation_year', graduationYear)
       .order('student_number'),
     supabase
       .from('field_training_records')
-      .select('*, students!inner(graduation_year, major, class_info)')
+      .select('id, student_id, training_order, company, start_date, end_date, stipend_status, hiring_status, conversion_date, students!inner(graduation_year, major, class_info)')
       .eq('students.graduation_year', graduationYear)
       .eq('students.major', major)
       .eq('students.class_info', classInfo)
@@ -110,7 +112,7 @@ export async function getAssignedStudentDetails(major: string, classInfo: string
     baseYear 
       ? supabase
           .from('student_academic_history')
-          .select('*, students!inner(graduation_year, major, class_info)')
+          .select('id, student_id, major, class_info, student_number, teacher_name, grade, students!inner(graduation_year, major, class_info)')
           .eq('academic_year', baseYear)
           .eq('students.graduation_year', graduationYear)
           .eq('students.major', major)
