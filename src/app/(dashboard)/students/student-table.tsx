@@ -329,6 +329,14 @@ export function StudentTable({
           rankingMap={rankingMap}
           userProfile={userProfile}
           baseYear={baseYear}
+          mobileInfoKeys={[
+            'phone_number',        // 휴대전화번호
+            'employment_status',   // 진로코스
+            'business_type',       // 취업현황
+            'company_type',        // 기업구분
+            'company',             // 취업처(회사명)
+            'latest_training_company', // 실습처(회사명)
+          ]}
         />
       </div>
 

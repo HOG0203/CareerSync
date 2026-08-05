@@ -26,4 +26,5 @@ export interface SpreadsheetTableProps {
   userProfile?: any
   disableNamePopover?: boolean
   baseYear?: number
+  mobileInfoKeys?: string[]  // 모바일 카드에 표시할 필드 키 목록 (지정 시 자동 선택 대신 사용)
 }
