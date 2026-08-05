@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { StudentPopover } from '@/components/dashboard/student-popover'
 
-export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, isEditing, isSelected, isFocused, onMouseDown, onMouseEnter, onStartEdit, onEndEdit, onSave, onAction, rankingMap, userProfile, disableNamePopover, baseYear }: any) => {
+export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, isEditing, isSelected, isFocused, onMouseDown, onMouseEnter, onStartEdit, onEndEdit, onSave, onAction, rankingMap, isRankingsLoading, userProfile, disableNamePopover, baseYear }: any) => {
   const [localValue, setLocalValue] = React.useState(value || '')
   const [isManualInput, setIsManualInput] = React.useState(false)
   const isManualRef = React.useRef(false)
@@ -98,7 +98,7 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
           <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] bg-blue-50 text-blue-600 font-bold hover:bg-blue-100" onClick={(e) => { e.stopPropagation(); onAction?.(id, field); }}>상세보기</Button>
         ) : field === 'student_name' ? (
           !disableNamePopover ? (
-            <StudentPopover student={rowData} rankingSummary={rankingMap?.[id]} userProfile={userProfile} baseYear={baseYear}>
+            <StudentPopover student={rowData} rankingSummary={rankingMap?.[id]} isRankingsLoading={isRankingsLoading} userProfile={userProfile} baseYear={baseYear}>
               <h3 className="font-bold text-slate-900 truncate hover:text-blue-600 transition-colors cursor-pointer underline decoration-dotted decoration-blue-300 underline-offset-4">{value || ''}</h3>
             </StudentPopover>
           ) : (
@@ -118,6 +118,7 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
   p.isSelected === n.isSelected &&
   p.isFocused === n.isFocused &&
   p.rankingMap === n.rankingMap &&
+  p.isRankingsLoading === n.isRankingsLoading &&
   p.userProfile === n.userProfile &&
   p.onMouseDown === n.onMouseDown &&
   p.onMouseEnter === n.onMouseEnter &&

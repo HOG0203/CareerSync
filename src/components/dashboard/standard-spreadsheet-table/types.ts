@@ -22,6 +22,7 @@ export interface SpreadsheetTableProps {
   searchPlaceholder?: string
   masterCertificates?: any[]
   rankingMap?: Record<string, any>
+  isRankingsLoading?: boolean
   userProfile?: any
   disableNamePopover?: boolean
   baseYear?: number

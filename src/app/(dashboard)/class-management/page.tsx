@@ -166,15 +166,9 @@ async function ClassManagementPageContent({
   // --- 학생 상세 데이터 패칭 ---
   const isViewable = !!(targetMajor && targetClass);
   let studentData: any[] = [];
-  let rankingMap: Record<string, any> = {};
 
   if (isViewable) {
-    const [details, rankings] = await Promise.all([
-      getAssignedStudentDetails(targetMajor!, targetClass!, calculatedYear),
-      getYearlyRankingsSummary(calculatedYear, settings.baseYear)
-    ]);
-    studentData = details;
-    rankingMap = rankings;
+    studentData = await getAssignedStudentDetails(targetMajor!, targetClass!, calculatedYear);
   }
 
   const displayClass = targetClass && !targetClass.includes('-') ? `${selectedGrade}-${targetClass}` : targetClass;
@@ -224,9 +218,9 @@ async function ClassManagementPageContent({
             <ClassTable 
               initialData={studentData} 
               masterCertificates={masterCertificates} 
-              rankingMap={rankingMap}
               userProfile={userProfile}
               baseYear={settings.baseYear}
+              graduationYear={calculatedYear}
             />
           </CardContent>
         </Card>

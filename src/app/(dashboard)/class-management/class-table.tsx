@@ -5,13 +5,14 @@ import { StandardSpreadsheetTable, ColumnConfig } from '@/components/dashboard/s
 import { updatePersonalDetail, bulkUpdatePersonalDetails } from './actions'
 import { MasterCertificate } from '@/app/(dashboard)/admin/settings/actions'
 import { CounselingModal } from './counseling-modal'
+import { fetchYearlyRankings } from '../employment-status/actions'
 
 interface ClassTableProps {
   initialData: any[];
   masterCertificates: MasterCertificate[];
-  rankingMap?: Record<string, any>;
   userProfile?: any;
   baseYear?: number;
+  graduationYear: number;
 }
 
 // 학년별 진로희망 옵션 생성 함수
@@ -86,12 +87,29 @@ const GET_SPECIFIC_COURSE_OPTIONS = (rowData: any) => {
 export function ClassTable({ 
   initialData, 
   masterCertificates,
-  rankingMap = {},
   userProfile = null,
-  baseYear
+  baseYear,
+  graduationYear
 }: ClassTableProps) {
   const [selectedStudent, setSelectedStudent] = React.useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = React.useState(false)
+  
+  const [rankingMap, setRankingMap] = React.useState<Record<string, any>>({})
+  const [isRankingsLoading, setIsRankingsLoading] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!graduationYear) return
+    setIsRankingsLoading(true)
+    fetchYearlyRankings(graduationYear, baseYear || 2026)
+      .then(rankings => {
+        setRankingMap(rankings)
+        setIsRankingsLoading(false)
+      })
+      .catch(err => {
+        console.error('Failed to load yearly rankings:', err)
+        setIsRankingsLoading(false)
+      })
+  }, [graduationYear, baseYear])
 
   // 현재 데이터로부터 학년 판별
   const currentGrade = React.useMemo(() => {
@@ -276,6 +294,7 @@ export function ClassTable({
         searchPlaceholder="학반 학생 검색..."
         masterCertificates={masterCertificates}
         rankingMap={rankingMap}
+        isRankingsLoading={isRankingsLoading}
         userProfile={userProfile}
         baseYear={baseYear}
       />

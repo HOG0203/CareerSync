@@ -30,6 +30,7 @@ export function StandardSpreadsheetTable({
   searchPlaceholder = "검색...",
   masterCertificates = [],
   rankingMap = {},
+  isRankingsLoading = false,
   userProfile = null,
   disableNamePopover = false,
   baseYear,
@@ -135,7 +136,7 @@ export function StandardSpreadsheetTable({
                 for (let i = start; i <= end; i++) {
                   const row = filteredData[i]; if (!row) continue;
                   rows.push(
-                    <SpreadsheetRow key={row.id} rIdx={i} row={row} columns={columns} selMinR={sMinR} selMaxR={sMaxR} selMinC={sMinC} selMaxC={sMaxC} selStart={selectionStart} editCell={editingCell} onMouseDown={handleMouseDown} onMouseEnter={handleMouseEnter} onStartEdit={(r: any, c: any) => { if (columns[c].type === 'multi-select') { setEditingCell({ row: r, col: c }); setIsPickerOpen(true); } else setEditingCell({ row: r, col: c }); }} onEndEdit={() => setEditingCell(null)} onSave={handleSaveInternal} isSelectedRow={selectedRowIds.includes(row.id)} onSelectRow={(id: any, v: any) => syncSelected(v ? [...selectedRowIds, id] : selectedRowIds.filter(x => x !== id))} onAction={onAction} rankingMap={rankingMap} userProfile={userProfile} disableNamePopover={disableNamePopover} baseYear={baseYear} />
+                    <SpreadsheetRow key={row.id} rIdx={i} row={row} columns={columns} selMinR={sMinR} selMaxR={sMaxR} selMinC={sMinC} selMaxC={sMaxC} selStart={selectionStart} editCell={editingCell} onMouseDown={handleMouseDown} onMouseEnter={handleMouseEnter} onStartEdit={(r: any, c: any) => { if (columns[c].type === 'multi-select') { setEditingCell({ row: r, col: c }); setIsPickerOpen(true); } else setEditingCell({ row: r, col: c }); }} onEndEdit={() => setEditingCell(null)} onSave={handleSaveInternal} isSelectedRow={selectedRowIds.includes(row.id)} onSelectRow={(id: any, v: any) => syncSelected(v ? [...selectedRowIds, id] : selectedRowIds.filter(x => x !== id))} onAction={onAction} rankingMap={rankingMap} isRankingsLoading={isRankingsLoading} userProfile={userProfile} disableNamePopover={disableNamePopover} baseYear={baseYear} />
                   );
                 }
                 if (end < totalCount - 1) rows.push(<tr key="b" style={{ height: (totalCount - 1 - end) * ROW_HEIGHT }}><td colSpan={columns.length + 1} className="border-none"></td></tr>);
@@ -165,7 +166,7 @@ export function StandardSpreadsheetTable({
                     <div className="min-w-0">
                       {!disableNamePopover ? (
                         <div onClick={(e) => e.stopPropagation()}>
-                          <StudentPopover student={row} rankingSummary={rankingMap?.[row.id]} userProfile={userProfile} baseYear={baseYear}>
+                          <StudentPopover student={row} rankingSummary={rankingMap?.[row.id]} isRankingsLoading={isRankingsLoading} userProfile={userProfile} baseYear={baseYear}>
                             <h3 className="font-bold text-slate-900 truncate hover:text-blue-600 transition-colors cursor-pointer">{row[titleCol?.key || ''] || '이름 없음'}</h3>
                           </StudentPopover>
                         </div>
