@@ -278,7 +278,7 @@ export default function AdminSettingsPage() {
         <Card className="border-none shadow-md bg-white overflow-hidden rounded-2xl flex flex-col">
           <CardHeader className="bg-slate-50/80 border-b py-4">
             <CardTitle className="text-lg font-bold flex items-center gap-2 text-slate-800">
-              <Calendar className="h-5 w-5 text-blue-500" />
+              <Calendar className="h-5 w-5 text-blue-600" />
               학사학년도 설정
             </CardTitle>
           </CardHeader>
@@ -290,7 +290,7 @@ export default function AdminSettingsPage() {
         <Card className="border-none shadow-md bg-white overflow-hidden rounded-2xl flex flex-col lg:row-span-2">
           <CardHeader className="bg-slate-50/80 border-b py-4">
             <CardTitle className="text-lg font-bold flex items-center gap-2 text-slate-800">
-              <Award className="h-5 w-5 text-blue-500" />
+              <Award className="h-5 w-5 text-blue-600" />
               자격증 및 급수 마스터 관리
             </CardTitle>
           </CardHeader>
@@ -300,9 +300,9 @@ export default function AdminSettingsPage() {
         </Card>
 
         <Card className="border-none shadow-md bg-white overflow-hidden rounded-2xl flex flex-col">
-          <CardHeader className="bg-indigo-50/80 border-b py-4">
-            <CardTitle className="text-lg font-bold flex items-center gap-2 text-indigo-800">
-              <Trophy className="h-5 w-5 text-indigo-500" />
+          <CardHeader className="bg-slate-50/80 border-b py-4">
+            <CardTitle className="text-lg font-bold flex items-center gap-2 text-slate-800">
+              <Trophy className="h-5 w-5 text-blue-600" />
               옥저인증제 관리
             </CardTitle>
           </CardHeader>
@@ -312,14 +312,14 @@ export default function AdminSettingsPage() {
         </Card>
       </div>
 
-      {/* 모바일 전용 아코디언 모드 레이아웃 (lg 미만) */}
+      {/* 모바일 전용 아코디언 모드 레이아웃 (lg 미만) - 색상 통일 적용 */}
       <div className="lg:hidden flex flex-col space-y-3">
         <Accordion type="multiple" defaultValue={["year-settings", "cert-settings", "certify-settings"]} className="space-y-3">
           {/* 1. 학사학년도 아코디언 */}
           <AccordionItem value="year-settings" className="border border-slate-200/80 bg-white rounded-2xl shadow-sm overflow-hidden px-0">
             <AccordionTrigger className="px-4 py-3.5 hover:no-underline bg-slate-50/80 font-bold text-sm text-slate-800">
               <div className="flex items-center gap-2">
-                <Calendar className="h-4.5 w-4.5 text-blue-500 shrink-0" />
+                <Calendar className="h-4.5 w-4.5 text-blue-600 shrink-0" />
                 <span>학사학년도 설정</span>
                 <span className="text-[10px] font-extrabold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full ml-1">
                   {baseYear}학년도
@@ -335,9 +335,9 @@ export default function AdminSettingsPage() {
           <AccordionItem value="cert-settings" className="border border-slate-200/80 bg-white rounded-2xl shadow-sm overflow-hidden px-0">
             <AccordionTrigger className="px-4 py-3.5 hover:no-underline bg-slate-50/80 font-bold text-sm text-slate-800">
               <div className="flex items-center gap-2">
-                <Award className="h-4.5 w-4.5 text-blue-500 shrink-0" />
+                <Award className="h-4.5 w-4.5 text-blue-600 shrink-0" />
                 <span>자격증 및 급수 마스터 관리</span>
-                <span className="text-[10px] font-extrabold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full ml-1">
+                <span className="text-[10px] font-extrabold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full ml-1">
                   {certs.length}개
                 </span>
               </div>
@@ -349,18 +349,19 @@ export default function AdminSettingsPage() {
 
           {/* 3. 옥저인증제 아코디언 */}
           <AccordionItem value="certify-settings" className="border border-slate-200/80 bg-white rounded-2xl shadow-sm overflow-hidden px-0">
-            <AccordionTrigger className="px-4 py-3.5 hover:no-underline bg-indigo-50/80 font-bold text-sm text-indigo-900">
+            <AccordionTrigger className="px-4 py-3.5 hover:no-underline bg-slate-50/80 font-bold text-sm text-slate-800">
               <div className="flex items-center gap-2">
-                <Trophy className="h-4.5 w-4.5 text-indigo-500 shrink-0" />
+                <Trophy className="h-4.5 w-4.5 text-blue-600 shrink-0" />
                 <span>옥저인증제 관리</span>
               </div>
             </AccordionTrigger>
-            <AccordionContent className="p-4 pt-4 border-t border-indigo-100/50">
+            <AccordionContent className="p-4 pt-4 border-t border-slate-100">
               {renderCertifySettingsContent()}
             </AccordionContent>
           </AccordionItem>
         </Accordion>
       </div>
+
     </div>
   );
 }
