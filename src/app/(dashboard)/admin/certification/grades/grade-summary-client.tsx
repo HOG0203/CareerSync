@@ -41,6 +41,8 @@ interface StudentSummary {
   classTotal: number;
 }
 
+import { CertificationSkeleton } from '@/components/dashboard/loading-skeleton';
+
 export function GradeSummaryClient({ 
   initialSummaries, 
   weights,
@@ -54,6 +56,7 @@ export function GradeSummaryClient({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = React.useTransition();
   const [searchTerm, setSearchText] = React.useState('');
   const [selectedMajor, setSelectedMajor] = React.useState('all');
   const [selectedClass, setSelectedClass] = React.useState('all');
@@ -71,8 +74,11 @@ export function GradeSummaryClient({
   const handleGradeChange = (grade: number) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('grade', grade.toString());
-    router.push(`/admin/certification/grades?${params.toString()}`);
+    startTransition(() => {
+      router.push(`/admin/certification/grades?${params.toString()}`);
+    });
   };
+
 
   // 클라이언트 사이드 필터링 (학과, 반, 검색어)
   const filteredData = React.useMemo(() => {
@@ -159,8 +165,12 @@ export function GradeSummaryClient({
     return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
   }, [detailedScores]);
 
+  if (isPending) {
+    return <CertificationSkeleton />;
+  }
+
   return (
-    <div className="flex flex-col h-full bg-slate-50/50">
+    <div className="flex flex-col h-full bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-w-0">
       {/* 헤더 바: 페이지 타이틀 및 성적 데이터 업로드 버튼 */}
       <div className="px-3 py-3 sm:px-6 sm:py-4 border-b flex justify-between items-center bg-white min-w-0 shrink-0">
         <div className="flex items-center gap-2 min-w-0 shrink">

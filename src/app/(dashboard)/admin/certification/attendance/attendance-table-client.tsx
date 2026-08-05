@@ -55,6 +55,8 @@ interface AttendanceRecord {
   };
 }
 
+import { CertificationSkeleton } from '@/components/dashboard/loading-skeleton';
+
 export function AttendanceTableClient({ 
   initialData,
   currentGrade,
@@ -68,6 +70,7 @@ export function AttendanceTableClient({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = React.useTransition();
   const [searchTerm, setSearchText] = React.useState('');
   const [selectedMajor, setSelectedMajor] = React.useState('all');
   const [selectedClass, setSelectedClass] = React.useState('all');
@@ -76,8 +79,11 @@ export function AttendanceTableClient({
   const handleGradeChange = (grade: number) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('grade', grade.toString());
-    router.push(`/admin/certification/attendance?${params.toString()}`);
+    startTransition(() => {
+      router.push(`/admin/certification/attendance?${params.toString()}`);
+    });
   };
+
 
   // 학생별 데이터 그룹화 및 필터링
   const studentGroups = React.useMemo(() => {
@@ -169,10 +175,15 @@ export function AttendanceTableClient({
     selectedStudentId ? studentGroups.find(g => g.id === selectedStudentId) : null
   , [selectedStudentId, studentGroups]);
 
+  if (isPending) {
+    return <CertificationSkeleton />;
+  }
+
   return (
-    <div className="flex flex-col h-full bg-slate-50/50">
+    <div className="flex flex-col h-full bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-w-0">
       {/* 헤더 바: 제목 줄바꿈 방지 (whitespace-nowrap) 및 모바일 여백 정돈 */}
       <div className="px-3 py-3 sm:px-6 sm:py-4 border-b flex justify-between items-center bg-white min-w-0">
+
         <div className="flex items-center gap-2 min-w-0 shrink">
           <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600 shrink-0" />
           <h2 className="font-black text-slate-800 tracking-tight text-base sm:text-lg whitespace-nowrap truncate">

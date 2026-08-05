@@ -26,6 +26,8 @@ import { useToast } from '@/hooks/use-toast';
 import { StudentCertificateSummary, updateStudentCertificates } from './actions';
 import { CertificateImportModal } from './certificate-import-modal';
 
+import { CertificationSkeleton } from '@/components/dashboard/loading-skeleton';
+
 export function CertificateSummaryClient({ 
   initialSummaries, 
   currentGrade,
@@ -37,6 +39,7 @@ export function CertificateSummaryClient({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = React.useTransition();
   const [searchTerm, setSearchText] = React.useState('');
   const [selectedMajor, setSelectedMajor] = React.useState('all');
   const [selectedClass, setSelectedClass] = React.useState('all');
@@ -51,8 +54,11 @@ export function CertificateSummaryClient({
   const handleGradeChange = (grade: number) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('grade', grade.toString());
-    router.push(`/admin/certification/certificates?${params.toString()}`);
+    startTransition(() => {
+      router.push(`/admin/certification/certificates?${params.toString()}`);
+    });
   };
+
 
   // 클라이언트 사이드 필터링 (학과, 반, 검색어)
   const filteredData = React.useMemo(() => {
@@ -159,10 +165,15 @@ export function CertificateSummaryClient({
     window.location.href = `/api/admin/certification/download${ay ? `?ay=${ay}` : ''}`;
   };
 
+  if (isPending) {
+    return <CertificationSkeleton />;
+  }
+
   return (
-    <div className="flex flex-col h-full bg-slate-50/50">
+    <div className="flex flex-col h-full bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-w-0">
       {/* 헤더 바: 타이틀 및 버튼 */}
       <div className="px-3 py-3 sm:px-6 sm:py-4 border-b flex justify-between items-center bg-white min-w-0 shrink-0">
+
         <div className="flex items-center gap-2 min-w-0 shrink">
           <Award className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600 shrink-0" />
           <h2 className="font-black text-slate-800 tracking-tight text-base sm:text-lg whitespace-nowrap truncate">
