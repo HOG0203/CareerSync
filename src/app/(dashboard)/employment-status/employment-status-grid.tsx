@@ -138,7 +138,7 @@ function SearchHeader({ onSearch, currentSearchQuery, isLowerGrade, matchedCount
           <Search className="h-5 w-5 text-slate-400 group-focus-within:text-blue-500 shrink-0" />
           <Input 
             type="text"
-            placeholder={isLowerGrade ? "이름, 희망진로코스 등 검색..." : "이름, 기업, 진로코스 등 검색..."}
+            placeholder={isLowerGrade ? "이름, 자격증, 희망진로코스 검색..." : "이름, 자격증, 기업, 진로코스 검색..."}
             value={localValue}
             onChange={(e) => setLocalValue(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -274,9 +274,13 @@ export function EmploymentStatusGrid({ allData, userProfile, baseYear, grade, gr
       else if (certFilter === '3+') certMatch = certsCount >= 3;
       else if (certFilter === '0') certMatch = certsCount === 0;
 
-      // 2. 검색어 필터 조건 확인
+      // 2. 검색어 필터 조건 확인 (개별 자격증 명칭도 포함)
       let searchMatch = true;
       if (searchQuery && searchQuery.trim() !== '') {
+        const certList = Array.isArray(student.certificates)
+          ? student.certificates
+          : (typeof student.certificates === 'string' ? [student.certificates] : []);
+
         const fieldsToSearch = isLowerGrade
           ? [
               student.student_name,
@@ -284,7 +288,8 @@ export function EmploymentStatusGrid({ allData, userProfile, baseYear, grade, gr
               student.career_course,
               student.special_notes,
               student.major,
-              student.class_info
+              student.class_info,
+              ...certList
             ]
           : [
               student.student_name,
@@ -294,7 +299,8 @@ export function EmploymentStatusGrid({ allData, userProfile, baseYear, grade, gr
               student.company,
               student.latest_training_company,
               student.major,
-              student.class_info
+              student.class_info,
+              ...certList
             ];
         searchMatch = fieldsToSearch.some(field => field?.toLowerCase().includes(query));
       }
@@ -302,6 +308,7 @@ export function EmploymentStatusGrid({ allData, userProfile, baseYear, grade, gr
       return certMatch && searchMatch;
     }).length;
   }, [allData, searchQuery, certFilter, isLowerGrade]);
+
 
   if (isLoading) {
     return (

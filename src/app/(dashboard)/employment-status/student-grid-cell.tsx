@@ -31,10 +31,14 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, isRanki
     else if (certFilter === '3+') certMatch = certsCount >= 3;
     else if (certFilter === '0') certMatch = certsCount === 0;
 
-    // 2. 검색어 필터 조건 확인
+    // 2. 검색어 필터 조건 확인 (개별 자격증 명칭 포함)
     let searchMatch = true;
     if (searchQuery && searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase().trim();
+      const certList = Array.isArray(student.certificates)
+        ? student.certificates
+        : (typeof student.certificates === 'string' ? [student.certificates] : []);
+
       const fieldsToSearch = isLowerGrade
         ? [
             student.student_name,
@@ -42,7 +46,8 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, isRanki
             student.career_course,
             student.special_notes,
             student.major,
-            student.class_info
+            student.class_info,
+            ...certList
           ]
         : [
             student.student_name,
@@ -52,12 +57,14 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, isRanki
             student.company,
             student.latest_training_company,
             student.major,
-            student.class_info
+            student.class_info,
+            ...certList
           ];
       searchMatch = fieldsToSearch.some(field => field?.toLowerCase().includes(query));
     }
 
     return certMatch && searchMatch;
+
   }, [student, searchQuery, certFilter, isLowerGrade]);
 
   const getDesireColor = (student: StudentEmploymentData) => {
