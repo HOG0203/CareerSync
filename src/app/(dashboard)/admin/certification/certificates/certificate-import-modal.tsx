@@ -261,9 +261,10 @@ export function CertificateImportModal() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-2 shadow-lg shadow-indigo-200">
-          <FileUp className="h-4 w-4" />
-          자격증 데이터 업로드
+        <Button className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 sm:gap-2 shadow-lg shadow-indigo-200 text-xs sm:text-sm px-2.5 sm:px-4 h-8 sm:h-10 whitespace-nowrap shrink-0">
+          <FileUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+          <span className="hidden sm:inline">자격증 데이터 업로드</span>
+          <span className="sm:hidden">자격증 업로드</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-3xl flex flex-col p-0 border-none shadow-2xl [&>button]:text-white [&>button]:opacity-100 [&>button]:hover:bg-white/10 [&>button]:p-2 [&>button]:rounded-full [&>button]:transition-colors overflow-hidden">
