@@ -1,5 +1,5 @@
 import {
-  getFilteredStudentData,
+  getDashboardStudentData,
   getGraduationYears,
   MAJOR_SORT_ORDER,
   getCurrentUserProfile,
@@ -49,8 +49,8 @@ export default async function DashboardPage({
   const selectedClass = params.class || 'all';
   const selectedStatus = params.status || 'all';
 
-  // 2. 타겟 데이터 패칭
-  const allData = await getFilteredStudentData(selectedYear);
+  // 2. 타겟 데이터 패칭 (대시보드 전용 슬림 쿼리 - 차트에 필요한 필드만)
+  const allData = await getDashboardStudentData(selectedYear);
 
   // 3. 필터링 로직 최적화: 한 번의 순회로 필요한 데이터 및 카운트 추출
   const majorCounts: Record<string, number> = {};

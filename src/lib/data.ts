@@ -7,6 +7,61 @@ export type { StudentEmploymentData, FieldTrainingRecord };
 export { MAJOR_SORT_ORDER };
 
 /**
+ * [대시보드 전용] 차트 렌더링에 필요한 최소한의 필드만 가져옵니다.
+ * 전화번호, 옷/신발 사이즈, 학부모 의견, 메모 등 불필요한 컬럼 제외.
+ */
+export async function getDashboardStudentData(graduationYear: string): Promise<StudentEmploymentData[]> {
+  const supabase = await createClient();
+  const gradYearInt = parseInt(graduationYear);
+
+  const [studentsResult, trainingsResult] = await Promise.all([
+    supabase
+      .from('students')
+      .select('id, major, class_info, student_number, graduation_year, career_aspiration, career_course, certificates, military_status, student_employments (business_type, company_type, employment_status)')
+      .eq('graduation_year', gradYearInt)
+      .order('major')
+      .order('class_info')
+      .order('student_number')
+      .range(0, 5000),
+    supabase
+      .from('field_training_records')
+      .select('student_id, hiring_status, students!inner(graduation_year)')
+      .eq('students.graduation_year', gradYearInt)
+      .order('training_order', { ascending: false }),
+  ]);
+
+  if (studentsResult.error) {
+    console.error('Error fetching dashboard students:', studentsResult.error);
+    return [];
+  }
+
+  const students = studentsResult.data || [];
+  const trainings = trainingsResult.data || [];
+
+  const flattened = students.map(s => {
+    const rawEmp = Array.isArray(s.student_employments) ? s.student_employments[0] : s.student_employments;
+    const { student_employments, ...studentBase } = s;
+    const emp = rawEmp || {};
+    const latestTraining = trainings.find(t => t.student_id === s.id);
+
+    return {
+      ...studentBase,
+      ...emp,
+      id: s.id,
+      has_field_training: latestTraining ? 'O' : '',
+    } as StudentEmploymentData;
+  });
+
+  return flattened.sort((a, b) => {
+    const indexA = MAJOR_SORT_ORDER.indexOf(a.major || '');
+    const indexB = MAJOR_SORT_ORDER.indexOf(b.major || '');
+    if (indexA !== indexB) return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+    if (a.class_info !== b.class_info) return (a.class_info || '').localeCompare(b.class_info || '');
+    return (a.student_number || '').localeCompare(b.student_number || '', undefined, { numeric: true });
+  });
+}
+
+/**
  * 특정 졸업연도의 모든 학생 및 취업/실습 데이터를 가져와 평탄화합니다.
  */
 export async function getFilteredStudentData(graduationYear: string, baseYear?: number): Promise<StudentEmploymentData[]> {
