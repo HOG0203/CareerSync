@@ -18,7 +18,7 @@ export async function getFilteredStudentData(graduationYear: string, baseYear?: 
   const [studentsResult, trainingsResult, historyResult] = await Promise.all([
     supabase
       .from('students')
-      .select('id, student_id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks)')
+      .select('*, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks)')
       .eq('graduation_year', gradYearInt)
       .order('major')
       .order('class_info')
@@ -97,7 +97,7 @@ export async function getAssignedStudentDetails(major: string, classInfo: string
   const [studentsResult, trainingsResult, historyResult] = await Promise.all([
     supabase
       .from('students')
-      .select('id, student_id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks), student_counseling_logs (*)')
+      .select('*, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks), student_counseling_logs (*)')
       .eq('major', major)
       .eq('class_info', classInfo)
       .eq('graduation_year', graduationYear)
