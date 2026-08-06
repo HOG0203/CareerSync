@@ -140,6 +140,12 @@ export async function uploadStudentAttendance(
     .upsert(upsertData, { onConflict: 'student_id, academic_year, grade, semester' });
 
   if (error) return { error: error.message };
+  
+  // 업로드된 데이터에 포함된 학년들만 핀포인트 캐시 비우기
+  const affectedGrades = Array.from(new Set(data.map(d => d.currentGrade).filter(Boolean)));
+  affectedGrades.forEach(g => {
+    revalidateTag(`cert-attendance-grade-${g}`);
+  });
   revalidateTag('cert-attendance');
   revalidatePath('/admin/certification/attendance');
   return { success: true, count: upsertData.length };
@@ -149,6 +155,7 @@ export async function deleteAllStudentAttendance() {
   const supabase = await createClient();
   const { error } = await supabase.from('student_attendance').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   if (error) return { success: false, error: error.message };
+  [1, 2, 3].forEach(g => revalidateTag(`cert-attendance-grade-${g}`));
   revalidateTag('cert-attendance');
   revalidatePath('/admin/certification/attendance');
   return { success: true };
@@ -187,16 +194,16 @@ export async function getAllAttendanceRecords(academicYear: number, currentGrade
 }
 
 /**
- * [캐싱] 학년별 전교생 출결 기록 조회 결과 서버 메모리 캐싱
+ * [캐싱] 학년별 전교생 출결 기록 조회 결과를 학년별 동적 태그로 서버 메모리에 캐싱합니다.
  */
-export const getCachedAllAttendanceRecords = unstable_cache(
-  async (academicYear: number, currentGrade: number) => {
-    return getAllAttendanceRecords(academicYear, currentGrade);
-  },
-  ['all-attendance-records'],
-  {
-    revalidate: 3600,
-    tags: ['cert-attendance']
-  }
-);
+export const getCachedAllAttendanceRecords = (academicYear: number, currentGrade: number) =>
+  unstable_cache(
+    async () => getAllAttendanceRecords(academicYear, currentGrade),
+    [`all-attendance-records-${academicYear}-${currentGrade}`],
+    {
+      revalidate: 3600,
+      tags: [`cert-attendance-grade-${currentGrade}`, 'cert-attendance']
+    }
+  )();
+
 

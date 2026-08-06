@@ -50,18 +50,17 @@ export async function getCertificateSummaries(gradeNum: number) {
 }
 
 /**
- * [캐싱] 학년별 자격증 현황 목록 서버 메모리 캐싱
+ * [캐싱] 학년별 자격증 현황 목록을 학년별 동적 태그로 서버 메모리에 캐싱합니다.
  */
-export const getCachedCertificateSummaries = unstable_cache(
-  async (gradeNum: number) => {
-    return getCertificateSummaries(gradeNum);
-  },
-  ['certificate-summaries'],
-  {
-    revalidate: 3600,
-    tags: ['cert-certificates']
-  }
-);
+export const getCachedCertificateSummaries = (gradeNum: number) =>
+  unstable_cache(
+    async () => getCertificateSummaries(gradeNum),
+    [`certificate-summaries-grade-${gradeNum}`],
+    {
+      revalidate: 3600,
+      tags: [`cert-certificates-grade-${gradeNum}`, 'cert-certificates']
+    }
+  )();
 
 /**
  * 개별 학생의 자격증 정보 직접 업데이트 (스프레드시트 셀 수정용)
@@ -80,6 +79,7 @@ export async function updateStudentCertificates(studentId: string, certificates:
     return { success: false, error: error.message };
   }
 
+  [1, 2, 3].forEach(g => revalidateTag(`cert-certificates-grade-${g}`));
   revalidateTag('cert-certificates');
   revalidateTag('students');
   revalidatePath('/admin/certification/certificates');
@@ -87,6 +87,7 @@ export async function updateStudentCertificates(studentId: string, certificates:
   revalidatePath('/students');
   return { success: true };
 }
+
 
 
 /**
@@ -263,11 +264,13 @@ export async function importUploadedCertificates(rawRows: any[][]) {
       studentCerts
     );
 
+    revalidateTag(`cert-certificates-grade-${grade}`);
     revalidateTag('cert-certificates');
     revalidateTag('students');
     revalidatePath('/admin/certification/certificates');
     revalidatePath('/employment-status');
     revalidatePath('/students');
+
 
 
     return {
