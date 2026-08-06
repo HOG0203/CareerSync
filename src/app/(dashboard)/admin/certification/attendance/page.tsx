@@ -19,7 +19,12 @@ export default async function AttendanceSummaryPage({
   const baseYear = settings.baseYear;
 
   const { grade } = await searchParams;
-  const selectedGradeNum = grade ? parseInt(grade) : 3;
+  let defaultGradeNum = 3;
+  if (profile?.role === 'teacher' && profile?.assigned_grade) {
+    defaultGradeNum = profile.assigned_grade;
+  }
+  const selectedGradeNum = grade ? parseInt(grade) : defaultGradeNum;
+
 
   const attendanceData = await getCachedAllAttendanceRecords(baseYear, selectedGradeNum);
 

@@ -19,9 +19,14 @@ export default async function CertificateSummaryPage({
   // 시스템 설정에서 기준 학사학년도 조회
   const settings = await getSystemSettings();
 
-  // URL 학년 정보 파싱 (기본 3학년)
+  // URL 학년 정보 파싱 (담임교사인 경우 담당 학년이 기본값, 나머지는 3학년)
   const { grade } = await searchParams;
-  const selectedGradeNum = grade ? parseInt(grade) : 3;
+  let defaultGradeNum = 3;
+  if (profile?.role === 'teacher' && profile?.assigned_grade) {
+    defaultGradeNum = profile.assigned_grade;
+  }
+  const selectedGradeNum = grade ? parseInt(grade) : defaultGradeNum;
+
 
   // 학년별 자격증 현황 데이터 로드 (캐시 적용)
   const summaries = await getCachedCertificateSummaries(selectedGradeNum);

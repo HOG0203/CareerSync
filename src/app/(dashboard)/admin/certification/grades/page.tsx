@@ -23,9 +23,14 @@ export default async function CertificationPage({
   const settings = await getSystemSettings();
   const baseYear = settings.baseYear;
 
-  // URL 파라미터에서 학년 정보 읽음 (기본값: 3학년)
+  // URL 파라미터에서 학년 정보 읽음 (담임교사인 경우 담당 학년이 기본값, 나머지는 3학년)
   const { grade } = await searchParams;
-  const selectedGradeNum = grade ? parseInt(grade) : 3;
+  let defaultGradeNum = 3;
+  if (profile?.role === 'teacher' && profile?.assigned_grade) {
+    defaultGradeNum = profile.assigned_grade;
+  }
+  const selectedGradeNum = grade ? parseInt(grade) : defaultGradeNum;
+
   
   const targetGradYear = baseYear + (4 - selectedGradeNum);
 
