@@ -1,7 +1,7 @@
 import { getCurrentUserProfile } from '@/lib/data';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { redirect } from 'next/navigation';
-import { getCertificateSummaries } from './actions';
+import { getCachedCertificateSummaries } from './actions';
 import { CertificateSummaryClient } from './certificate-summary-client';
 
 export default async function CertificateSummaryPage({
@@ -23,8 +23,9 @@ export default async function CertificateSummaryPage({
   const { grade } = await searchParams;
   const selectedGradeNum = grade ? parseInt(grade) : 3;
 
-  // 학년별 자격증 현황 데이터 로드
-  const summaries = await getCertificateSummaries(selectedGradeNum);
+  // 학년별 자격증 현황 데이터 로드 (캐시 적용)
+  const summaries = await getCachedCertificateSummaries(selectedGradeNum);
+
 
   return (
     <CertificateSummaryClient 

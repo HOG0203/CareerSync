@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import * as XLSX from 'xlsx';
@@ -50,6 +50,20 @@ export async function getCertificateSummaries(gradeNum: number) {
 }
 
 /**
+ * [캐싱] 학년별 자격증 현황 목록 서버 메모리 캐싱
+ */
+export const getCachedCertificateSummaries = unstable_cache(
+  async (gradeNum: number) => {
+    return getCertificateSummaries(gradeNum);
+  },
+  ['certificate-summaries'],
+  {
+    revalidate: 3600,
+    tags: ['cert-certificates']
+  }
+);
+
+/**
  * 개별 학생의 자격증 정보 직접 업데이트 (스프레드시트 셀 수정용)
  */
 export async function updateStudentCertificates(studentId: string, certificates: string[]) {
@@ -66,11 +80,14 @@ export async function updateStudentCertificates(studentId: string, certificates:
     return { success: false, error: error.message };
   }
 
+  revalidateTag('cert-certificates');
+  revalidateTag('students');
   revalidatePath('/admin/certification/certificates');
   revalidatePath('/employment-status');
   revalidatePath('/students');
   return { success: true };
 }
+
 
 /**
  * 파싱된 자격증 데이터 레코드를 DB에 일괄 저장하는 공통 로직
@@ -246,9 +263,12 @@ export async function importUploadedCertificates(rawRows: any[][]) {
       studentCerts
     );
 
+    revalidateTag('cert-certificates');
+    revalidateTag('students');
     revalidatePath('/admin/certification/certificates');
     revalidatePath('/employment-status');
     revalidatePath('/students');
+
 
     return {
       success: true,

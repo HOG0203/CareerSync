@@ -103,9 +103,11 @@ export async function updateCertificationConfig(config: CertificationConfig) {
       });
 
     if (error) throw error;
+    revalidateTag('cert-grades');
     revalidatePath('/admin/settings');
     revalidatePath('/admin/certification/grades');
     return { success: true };
+
   } catch (error: any) {
     return { error: error.message };
   }

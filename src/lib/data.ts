@@ -483,3 +483,18 @@ const getAchievementScoresCached = unstable_cache(
 export async function getAchievementScores(): Promise<Record<string, number>> {
   return getAchievementScoresCached();
 }
+
+/**
+ * [캐싱] 특정 졸업연도 학생들의 석차 및 성취도 사전 계산 결과를 서버 메모리에 캐싱합니다.
+ */
+export const getCachedYearlyRankingsSummary = unstable_cache(
+  async (graduationYear: number, baseYear: number = 2026) => {
+    return getYearlyRankingsSummary(graduationYear, baseYear);
+  },
+  ['yearly-rankings-summary'],
+  {
+    revalidate: 3600,
+    tags: ['cert-grades']
+  }
+);
+

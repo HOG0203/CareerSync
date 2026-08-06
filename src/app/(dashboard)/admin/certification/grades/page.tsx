@@ -1,7 +1,7 @@
 import { 
   getAchievementScores, 
   getCurrentUserProfile, 
-  getYearlyRankingsSummary
+  getCachedYearlyRankingsSummary
 } from '@/lib/data';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { redirect } from 'next/navigation';
@@ -29,11 +29,12 @@ export default async function CertificationPage({
   
   const targetGradYear = baseYear + (4 - selectedGradeNum);
 
-  // 성적 및 가중치 데이터만 서버에서 로드
+  // 성적 및 가중치 데이터만 서버에서 로드 (캐시 적용)
   const [summaryMap, weights] = await Promise.all([
-    getYearlyRankingsSummary(targetGradYear, baseYear),
+    getCachedYearlyRankingsSummary(targetGradYear, baseYear),
     getAchievementScores()
   ]);
+
 
   const studentSummaries = Object.values(summaryMap);
 

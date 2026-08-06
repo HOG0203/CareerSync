@@ -1,9 +1,10 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
 
 export interface ParsedAttendanceData {
+
   studentId?: string;
   studentName: string;
   studentNumber: string;
@@ -139,6 +140,7 @@ export async function uploadStudentAttendance(
     .upsert(upsertData, { onConflict: 'student_id, academic_year, grade, semester' });
 
   if (error) return { error: error.message };
+  revalidateTag('cert-attendance');
   revalidatePath('/admin/certification/attendance');
   return { success: true, count: upsertData.length };
 }
@@ -147,6 +149,7 @@ export async function deleteAllStudentAttendance() {
   const supabase = await createClient();
   const { error } = await supabase.from('student_attendance').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   if (error) return { success: false, error: error.message };
+  revalidateTag('cert-attendance');
   revalidatePath('/admin/certification/attendance');
   return { success: true };
 }
@@ -182,3 +185,18 @@ export async function getAllAttendanceRecords(academicYear: number, currentGrade
   if (error) return [];
   return data;
 }
+
+/**
+ * [캐싱] 학년별 전교생 출결 기록 조회 결과 서버 메모리 캐싱
+ */
+export const getCachedAllAttendanceRecords = unstable_cache(
+  async (academicYear: number, currentGrade: number) => {
+    return getAllAttendanceRecords(academicYear, currentGrade);
+  },
+  ['all-attendance-records'],
+  {
+    revalidate: 3600,
+    tags: ['cert-attendance']
+  }
+);
+

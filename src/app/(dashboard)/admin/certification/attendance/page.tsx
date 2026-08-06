@@ -1,7 +1,7 @@
-import { getCurrentUserProfile, getAchievementScores, getYearlyRankingsSummary } from '@/lib/data';
+import { getCurrentUserProfile } from '@/lib/data';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { redirect } from 'next/navigation';
-import { getAllAttendanceRecords } from './actions';
+import { getCachedAllAttendanceRecords } from './actions';
 import { AttendanceTableClient } from './attendance-table-client';
 
 export default async function AttendanceSummaryPage({
@@ -21,7 +21,8 @@ export default async function AttendanceSummaryPage({
   const { grade } = await searchParams;
   const selectedGradeNum = grade ? parseInt(grade) : 3;
 
-  const attendanceData = await getAllAttendanceRecords(baseYear, selectedGradeNum);
+  const attendanceData = await getCachedAllAttendanceRecords(baseYear, selectedGradeNum);
+
 
   return (
     <AttendanceTableClient 
