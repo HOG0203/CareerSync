@@ -1,14 +1,12 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, unstable_cache, revalidateTag } from 'next/cache'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 export interface MasterCertificate {
   name: string;
   levels: string[];
 }
-
-import { unstable_cache, revalidateTag } from 'next/cache'
 
 const getSystemSettingsCached = unstable_cache(
   async () => {
@@ -143,7 +141,7 @@ export async function updateSystemSettings(settings: { baseYear: number }) {
  * 마스터 자격증 목록 조회
  */
 export async function getMasterCertificates(): Promise<MasterCertificate[]> {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   try {
     const { data, error } = await supabase
