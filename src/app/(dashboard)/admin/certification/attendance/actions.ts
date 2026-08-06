@@ -196,8 +196,8 @@ export async function getAllAttendanceRecords(academicYear: number, currentGrade
 /**
  * [캐싱] 학년별 전교생 출결 기록 조회 결과를 학년별 동적 태그로 서버 메모리에 캐싱합니다.
  */
-export const getCachedAllAttendanceRecords = (academicYear: number, currentGrade: number) =>
-  unstable_cache(
+export async function getCachedAllAttendanceRecords(academicYear: number, currentGrade: number) {
+  return unstable_cache(
     async () => getAllAttendanceRecords(academicYear, currentGrade),
     [`all-attendance-records-${academicYear}-${currentGrade}`],
     {
@@ -205,5 +205,7 @@ export const getCachedAllAttendanceRecords = (academicYear: number, currentGrade
       tags: [`cert-attendance-grade-${currentGrade}`, 'cert-attendance']
     }
   )();
+}
+
 
 

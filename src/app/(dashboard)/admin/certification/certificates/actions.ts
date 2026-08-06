@@ -52,8 +52,8 @@ export async function getCertificateSummaries(gradeNum: number) {
 /**
  * [캐싱] 학년별 자격증 현황 목록을 학년별 동적 태그로 서버 메모리에 캐싱합니다.
  */
-export const getCachedCertificateSummaries = (gradeNum: number) =>
-  unstable_cache(
+export async function getCachedCertificateSummaries(gradeNum: number) {
+  return unstable_cache(
     async () => getCertificateSummaries(gradeNum),
     [`certificate-summaries-grade-${gradeNum}`],
     {
@@ -61,6 +61,8 @@ export const getCachedCertificateSummaries = (gradeNum: number) =>
       tags: [`cert-certificates-grade-${gradeNum}`, 'cert-certificates']
     }
   )();
+}
+
 
 /**
  * 개별 학생의 자격증 정보 직접 업데이트 (스프레드시트 셀 수정용)
