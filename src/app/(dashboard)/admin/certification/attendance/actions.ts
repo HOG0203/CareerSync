@@ -1,9 +1,10 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
 
 export interface ParsedAttendanceData {
+
 
   studentId?: string;
   studentName: string;
@@ -162,7 +163,8 @@ export async function deleteAllStudentAttendance() {
 }
 
 export async function getAllAttendanceRecords(academicYear: number, currentGrade: number) {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
+
   const targetGraduationYear = academicYear + (4 - currentGrade);
 
   const { data: students } = await supabase

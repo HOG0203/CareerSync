@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import * as XLSX from 'xlsx';
 
@@ -19,7 +19,8 @@ export interface StudentCertificateSummary {
  * 특정 학년의 학생 자격증 현황 목록 조회
  */
 export async function getCertificateSummaries(gradeNum: number) {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
+
   const settings = await getSystemSettings();
   const baseYear = settings.baseYear;
   

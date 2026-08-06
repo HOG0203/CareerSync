@@ -74,7 +74,8 @@ export async function getDashboardStudentData(graduationYear: string): Promise<S
  * 특정 졸업연도의 모든 학생 및 취업/실습 데이터를 가져와 평탄화합니다.
  */
 export async function getFilteredStudentData(graduationYear: string, baseYear?: number): Promise<StudentEmploymentData[]> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
+
   const gradYearInt = parseInt(graduationYear);
   
   // [최적화] Promise.all을 활용해 학생 정보, 실습 기록, 학적 이력을 병렬로 쿼리하여 네트워크 왕복 시간을 1/3로 단축
@@ -183,7 +184,8 @@ export async function getCachedGraduationYears(): Promise<number[]> {
 
 
 export async function getAssignedStudentDetails(major: string, classInfo: string, graduationYear: number, baseYear?: number) {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
+
   
   // [최적화] Promise.all을 활용해 학생 정보, 실습 기록, 학적 이력을 병렬로 조회
   // [컬럼 슬림화 최적화] 불필요한 대용량 컬럼(전화번호, 옷/신발 사이즈, 학부모 의견 등)을 제외하고 필수 데이터만 골라서 select 합니다.
@@ -381,7 +383,8 @@ export async function getAllStudentScores() {
  * [초고속 요약] 특정 졸업연도 학생들의 석차 및 성취도를 사전 계산합니다.
  */
 export async function getYearlyRankingsSummary(graduationYear: number, baseYear: number = 2026) {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
+
   
   // 1. [최적화] 학생 정보 조회, 전체 성적 개수 카운트, 출결 정보 수집을 병렬로 수행하여 대기시간 단축
   const [studentsResult, countResult, attendanceResult] = await Promise.all([
