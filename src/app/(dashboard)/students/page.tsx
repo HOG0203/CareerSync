@@ -14,6 +14,8 @@ import { getCachedMasterCertificates, getSystemSettings } from '@/app/(dashboard
 import DashboardFilters from '@/components/dashboard/dashboard-filters';
 import React from 'react';
 
+import { TableLoadingSkeleton } from '@/components/dashboard/loading-skeleton';
+
 export const dynamic = 'force-dynamic';
 
 export default async function StudentsPage({
@@ -22,6 +24,21 @@ export default async function StudentsPage({
   searchParams: Promise<{ year?: string; major?: string; class?: string; status?: string; ay?: string; grade?: string }>;
 }) {
   const params = await searchParams;
+  const suspenseKey = `${params.ay || ''}-${params.grade || ''}-${params.year || ''}-${params.major || ''}-${params.class || ''}-${params.status || ''}`;
+
+  return (
+    <React.Suspense key={suspenseKey} fallback={<TableLoadingSkeleton />}>
+      <StudentsPageContent searchParams={params} />
+    </React.Suspense>
+  );
+}
+
+async function StudentsPageContent({
+  searchParams,
+}: {
+  searchParams: { year?: string; major?: string; class?: string; status?: string; ay?: string; grade?: string };
+}) {
+  const params = searchParams;
 
   // 1. 기반 설정 및 사용자 프로필 패칭 (캐시 적용)
   const [settings, graduationYears, masterCertificates, userProfile] = await Promise.all([
@@ -30,6 +47,7 @@ export default async function StudentsPage({
     getCachedMasterCertificates(),
     getCurrentUserProfile()
   ]);
+
 
   if (!userProfile) {
     redirect('/login');

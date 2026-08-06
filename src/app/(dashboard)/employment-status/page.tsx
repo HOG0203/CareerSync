@@ -19,6 +19,9 @@ export async function generateMetadata({
   };
 }
 
+import { GridLoadingSkeleton } from '@/components/dashboard/loading-skeleton';
+import React from 'react';
+
 export const dynamic = 'force-dynamic';
 
 export default async function EmploymentStatusPage({
@@ -27,12 +30,28 @@ export default async function EmploymentStatusPage({
   searchParams: Promise<{ year?: string; ay?: string; grade?: string }>;
 }) {
   const params = await searchParams;
+  const suspenseKey = `${params.ay || ''}-${params.grade || ''}-${params.year || ''}`;
+
+  return (
+    <React.Suspense key={suspenseKey} fallback={<GridLoadingSkeleton />}>
+      <EmploymentStatusPageContent searchParams={params} />
+    </React.Suspense>
+  );
+}
+
+async function EmploymentStatusPageContent({
+  searchParams,
+}: {
+  searchParams: { year?: string; ay?: string; grade?: string };
+}) {
+  const params = searchParams;
 
   const [graduationYears, settings, userProfile] = await Promise.all([
     getCachedGraduationYears(),
     getSystemSettings(),
     getCurrentUserProfile()
   ]);
+
 
   // 담임 교사인 경우 해당 학년과 현재 학사학년도를 기본값으로 설정
   const defaultAY = settings.baseYear;
