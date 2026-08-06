@@ -35,6 +35,8 @@ export default async function AttendanceSummaryPage({
       currentGrade={selectedGradeNum}
       baseYear={baseYear}
       isAdmin={profile?.role === 'admin'}
+      userProfile={profile}
     />
   );
+
 }

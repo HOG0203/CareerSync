@@ -31,18 +31,31 @@ import { CertificationDataSkeleton } from '@/components/dashboard/loading-skelet
 export function CertificateSummaryClient({ 
   initialSummaries, 
   currentGrade,
-  isAdmin = false
+  isAdmin = false,
+  userProfile
 }: { 
   initialSummaries: StudentCertificateSummary[], 
   currentGrade: number,
-  isAdmin?: boolean
+  isAdmin?: boolean,
+  userProfile?: any
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = React.useTransition();
   const [searchTerm, setSearchText] = React.useState('');
-  const [selectedMajor, setSelectedMajor] = React.useState('all');
-  const [selectedClass, setSelectedClass] = React.useState('all');
+  const [selectedMajor, setSelectedMajor] = React.useState(() => {
+    if (!isAdmin && userProfile?.role === 'teacher' && userProfile?.assigned_major) {
+      return userProfile.assigned_major;
+    }
+    return 'all';
+  });
+  const [selectedClass, setSelectedClass] = React.useState(() => {
+    if (!isAdmin && userProfile?.role === 'teacher' && userProfile?.assigned_class) {
+      return userProfile.assigned_class;
+    }
+    return 'all';
+  });
+
   const [editingStudent, setEditingStudent] = React.useState<StudentCertificateSummary | null>(null);
   const [certsInput, setCertsInput] = React.useState('');
   const [isSaving, setIsSaving] = React.useState(false);

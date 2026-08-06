@@ -50,7 +50,9 @@ export default async function CertificationPage({
         weights={weights}
         currentGrade={selectedGradeNum} 
         isAdmin={profile?.role === 'admin'}
+        userProfile={profile}
       />
     </div>
   );
+
 }

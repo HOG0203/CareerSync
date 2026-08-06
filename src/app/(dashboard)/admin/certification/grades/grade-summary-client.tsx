@@ -47,19 +47,32 @@ export function GradeSummaryClient({
   initialSummaries, 
   weights,
   currentGrade, // 서버에서 결정된 학년
-  isAdmin = false
+  isAdmin = false,
+  userProfile
 }: { 
   initialSummaries: StudentSummary[], 
   weights: Record<string, number>,
   currentGrade: number,
-  isAdmin?: boolean
+  isAdmin?: boolean,
+  userProfile?: any
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = React.useTransition();
   const [searchTerm, setSearchText] = React.useState('');
-  const [selectedMajor, setSelectedMajor] = React.useState('all');
-  const [selectedClass, setSelectedClass] = React.useState('all');
+  const [selectedMajor, setSelectedMajor] = React.useState(() => {
+    if (!isAdmin && userProfile?.role === 'teacher' && userProfile?.assigned_major) {
+      return userProfile.assigned_major;
+    }
+    return 'all';
+  });
+  const [selectedClass, setSelectedClass] = React.useState(() => {
+    if (!isAdmin && userProfile?.role === 'teacher' && userProfile?.assigned_class) {
+      return userProfile.assigned_class;
+    }
+    return 'all';
+  });
+
   const [selectedStudentId, setSelectedStudentId] = React.useState<string | null>(null);
   const [currentPage, setCurrentPage] = React.useState(1);
   const [detailedScores, setDetailedScores] = React.useState<any[]>([]);

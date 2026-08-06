@@ -61,19 +61,32 @@ export function AttendanceTableClient({
   initialData,
   currentGrade,
   baseYear,
-  isAdmin = false
+  isAdmin = false,
+  userProfile
 }: { 
   initialData: AttendanceRecord[],
   currentGrade: number,
   baseYear: number,
-  isAdmin?: boolean
+  isAdmin?: boolean,
+  userProfile?: any
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = React.useTransition();
   const [searchTerm, setSearchText] = React.useState('');
-  const [selectedMajor, setSelectedMajor] = React.useState('all');
-  const [selectedClass, setSelectedClass] = React.useState('all');
+  const [selectedMajor, setSelectedMajor] = React.useState(() => {
+    if (!isAdmin && userProfile?.role === 'teacher' && userProfile?.assigned_major) {
+      return userProfile.assigned_major;
+    }
+    return 'all';
+  });
+  const [selectedClass, setSelectedClass] = React.useState(() => {
+    if (!isAdmin && userProfile?.role === 'teacher' && userProfile?.assigned_class) {
+      return userProfile.assigned_class;
+    }
+    return 'all';
+  });
+
   const [selectedStudentId, setSelectedStudentId] = React.useState<string | null>(null);
 
   const handleGradeChange = (grade: number) => {

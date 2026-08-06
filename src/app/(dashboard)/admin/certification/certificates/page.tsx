@@ -37,6 +37,8 @@ export default async function CertificateSummaryPage({
       initialSummaries={summaries}
       currentGrade={selectedGradeNum}
       isAdmin={profile?.role === 'admin'}
+      userProfile={profile}
     />
   );
+
 }
