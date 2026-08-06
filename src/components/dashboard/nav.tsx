@@ -36,7 +36,8 @@ import {
   CheckCircle2,
   Briefcase,
   CalendarCheck,
-  Award
+  Award,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { logout } from '@/app/login/actions';
@@ -53,10 +54,15 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { setOpenMobile } = useSidebar();
+  const [navigatingHref, setNavigatingHref] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     setMounted(true);
   }, []);
+
+  React.useEffect(() => {
+    setNavigatingHref(null);
+  }, [pathname, searchParams]);
 
   const handleLogout = async () => {
     await logout();
@@ -65,6 +71,12 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
   const closeMobile = () => {
     setOpenMobile(false);
   };
+
+  const handleNavClick = (href: string) => {
+    setNavigatingHref(href);
+    closeMobile();
+  };
+
 
   const userGrade = userProfile?.assigned_grade;
   const isLowerGradeTeacher = userProfile?.role === 'teacher' && (userGrade === 1 || userGrade === 2);
@@ -136,19 +148,26 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
         {/* 대시보드 - 최상단 단일 메뉴 */}
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton 
-              asChild 
-              isActive={pathname === '/dashboard'}
-              className={cn(
-                "h-10 px-3",
-                pathname === '/dashboard' ? "bg-blue-50 text-blue-600 hover:bg-blue-50 hover:text-blue-600" : ""
-              )}
-            >
-              <Link href="/dashboard" onClick={closeMobile}>
-                <LayoutDashboard className={cn("mr-2 h-4 w-4", pathname === '/dashboard' ? "text-blue-600" : "")} />
-                <span className="font-bold">대시보드</span>
-              </Link>
-            </SidebarMenuButton>
+            {(() => {
+              const isDashNav = navigatingHref === '/dashboard';
+              const isDashActive = isDashNav || (navigatingHref === null && pathname === '/dashboard');
+              return (
+                <SidebarMenuButton 
+                  asChild 
+                  isActive={isDashActive}
+                  className={cn(
+                    "h-10 px-3",
+                    isDashActive ? "bg-blue-50 text-blue-600 hover:bg-blue-50 hover:text-blue-600" : ""
+                  )}
+                >
+                  <Link href="/dashboard" onClick={() => handleNavClick('/dashboard')}>
+                    <LayoutDashboard className={cn("mr-2 h-4 w-4 flex-shrink-0", isDashActive ? "text-blue-600" : "")} />
+                    <span className="font-bold flex-1">대시보드</span>
+                    {isDashNav && <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin text-blue-600 shrink-0" />}
+                  </Link>
+                </SidebarMenuButton>
+              );
+            })()}
           </SidebarMenuItem>
         </SidebarMenu>
 
@@ -156,7 +175,8 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
         {groups.map((group) => {
           if ((group as any).isSingle) {
             const item = group.items[0];
-            const isActive = pathname === item.href;
+            const isItemNav = navigatingHref === item.href;
+            const isActive = isItemNav || (navigatingHref === null && pathname === item.href);
             return (
               <SidebarMenu key={group.title}>
                 <SidebarMenuItem>
@@ -168,9 +188,10 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
                       isActive ? "bg-blue-50 text-blue-600 hover:bg-blue-50 hover:text-blue-600" : ""
                     )}
                   >
-                    <Link href={item.href} onClick={closeMobile}>
-                      <group.icon className={cn("mr-2 h-4 w-4", isActive ? "text-blue-600" : "")} />
-                      <span className="font-bold">{group.title}</span>
+                    <Link href={item.href} onClick={() => handleNavClick(item.href)}>
+                      <group.icon className={cn("mr-2 h-4 w-4 flex-shrink-0", isActive ? "text-blue-600" : "")} />
+                      <span className="font-bold flex-1">{group.title}</span>
+                      {isItemNav && <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin text-blue-600 shrink-0" />}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -179,6 +200,7 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
           }
 
           const isAnyItemActive = group.items.some(item => {
+            if (navigatingHref === item.href) return true;
             const [path, query] = item.href.split('?');
             const matchPath = pathname === path;
             if (!matchPath) return false;
@@ -202,10 +224,10 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
                     <SidebarMenuButton 
                       className={cn(
                         "h-10 px-3 text-slate-500 hover:text-slate-900 transition-colors",
-                        isAnyItemActive && "text-slate-900"
+                        isAnyItemActive && "text-slate-900 font-bold"
                       )}
                     >
-                      <group.icon className="mr-2 h-4 w-4" />
+                      <group.icon className="mr-2 h-4 w-4 flex-shrink-0" />
                       <span className="font-bold">{group.title}</span>
                       <ChevronRight className="ml-auto h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                     </SidebarMenuButton>
@@ -213,7 +235,8 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
                   <CollapsibleContent>
                     <SidebarMenuSub className="ml-4 border-l border-slate-100 pl-2">
                       {group.items.map((item) => {
-                        const isSubActive = (() => {
+                        const isNavThis = navigatingHref === item.href;
+                        const isSubActive = isNavThis || (navigatingHref === null && (() => {
                           const [path, query] = item.href.split('?');
                           const matchPath = pathname === path;
                           if (!matchPath) return false;
@@ -222,7 +245,7 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
                             return searchParams.get('tab') === tabVal || (!searchParams.get('tab') && tabVal === 'grades');
                           }
                           return true;
-                        })();
+                        })());
 
                         return (
                           <SidebarMenuSubItem key={item.href}>
@@ -234,9 +257,10 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
                                 isSubActive ? "text-blue-600 font-bold bg-blue-50/50" : "text-slate-500 hover:text-slate-800"
                               )}
                             >
-                              <Link href={item.href} onClick={closeMobile}>
-                                <item.icon className="mr-2 h-3.5 w-3.5" />
-                                <span>{item.label}</span>
+                              <Link href={item.href} onClick={() => handleNavClick(item.href)}>
+                                <item.icon className="mr-2 h-3.5 w-3.5 flex-shrink-0" />
+                                <span className="flex-1">{item.label}</span>
+                                {isNavThis && <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin text-blue-600 shrink-0" />}
                               </Link>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
@@ -249,6 +273,7 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
             </Collapsible>
           );
         })}
+
       </SidebarContent>
       <SidebarFooter className="p-2 border-t border-slate-50">
         <Button 

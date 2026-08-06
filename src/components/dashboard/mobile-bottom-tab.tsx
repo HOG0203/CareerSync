@@ -13,9 +13,18 @@ import {
 import { cn } from '@/lib/utils';
 import { useSidebar } from '@/components/ui/sidebar';
 
+import * as React from 'react';
+import { Loader2 } from 'lucide-react';
+
 export function MobileBottomTab({ isAdmin = false, role, userGrade }: { isAdmin?: boolean; role?: string; userGrade?: number }) {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
+  const [navigatingHref, setNavigatingHref] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setNavigatingHref(null);
+  }, [pathname]);
+
   const isLowerGradeTeacher = role === 'teacher' && (userGrade === 1 || userGrade === 2);
 
   // 담임 선생님(teacher)과 관리자(admin)의 하단 탭 구성을 다르게 설정
@@ -39,25 +48,33 @@ export function MobileBottomTab({ isAdmin = false, role, userGrade }: { isAdmin?
         { href: '/company-info', label: '업체정보', icon: Factory },
         { href: '/students', label: '취업데이터', icon: ClipboardList },
       ];
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around h-16 bg-white border-t border-slate-100 pb-safe shadow-[0_-4px_12px_rgba(0,0,0,0.05)] lg:hidden px-2">
       {tabs.map((tab) => {
-        const isActive = pathname === tab.href;
+        const isNav = navigatingHref === tab.href;
+        const isActive = isNav || (navigatingHref === null && pathname === tab.href);
         return (
           <Link
             key={tab.href}
             href={tab.href}
+            onClick={() => setNavigatingHref(tab.href)}
             className={cn(
               "flex flex-col items-center justify-center min-w-[56px] flex-1 h-full gap-1 transition-all relative shrink-0",
-              isActive ? "text-indigo-600" : "text-slate-400"
+              isActive ? "text-indigo-600 font-bold" : "text-slate-400"
             )}
           >
-            <tab.icon className={cn("h-5 w-5", isActive ? "stroke-[2.5px]" : "stroke-2")} />
+            {isNav ? (
+              <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
+            ) : (
+              <tab.icon className={cn("h-5 w-5", isActive ? "stroke-[2.5px]" : "stroke-2")} />
+            )}
             <span className="text-[9px] font-bold tracking-tighter">{tab.label}</span>
             {isActive && <div className="absolute bottom-0 w-8 h-1 bg-indigo-600 rounded-t-full animate-in fade-in zoom-in-95 duration-200" />}
           </Link>
         );
       })}
+
       
       {/* 전체 메뉴 버튼 (서랍 열기) */}
       <button
