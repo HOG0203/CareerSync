@@ -153,6 +153,35 @@ export async function getFilteredStudentData(graduationYear: string, baseYear?: 
   });
 }
 
+/**
+ * [캐싱] 취업상세현황 필터링 학생 데이터 서버 메모리 캐싱
+ */
+export async function getCachedFilteredStudentData(graduationYear: string, baseYear?: number): Promise<StudentEmploymentData[]> {
+  return unstable_cache(
+    async () => getFilteredStudentData(graduationYear, baseYear),
+    [`filtered-student-data-${graduationYear}-${baseYear || 2026}`],
+    {
+      revalidate: 3600,
+      tags: [`emp-status-${graduationYear}`, 'students']
+    }
+  )();
+}
+
+/**
+ * [캐싱] 졸업연도 목록 서버 메모리 캐싱
+ */
+export async function getCachedGraduationYears(): Promise<number[]> {
+  return unstable_cache(
+    async () => getGraduationYears(),
+    ['graduation-years'],
+    {
+      revalidate: 86400,
+      tags: ['students']
+    }
+  )();
+}
+
+
 export async function getAssignedStudentDetails(major: string, classInfo: string, graduationYear: number, baseYear?: number) {
   const supabase = await createClient();
   
@@ -220,6 +249,22 @@ export async function getAssignedStudentDetails(major: string, classInfo: string
     };
   }).sort((a, b) => (a.student_number || '').localeCompare(b.student_number || '', undefined, { numeric: true }));
 }
+
+
+/**
+ * [캐싱] 특정 학과/반 학생 상세 데이터 서버 메모리 캐싱
+ */
+export async function getCachedAssignedStudentDetails(major: string, classInfo: string, graduationYear: number, baseYear?: number) {
+  return unstable_cache(
+    async () => getAssignedStudentDetails(major, classInfo, graduationYear, baseYear),
+    [`assigned-student-details-${major}-${classInfo}-${graduationYear}-${baseYear || 2026}`],
+    {
+      revalidate: 3600,
+      tags: [`class-students-${graduationYear}-${major}-${classInfo}`, 'students']
+    }
+  )();
+}
+
 
 export async function getStudentEmploymentData(id: string): Promise<StudentEmploymentData | null> {
   const supabase = await createClient();

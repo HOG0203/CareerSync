@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import { getFilteredStudentData, getGraduationYears, StudentEmploymentData, getYearlyRankingsSummary, getCurrentUserProfile } from '@/lib/data';
+import { getCachedFilteredStudentData, getCachedGraduationYears, StudentEmploymentData, getCurrentUserProfile } from '@/lib/data';
 import EmploymentStatusFilters from './employment-status-filters';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { Grid3X3 } from 'lucide-react';
@@ -19,8 +19,6 @@ export async function generateMetadata({
   };
 }
 
-// ... (getCompanyTypeVariant, getShortClassName, MAJOR_MAP, SORT_ORDER remain same)
-
 export const dynamic = 'force-dynamic';
 
 export default async function EmploymentStatusPage({
@@ -31,7 +29,7 @@ export default async function EmploymentStatusPage({
   const params = await searchParams;
 
   const [graduationYears, settings, userProfile] = await Promise.all([
-    getGraduationYears(),
+    getCachedGraduationYears(),
     getSystemSettings(),
     getCurrentUserProfile()
   ]);
@@ -48,7 +46,8 @@ export default async function EmploymentStatusPage({
   const calculatedGradYear = (ay + (4 - grade)).toString();
   const selectedYear = params.year || calculatedGradYear;
 
-  const allData = await getFilteredStudentData(selectedYear, ay);
+  const allData = await getCachedFilteredStudentData(selectedYear, ay);
+
 
   const displayAY = ay;
 

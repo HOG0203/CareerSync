@@ -167,22 +167,33 @@ export async function getMasterCertificates(): Promise<MasterCertificate[]> {
 }
 
 /**
+ * [캐싱] 마스터 자격증 목록 서버 메모리 캐싱
+ */
+export async function getCachedMasterCertificates(): Promise<MasterCertificate[]> {
+  return unstable_cache(
+    async () => getMasterCertificates(),
+    ['master-certificates-list'],
+    {
+      revalidate: 86400,
+      tags: ['settings', 'master-certificates']
+    }
+  )();
+}
+
+/**
  * 마스터 자격증 목록 저장
  */
 export async function updateMasterCertificates(certificates: MasterCertificate[]) {
   const supabase = await createClient()
 
   try {
-    // 트랜잭션 대신 기존 데이터를 삭제하고 다시 삽입하는 방식 (또는 upsert 활용)
-    // 1. 기존 데이터 삭제
     const { error: deleteError } = await supabase
       .from('master_certificates')
       .delete()
-      .neq('name', '___dummy___') // 전체 삭제를 위한 트릭
+      .neq('name', '')
 
     if (deleteError) throw deleteError
 
-    // 2. 새 데이터 삽입
     if (certificates.length > 0) {
       const { error: insertError } = await supabase
         .from('master_certificates')
@@ -194,6 +205,7 @@ export async function updateMasterCertificates(certificates: MasterCertificate[]
       if (insertError) throw insertError
     }
 
+    revalidateTag('master-certificates');
     revalidatePath('/admin/settings')
     return { success: true }
   } catch (error: any) {

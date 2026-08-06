@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { getAssignedStudentDetails, getGraduationYears, getFilteredStudentData, MAJOR_SORT_ORDER, getYearlyRankingsSummary, getCurrentUserProfile } from '@/lib/data';
+import { getCachedAssignedStudentDetails, getCachedGraduationYears, getCachedFilteredStudentData, MAJOR_SORT_ORDER, getCurrentUserProfile } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -10,7 +10,7 @@ import {
 import { ClassTable } from './class-table';
 import { ShieldAlert, Users } from 'lucide-react';
 import AdminClassSelector from './admin-class-selector';
-import { getMasterCertificates, getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
+import { getCachedMasterCertificates, getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { Suspense } from 'react';
 import { TableLoadingSkeleton } from '@/components/dashboard/loading-skeleton';
 
@@ -44,11 +44,11 @@ async function ClassManagementPageContent({
   const params = searchParams;
   const supabase = await createClient();
   
-  // 1. 기반 공통 데이터 병렬 패칭
+  // 1. 기반 공통 데이터 병렬 패칭 (캐시 적용)
   const [settings, graduationYears, masterCertificates, userProfile] = await Promise.all([
     getSystemSettings(),
-    getGraduationYears(),
-    getMasterCertificates(),
+    getCachedGraduationYears(),
+    getCachedMasterCertificates(),
     getCurrentUserProfile()
   ]);
 
@@ -108,30 +108,27 @@ async function ClassManagementPageContent({
   // 3. 학년 옵션 계산 (졸업연도 목록 기반 역산)
   const availableGradesSet = new Set<number>();
   const gradeToYearMap = new Map<number, number>();
-  
-  [1, 2, 3].forEach(g => {
-    const y = settings.baseYear + (4 - g);
-    gradeToYearMap.set(g, y);
+
+  graduationYears.forEach(gradYear => {
+    const calculatedGrade = 4 - (gradYear - settings.baseYear);
+    if (calculatedGrade >= 1 && calculatedGrade <= 3) {
+      availableGradesSet.add(calculatedGrade);
+      gradeToYearMap.set(calculatedGrade, gradYear);
+    }
   });
 
-  for (const year of graduationYears) {
-    for (const [g, y] of gradeToYearMap.entries()) {
-      if (year === y) availableGradesSet.add(g);
-    }
-  }
   const availableGrades = Array.from(availableGradesSet).sort((a, b) => b - a);
-
-  // --- 권한별 타겟 정보 결정 ---
+  const defaultGrade = userProfile?.assigned_grade || (availableGrades.includes(3) ? 3 : availableGrades[0] || 3);
   const selectedGrade = isAdmin 
-    ? (params.grade ? parseInt(params.grade) : (availableGrades.includes(3) ? 3 : (availableGrades[0] || 3)))
-    : (userProfile?.assigned_grade || 3);
-  
+    ? (params.grade ? parseInt(params.grade) : defaultGrade)
+    : defaultGrade;
+
   const calculatedYear = isAdmin 
-    ? settings.baseYear + (4 - selectedGrade)
+    ? (gradeToYearMap.get(selectedGrade) || settings.baseYear + (4 - selectedGrade))
     : (userProfile?.assigned_year || settings.baseYear + (4 - selectedGrade));
 
-  // 4. 해당 학년의 전체 데이터만 DB에서 직접 필터링하여 패칭
-  const allBaseData = await getFilteredStudentData(calculatedYear.toString());
+  // 4. 해당 학년의 전체 데이터만 DB에서 직접 필터링하여 패칭 (캐시 적용)
+  const allBaseData = await getCachedFilteredStudentData(calculatedYear.toString());
 
   // 학과 및 반 추출
   const availableMajorsSet = new Set<string>();
@@ -163,12 +160,12 @@ async function ClassManagementPageContent({
     ? (params.class && availableClasses.includes(params.class) ? params.class : (availableClasses[0] || null))
     : (userProfile?.assigned_class || null);
 
-  // --- 학생 상세 데이터 패칭 ---
+  // --- 학생 상세 데이터 패칭 (캐시 적용) ---
   const isViewable = !!(targetMajor && targetClass);
   let studentData: any[] = [];
 
   if (isViewable) {
-    studentData = await getAssignedStudentDetails(targetMajor!, targetClass!, calculatedYear);
+    studentData = await getCachedAssignedStudentDetails(targetMajor!, targetClass!, calculatedYear);
   }
 
   const displayClass = targetClass && !targetClass.includes('-') ? `${selectedGrade}-${targetClass}` : targetClass;

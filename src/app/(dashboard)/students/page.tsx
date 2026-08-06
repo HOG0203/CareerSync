@@ -5,11 +5,11 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { getFilteredStudentData, getGraduationYears, MAJOR_SORT_ORDER, getYearlyRankingsSummary, getCurrentUserProfile } from '@/lib/data';
+import { getCachedFilteredStudentData, getCachedGraduationYears, MAJOR_SORT_ORDER, getCachedYearlyRankingsSummary, getCurrentUserProfile } from '@/lib/data';
 import { Users } from 'lucide-react';
 import { StudentTable } from './student-table';
 import { redirect } from 'next/navigation';
-import { getMasterCertificates, getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
+import { getCachedMasterCertificates, getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 
 import DashboardFilters from '@/components/dashboard/dashboard-filters';
 import React from 'react';
@@ -23,11 +23,11 @@ export default async function StudentsPage({
 }) {
   const params = await searchParams;
 
-  // 1. 기반 설정 및 사용자 프로필 패칭
+  // 1. 기반 설정 및 사용자 프로필 패칭 (캐시 적용)
   const [settings, graduationYears, masterCertificates, userProfile] = await Promise.all([
     getSystemSettings(),
-    getGraduationYears(),
-    getMasterCertificates(),
+    getCachedGraduationYears(),
+    getCachedMasterCertificates(),
     getCurrentUserProfile()
   ]);
 
@@ -47,11 +47,12 @@ export default async function StudentsPage({
   const defaultGradYear = (settings.baseYear + 1).toString();
   const selectedYear = params.year || calculatedGradYear || defaultGradYear;
 
-  // 2. 타겟 데이터 및 랭킹 요약 패칭
+  // 2. 타겟 데이터 및 랭킹 요약 패칭 (캐시 적용)
   const [rawStudentData, rankingMap] = await Promise.all([
-    getFilteredStudentData(selectedYear),
-    getYearlyRankingsSummary(parseInt(selectedYear), settings.baseYear)
+    getCachedFilteredStudentData(selectedYear),
+    getCachedYearlyRankingsSummary(parseInt(selectedYear), settings.baseYear)
   ]);
+
   
   let allStudentData = rawStudentData;
 
