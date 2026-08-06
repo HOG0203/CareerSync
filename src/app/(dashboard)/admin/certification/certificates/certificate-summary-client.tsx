@@ -63,14 +63,26 @@ export function CertificateSummaryClient({
   const PAGE_SIZE = 50;
   const { toast } = useToast();
 
+  const [pendingGrade, setPendingGrade] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    setPendingGrade(null);
+  }, [currentGrade]);
+
   // 학년 변경 시 URL 업데이트 (서버 리로딩 유도)
   const handleGradeChange = (grade: number) => {
+    if (grade === currentGrade) return;
+    setPendingGrade(grade);
     const params = new URLSearchParams(searchParams.toString());
     params.set('grade', grade.toString());
     startTransition(() => {
       router.push(`/admin/certification/certificates?${params.toString()}`);
     });
   };
+
+  const activeGrade = pendingGrade !== null ? pendingGrade : currentGrade;
+  const showSkeleton = isPending || (pendingGrade !== null && pendingGrade !== currentGrade);
+
 
 
   // 클라이언트 사이드 필터링 (학과, 반, 검색어)
@@ -222,15 +234,17 @@ export function CertificateSummaryClient({
             {[1, 2, 3].map(g => (
               <Button 
                 key={g} 
-                variant={currentGrade === g ? 'secondary' : 'ghost'} 
+                variant={activeGrade === g ? 'secondary' : 'ghost'} 
                 size="sm" 
                 onClick={() => handleGradeChange(g)} 
-                className={cn("h-7 sm:h-8 px-2.5 sm:px-3 text-xs font-black", currentGrade === g && "text-indigo-600 bg-indigo-50")}
+                className={cn("h-7 sm:h-8 px-2.5 sm:px-3 text-xs font-black items-center gap-1", activeGrade === g && "text-indigo-600 bg-indigo-50")}
               >
                 {g}학년
+                {pendingGrade === g && <Loader2 className="h-3 w-3 animate-spin text-indigo-600" />}
               </Button>
             ))}
           </div>
+
 
           {/* 학과 필터 */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar max-w-full">
@@ -286,9 +300,10 @@ export function CertificateSummaryClient({
       </div>
 
       {/* 로딩 시 하단 데이터 영역만 회전 로더 스켈레톤 전환 */}
-      {isPending ? (
+      {showSkeleton ? (
         <CertificationDataSkeleton />
       ) : (
+
         <>
 
           {/* 데스크톱: 테이블 뷰 (md 이상) */}

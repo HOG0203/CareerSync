@@ -9,7 +9,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { X, Calendar, GraduationCap, Building2, LayoutGrid, ListFilter, Search } from 'lucide-react';
+import { X, Calendar, GraduationCap, Building2, LayoutGrid, ListFilter, Search, Loader2 } from 'lucide-react';
+
 import * as React from 'react';
 
 interface FilterOption {
@@ -90,6 +91,8 @@ export default function DashboardFilters({
     setSelectedStatus('all');
   };
 
+  const [isPending, startTransition] = React.useTransition();
+
   const handleSearch = () => {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('dashboard-loading'));
@@ -106,8 +109,11 @@ export default function DashboardFilters({
     params.set('class', selectedClass);
     params.set('status', selectedStatus);
     
-    router.push(`${baseUrl}?${params.toString()}`);
+    startTransition(() => {
+      router.push(`${baseUrl}?${params.toString()}`);
+    });
   };
+
 
   const academicYears = React.useMemo(() => {
     const years = new Set<number>();
@@ -238,11 +244,13 @@ export default function DashboardFilters({
       
       <Button 
         onClick={handleSearch}
+        disabled={isPending}
         className="h-9 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-sm transition-all active:scale-95 shrink-0"
       >
-        <Search className="h-3.5 w-3.5" />
+        {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
         조회
       </Button>
+
       
       {hasActiveFilters && (
         <Button variant="ghost" size="sm" onClick={resetFilters} className="h-9 px-2 text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50">

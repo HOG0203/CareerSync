@@ -10,8 +10,10 @@ import {
   GraduationCap,
   User,
   ChevronRight,
-  ClipboardList
+  ClipboardList,
+  Loader2
 } from 'lucide-react';
+
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -88,14 +90,25 @@ export function AttendanceTableClient({
   });
 
   const [selectedStudentId, setSelectedStudentId] = React.useState<string | null>(null);
+  const [pendingGrade, setPendingGrade] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    setPendingGrade(null);
+  }, [currentGrade]);
 
   const handleGradeChange = (grade: number) => {
+    if (grade === currentGrade) return;
+    setPendingGrade(grade);
     const params = new URLSearchParams(searchParams.toString());
     params.set('grade', grade.toString());
     startTransition(() => {
       router.push(`/admin/certification/attendance?${params.toString()}`);
     });
   };
+
+  const activeGrade = pendingGrade !== null ? pendingGrade : currentGrade;
+  const showSkeleton = isPending || (pendingGrade !== null && pendingGrade !== currentGrade);
+
 
   // 학생별 데이터 그룹화 및 필터링
   const studentGroups = React.useMemo(() => {
@@ -239,15 +252,17 @@ export function AttendanceTableClient({
             {[1, 2, 3].map(g => (
               <Button 
                 key={g} 
-                variant={currentGrade === g ? "secondary" : "ghost"}
+                variant={activeGrade === g ? "secondary" : "ghost"}
                 size="sm"
                 onClick={() => handleGradeChange(g)}
-                className={cn("h-7 sm:h-8 px-2.5 sm:px-4 text-xs font-black rounded-lg", currentGrade === g && "bg-white shadow-sm text-indigo-600")}
+                className={cn("h-7 sm:h-8 px-2.5 sm:px-4 text-xs font-black rounded-lg items-center gap-1", activeGrade === g && "bg-white shadow-sm text-indigo-600")}
               >
                 {g}학년
+                {pendingGrade === g && <Loader2 className="h-3 w-3 animate-spin text-indigo-600" />}
               </Button>
             ))}
           </div>
+
 
           {/* 학과 필터 */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar max-w-full">
@@ -292,9 +307,10 @@ export function AttendanceTableClient({
       </div>
 
       {/* 로딩 시 하단 데이터 영역만 회전 로더 스켈레톤 전환 */}
-      {isPending ? (
+      {showSkeleton ? (
         <CertificationDataSkeleton />
       ) : (
+
         <>
 
           {/* 출결 카드 목록 영역 */}

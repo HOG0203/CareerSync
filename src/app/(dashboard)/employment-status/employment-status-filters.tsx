@@ -9,7 +9,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Calendar, GraduationCap, Search } from 'lucide-react';
+import { Calendar, GraduationCap, Search, Loader2 } from 'lucide-react';
+
 import * as React from 'react';
 
 interface EmploymentStatusFiltersProps {
@@ -45,6 +46,8 @@ export default function EmploymentStatusFilters({ graduationYears, defaultYear, 
     return Array.from(years).sort((a, b) => b - a);
   }, [graduationYears, baseYear]);
 
+  const [isPending, startTransition] = React.useTransition();
+
   const handleSearch = () => {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('employment-status-loading'));
@@ -57,7 +60,10 @@ export default function EmploymentStatusFilters({ graduationYears, defaultYear, 
     params.set('ay', selectedAY);
     params.set('grade', selectedGrade);
     params.set('year', gradYear.toString());
-    router.push(`/employment-status?${params.toString()}`);
+
+    startTransition(() => {
+      router.push(`/employment-status?${params.toString()}`);
+    });
   };
 
   return (
@@ -95,11 +101,13 @@ export default function EmploymentStatusFilters({ graduationYears, defaultYear, 
       {/* 조회 버튼 */}
       <Button 
         onClick={handleSearch}
+        disabled={isPending}
         className="h-8 px-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold flex items-center gap-1 shadow-sm transition-all"
       >
-        <Search className="h-3.5 w-3.5" />
+        {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
         조회
       </Button>
     </div>
   );
 }
+

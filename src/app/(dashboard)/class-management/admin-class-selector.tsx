@@ -73,14 +73,19 @@ export default function AdminClassSelector({
     }
   };
 
+  const [isPending, startTransition] = React.useTransition();
+
   const handleSearch = () => {
     setIsLoading(true);
     const params = new URLSearchParams();
     params.set('grade', selectedGrade);
     params.set('major', selectedMajor);
     params.set('class', selectedClass);
-    router.push(`/class-management?${params.toString()}`);
+    startTransition(() => {
+      router.push(`/class-management?${params.toString()}`);
+    });
   };
+
 
   // 현재 선택된 학년 기준의 학과 목록
   const currentMajors = React.useMemo(() => {
@@ -144,10 +149,10 @@ export default function AdminClassSelector({
       {isAdmin && (
         <Button
           onClick={handleSearch}
-          disabled={isLoading}
+          disabled={isLoading || isPending}
           className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md transition-all active:scale-95 shrink-0"
         >
-          {isLoading ? (
+          {isLoading || isPending ? (
             <>
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               조회 중...
@@ -160,6 +165,7 @@ export default function AdminClassSelector({
           )}
         </Button>
       )}
+
       
       <div className="ml-auto flex items-center gap-4">
         {isAdmin ? (
