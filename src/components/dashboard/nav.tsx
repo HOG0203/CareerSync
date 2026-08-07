@@ -37,7 +37,8 @@ import {
   Briefcase,
   CalendarCheck,
   Award,
-  Loader2
+  Loader2,
+  History
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { logout } from '@/app/login/actions';
@@ -116,6 +117,7 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
         icon: Settings,
         items: [
           { href: '/admin/users', label: '사용자 관리', icon: UserCog },
+          { href: '/admin/audit-logs', label: '작업 이력 관리', icon: History },
           { href: '/admin/settings', label: '시스템 설정', icon: ShieldCheck },
         ]
       }

@@ -112,28 +112,49 @@ export async function updateCertificationConfig(config: CertificationConfig) {
 }
 
 /**
- * 시스템 설정 저장
+ * 시스템 설정 저장 (baseYear 변경 시 전년도 자동 스냅샷 백업 및 Audit Log 기록)
  */
 export async function updateSystemSettings(settings: { baseYear: number }) {
-  const supabase = await createClient()
+  const supabase = createAdminClient();
 
   try {
+    // 기존 기준년도 확인
+    const currentSettings = await getSystemSettings();
+    const oldBaseYear = currentSettings.baseYear;
+
+    // 만약 학사학년도가 변경되면 변경 전 학년도 데이터 자동 스냅샷 백업 수행
+    if (oldBaseYear !== settings.baseYear) {
+      const { createAcademicHistorySnapshot } = await import('@/lib/academic-snapshots');
+      await createAcademicHistorySnapshot({
+        baseYear: oldBaseYear,
+        snapshotName: `${oldBaseYear}학년도 학적 최종 마감 자동 스냅샷`
+      });
+    }
+
     const { error } = await supabase
       .from('system_settings')
       .upsert({ 
         key: 'base_year', 
         value: { year: settings.baseYear },
         updated_at: new Date().toISOString()
-      })
+      });
 
-    if (error) throw error
+    if (error) throw error;
     
-    revalidateTag('settings')
-    revalidatePath('/', 'layout')
-    return { success: true }
+    // Audit Log 기록
+    const { logAuditAction } = await import('@/lib/audit-logger');
+    await logAuditAction({
+      action_type: 'SYSTEM_SETTING_UPDATE',
+      target_name: '학사학년도 설정',
+      details: { oldBaseYear, newBaseYear: settings.baseYear }
+    });
+
+    revalidateTag('settings');
+    revalidatePath('/', 'layout');
+    return { success: true, snapshotCreated: oldBaseYear !== settings.baseYear };
   } catch (error: any) {
-    console.error('Error updating settings in database:', error)
-    return { error: error.message }
+    console.error('Error updating settings in database:', error);
+    return { error: error.message };
   }
 }
 

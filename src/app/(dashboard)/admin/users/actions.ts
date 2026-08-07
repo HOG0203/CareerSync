@@ -84,6 +84,13 @@ export async function createUser(formData: FormData) {
     return { error: `프로필 설정 실패: ${profileError.message}` }
   }
 
+  const { logAuditAction } = await import('@/lib/audit-logger');
+  await logAuditAction({
+    action_type: 'USER_CREATE',
+    target_name: `${trimmedFullName} (${trimmedUsername})`,
+    details: { role, username: trimmedUsername }
+  });
+
   revalidateTag('profiles')
   revalidateTag('teachers')
   revalidatePath('/admin/users')
@@ -239,6 +246,13 @@ export async function updateAssignedClass(userId: string, data: { year: number |
   if (error) {
     return { error: error.message }
   }
+
+  const { logAuditAction } = await import('@/lib/audit-logger');
+  await logAuditAction({
+    action_type: 'HOMEROOM_ASSIGN',
+    target_name: `담임 배정 변경 (${data.grade ? `${data.grade}학년 ` : ''}${data.major || ''} ${data.className ? `${data.className}반` : ''})`,
+    details: { userId, ...data }
+  });
 
   revalidateTag('profiles');
   revalidateTag('teachers');
