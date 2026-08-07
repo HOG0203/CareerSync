@@ -39,8 +39,13 @@ const VIVID_COLORS = [
 
 const COURSE_ORDER = [
   '청솔반', '취업맞춤반', '중견기업반', '반도체아카데미반', '혁신인재반', '부사관반', '일학습병행', '계약학과', '도제반', '아우스빌둥', 
-  '일반취업', '기술사관', '군특성화', '운동부', '진학', '기타(직접입력)'
+  '일반취업', '기술사관', '군특성화', '운동부', '4년제대학', '전문대학', '진학', '미용', '기타(직접입력)'
 ];
+
+const getStudentCourse = (student: StudentEmploymentData) => {
+  const c = student.career_course?.trim() || student.employment_status?.trim();
+  return c || '미설정';
+};
 
 export default function SpecificCourseChart({ 
   data, 
@@ -56,8 +61,7 @@ export default function SpecificCourseChart({
   // 1. 도넛 차트용 전체 집계 데이터
   const formattedPieData = React.useMemo(() => {
     const counts = data.reduce((acc, student) => {
-      // /students 페이지의 career_course(진로코스) 필드를 직접 참조
-      const course = student.career_course || '미설정';
+      const course = getStudentCourse(student);
       acc[course] = (acc[course] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -71,6 +75,8 @@ export default function SpecificCourseChart({
         const indexA = COURSE_ORDER.indexOf(a.name);
         const indexB = COURSE_ORDER.indexOf(b.name);
         if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+        if (indexA !== -1) return -1;
+        if (indexB !== -1) return 1;
         return b.value - a.value;
       });
   }, [data]);
@@ -80,14 +86,16 @@ export default function SpecificCourseChart({
     const isFiltered = selectedMajor !== 'all';
     const groupKey = isFiltered ? 'class_info' : 'major';
     
-    const existingCourses = Array.from(new Set(data.map(s => s.career_course || '미설정')))
-      .filter(c => data.some(s => (s.career_course || '미설정') === c))
+    const existingCourses = Array.from(new Set(data.map(s => getStudentCourse(s))))
+      .filter(c => data.some(s => getStudentCourse(s) === c))
       .sort((a, b) => {
         if (a === '미설정') return 1;
         if (b === '미설정') return -1;
         const indexA = COURSE_ORDER.indexOf(a);
         const indexB = COURSE_ORDER.indexOf(b);
         if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+        if (indexA !== -1) return -1;
+        if (indexB !== -1) return 1;
         return a.localeCompare(b, 'ko');
       });
 
@@ -105,7 +113,7 @@ export default function SpecificCourseChart({
             const groupStudents = data.filter((s: any) => s[groupKey] === group);
             const row: any = { group };
             existingCourses.forEach(course => {
-                row[course] = groupStudents.filter(s => (s.career_course || '미설정') === course).length;
+                row[course] = groupStudents.filter(s => getStudentCourse(s) === course).length;
             });
             return row;
         }),
@@ -115,21 +123,25 @@ export default function SpecificCourseChart({
 
   const chartConfig = React.useMemo(() => {
     const config: ChartConfig = { value: { label: '학생 수' } };
-    const activeCourses = Array.from(new Set(data.map(s => s.career_course || '미설정')))
+    const activeCourses = Array.from(new Set(data.map(s => getStudentCourse(s))))
       .sort((a, b) => {
         const indexA = COURSE_ORDER.indexOf(a);
         const indexB = COURSE_ORDER.indexOf(b);
         if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+        if (indexA !== -1) return -1;
+        if (indexB !== -1) return 1;
         return 0;
       });
 
-    activeCourses.forEach((opt) => {
-      const globalIdx = COURSE_ORDER.indexOf(opt);
-      const color = opt === '미설정' ? '#cbd5e1' : VIVID_COLORS[globalIdx % VIVID_COLORS.length] || VIVID_COLORS[0];
+    activeCourses.forEach((opt, idx) => {
+      let globalIdx = COURSE_ORDER.indexOf(opt);
+      if (globalIdx === -1) globalIdx = idx + 1;
+      const color = opt === '미설정' ? '#cbd5e1' : VIVID_COLORS[Math.abs(globalIdx) % VIVID_COLORS.length] || VIVID_COLORS[0];
       config[opt] = { label: opt, color };
     });
     return config;
   }, [data]);
+
 
   const titleText = grade === 3 ? '진로코스' : '희망 진로코스';
 
