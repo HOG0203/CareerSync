@@ -121,8 +121,9 @@ const COLUMNS: ColumnConfig[] = [
   },
   { 
     key: 'career_course', 
-    label: '희망\n진로코스', 
+    label: '진로코스', 
     width: 120, 
+
     type: 'select',
     options: (rowData) => GET_SPECIFIC_COURSE_OPTIONS(rowData),
     variant: (val) => {

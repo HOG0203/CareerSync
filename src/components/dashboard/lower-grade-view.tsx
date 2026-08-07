@@ -91,7 +91,8 @@ export default function LowerGradeView({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 min-w-0 overflow-hidden">
          <CareerAspirationChart data={filteredData} grade={grade} selectedMajor={selectedMajor} />
          <CareerCourseChart data={filteredData} grade={grade} selectedMajor={selectedMajor} />
-         <SpecificCourseChart data={filteredData} selectedMajor={selectedMajor} />
+         <SpecificCourseChart data={filteredData} selectedMajor={selectedMajor} grade={grade} />
+
          <MilitaryStatusChart data={filteredData} selectedMajor={selectedMajor} />
          <CertificateStatusChart 
            data={filteredData} 
