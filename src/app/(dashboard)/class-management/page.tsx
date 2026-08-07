@@ -1,5 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
-import { getCachedAssignedStudentDetails, getCachedGraduationYears, getCachedFilteredStudentData, MAJOR_SORT_ORDER, getCurrentUserProfile } from '@/lib/data';
+import { getCachedAssignedStudentDetails, getCachedGraduationYears, getCachedFilteredStudentData, getCachedClassStructureCombinations, MAJOR_SORT_ORDER, getCurrentUserProfile } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -42,9 +41,8 @@ async function ClassManagementPageContent({
   searchParams: { grade?: string; major?: string; class?: string };
 }) {
   const params = searchParams;
-  const supabase = await createClient();
   
-  // 1. 기반 공통 데이터 병렬 패칭 (캐시 적용)
+  // 1. 기반 공통 데이터 병렬 패칭 (서버 메모리 캐시 적용)
   const [settings, graduationYears, masterCertificates, userProfile] = await Promise.all([
     getSystemSettings(),
     getCachedGraduationYears(),
@@ -56,16 +54,10 @@ async function ClassManagementPageContent({
 
   const isAdmin = userProfile.role === 'admin';
 
-  // 관리자일 경우 학년별 학과 및 반 구조 전체 조회
+  // 관리자일 경우 학년별 학과 및 반 구조 전체 조회 (서버 메모리 캐시 적용)
   let allCombinations: any[] = [];
   if (isAdmin) {
-    const { data: combinations } = await supabase
-      .from('students')
-      .select('graduation_year, major, class_info')
-      .not('graduation_year', 'is', null)
-      .not('major', 'is', null)
-      .not('class_info', 'is', null);
-    if (combinations) allCombinations = combinations;
+    allCombinations = await getCachedClassStructureCombinations();
   }
 
   const classStructure: Record<number, Record<string, string[]>> = {};
@@ -127,8 +119,8 @@ async function ClassManagementPageContent({
     ? (gradeToYearMap.get(selectedGrade) || settings.baseYear + (4 - selectedGrade))
     : (userProfile?.assigned_year || settings.baseYear + (4 - selectedGrade));
 
-  // 4. 해당 학년의 전체 데이터만 DB에서 직접 필터링하여 패칭 (캐시 적용)
-  const allBaseData = await getCachedFilteredStudentData(calculatedYear.toString());
+  // 4. 해당 학년의 전체 데이터만 서버 메모리 캐시로 패칭
+  const allBaseData = await getCachedFilteredStudentData(calculatedYear.toString(), settings.baseYear);
 
   // 학과 및 반 추출
   const availableMajorsSet = new Set<string>();

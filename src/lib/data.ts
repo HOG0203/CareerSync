@@ -577,6 +577,29 @@ export async function getCachedYearlyRankingsSummary(graduationYear: number, bas
 }
 
 /**
+ * [캐싱] 전교 학과 및 반 구조 조합 목록 캐싱 (students 태그 적용)
+ */
+export async function getCachedClassStructureCombinations() {
+  return unstable_cache(
+    async () => {
+      const supabase = createAdminClient();
+      const { data } = await supabase
+        .from('students')
+        .select('graduation_year, major, class_info')
+        .not('graduation_year', 'is', null)
+        .not('major', 'is', null)
+        .not('class_info', 'is', null);
+      return data || [];
+    },
+    ['class-structure-combinations'],
+    {
+      revalidate: 3600,
+      tags: ['students']
+    }
+  )();
+}
+
+/**
  * [캐싱] 담임 교사 프로필 목록 서버 메모리 캐싱 (teachers 태그 적용)
  */
 export async function getCachedTeacherProfiles() {
