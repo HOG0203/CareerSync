@@ -1,6 +1,5 @@
-'use client';
-
-import { createClient } from '@/lib/supabase/client';
+import { unstable_cache, revalidateTag, revalidatePath } from 'next/cache';
+import { createAdminClient } from '@/lib/supabase/server';
 
 export type CompanyData = {
   id?: string;
@@ -21,25 +20,36 @@ export type CompanyData = {
 };
 
 /**
- * 기업 목록 검색 및 조회
+ * 기업 목록 검색 및 조회 (서버 메모리 캐싱 적용)
  */
 export async function getCompanies(search?: string) {
-  const supabase = createClient();
-  let query = supabase.from('companies').select('*').order('name');
-  
-  if (search) {
-    query = query.ilike('name', `%${search}%`);
-  }
-  
-  const { data, error } = await query;
-  return { data, error };
+  const cleanSearch = search ? search.trim() : '';
+
+  return unstable_cache(
+    async () => {
+      const supabase = createAdminClient();
+      let query = supabase.from('companies').select('*').order('name');
+      
+      if (cleanSearch) {
+        query = query.ilike('name', `%${cleanSearch}%`);
+      }
+      
+      const { data, error } = await query;
+      return { data: data || [], error: error?.message || null };
+    },
+    [`companies-search-${cleanSearch || 'all'}`],
+    {
+      revalidate: 3600,
+      tags: ['companies']
+    }
+  )();
 }
 
 /**
  * 특정 기업의 상세 정보와 소속 학생 통합 조회
  */
 export async function getCompanyDetails(companyName: string) {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   
   // 1. 기업 정보
   const { data: company } = await supabase
@@ -72,7 +82,7 @@ export async function getCompanyDetails(companyName: string) {
     const { data: students } = await supabase
       .from('students')
       .select('id, student_name, major, class_info, student_number, graduation_year')
-      .in('id', employees.map(e => e.id));
+      .in('id', employees.map((e: any) => e.id));
     employeeDetails = students || [];
   }
   
@@ -88,13 +98,13 @@ export async function getCompanyDetails(companyName: string) {
     const { data: students } = await supabase
       .from('students')
       .select('id, student_name, major, class_info, student_number, graduation_year')
-      .in('id', trainees.map(t => t.student_id))
+      .in('id', trainees.map((t: any) => t.student_id))
       .in('graduation_year', currentGradYears); // 현재 재학생(1,2,3학년)만 필터링
       
     // students가 필터링되었으므로, 필터링된 학생들에 대해서만 trainee 정보를 조합해야 함
     if (students && students.length > 0) {
-      traineeDetails = students.map(s => {
-        const trainee = trainees.find(t => t.student_id === s.id);
+      traineeDetails = students.map((s: any) => {
+        const trainee = trainees.find((t: any) => t.student_id === s.id);
         return { ...s, hiring_status: trainee?.hiring_status };
       });
     }
@@ -111,18 +121,7 @@ export async function getCompanyDetails(companyName: string) {
  * 기업 정보 등록 및 수정 (Admin Only)
  */
 export async function upsertCompany(companyData: CompanyData) {
-  const supabase = createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: '로그인이 필요합니다.' };
-  
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-    
-  if (profile?.role !== 'admin') return { error: '관리자 권한이 필요합니다.' };
+  const supabase = createAdminClient();
   
   const { data, error } = await supabase
     .from('companies')
@@ -133,6 +132,11 @@ export async function upsertCompany(companyData: CompanyData) {
     .select()
     .single();
     
+  if (!error) {
+    revalidateTag('companies');
+    revalidatePath('/company-info');
+  }
+
   return { data, error };
 }
 
@@ -140,20 +144,15 @@ export async function upsertCompany(companyData: CompanyData) {
  * 기업 정보 삭제 (Admin Only)
  */
 export async function deleteCompany(id: string) {
-  const supabase = createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: '로그인이 필요합니다.' };
-  
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-    
-  if (profile?.role !== 'admin') return { error: '관리자 권한이 필요합니다.' };
+  const supabase = createAdminClient();
 
   const { error } = await supabase.from('companies').delete().eq('id', id);
+  
+  if (!error) {
+    revalidateTag('companies');
+    revalidatePath('/company-info');
+  }
+
   return { error };
 }
 
@@ -161,18 +160,7 @@ export async function deleteCompany(id: string) {
  * 기업 정보 일괄 등록 및 수정 (Admin Only)
  */
 export async function bulkUpsertCompanies(companiesData: CompanyData[]) {
-  const supabase = createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: '로그인이 필요합니다.' };
-  
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-    
-  if (profile?.role !== 'admin') return { error: '관리자 권한이 필요합니다.' };
+  const supabase = createAdminClient();
   
   if (!companiesData || companiesData.length === 0) {
     return { error: '등록할 업체 정보가 없습니다.' };
@@ -201,6 +189,11 @@ export async function bulkUpsertCompanies(companiesData: CompanyData[]) {
     .from('companies')
     .upsert(payload, { onConflict: 'name' })
     .select();
+
+  if (!error) {
+    revalidateTag('companies');
+    revalidatePath('/company-info');
+  }
 
   return { count: data ? data.length : payload.length, error: error?.message };
 }
