@@ -344,11 +344,12 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
             const sampleStudent = students[0];
             const studentMajor = sampleStudent?.major || '';
             const studentClass = sampleStudent?.class_info || '';
-            const studentGrade = sampleStudent?.grade || grade;
+            const targetGrade = grade;
 
-            let teacherName = students.find(s => s.teacher_name)?.teacher_name || '';
+            let teacherName = '';
 
-            if (!teacherName && teacherProfiles && teacherProfiles.length > 0) {
+            // 1. 사용자 관리 DB (profiles)에서 현재 학년/학과/반에 배정된 담임 교사를 최우선 탐색
+            if (teacherProfiles && teacherProfiles.length > 0) {
               const cleanM = (studentMajor || '').replace(/과|공업계/g, '').trim();
               const cleanC = (studentClass || '').replace(/반|학년/g, '').trim();
               const matchedT = teacherProfiles.find(t => {
@@ -356,12 +357,17 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
                 const tClass = (t.assigned_class || '').replace(/반|학년/g, '').trim();
                 const isM = tMajor === cleanM || cleanM.includes(tMajor) || tMajor.includes(cleanM);
                 const isC = tClass === cleanC;
-                const isG = !t.assigned_grade || t.assigned_grade === studentGrade;
+                const isG = t.assigned_grade ? t.assigned_grade === targetGrade : (t.assigned_year ? t.assigned_year === ((baseYear || 2026) + (4 - targetGrade)) : true);
                 return isM && isC && isG;
               });
               if (matchedT) {
                 teacherName = matchedT.username || matchedT.full_name || '';
               }
+            }
+
+            // 2. 만약 profiles DB에 없으면 학생 데이터의 teacher_name 폴백 사용
+            if (!teacherName) {
+              teacherName = students.find(s => s.teacher_name)?.teacher_name || '';
             }
 
             return (
