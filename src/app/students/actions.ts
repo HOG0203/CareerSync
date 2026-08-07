@@ -50,7 +50,7 @@ async function syncAcademicHistory(supabase: any, studentUuid: string, info: any
     const { data: teachers } = await supabase
       .from('profiles')
       .select('username, assigned_major, assigned_class, assigned_grade')
-      .eq('role', 'teacher');
+      .not('assigned_major', 'is', null);
       
     if (teachers) {
       const matchedTeacher = teachers.find((t: any) => {

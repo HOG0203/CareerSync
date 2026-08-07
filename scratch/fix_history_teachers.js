@@ -6,9 +6,9 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-async function fixAcademicHistoryTeachers() {
+async function fixAcademicHistoryTeachersWithAdmins() {
   const [teachersRes, historyRes] = await Promise.all([
-    supabase.from('profiles').select('username, assigned_major, assigned_class, assigned_grade').eq('role', 'teacher'),
+    supabase.from('profiles').select('username, full_name, assigned_major, assigned_class, assigned_grade').not('assigned_major', 'is', null),
     supabase.from('student_academic_history').select('*')
   ]);
 
@@ -27,10 +27,13 @@ async function fixAcademicHistoryTeachers() {
       const tMajor = (t.assigned_major || '').replace(/과|공업계/g, '').trim();
       const tClass = (t.assigned_class || '').replace(/반|학년/g, '').trim();
       const tGrade = t.assigned_grade;
-      return tMajor === cleanMajor && tClass === cleanClass && (tGrade ? tGrade === grade : true);
+      const isMajorMatch = tMajor === cleanMajor || cleanMajor.includes(tMajor) || tMajor.includes(cleanMajor);
+      const isClassMatch = tClass === cleanClass;
+      const isGradeMatch = !tGrade || tGrade === grade;
+      return isMajorMatch && isClassMatch && isGradeMatch;
     });
 
-    const correctTeacherName = matchedTeacher ? matchedTeacher.username : null;
+    const correctTeacherName = matchedTeacher ? (matchedTeacher.username || matchedTeacher.full_name) : null;
 
     if (h.teacher_name !== correctTeacherName) {
       const { error } = await supabase
@@ -42,7 +45,7 @@ async function fixAcademicHistoryTeachers() {
     }
   }
 
-  console.log(`Successfully re-synced ${updatedCount} academic history teacher records!`);
+  console.log(`Successfully re-synced ${updatedCount} academic history teacher records (including Admin teachers)!`);
 }
 
-fixAcademicHistoryTeachers();
+fixAcademicHistoryTeachersWithAdmins();
