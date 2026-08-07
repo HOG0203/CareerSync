@@ -206,6 +206,14 @@ export async function updateStudentField(id: string, field: string, value: any) 
     const { data: student } = await supabase.from('students').select('*').eq('id', id).single();
     if (student) await syncAcademicHistory(supabase, id, student, settings.baseYear);
   }
+
+  const { logAuditAction } = await import('@/lib/audit-logger');
+  await logAuditAction({
+    action_type: 'STUDENT_UPDATE',
+    target_name: `학생 항목 수정 (${field})`,
+    details: { student_id: id, field, value: finalValue }
+  });
+
   revalidatePath('/students'); 
   revalidatePath('/admin/students'); 
   revalidatePath('/class-management');
@@ -222,6 +230,14 @@ export async function bulkUpdateStudentData(updates: { id: string, field: string
     else if (update.value === '' || update.value === 'CLEARED' || (Array.isArray(update.value) && update.value.length === 0)) fv = null;
     await supabase.from(BASIC_INFO_FIELDS.includes(update.field) ? 'students' : 'student_employments').update({ [update.field]: fv, updated_at: new Date().toISOString() }).eq('id', update.id);
   }
+
+  const { logAuditAction } = await import('@/lib/audit-logger');
+  await logAuditAction({
+    action_type: 'STUDENT_BULK_UPDATE',
+    target_name: `학생 데이터 ${updates.length}건 일괄 수정`,
+    details: { count: updates.length }
+  });
+
   revalidatePath('/students'); 
   revalidatePath('/admin/students'); 
   revalidatePath('/class-management');
