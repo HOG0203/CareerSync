@@ -42,9 +42,22 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
     }
   }, [isEditing, config.type, id, field, onSave]);
 
+  const isCommittingRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (!isEditing) {
+      isCommittingRef.current = false;
+    }
+  }, [isEditing]);
+
   const handleCommit = React.useCallback((v: any) => {
+    if (isCommittingRef.current) return;
+    isCommittingRef.current = true;
+
     const finalVal = v === '기타(직접입력)' ? '' : v;
-    if (finalVal !== value) onSave(id, field, finalVal);
+    if (finalVal !== value) {
+      onSave(id, field, finalVal);
+    }
     onEndEdit();
   }, [id, field, value, onSave, onEndEdit]);
 
@@ -56,7 +69,7 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
         return (
           <td className="p-0 border-r border-b relative z-40 bg-white ring-2 ring-blue-500" style={{ width: config.width }}>
             <div className="flex items-center w-full bg-white">
-              <Input autoFocus value={isOtherTrigger ? '' : localValue} onChange={(e) => { setLocalValue(e.target.value); setIsManualInput(true); isManualRef.current = true; }} onBlur={() => handleCommit(localValue)} onKeyDown={(e) => { if(e.key==='Enter') handleCommit(localValue); if(e.key==='Escape') onEndEdit(); }} className="h-8 w-full text-[11px] border-none rounded-none focus-visible:ring-0 px-1 bg-transparent font-medium" placeholder="내용 입력..." />
+              <Input autoFocus value={isOtherTrigger ? '' : localValue} onChange={(e) => { setLocalValue(e.target.value); setIsManualInput(true); isManualRef.current = true; }} onBlur={() => handleCommit(localValue)} onKeyDown={(e) => { if(e.key==='Enter') { e.preventDefault(); e.stopPropagation(); handleCommit(localValue); } if(e.key==='Escape') { e.preventDefault(); e.stopPropagation(); onEndEdit(); } }} className="h-8 w-full text-[11px] border-none rounded-none focus-visible:ring-0 px-1 bg-transparent font-medium" placeholder="내용 입력..." />
               <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-slate-400 hover:text-rose-500" onClick={() => { setLocalValue(''); setIsManualInput(false); isManualRef.current = false; }}><X className="h-3 w-3" /></Button>
             </div>
           </td>
@@ -82,10 +95,11 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
     if (config.type === 'multi-select') return <td className="p-0 border-r border-b relative z-40 bg-white" />;
     return (
       <td className="p-0 border-r border-b relative z-40 bg-white ring-2 ring-blue-500" style={{ width: config.width }}>
-        <Input autoFocus value={localValue} onChange={(e) => setLocalValue(e.target.value)} onBlur={() => handleCommit(localValue)} onKeyDown={(e) => { if(e.key==='Enter') handleCommit(localValue); if(e.key==='Escape') onEndEdit(); }} className="h-8 w-full text-[11px] border-none rounded-none focus-visible:ring-0 px-1 bg-transparent font-medium" />
+        <Input autoFocus value={localValue} onChange={(e) => setLocalValue(e.target.value)} onBlur={() => handleCommit(localValue)} onKeyDown={(e) => { if(e.key==='Enter') { e.preventDefault(); e.stopPropagation(); handleCommit(localValue); } if(e.key==='Escape') { e.preventDefault(); e.stopPropagation(); onEndEdit(); } }} className="h-8 w-full text-[11px] border-none rounded-none focus-visible:ring-0 px-1 bg-transparent font-medium" />
       </td>
     )
   }
+
 
   return (
     <td

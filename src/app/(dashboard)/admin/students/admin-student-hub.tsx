@@ -108,7 +108,13 @@ export function AdminStudentHub({
     setSelectedRowIds([])
   }, [params.year, params.major, params.class, params.status])
 
+  const pendingSaveRef = React.useRef<PendingSaveRequest | null>(null);
+
   const handleSave = (id: string, field: string, value: any) => {
+    if (pendingSaveRef.current) {
+      return Promise.resolve({ success: false });
+    }
+
     const student = processedData.find(s => s.id === id);
     const studentName = student?.student_name || '선택한 학생';
     const oldValue = student ? (student as any)[field] || '미입력' : '미입력';
@@ -119,7 +125,7 @@ export function AdminStudentHub({
     }
 
     return new Promise<{ success: boolean; error?: string }>((resolve) => {
-      setPendingSave({
+      const newPending = {
         id,
         field,
         fieldLabel,
@@ -127,43 +133,50 @@ export function AdminStudentHub({
         oldValue,
         studentName,
         resolve,
-      });
+      };
+      pendingSaveRef.current = newPending;
+      setPendingSave(newPending);
     });
   };
 
   const handleConfirmSave = async () => {
-    if (!pendingSave) return;
+    const target = pendingSaveRef.current || pendingSave;
+    if (!target) return;
     setIsSavingConfirm(true);
     try {
-      const res = await updateStudentField(pendingSave.id, pendingSave.field, pendingSave.value);
+      const res = await updateStudentField(target.id, target.field, target.value);
       if (res.success) {
         toast({
           title: '학생 정보 수정 완료',
-          description: `${pendingSave.studentName} 학생의 ${pendingSave.fieldLabel} 정보가 성공적으로 변경되었습니다.`,
+          description: `${target.studentName} 학생의 ${target.fieldLabel} 정보가 성공적으로 변경되었습니다.`,
         });
-        pendingSave.resolve({ success: true });
+        target.resolve({ success: true });
       } else {
         toast({
           variant: 'destructive',
           title: '수정 실패',
           description: res.error || '정보 수정 중 오류가 발생했습니다.',
         });
-        pendingSave.resolve({ success: false, error: res.error });
+        target.resolve({ success: false, error: res.error });
       }
     } catch (err: any) {
-      pendingSave.resolve({ success: false, error: err.message });
+      target.resolve({ success: false, error: err.message });
     } finally {
       setIsSavingConfirm(false);
+      pendingSaveRef.current = null;
       setPendingSave(null);
     }
   };
 
   const handleCancelSave = () => {
-    if (pendingSave) {
-      pendingSave.resolve({ success: false });
+    const target = pendingSaveRef.current || pendingSave;
+    if (target) {
+      target.resolve({ success: false });
     }
+    pendingSaveRef.current = null;
     setPendingSave(null);
   };
+
 
 
   const handleBulkSave = async (updates: any[]) => {
