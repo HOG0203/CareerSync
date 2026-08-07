@@ -189,23 +189,96 @@ export async function getCounselingLogs(studentId: string) {
 }
 
 /**
- * 학적 이력 조회 (UUID 기준)
+ * 학적 이력 및 담임교사 정보 동적 조회 (DB 기반)
  */
 export async function getAcademicHistory(studentId: string) {
   const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('student_academic_history')
-    .select('*')
-    .eq('student_id', studentId)
-    .order('academic_year', { ascending: false })
 
-  if (error) {
-    console.error('Academic history fetch error:', error.message);
-    return { data: [], error: error.message }
+  const [historyRes, studentRes, settingsRes, teachersRes] = await Promise.all([
+    supabase
+      .from('student_academic_history')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('academic_year', { ascending: false }),
+    supabase
+      .from('students')
+      .select('id, graduation_year, major, class_info, student_number')
+      .eq('id', studentId)
+      .single(),
+    supabase.from('system_settings').select('*'),
+    supabase
+      .from('profiles')
+      .select('username, assigned_grade, assigned_major, assigned_class')
+      .eq('role', 'teacher')
+  ]);
+
+  const history = historyRes.data || [];
+  const student = studentRes.data;
+  const teachers = teachersRes.data || [];
+  
+  let baseYear = 2026;
+  if (settingsRes.data) {
+    const sysYear = settingsRes.data.find((s: any) => s.key === 'base_year');
+    if (sysYear?.value?.year) baseYear = sysYear.value.year;
   }
 
-  return { data: data || [], error: null }
+  // 만약 현재 학년 데이터가 history에 없다면 student 정보로 현재 학년 히스토리 항목 구성
+  if (student && student.graduation_year && student.major && student.class_info) {
+    const currentGrade = 4 - (student.graduation_year - baseYear);
+    if (currentGrade >= 1 && currentGrade <= 3) {
+      const hasCurrent = history.some(h => h.grade === currentGrade);
+      if (!hasCurrent) {
+        const cleanMajor = (student.major || '').replace(/과|공업계/g, '').trim();
+        const cleanClass = (student.class_info || '').replace(/반|학년/g, '').trim();
+        const matchedTeacher = teachers.find(t => {
+          const tMajor = (t.assigned_major || '').replace(/과|공업계/g, '').trim();
+          const tClass = (t.assigned_class || '').replace(/반|학년/g, '').trim();
+          const tGrade = t.assigned_grade;
+          return tMajor === cleanMajor && tClass === cleanClass && (tGrade ? tGrade === currentGrade : true);
+        });
+
+        history.push({
+          id: `current-${student.id}`,
+          student_id: student.id,
+          academic_year: baseYear,
+          grade: currentGrade,
+          major: student.major,
+          class_info: student.class_info,
+          student_number: student.student_number,
+          teacher_name: matchedTeacher ? matchedTeacher.username : null
+        });
+      }
+    }
+  }
+
+  // DB profiles 테이블과 연동하여 teacher_name이 미기재된 항목의 담임교사 성명 보완
+  const enrichedHistory = history.map(h => {
+    let teacherName = h.teacher_name;
+    if (!teacherName && h.major && h.class_info) {
+      const cleanMajor = (h.major || '').replace(/과|공업계/g, '').trim();
+      const cleanClass = (h.class_info || '').replace(/반|학년/g, '').trim();
+      const grade = h.grade;
+
+      const matchedTeacher = teachers.find(t => {
+        const tMajor = (t.assigned_major || '').replace(/과|공업계/g, '').trim();
+        const tClass = (t.assigned_class || '').replace(/반|학년/g, '').trim();
+        const tGrade = t.assigned_grade;
+        return tMajor === cleanMajor && tClass === cleanClass && (tGrade ? tGrade === grade : true);
+      });
+
+      if (matchedTeacher) {
+        teacherName = matchedTeacher.username;
+      }
+    }
+    return {
+      ...h,
+      teacher_name: teacherName || null
+    };
+  });
+
+  return { data: enrichedHistory, error: null };
 }
+
 
 /**
  * 상담 일지 저장 (UUID 기준)
