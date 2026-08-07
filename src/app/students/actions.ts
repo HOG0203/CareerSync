@@ -200,8 +200,20 @@ export async function updateStudentField(id: string, field: string, value: any) 
   if (field === 'graduation_year') finalValue = value ? parseInt(value) : null;
   else if (value === '' || value === 'CLEARED' || (Array.isArray(value) && value.length === 0)) finalValue = null;
   const isBasicField = BASIC_INFO_FIELDS.includes(field);
-  const { error } = await supabase.from(isBasicField ? 'students' : 'student_employments').update({ [field]: finalValue, updated_at: new Date().toISOString() }).eq('id', id)
+  const targetTable = isBasicField ? 'students' : 'student_employments';
+
+  // 변경 전 기존 값 및 학생 정보 조회
+  const [{ data: oldRecord }, { data: studentInfo }] = await Promise.all([
+    supabase.from(targetTable).select(field).eq('id', id).single(),
+    supabase.from('students').select('student_name, student_number, class_info').eq('id', id).single()
+  ]);
+
+  const oldValue = oldRecord ? (oldRecord as any)[field] : null;
+  const studentLabel = studentInfo ? `${studentInfo.student_name} (${studentInfo.class_info ? `${studentInfo.class_info}반 ` : ''}${studentInfo.student_number ? `${studentInfo.student_number}번` : ''})` : `학생 (ID: ${id})`;
+
+  const { error } = await supabase.from(targetTable).update({ [field]: finalValue, updated_at: new Date().toISOString() }).eq('id', id);
   if (error) return { success: false, error: error.message };
+  
   if (['major', 'class_info', 'student_number', 'graduation_year'].includes(field)) {
     const { data: student } = await supabase.from('students').select('*').eq('id', id).single();
     if (student) await syncAcademicHistory(supabase, id, student, settings.baseYear);
@@ -210,8 +222,14 @@ export async function updateStudentField(id: string, field: string, value: any) 
   const { logAuditAction } = await import('@/lib/audit-logger');
   await logAuditAction({
     action_type: 'STUDENT_UPDATE',
-    target_name: `학생 항목 수정 (${field})`,
-    details: { student_id: id, field, value: finalValue }
+    target_name: `${studentLabel} - [${field}]`,
+    details: { 
+      student_id: id, 
+      student_name: studentInfo?.student_name,
+      field, 
+      old_value: oldValue ?? '(빈값)', 
+      new_value: finalValue ?? '(빈값)' 
+    }
   });
 
   revalidatePath('/students'); 

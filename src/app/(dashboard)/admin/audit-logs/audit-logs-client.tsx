@@ -172,8 +172,19 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
                             {typeCfg.label}
                           </span>
                         </td>
-                        <td className="p-3 font-bold text-slate-800 truncate max-w-[220px]">
-                          {log.target_name}
+                        <td className="p-3 font-bold text-slate-800">
+                          <div>{log.target_name}</div>
+                          {log.details && typeof log.details === 'object' && (log.details.old_value !== undefined || log.details.new_value !== undefined) && (
+                            <div className="flex items-center gap-1 mt-1 text-[10.5px]">
+                              <span className="bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded font-mono border border-rose-200 max-w-[130px] truncate">
+                                {String(log.details.old_value ?? '(빈값)')}
+                              </span>
+                              <span className="text-slate-400 font-black shrink-0">➔</span>
+                              <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-mono border border-emerald-200 max-w-[130px] truncate">
+                                {String(log.details.new_value ?? '(빈값)')}
+                              </span>
+                            </div>
+                          )}
                         </td>
                         <td className="p-3 pr-4 sm:pr-6 text-center">
                           <Button
@@ -228,6 +239,25 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
                   <span className="font-bold text-emerald-700">{selectedLog.target_name}</span>
                 </div>
               </div>
+
+              {/* 이전 값 -> 변경 후 값 비교 카드 */}
+              {selectedLog.details && typeof selectedLog.details === 'object' && (selectedLog.details.old_value !== undefined || selectedLog.details.new_value !== undefined) && (
+                <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 space-y-2">
+                  <h4 className="font-bold text-indigo-900 text-xs flex items-center gap-1">
+                    🔄 데이터 변경 시각적 비교 (Before ➔ After)
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-rose-50 border border-rose-200 p-2.5 rounded-lg space-y-1">
+                      <span className="text-[10px] font-bold text-rose-600 block">이전 상태 (Before)</span>
+                      <span className="font-bold text-rose-900 font-mono break-all block">{String(selectedLog.details.old_value ?? '(빈값)')}</span>
+                    </div>
+                    <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg space-y-1">
+                      <span className="text-[10px] font-bold text-emerald-600 block">변경 후 상태 (After)</span>
+                      <span className="font-bold text-emerald-900 font-mono break-all block">{String(selectedLog.details.new_value ?? '(빈값)')}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <h4 className="font-bold text-slate-700 mb-1">상세 파라미터 (JSON)</h4>
