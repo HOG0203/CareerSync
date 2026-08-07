@@ -44,7 +44,7 @@ const MAJOR_MAP: Record<string, string> = {
   '스마트디자인과': '디자인'
 };
 
-const getShortClassName = (major: string, classInfo: string, gradYear?: number) => {
+const getShortClassName = (major: string, classInfo: string, currentGrade: number = 3, gradYear?: number) => {
   let shortMajor = MAJOR_MAP[major] || major;
   
   // 2028년 졸업생(현재 2학년)부터는 '건축' 대신 '공간'으로 표시
@@ -52,7 +52,7 @@ const getShortClassName = (major: string, classInfo: string, gradYear?: number) 
     shortMajor = '공간';
   }
   
-  return `${shortMajor} ${classInfo}`;
+  return `${shortMajor}${currentGrade}-${classInfo}`;
 };
 
 const SORT_ORDER = [
@@ -191,7 +191,7 @@ function SearchHeader({ onSearch, currentSearchQuery, isLowerGrade, matchedCount
   );
 }
 
-export function EmploymentStatusGrid({ allData, userProfile, baseYear, grade, graduationYear }: EmploymentStatusGridProps) {
+export function EmploymentStatusGrid({ allData, userProfile, baseYear, grade = 3, graduationYear }: EmploymentStatusGridProps) {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [certFilter, setCertFilter] = React.useState('all');
   const [isLoading, setIsLoading] = React.useState(false);
@@ -230,13 +230,13 @@ export function EmploymentStatusGrid({ allData, userProfile, baseYear, grade, gr
     for (const student of allData) {
       const major = student.major || '';
       const classInfo = student.class_info || '';
-      // 학년도별 명칭 변경 적용 (2028년 졸업생부터 공간으로 표시)
-      const displayClassName = getShortClassName(major, classInfo, student.graduation_year);
+      // 학년도별 명칭 변경 적용 (예: 기계3-1)
+      const displayClassName = getShortClassName(major, classInfo, grade, student.graduation_year);
       if (!grouped[displayClassName]) grouped[displayClassName] = [];
       grouped[displayClassName].push(student);
     }
     return grouped;
-  }, [allData]);
+  }, [allData, grade]);
 
   const majorOrderMap = React.useMemo(() => {
     const map = new Map(SORT_ORDER.map((m, i) => [MAJOR_MAP[m] || m, i]));
@@ -245,15 +245,18 @@ export function EmploymentStatusGrid({ allData, userProfile, baseYear, grade, gr
     return map;
   }, []);
 
-
   const classNames = React.useMemo(() => {
     return Object.keys(groupedData).sort((a, b) => {
-      const majorA = a.split(' ')[0];
-      const majorB = b.split(' ')[0];
+      const matchA = a.match(/^([^\d]+)(\d+)-(\d+)$/);
+      const matchB = b.match(/^([^\d]+)(\d+)-(\d+)$/);
+      const majorA = matchA ? matchA[1] : a;
+      const majorB = matchB ? matchB[1] : b;
       const orderA = majorOrderMap.get(majorA) ?? 999;
       const orderB = majorOrderMap.get(majorB) ?? 999;
       if (orderA !== orderB) return orderA - orderB;
-      return a.localeCompare(b, 'ko');
+      const classNumA = matchA ? parseInt(matchA[3]) : 0;
+      const classNumB = matchB ? parseInt(matchB[3]) : 0;
+      return classNumA - classNumB;
     });
   }, [groupedData, majorOrderMap]);
 
@@ -337,14 +340,23 @@ export function EmploymentStatusGrid({ allData, userProfile, baseYear, grade, gr
               (parseInt(a.student_number || '0')) - (parseInt(b.student_number || '0'))
             );
             const totalCount = students.length;
+            const teacherName = students.find(s => s.teacher_name)?.teacher_name || '';
 
             return (
-              <div key={className} className="flex flex-col bg-white w-[72px]">
-                <div className="bg-[#f2f2f2] border-b border-gray-300 h-8 flex items-center justify-center font-bold text-[9px] sm:text-[10px] text-gray-700 px-0.5 text-center leading-tight whitespace-nowrap overflow-hidden">
+              <div key={className} className="flex flex-col bg-white w-[76px] sm:w-[84px] shrink-0">
+                {/* 학반 표기 (예: 기계3-1) */}
+                <div className="bg-[#f2f2f2] border-b border-gray-300 h-7 flex items-center justify-center font-extrabold text-[10px] sm:text-[11px] text-gray-800 px-0.5 text-center leading-tight whitespace-nowrap overflow-hidden">
                   {className}
                 </div>
-                <div className="bg-sky-500 text-white h-6 flex items-center justify-center font-bold text-[10.5px]">
-                  {totalCount}
+
+                {/* 바로 아래 담임교사 이름 표기 (예: 고홍석T) */}
+                <div className="bg-indigo-50/90 border-b border-gray-300 h-6 flex items-center justify-center font-bold text-[9.5px] sm:text-[10px] text-indigo-700 px-0.5 text-center leading-tight whitespace-nowrap overflow-hidden">
+                  {teacherName ? `${teacherName}T` : '담임미지정'}
+                </div>
+
+                {/* 인원수 배지 */}
+                <div className="bg-sky-500 text-white h-5 flex items-center justify-center font-bold text-[10px]">
+                  {totalCount}명
                 </div>
 
                 <div className="flex flex-col">
@@ -382,3 +394,4 @@ export function EmploymentStatusGrid({ allData, userProfile, baseYear, grade, gr
     </div>
   );
 }
+

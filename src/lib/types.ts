@@ -32,7 +32,8 @@ export type StudentEmploymentData = {
   labor_education_status?: string;
   special_notes?: string;
   desired_work_area?: string;
-  parents_opinion?: string;
+  teacher_name?: string;
+  grade?: number;
   training_records?: FieldTrainingRecord[];
 };
 
