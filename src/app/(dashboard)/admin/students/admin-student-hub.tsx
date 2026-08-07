@@ -23,15 +23,16 @@ import { PromotionModal } from '../../class-management/promotion-modal'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 
-// 학생 등록 및 진급 관리 전용 컬럼 (기본 정보만 노출)
+// 학생 등록 및 진급 관리 전용 컬럼 (기본 정보 직접 수정 가능)
 const COLUMNS = [
   { key: 'grade', label: '학년', width: 60, readOnly: true },
-  { key: 'major', label: '학과', width: 120, readOnly: true },
-  { key: 'class_info', label: '반', width: 60, readOnly: true },
-  { key: 'student_number', label: '번호', width: 60, readOnly: true },
-  { key: 'student_name', label: '성명', width: 100, readOnly: true },
-  { key: 'phone_number', label: '휴대전화번호', width: 110, readOnly: true },
+  { key: 'major', label: '학과', width: 120 },
+  { key: 'class_info', label: '반', width: 60 },
+  { key: 'student_number', label: '번호', width: 60 },
+  { key: 'student_name', label: '성명', width: 100 },
+  { key: 'phone_number', label: '휴대전화번호', width: 110 },
 ]
+
 
 const GROUP_HEADERS = [
   { label: '학생 기본 인적사항', colSpan: 6, className: 'bg-slate-100 text-slate-900 text-[11px]' },
