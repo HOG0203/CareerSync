@@ -1,6 +1,5 @@
 import { Metadata } from 'next';
-import { createClient } from '@/lib/supabase/server';
-import { getCachedFilteredStudentData, getCachedGraduationYears, StudentEmploymentData, getCurrentUserProfile } from '@/lib/data';
+import { getCachedFilteredStudentData, getCachedGraduationYears, getCachedTeacherProfiles, StudentEmploymentData, getCurrentUserProfile } from '@/lib/data';
 import EmploymentStatusFilters from './employment-status-filters';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { Grid3X3 } from 'lucide-react';
@@ -47,16 +46,12 @@ async function EmploymentStatusPageContent({
 }) {
   const params = searchParams;
 
-  const supabase = await createClient();
-
-  const [graduationYears, settings, userProfile, teacherProfilesRes] = await Promise.all([
+  const [graduationYears, settings, userProfile, teacherProfiles] = await Promise.all([
     getCachedGraduationYears(),
     getSystemSettings(),
     getCurrentUserProfile(),
-    supabase.from('profiles').select('username, full_name, assigned_grade, assigned_major, assigned_class').not('assigned_major', 'is', null)
+    getCachedTeacherProfiles()
   ]);
-
-  const teacherProfiles = teacherProfilesRes?.data || [];
 
   // 담임 교사인 경우 해당 학년과 현재 학사학년도를 기본값으로 설정
   const defaultAY = settings.baseYear;

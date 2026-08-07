@@ -576,5 +576,26 @@ export async function getCachedYearlyRankingsSummary(graduationYear: number, bas
   )();
 }
 
+/**
+ * [캐싱] 담임 교사 프로필 목록 서버 메모리 캐싱 (teachers 태그 적용)
+ */
+export async function getCachedTeacherProfiles() {
+  return unstable_cache(
+    async () => {
+      const supabase = createAdminClient();
+      const { data } = await supabase
+        .from('profiles')
+        .select('username, full_name, assigned_grade, assigned_major, assigned_class, assigned_year')
+        .not('assigned_major', 'is', null);
+      return data || [];
+    },
+    ['teacher-profiles-all'],
+    {
+      revalidate: 3600,
+      tags: ['teachers']
+    }
+  )();
+}
+
 
 
