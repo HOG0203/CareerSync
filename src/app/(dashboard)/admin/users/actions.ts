@@ -1,6 +1,6 @@
-'use server'
+'use server';
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 
@@ -84,6 +84,8 @@ export async function createUser(formData: FormData) {
     return { error: `프로필 설정 실패: ${profileError.message}` }
   }
 
+  revalidateTag('profiles')
+  revalidateTag('teachers')
   revalidatePath('/admin/users')
   return { success: true }
 }
@@ -169,6 +171,8 @@ export async function bulkCreateUsers(users: { username: string, fullName: strin
     }
   }
 
+  revalidateTag('profiles')
+  revalidateTag('teachers')
   revalidatePath('/admin/users')
   return { success: true, count: results.successCount, failures: results.failures }
 }
@@ -210,6 +214,8 @@ export async function updateUserRole(userId: string, newRole: string) {
     return { error: error.message }
   }
 
+  revalidateTag('profiles')
+  revalidateTag('teachers')
   revalidatePath('/admin/users')
   return { success: true }
 }
@@ -234,6 +240,8 @@ export async function updateAssignedClass(userId: string, data: { year: number |
     return { error: error.message }
   }
 
+  revalidateTag('profiles');
+  revalidateTag('teachers');
   revalidatePath('/admin/users');
   revalidatePath('/employment-status');
   revalidatePath('/class-management');
@@ -253,6 +261,8 @@ export async function deleteUser(userId: string) {
     return { error: error.message }
   }
 
+  revalidateTag('profiles')
+  revalidateTag('teachers')
   revalidatePath('/admin/users')
   return { success: true }
 }

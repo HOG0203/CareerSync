@@ -1,5 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
-import { redirect } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -10,39 +8,30 @@ import {
 import { UserTable } from './user-table';
 import { CreateUserButton } from './create-user-button';
 import { ImportUserButton } from './import-user-button';
-import { getProfiles, getGraduationYears, getAllStudentBaseData } from '@/lib/data';
+import { getCachedProfiles, getCachedGraduationYears, getCachedAllStudentBaseData } from '@/lib/data';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { UserCog } from 'lucide-react';
+import React from 'react';
+import { TableLoadingSkeleton } from '@/components/dashboard/loading-skeleton';
 
 export const dynamic = 'force-dynamic';
 
-async function checkAdmin() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  return profile?.role === 'admin';
+export default async function AdminUsersPage() {
+  return (
+    <React.Suspense fallback={<TableLoadingSkeleton />}>
+      <AdminUsersPageContent />
+    </React.Suspense>
+  );
 }
 
-export default async function AdminUsersPage() {
-  // 권한 체크 로직 임시 비활성화 상태 유지
-  /*
-  const isAdmin = await checkAdmin();
-  if (!isAdmin) {
-    redirect('/dashboard');
-  }
-  */
-
-  const profiles = await getProfiles();
-  const graduationYears = await getGraduationYears();
-  const allBaseData = await getAllStudentBaseData();
-  const settings = await getSystemSettings();
+async function AdminUsersPageContent() {
+  // 서버 메모리 캐시 적용된 데이터 병렬 패칭 (Promise.all)
+  const [profiles, graduationYears, allBaseData, settings] = await Promise.all([
+    getCachedProfiles(),
+    getCachedGraduationYears(),
+    getCachedAllStudentBaseData(),
+    getSystemSettings()
+  ]);
   
   // 학년도별 학과 및 반 정보 전체 매핑 데이터 생성
   const fullClassMapping: { year: number; major: string; className: string }[] = allBaseData

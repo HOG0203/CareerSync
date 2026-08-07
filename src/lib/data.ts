@@ -349,9 +349,46 @@ export async function getAllStudentBaseData(): Promise<StudentEmploymentData[]> 
 }
 
 export async function getProfiles() {
-  const supabase = await createClient();
-  const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
-  return data || [];
+  return getCachedProfiles();
+}
+
+/**
+ * [캐싱] 사용자 프로필 전체 목록 서버 메모리 캐싱 (profiles, teachers 태그)
+ */
+export async function getCachedProfiles() {
+  return unstable_cache(
+    async () => {
+      const supabase = createAdminClient();
+      const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+      return data || [];
+    },
+    ['profiles-list-all'],
+    {
+      revalidate: 3600,
+      tags: ['profiles', 'teachers']
+    }
+  )();
+}
+
+/**
+ * [캐싱] 전교생 학반 매핑 기본 정보 캐싱 (students 태그)
+ */
+export async function getCachedAllStudentBaseData() {
+  return unstable_cache(
+    async () => {
+      const supabase = createAdminClient();
+      const { data } = await supabase
+        .from('students')
+        .select('id, graduation_year, major, class_info, student_number, student_name')
+        .order('graduation_year', { ascending: false });
+      return data || [];
+    },
+    ['all-student-base-data'],
+    {
+      revalidate: 3600,
+      tags: ['students']
+    }
+  )();
 }
 
 export async function getGradeStatistics(graduationYear: number) {
