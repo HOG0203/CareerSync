@@ -10,7 +10,15 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Users, UserPlus, GraduationCap } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Users, UserPlus, GraduationCap, AlertTriangle, Loader2 } from 'lucide-react';
 import { ImportButton } from '../../students/import-button';
 import { ExportButton } from '../../students/export-button';
 import DashboardFilters from '@/components/dashboard/dashboard-filters';
@@ -33,10 +41,27 @@ const COLUMNS = [
   { key: 'phone_number', label: '휴대전화번호', width: 110 },
 ]
 
+const FIELD_LABEL_MAP: Record<string, string> = {
+  major: '학과',
+  class_info: '반',
+  student_number: '번호',
+  student_name: '성명',
+  phone_number: '휴대전화번호',
+};
 
 const GROUP_HEADERS = [
   { label: '학생 기본 인적사항', colSpan: 6, className: 'bg-slate-100 text-slate-900 text-[11px]' },
 ]
+
+interface PendingSaveRequest {
+  id: string;
+  field: string;
+  fieldLabel: string;
+  value: any;
+  oldValue: any;
+  studentName: string;
+  resolve: (res: { success: boolean; error?: string }) => void;
+}
 
 export function AdminStudentHub({ 
   initialData, 
@@ -60,6 +85,8 @@ export function AdminStudentHub({
   const [selectedRowIds, setSelectedRowIds] = React.useState<string[]>([])
   const [isPromotionModalOpen, setIsPromotionModalOpen] = React.useState(false)
   const [selectedIdsForPromotion, setSelectedIdsForPromotion] = React.useState<string[]>([])
+  const [pendingSave, setPendingSave] = React.useState<PendingSaveRequest | null>(null)
+  const [isSavingConfirm, setIsSavingConfirm] = React.useState(false)
   const router = useRouter()
   const { toast } = useToast()
 
@@ -81,9 +108,63 @@ export function AdminStudentHub({
     setSelectedRowIds([])
   }, [params.year, params.major, params.class, params.status])
 
-  const handleSave = async (id: string, field: string, value: any) => {
-    return await updateStudentField(id, field, value) as any
-  }
+  const handleSave = (id: string, field: string, value: any) => {
+    const student = processedData.find(s => s.id === id);
+    const studentName = student?.student_name || '선택한 학생';
+    const oldValue = student ? (student as any)[field] || '미입력' : '미입력';
+    const fieldLabel = FIELD_LABEL_MAP[field] || field;
+
+    if (String(oldValue).trim() === String(value).trim()) {
+      return Promise.resolve({ success: true });
+    }
+
+    return new Promise<{ success: boolean; error?: string }>((resolve) => {
+      setPendingSave({
+        id,
+        field,
+        fieldLabel,
+        value,
+        oldValue,
+        studentName,
+        resolve,
+      });
+    });
+  };
+
+  const handleConfirmSave = async () => {
+    if (!pendingSave) return;
+    setIsSavingConfirm(true);
+    try {
+      const res = await updateStudentField(pendingSave.id, pendingSave.field, pendingSave.value);
+      if (res.success) {
+        toast({
+          title: '학생 정보 수정 완료',
+          description: `${pendingSave.studentName} 학생의 ${pendingSave.fieldLabel} 정보가 성공적으로 변경되었습니다.`,
+        });
+        pendingSave.resolve({ success: true });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: '수정 실패',
+          description: res.error || '정보 수정 중 오류가 발생했습니다.',
+        });
+        pendingSave.resolve({ success: false, error: res.error });
+      }
+    } catch (err: any) {
+      pendingSave.resolve({ success: false, error: err.message });
+    } finally {
+      setIsSavingConfirm(false);
+      setPendingSave(null);
+    }
+  };
+
+  const handleCancelSave = () => {
+    if (pendingSave) {
+      pendingSave.resolve({ success: false });
+    }
+    setPendingSave(null);
+  };
+
 
   const handleBulkSave = async (updates: any[]) => {
     return await bulkUpdateStudentData(updates) as any
@@ -202,6 +283,76 @@ export function AdminStudentHub({
         onClose={() => setIsPromotionModalOpen(false)}
         selectedStudents={selectedStudentsForPromotion}
       />
+
+      {/* 학생 정보 변경 확인 2차 모달 */}
+      <Dialog open={!!pendingSave} onOpenChange={(open) => { if (!open) handleCancelSave(); }}>
+        <DialogContent className="sm:max-w-md bg-white rounded-2xl p-6 shadow-xl border border-slate-100">
+          <DialogHeader className="flex flex-col items-center sm:items-start gap-2">
+            <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-200">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span className="text-xs font-bold">학생 정보 변경 확인</span>
+            </div>
+            <DialogTitle className="text-xl font-black text-slate-900">
+              학생 정보를 변경하시겠습니까?
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500 font-medium leading-relaxed">
+              인적사항 변경은 학사 관리 및 이력 데이터에 직접 반영됩니다. 아래 내용을 확인 후 적용해 주세요.
+            </DialogDescription>
+          </DialogHeader>
+
+          {pendingSave && (
+            <div className="my-3 p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2 text-xs">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                <span className="font-bold text-slate-500">학생 성명</span>
+                <span className="font-black text-slate-900 text-sm">{pendingSave.studentName}</span>
+              </div>
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                <span className="font-bold text-slate-500">수정 항목</span>
+                <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">{pendingSave.fieldLabel}</span>
+              </div>
+              <div className="flex items-center justify-between pt-1">
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase">기존 값</span>
+                  <span className="font-semibold text-slate-600 line-through">{String(pendingSave.oldValue)}</span>
+                </div>
+                <span className="text-slate-400 font-bold">➔</span>
+                <div className="flex flex-col items-end">
+                  <span className="text-[10px] text-emerald-600 font-bold uppercase">변경할 값</span>
+                  <span className="font-black text-emerald-600 text-sm">{String(pendingSave.value)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex sm:justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCancelSave}
+              disabled={isSavingConfirm}
+              className="h-10 px-4 text-xs font-bold text-slate-600 rounded-xl"
+            >
+              취소
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmSave}
+              disabled={isSavingConfirm}
+              className="h-10 px-5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md"
+            >
+              {isSavingConfirm ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  저장 중...
+                </>
+              ) : (
+                '변경 적용'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
+
