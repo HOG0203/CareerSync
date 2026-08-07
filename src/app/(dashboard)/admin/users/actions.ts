@@ -234,8 +234,11 @@ export async function updateAssignedClass(userId: string, data: { year: number |
     return { error: error.message }
   }
 
-  revalidatePath('/admin/users')
-  return { success: true }
+  revalidatePath('/admin/users');
+  revalidatePath('/employment-status');
+  revalidatePath('/class-management');
+  revalidatePath('/students');
+  return { success: true };
 }
 
 export async function deleteUser(userId: string) {
