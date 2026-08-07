@@ -298,12 +298,22 @@ export function useSpreadsheet({
     }
     const finalValue = (value === 'CLEARED' || value === '') ? null : value;
     const student = data.find(s => s.id === id);
-    if (student && student[field] !== finalValue) recordHistory([{ id, field, oldValue: student[field] }]);
-    setEditingCell(null);
-    setData(prev => prev.map(s => s.id === id ? { ...s, [field]: finalValue } : s));
-    setDetailData((prev: any) => (prev && prev.id === id) ? { ...prev, [field]: finalValue } : prev);
-    return onSave(id, field, finalValue);
+
+    // 2차 확인 모달 / 서버 저장을 먼저 수행하고 승인될 때만 클라이언트 데이터 반영
+    const result = await onSave(id, field, finalValue);
+
+    if (result && result.success) {
+      if (student && student[field] !== finalValue) recordHistory([{ id, field, oldValue: student[field] }]);
+      setEditingCell(null);
+      setData(prev => prev.map(s => s.id === id ? { ...s, [field]: finalValue } : s));
+      setDetailData((prev: any) => (prev && prev.id === id) ? { ...prev, [field]: finalValue } : prev);
+      return result;
+    } else {
+      setEditingCell(null);
+      return result || { success: false };
+    }
   }, [onSave, filteredData, columns, data, recordHistory])
+
 
   const handleKeyDown = React.useCallback((e: React.KeyboardEvent) => {
     if (editingCell) return;
