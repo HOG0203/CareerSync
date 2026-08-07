@@ -49,14 +49,15 @@ async function syncAcademicHistory(supabase: any, studentUuid: string, info: any
     
     const { data: teachers } = await supabase
       .from('profiles')
-      .select('username, assigned_major, assigned_class')
+      .select('username, assigned_major, assigned_class, assigned_grade')
       .eq('role', 'teacher');
       
     if (teachers) {
       const matchedTeacher = teachers.find((t: any) => {
         const tMajor = (t.assigned_major || '').replace(/과|공업계/g, '').trim();
         const tClass = (t.assigned_class || '').replace(/반|학년/g, '').trim();
-        return tMajor === cleanMajor && tClass === cleanClass;
+        const tGrade = t.assigned_grade;
+        return tMajor === cleanMajor && tClass === cleanClass && (tGrade ? tGrade === grade : true);
       });
       if (matchedTeacher) teacherName = matchedTeacher.username;
     }
