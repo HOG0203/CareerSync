@@ -371,19 +371,19 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
             }
 
             return (
-              <div key={className} className="flex flex-col bg-white w-[76px] sm:w-[84px] shrink-0">
+              <div key={className} className="flex flex-col bg-white w-[72px] shrink-0">
                 {/* 학반 표기 (예: 기계3-1) */}
-                <div className="bg-[#f2f2f2] border-b border-gray-300 h-7 flex items-center justify-center font-extrabold text-[10px] sm:text-[11px] text-gray-800 px-0.5 text-center leading-tight whitespace-nowrap overflow-hidden">
+                <div className="bg-[#f2f2f2] border-b border-gray-300 h-7 flex items-center justify-center font-extrabold text-[10px] sm:text-[10.5px] text-gray-800 px-0.5 text-center leading-tight whitespace-nowrap overflow-hidden">
                   {className}
                 </div>
 
                 {/* 바로 아래 담임교사 이름 표기 (예: 고홍석T) */}
-                <div className="bg-indigo-50/90 border-b border-gray-300 h-6 flex items-center justify-center font-bold text-[9.5px] sm:text-[10px] text-indigo-700 px-0.5 text-center leading-tight whitespace-nowrap overflow-hidden">
-                  {teacherName ? `${teacherName}T` : '담임미지정'}
+                <div className="bg-indigo-50/90 border-b border-gray-300 h-5 flex items-center justify-center font-bold text-[9px] sm:text-[9.5px] text-indigo-700 px-0.5 text-center leading-tight whitespace-nowrap overflow-hidden">
+                  {teacherName ? `${teacherName}T` : '미지정'}
                 </div>
 
                 {/* 인원수 배지 */}
-                <div className="bg-sky-500 text-white h-5 flex items-center justify-center font-bold text-[10px]">
+                <div className="bg-sky-500 text-white h-5 flex items-center justify-center font-bold text-[9.5px]">
                   {totalCount}명
                 </div>
 
