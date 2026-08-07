@@ -156,3 +156,51 @@ export async function deleteCompany(id: string) {
   const { error } = await supabase.from('companies').delete().eq('id', id);
   return { error };
 }
+
+/**
+ * 기업 정보 일괄 등록 및 수정 (Admin Only)
+ */
+export async function bulkUpsertCompanies(companiesData: CompanyData[]) {
+  const supabase = createClient();
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: '로그인이 필요합니다.' };
+  
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+    
+  if (profile?.role !== 'admin') return { error: '관리자 권한이 필요합니다.' };
+  
+  if (!companiesData || companiesData.length === 0) {
+    return { error: '등록할 업체 정보가 없습니다.' };
+  }
+
+  const now = new Date().toISOString();
+  const payload = companiesData.map(c => ({
+    name: c.name.trim(),
+    location: c.location || null,
+    industry: c.industry || null,
+    company_type: c.company_type || null,
+    job_description: c.job_description || null,
+    salary: c.salary || null,
+    bonus: c.bonus || null,
+    working_hours: c.working_hours || null,
+    employment_type: c.employment_type || null,
+    welfare: c.welfare || null,
+    required_major: c.required_major || null,
+    required_certificates: c.required_certificates || null,
+    etc: c.etc || null,
+    strengths: c.strengths || null,
+    updated_at: now
+  }));
+
+  const { data, error } = await supabase
+    .from('companies')
+    .upsert(payload, { onConflict: 'name' })
+    .select();
+
+  return { count: data ? data.length : payload.length, error: error?.message };
+}

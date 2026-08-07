@@ -33,8 +33,10 @@ import {
   ChevronDown,
   ArrowUpDown,
   CheckCircle2,
-  ChevronRight
+  ChevronRight,
+  FileSpreadsheet
 } from 'lucide-react';
+import { ImportCompanyModal } from './import-company-modal';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -68,8 +70,9 @@ export default function CompanyInfoPage() {
   const [employeeSort, setEmployeeSort] = React.useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'student_name', direction: 'asc' });
   const [traineeSort, setTraineeSort] = React.useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'student_name', direction: 'asc' });
 
-  // 편집 모달 상태
+  // 편집 및 일괄등록 모달 상태
   const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = React.useState(false);
   const [editingCompany, setEditingCompany] = React.useState<CompanyData | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
@@ -225,15 +228,24 @@ export default function CompanyInfoPage() {
           </p>
         </div>
         {isAdmin && (
-          <Button 
-            onClick={() => {
-              setEditingCompany({ name: '' });
-              setIsEditModalOpen(true);
-            }}
-            className="bg-blue-600 hover:bg-blue-700 font-bold gap-2"
-          >
-            <Plus className="h-4 w-4" /> 신규 업체 등록
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsImportModalOpen(true)}
+              className="bg-white hover:bg-emerald-50 hover:text-emerald-700 border-emerald-300 text-emerald-800 font-bold gap-2 text-xs sm:text-sm"
+            >
+              <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> 업체 일괄 등록
+            </Button>
+            <Button 
+              onClick={() => {
+                setEditingCompany({ name: '' });
+                setIsEditModalOpen(true);
+              }}
+              className="bg-blue-600 hover:bg-blue-700 font-bold gap-2 text-xs sm:text-sm"
+            >
+              <Plus className="h-4 w-4" /> 신규 업체 등록
+            </Button>
+          </div>
         )}
       </div>
 
@@ -649,6 +661,20 @@ export default function CompanyInfoPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 업체 일괄 등록 모달 */}
+      <ImportCompanyModal 
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={() => {
+          loadCompanies(search);
+          if (selectedCompany) {
+            getCompanyDetails(selectedCompany.name).then(res => {
+              if (res.company) setSelectedCompany(res.company);
+            });
+          }
+        }}
+      />
     </div>
   );
 }
