@@ -80,7 +80,7 @@ export async function getFilteredStudentData(graduationYear: string, baseYear?: 
   
   // [최적화] Promise.all을 활용해 학생 정보, 실습 기록, 학적 이력을 병렬로 쿼리하여 네트워크 왕복 시간을 1/3로 단축
   // [컬럼 슬림화 최적화] 불필요한 대용량 컬럼(전화번호, 옷/신발 사이즈, 학부모 의견 등)을 제외하고 필수 데이터만 골라서 select 합니다.
-  const [studentsResult, trainingsResult, historyResult] = await Promise.all([
+  const [studentsResult, trainingsResult, historyResult, teachersResult] = await Promise.all([
     supabase
       .from('students')
       .select('id, student_id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, labor_education_status, military_status, desired_work_area, parents_opinion, shoe_size, top_size, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks)')
@@ -100,7 +100,11 @@ export async function getFilteredStudentData(graduationYear: string, baseYear?: 
           .select('id, student_id, major, class_info, student_number, teacher_name, grade, students!inner(graduation_year)')
           .eq('academic_year', baseYear)
           .eq('students.graduation_year', gradYearInt)
-      : Promise.resolve({ data: [] as any[], error: null })
+      : Promise.resolve({ data: [] as any[], error: null }),
+    supabase
+      .from('profiles')
+      .select('username, full_name, assigned_grade, assigned_major, assigned_class')
+      .not('assigned_major', 'is', null)
   ]);
 
   if (studentsResult.error) {
@@ -110,6 +114,7 @@ export async function getFilteredStudentData(graduationYear: string, baseYear?: 
   const students = studentsResult.data || [];
   const trainings = trainingsResult.data || [];
   const historyData = historyResult?.data || [];
+  const teachers = teachersResult?.data || [];
 
   // 3. 데이터 평탄화 (데이터 뒤섞임 방지를 위해 명시적 객체 생성)
   const flattened = students.map(s => {
@@ -122,6 +127,29 @@ export async function getFilteredStudentData(graduationYear: string, baseYear?: 
     const latestTraining = studentTrainings[0];
     const hist = historyData.find(h => h.student_id === s.id);
 
+    let teacherName = hist?.teacher_name;
+    if (!teacherName) {
+      const studentMajor = hist?.major || s.major;
+      const studentClass = hist?.class_info || s.class_info;
+      const studentGrade = hist?.grade || (baseYear ? (4 - (s.graduation_year - baseYear)) : 3);
+      
+      const cleanM = (studentMajor || '').replace(/과|공업계/g, '').trim();
+      const cleanC = (studentClass || '').replace(/반|학년/g, '').trim();
+
+      const matchedT = teachers.find(t => {
+        const tMajor = (t.assigned_major || '').replace(/과|공업계/g, '').trim();
+        const tClass = (t.assigned_class || '').replace(/반|학년/g, '').trim();
+        const isM = tMajor === cleanM || cleanM.includes(tMajor) || tMajor.includes(cleanM);
+        const isC = tClass === cleanC;
+        const isG = !t.assigned_grade || t.assigned_grade === studentGrade;
+        return isM && isC && isG;
+      });
+
+      if (matchedT) {
+        teacherName = matchedT.username || matchedT.full_name;
+      }
+    }
+
     return {
       ...studentBase,
       ...emp,
@@ -130,9 +158,11 @@ export async function getFilteredStudentData(graduationYear: string, baseYear?: 
         major: hist.major,
         class_info: hist.class_info,
         student_number: hist.student_number,
-        teacher_name: hist.teacher_name,
+        teacher_name: teacherName || hist.teacher_name,
         grade: hist.grade
-      } : {}),
+      } : {
+        teacher_name: teacherName || undefined
+      }),
       id: s.id, // ID 유지 보장
       training_records: studentTrainings,
       has_field_training: latestTraining ? 'O' : '',
