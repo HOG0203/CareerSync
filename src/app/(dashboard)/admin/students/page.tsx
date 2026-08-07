@@ -1,8 +1,9 @@
-import { getFilteredStudentData, getGraduationYears, MAJOR_SORT_ORDER } from '@/lib/data';
-import { createClient } from '@/lib/supabase/server';
+import { getCachedFilteredStudentData, getCachedGraduationYears, getCurrentUserProfile, MAJOR_SORT_ORDER } from '@/lib/data';
 import { redirect } from 'next/navigation';
-import { getMasterCertificates, getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
+import { getCachedMasterCertificates, getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { AdminStudentHub } from './admin-student-hub';
+import React from 'react';
+import { TableLoadingSkeleton } from '@/components/dashboard/loading-skeleton';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,29 +13,36 @@ export default async function AdminStudentsPage({
   searchParams: Promise<{ year?: string; major?: string; class?: string; status?: string; ay?: string; grade?: string }>;
 }) {
   const params = await searchParams;
-  const supabase = await createClient();
+  const suspenseKey = `${params.ay || ''}-${params.grade || ''}-${params.year || ''}-${params.major || ''}-${params.class || ''}-${params.status || ''}`;
+
+  return (
+    <React.Suspense key={suspenseKey} fallback={<TableLoadingSkeleton />}>
+      <AdminStudentsPageContent searchParams={params} />
+    </React.Suspense>
+  );
+}
+
+async function AdminStudentsPageContent({
+  searchParams,
+}: {
+  searchParams: { year?: string; major?: string; class?: string; status?: string; ay?: string; grade?: string };
+}) {
+  const params = searchParams;
   
-  // 1. 기반 설정 패칭
-  const [userRes, settings, graduationYears, masterCertificates] = await Promise.all([
-    supabase.auth.getUser(),
+  // 1. 기반 설정 및 사용자 프로필 패칭 (서버 메모리 캐시 적용)
+  const [settings, graduationYears, masterCertificates, userProfile] = await Promise.all([
     getSystemSettings(),
-    getGraduationYears(),
-    getMasterCertificates()
+    getCachedGraduationYears(),
+    getCachedMasterCertificates(),
+    getCurrentUserProfile()
   ]);
 
-  const user = userRes.data.user;
-  if (!user) {
+  if (!userProfile) {
     redirect('/login');
   }
 
-  // 2. 권한 확인
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (profile?.role !== 'admin') {
+  // 2. 관리자 권한 확인
+  if (userProfile.role !== 'admin') {
     redirect('/dashboard');
   }
 
@@ -50,10 +58,10 @@ export default async function AdminStudentsPage({
   const selectedClass = params.class || 'all';
   const selectedStatus = params.status || 'all';
 
-  // 3. 타겟 데이터 패칭 (해당 학년의 데이터만 DB에서 직접 필터링하여 가져오되, 학사학년도 기준 이력 매칭 반영)
-  const allStudentData = await getFilteredStudentData(selectedYear, settings.baseYear);
+  // 3. 타겟 데이터 패칭 (서버 메모리 캐시 적용)
+  const allStudentData = await getCachedFilteredStudentData(selectedYear, ay);
 
-  // 4. 세부 필터링 및 옵션 계산 (이미 DB에서 학년은 걸러짐)
+  // 4. 세부 필터링 및 옵션 계산
   const majorCounts: Record<string, number> = {};
   const classCounts: Record<string, number> = {};
   const statusCounts: Record<string, number> = {};
