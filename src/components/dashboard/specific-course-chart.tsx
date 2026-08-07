@@ -37,15 +37,19 @@ const VIVID_COLORS = [
   '#8b5cf6', // 기타(직접입력) (Violet)
 ];
 
+// /students 페이지의 '진로코스' (career_course) 옵션과 1:1 순수 정렬 매핑
 const COURSE_ORDER = [
   '청솔반', '취업맞춤반', '중견기업반', '반도체아카데미반', '혁신인재반', '부사관반', '일학습병행', '계약학과', '도제반', '아우스빌둥', 
-  '일반취업', '기술사관', '군특성화', '운동부', '4년제대학', '전문대학', '진학', '미용', '기타(직접입력)'
+  '군특성화', '기술사관', '운동부', 
+  '전문대학', '4년제대학', 
+  '기타(직접입력)'
 ];
 
+// /students 페이지의 'career_course' (진로코스) 데이터 컬럼만 순수 참조
 const getStudentCourse = (student: StudentEmploymentData) => {
-  const c = student.career_course?.trim() || student.employment_status?.trim();
-  return c || '미설정';
+  return student.career_course?.trim() || '미설정';
 };
+
 
 export default function SpecificCourseChart({ 
   data, 
