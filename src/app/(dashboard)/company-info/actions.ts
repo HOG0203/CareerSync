@@ -1,3 +1,5 @@
+'use server';
+
 import { unstable_cache, revalidateTag, revalidatePath } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/server';
 
