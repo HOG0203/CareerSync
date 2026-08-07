@@ -146,7 +146,14 @@ export function StudentPopover({
         >
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b-2 pb-1.5 mb-1">
-              <span className="font-bold text-[15px] text-blue-900">{student.student_name}</span>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="font-bold text-[15px] text-blue-900">{student.student_name}</span>
+                {student.teacher_name && (
+                  <span className="text-[10px] text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 font-bold shrink-0">
+                    {student.teacher_name}T
+                  </span>
+                )}
+              </div>
               <span className={cn(
                 "text-[10px] px-2 py-0.5 rounded-full font-bold",
                 isLowerGrade ? (
