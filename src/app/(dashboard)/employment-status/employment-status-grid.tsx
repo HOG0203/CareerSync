@@ -18,6 +18,7 @@ import { fetchYearlyRankings } from './actions';
 interface EmploymentStatusGridProps {
   allData: StudentEmploymentData[];
   userProfile: any;
+  teacherProfiles?: any[];
   baseYear?: number;
   grade?: number;
   graduationYear: string;
@@ -191,7 +192,7 @@ function SearchHeader({ onSearch, currentSearchQuery, isLowerGrade, matchedCount
   );
 }
 
-export function EmploymentStatusGrid({ allData, userProfile, baseYear, grade = 3, graduationYear }: EmploymentStatusGridProps) {
+export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [], baseYear, grade = 3, graduationYear }: EmploymentStatusGridProps) {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [certFilter, setCertFilter] = React.useState('all');
   const [isLoading, setIsLoading] = React.useState(false);
@@ -340,7 +341,28 @@ export function EmploymentStatusGrid({ allData, userProfile, baseYear, grade = 3
               (parseInt(a.student_number || '0')) - (parseInt(b.student_number || '0'))
             );
             const totalCount = students.length;
-            const teacherName = students.find(s => s.teacher_name)?.teacher_name || '';
+            const sampleStudent = students[0];
+            const studentMajor = sampleStudent?.major || '';
+            const studentClass = sampleStudent?.class_info || '';
+            const studentGrade = sampleStudent?.grade || grade;
+
+            let teacherName = students.find(s => s.teacher_name)?.teacher_name || '';
+
+            if (!teacherName && teacherProfiles && teacherProfiles.length > 0) {
+              const cleanM = (studentMajor || '').replace(/과|공업계/g, '').trim();
+              const cleanC = (studentClass || '').replace(/반|학년/g, '').trim();
+              const matchedT = teacherProfiles.find(t => {
+                const tMajor = (t.assigned_major || '').replace(/과|공업계/g, '').trim();
+                const tClass = (t.assigned_class || '').replace(/반|학년/g, '').trim();
+                const isM = tMajor === cleanM || cleanM.includes(tMajor) || tMajor.includes(cleanM);
+                const isC = tClass === cleanC;
+                const isG = !t.assigned_grade || t.assigned_grade === studentGrade;
+                return isM && isC && isG;
+              });
+              if (matchedT) {
+                teacherName = matchedT.username || matchedT.full_name || '';
+              }
+            }
 
             return (
               <div key={className} className="flex flex-col bg-white w-[76px] sm:w-[84px] shrink-0">
