@@ -45,11 +45,14 @@ const COURSE_ORDER = [
   '기타(직접입력)'
 ];
 
-// /students 페이지의 'career_course' (진로코스) 데이터 컬럼만 순수 참조
-const getStudentCourse = (student: StudentEmploymentData) => {
+const getStudentCourse = (student: StudentEmploymentData, gradeNum: number) => {
+  if (gradeNum === 3) {
+    // 3학년: /students 페이지 취업 현황 테이블의 진로코스(employment_status) 참조
+    return student.employment_status?.trim() || '미설정';
+  }
+  // 1~2학년: 기본 정보의 희망 진로코스(career_course) 참조
   return student.career_course?.trim() || '미설정';
 };
-
 
 export default function SpecificCourseChart({ 
   data, 
@@ -65,7 +68,7 @@ export default function SpecificCourseChart({
   // 1. 도넛 차트용 전체 집계 데이터
   const formattedPieData = React.useMemo(() => {
     const counts = data.reduce((acc, student) => {
-      const course = getStudentCourse(student);
+      const course = getStudentCourse(student, grade);
       acc[course] = (acc[course] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -83,15 +86,15 @@ export default function SpecificCourseChart({
         if (indexB !== -1) return 1;
         return b.value - a.value;
       });
-  }, [data]);
+  }, [data, grade]);
 
   // 2. 학과별/반별 막대 차트용 데이터 집계
   const formattedBarData = React.useMemo(() => {
     const isFiltered = selectedMajor !== 'all';
     const groupKey = isFiltered ? 'class_info' : 'major';
     
-    const existingCourses = Array.from(new Set(data.map(s => getStudentCourse(s))))
-      .filter(c => data.some(s => getStudentCourse(s) === c))
+    const existingCourses = Array.from(new Set(data.map(s => getStudentCourse(s, grade))))
+      .filter(c => data.some(s => getStudentCourse(s, grade) === c))
       .sort((a, b) => {
         if (a === '미설정') return 1;
         if (b === '미설정') return -1;
@@ -117,17 +120,17 @@ export default function SpecificCourseChart({
             const groupStudents = data.filter((s: any) => s[groupKey] === group);
             const row: any = { group };
             existingCourses.forEach(course => {
-                row[course] = groupStudents.filter(s => getStudentCourse(s) === course).length;
+                row[course] = groupStudents.filter(s => getStudentCourse(s, grade) === course).length;
             });
             return row;
         }),
         courses: existingCourses
     };
-  }, [data, selectedMajor]);
+  }, [data, selectedMajor, grade]);
 
   const chartConfig = React.useMemo(() => {
     const config: ChartConfig = { value: { label: '학생 수' } };
-    const activeCourses = Array.from(new Set(data.map(s => getStudentCourse(s))))
+    const activeCourses = Array.from(new Set(data.map(s => getStudentCourse(s, grade))))
       .sort((a, b) => {
         const indexA = COURSE_ORDER.indexOf(a);
         const indexB = COURSE_ORDER.indexOf(b);
@@ -144,7 +147,8 @@ export default function SpecificCourseChart({
       config[opt] = { label: opt, color };
     });
     return config;
-  }, [data]);
+  }, [data, grade]);
+
 
 
   const titleText = grade === 3 ? '진로코스' : '희망 진로코스';
