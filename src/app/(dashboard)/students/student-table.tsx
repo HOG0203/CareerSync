@@ -67,15 +67,15 @@ const GET_SPECIFIC_COURSE_OPTIONS = (rowData: any) => {
 
 // 학생 관리 컬럼 정의
 const COLUMNS: ColumnConfig[] = [
-  { key: 'major', label: '학과', width: 70, readOnly: true },
-  { key: 'class_info', label: '반', width: 40, readOnly: true },
-  { key: 'student_number', label: '번호', width: 40, readOnly: true },
-  { key: 'student_name', label: '성명', width: 65, readOnly: true },
-  { key: 'phone_number', label: '휴대전화번호', width: 110, readOnly: true },
+  { key: 'major', label: '학과', width: 65, readOnly: true },
+  { key: 'class_info', label: '반', width: 35, readOnly: true },
+  { key: 'student_number', label: '번호', width: 35, readOnly: true },
+  { key: 'student_name', label: '성명', width: 60, readOnly: true },
+  { key: 'phone_number', label: '휴대전화번호', width: 105, readOnly: true },
   { 
     key: 'career_aspiration', 
     label: '진로희망', 
-    width: 80, 
+    width: 70, 
     type: 'select',
     options: [
       { label: '취업', value: '취업' },
@@ -96,7 +96,7 @@ const COLUMNS: ColumnConfig[] = [
   { 
     key: 'special_notes', 
     label: '희망\n기업유형', 
-    width: 100, 
+    width: 90, 
     type: 'select',
     options: (rowData) => GET_CAREER_COURSE_OPTIONS(rowData),
     variant: (val) => {
@@ -121,9 +121,8 @@ const COLUMNS: ColumnConfig[] = [
   },
   { 
     key: 'career_course', 
-    label: '진로코스', 
-    width: 120, 
-
+    label: '희망\n진로코스', 
+    width: 100, 
     type: 'select',
     options: (rowData) => GET_SPECIFIC_COURSE_OPTIONS(rowData),
     variant: (val) => {
@@ -146,7 +145,7 @@ const COLUMNS: ColumnConfig[] = [
     }
   },
   { 
-    key: 'is_desiring_employment', label: '취업\n희망', width: 55, type: 'select', 
+    key: 'is_desiring_employment', label: '취업\n희망', width: 50, type: 'select', 
     options: [
       { label: '예', value: '예' }, 
       { label: '아니오', value: '아니오' }
@@ -158,7 +157,7 @@ const COLUMNS: ColumnConfig[] = [
     }
   },
   { 
-    key: 'employment_status', label: '진로\n코스', width: 100, type: 'select', 
+    key: 'employment_status', label: '최종\n진로코스', width: 95, type: 'select', 
     options: [
       { label: '청솔반', value: '청솔반' }, 
       { label: '취업맞춤반', value: '취업맞춤반' }, 
@@ -201,7 +200,7 @@ const COLUMNS: ColumnConfig[] = [
   { 
     key: 'business_type', 
     label: '취업\n현황', 
-    width: 80,
+    width: 75,
     type: 'select',
     options: [
       { label: '취업', value: '취업' },
@@ -224,7 +223,7 @@ const COLUMNS: ColumnConfig[] = [
     }
   },
   { 
-    key: 'company_type', label: '기업\n구분', width: 95, type: 'select', 
+    key: 'company_type', label: '기업\n구분', width: 85, type: 'select', 
     options: [
       { label: '대기업', value: '대기업' }, 
       { label: '공기업', value: '공기업' }, 
@@ -247,15 +246,15 @@ const COLUMNS: ColumnConfig[] = [
       }
     }
   },
-  { key: 'company', label: '취업처\n(회사명)', width: 130 },
-  { key: 'latest_training_company', label: '실습처\n(회사명)', width: 120, readOnly: true },
-  { key: 'start_date', label: '시작일', width: 85, readOnly: true },
-  { key: 'end_date', label: '종료일', width: 85, readOnly: true },
-  { key: 'training_stipend_status', label: '지원금\n신청', width: 50, readOnly: true },
-  { key: 'is_hiring_conversion', label: '채용\n전환', width: 85, readOnly: true },
-  { key: 'is_returned', label: '복교', width: 60, readOnly: true },
-  { key: 'field_training_action', label: '실습이력', width: 100, type: 'action' },
-  { key: 'personal_remarks', label: '비고(특이사항)', width: 150 },
+  { key: 'company', label: '취업처\n(회사명)', width: 120 },
+  { key: 'latest_training_company', label: '실습처\n(회사명)', width: 110, readOnly: true },
+  { key: 'start_date', label: '시작일', width: 80, readOnly: true },
+  { key: 'end_date', label: '종료일', width: 80, readOnly: true },
+  { key: 'training_stipend_status', label: '지원금\n신청', width: 45, readOnly: true },
+  { key: 'is_hiring_conversion', label: '채용\n전환', width: 80, readOnly: true },
+  { key: 'is_returned', label: '복교', width: 50, readOnly: true },
+  { key: 'field_training_action', label: '실습이력', width: 85, type: 'action' },
+  { key: 'personal_remarks', label: '비고(특이사항)', width: 140 },
 ]
 
 const GROUP_HEADERS = [
