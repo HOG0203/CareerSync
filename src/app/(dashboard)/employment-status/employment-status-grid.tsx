@@ -1,9 +1,10 @@
 'use client';
 
 import * as React from 'react';
+import { cn } from '@/lib/utils';
 import { StudentEmploymentData } from '@/lib/data';
 import { StudentGridCell } from './student-grid-cell';
-import { Search, X, Award } from 'lucide-react';
+import { Search, X, Award, SlidersHorizontal, Sparkles, RotateCcw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { GridLoadingSkeleton } from '@/components/dashboard/loading-skeleton';
 import {
@@ -14,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { fetchYearlyRankings } from './actions';
+import { CustomCombinationModal, CustomRule } from './custom-combination-modal';
 
 interface EmploymentStatusGridProps {
   allData: StudentEmploymentData[];
@@ -48,7 +50,6 @@ const MAJOR_MAP: Record<string, string> = {
 const getShortClassName = (major: string, classInfo: string, currentGrade: number = 3, gradYear?: number) => {
   let shortMajor = MAJOR_MAP[major] || major;
   
-  // 2028년 졸업생(현재 2학년)부터는 '건축' 대신 '공간'으로 표시
   if (gradYear && gradYear >= 2028 && shortMajor === '건축') {
     shortMajor = '공간';
   }
@@ -111,9 +112,24 @@ interface SearchHeaderProps {
   matchedCount?: number;
   certFilter: string;
   onCertFilterChange: (val: string) => void;
+  customRule: CustomRule | null;
+  onOpenCustomModal: () => void;
+  onClearCustomRule: () => void;
+  customMatchedCount?: number;
 }
 
-function SearchHeader({ onSearch, currentSearchQuery, isLowerGrade, matchedCount, certFilter, onCertFilterChange }: SearchHeaderProps) {
+function SearchHeader({ 
+  onSearch, 
+  currentSearchQuery, 
+  isLowerGrade, 
+  matchedCount, 
+  certFilter, 
+  onCertFilterChange,
+  customRule,
+  onOpenCustomModal,
+  onClearCustomRule,
+  customMatchedCount
+}: SearchHeaderProps) {
   const [localValue, setLocalValue] = React.useState('');
 
   const handleSearch = () => {
@@ -132,10 +148,10 @@ function SearchHeader({ onSearch, currentSearchQuery, isLowerGrade, matchedCount
   };
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-1">
+    <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-1 flex-wrap">
       {/* 검색어 입력 */}
       <div className="flex items-center gap-2 w-full sm:w-auto">
-        <div className="relative flex items-center bg-white rounded-lg border-2 border-slate-200 focus-within:border-blue-500 shadow-sm px-3 h-11 w-full sm:w-[320px] group transition-all">
+        <div className="relative flex items-center bg-white rounded-lg border-2 border-slate-200 focus-within:border-blue-500 shadow-sm px-3 h-11 w-full sm:w-[280px] group transition-all">
           <Search className="h-5 w-5 text-slate-400 group-focus-within:text-blue-500 shrink-0" />
           <Input 
             type="text"
@@ -156,7 +172,7 @@ function SearchHeader({ onSearch, currentSearchQuery, isLowerGrade, matchedCount
         </div>
         <button
           onClick={handleSearch}
-          className="h-11 px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md transition-all active:scale-95 shrink-0 flex items-center gap-1.5"
+          className="h-11 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs sm:text-sm font-bold shadow-md transition-all active:scale-95 shrink-0 flex items-center gap-1.5"
         >
           <Search className="h-4 w-4" />
           검색
@@ -164,13 +180,13 @@ function SearchHeader({ onSearch, currentSearchQuery, isLowerGrade, matchedCount
       </div>
 
       {/* 자격증 개수 필터 */}
-      <div className="flex items-center gap-1.5 px-3 bg-white rounded-lg border-2 border-slate-200 h-11 w-full sm:w-[150px] shadow-sm">
+      <div className="flex items-center gap-1.5 px-3 bg-white rounded-lg border-2 border-slate-200 h-11 w-full sm:w-[140px] shadow-sm">
         <Award className="h-5 w-5 text-slate-400 shrink-0" />
         <Select value={certFilter} onValueChange={onCertFilterChange}>
           <SelectTrigger className="w-full h-full text-xs font-bold border-none bg-transparent shadow-none focus:ring-0 px-0">
             <SelectValue placeholder="자격증 필터" />
           </SelectTrigger>
-          <SelectContent position="popper" className="w-[150px]">
+          <SelectContent position="popper" className="w-[140px]">
             <SelectItem value="all" className="text-xs font-medium">자격증: 전체</SelectItem>
             <SelectItem value="1+" className="text-xs font-medium">1개 이상</SelectItem>
             <SelectItem value="2+" className="text-xs font-medium">2개 이상</SelectItem>
@@ -180,8 +196,38 @@ function SearchHeader({ onSearch, currentSearchQuery, isLowerGrade, matchedCount
         </Select>
       </div>
 
-      {/* 강조 배지 */}
-      {(currentSearchQuery || certFilter !== 'all') && (
+      {/* 자유 커스텀 조합 하이라이트 버튼 */}
+      <button
+        onClick={onOpenCustomModal}
+        className={cn(
+          "h-11 px-4 rounded-lg text-xs sm:text-sm font-bold shadow-sm border-2 transition-all flex items-center gap-1.5 shrink-0",
+          customRule 
+            ? "bg-indigo-600 text-white border-indigo-700 shadow-indigo-100" 
+            : "bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50"
+        )}
+      >
+        <SlidersHorizontal className="h-4 w-4 shrink-0" />
+        {customRule ? '조합 조건 수정' : '🔍 커스텀 조합 설정'}
+      </button>
+
+      {/* 커스텀 조합 적용 안내 태그 */}
+      {customRule && (
+        <div className="flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 text-indigo-900 px-3 py-1.5 rounded-full text-xs font-bold shrink-0 animate-in fade-in-50">
+          <Sparkles className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+          <span>
+            커스텀 조합 강조 ({customRule.operator}): <strong>{customMatchedCount ?? 0}명</strong>
+          </span>
+          <button 
+            onClick={onClearCustomRule} 
+            className="ml-1 p-0.5 hover:bg-indigo-100 rounded-full text-indigo-500 hover:text-indigo-800"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* 기본 강조 배지 */}
+      {!customRule && (currentSearchQuery || certFilter !== 'all') && (
         <span className="text-xs font-bold text-blue-600 animate-pulse bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100 shrink-0 self-start sm:self-auto">
           {certFilter !== 'all' && `[자격증: ${certFilter === '0' ? '없음' : `${certFilter} 이상`}] `}
           {currentSearchQuery && `"${currentSearchQuery}" `}
@@ -195,6 +241,8 @@ function SearchHeader({ onSearch, currentSearchQuery, isLowerGrade, matchedCount
 export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [], baseYear, grade = 3, graduationYear }: EmploymentStatusGridProps) {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [certFilter, setCertFilter] = React.useState('all');
+  const [customRule, setCustomRule] = React.useState<CustomRule | null>(null);
+  const [isCustomModalOpen, setIsCustomModalOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [rankingMap, setRankingMap] = React.useState<Record<string, any>>({});
   const [isRankingsLoading, setIsRankingsLoading] = React.useState(false);
@@ -226,12 +274,85 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
       });
   }, [graduationYear, baseYear]);
 
+  // 전체 데이터에서 고유 자격증 목록 추출 (모달 자동완성 힌트용)
+  const allCertificates = React.useMemo(() => {
+    const certSet = new Set<string>();
+    allData.forEach(s => {
+      const certs = Array.isArray(s.certificates)
+        ? s.certificates
+        : (typeof s.certificates === 'string' ? [s.certificates] : []);
+      certs.forEach(c => {
+        if (c && c.trim()) certSet.add(c.trim());
+      });
+    });
+    return Array.from(certSet).sort();
+  }, [allData]);
+
+  // 커스텀 조건 매칭 학생 수 계산
+  const customMatchedCount = React.useMemo(() => {
+    if (!customRule || !customRule.conditions || customRule.conditions.length === 0) return 0;
+    
+    return allData.filter(student => {
+      const certList = Array.isArray(student.certificates)
+        ? student.certificates
+        : (typeof student.certificates === 'string' ? [student.certificates] : []);
+      const certCount = certList.length;
+      const rankingSummary = rankingMap[student.id];
+
+      const matches = customRule.conditions.map(cond => {
+        if (cond.category === 'cert_name') {
+          const query = (cond.value || '').toLowerCase().trim();
+          if (!query) return true;
+          return certList.some((c: string) => c.toLowerCase().includes(query));
+        }
+        if (cond.category === 'cert_count') {
+          if (cond.value === '1+') return certCount >= 1;
+          if (cond.value === '2+') return certCount >= 2;
+          if (cond.value === '3+') return certCount >= 3;
+          if (cond.value === '0') return certCount === 0;
+          return true;
+        }
+        if (cond.category === 'attendance') {
+          const absent = rankingSummary?.unexcused_absent_count || 0;
+          const late = rankingSummary?.unexcused_late_count || 0;
+          const score = rankingSummary?.attendance_score ?? 100;
+
+          if (cond.value === 'perfect') return absent === 0 && late === 0 && score === 100;
+          if (cond.value === 'absent_le_1') return absent <= 1;
+          if (cond.value === 'score_ge_90') return score >= 90;
+          return true;
+        }
+        if (cond.category === 'status') {
+          const status = student.employment_status || '';
+          const bType = student.business_type || '';
+          if (cond.value === '미취업') return status === '미취업' || status === '미설정' || !status;
+          if (cond.value === '취업') return status === '취업' || bType === '취업' || bType === '도제OJT';
+          if (cond.value === '현장실습중') return bType === '현장실습중' || bType === '채용진행중';
+          if (cond.value === '진학') return status === '진학';
+          return true;
+        }
+        if (cond.category === 'rank') {
+          const pct = rankingSummary?.rank_percentile;
+          if (pct === undefined || pct === null) return false;
+          if (cond.value === 'top30') return pct <= 30;
+          if (cond.value === 'top50') return pct <= 50;
+          return true;
+        }
+        return true;
+      });
+
+      if (customRule.operator === 'OR') {
+        return matches.some(m => m === true);
+      }
+      return matches.every(m => m === true);
+    }).length;
+  }, [allData, rankingMap, customRule]);
+
   const groupedData = React.useMemo(() => {
     const grouped: Record<string, StudentEmploymentData[]> = {};
     for (const student of allData) {
       const major = student.major || '';
       const classInfo = student.class_info || '';
-      // 학년도별 명칭 변경 적용 (예: 기계3-1)
       const displayClassName = getShortClassName(major, classInfo, grade, student.graduation_year);
       if (!grouped[displayClassName]) grouped[displayClassName] = [];
       grouped[displayClassName].push(student);
@@ -241,7 +362,6 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
 
   const majorOrderMap = React.useMemo(() => {
     const map = new Map(SORT_ORDER.map((m, i) => [MAJOR_MAP[m] || m, i]));
-    // '공간'도 '건축'과 동일한 순서로 처리
     map.set('공간', map.get('건축') ?? 5);
     return map;
   }, []);
@@ -270,7 +390,6 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
     const query = searchQuery.toLowerCase().trim();
     
     return allData.filter(student => {
-      // 1. 자격증 개수 필터 조건 확인
       const certsCount = student.certificates?.length || 0;
       let certMatch = true;
       if (certFilter === '1+') certMatch = certsCount >= 1;
@@ -278,7 +397,6 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
       else if (certFilter === '3+') certMatch = certsCount >= 3;
       else if (certFilter === '0') certMatch = certsCount === 0;
 
-      // 2. 검색어 필터 조건 확인 (개별 자격증 명칭도 포함)
       let searchMatch = true;
       if (searchQuery && searchQuery.trim() !== '') {
         const certList = Array.isArray(student.certificates)
@@ -324,7 +442,7 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
 
   return (
     <div className="flex flex-col h-full gap-4">
-      {/* 클라이언트 사이드 검색창 (독립된 상태 관리로 타이핑 렉 제거) */}
+      {/* 클라이언트 사이드 검색창 */}
       <SearchHeader 
         onSearch={setSearchQuery} 
         currentSearchQuery={searchQuery} 
@@ -332,6 +450,10 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
         matchedCount={matchedCount} 
         certFilter={certFilter}
         onCertFilterChange={setCertFilter}
+        customRule={customRule}
+        onOpenCustomModal={() => setIsCustomModalOpen(true)}
+        onClearCustomRule={() => setCustomRule(null)}
+        customMatchedCount={customMatchedCount}
       />
 
       <div className="flex-1 overflow-x-auto overflow-y-auto bg-gray-50/50 rounded-xl border border-slate-200 shadow-sm p-2 sm:p-4">
@@ -348,7 +470,6 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
 
             let teacherName = '';
 
-            // 1. 사용자 관리 DB (profiles)에서 현재 학년/학과/반에 배정된 담임 교사를 최우선 탐색
             if (teacherProfiles && teacherProfiles.length > 0) {
               const cleanM = (studentMajor || '').replace(/과|공업계/g, '').trim();
               const cleanC = (studentClass || '').replace(/반|학년/g, '').trim();
@@ -365,7 +486,6 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
               }
             }
 
-            // 2. 만약 profiles DB에 없으면 학생 데이터의 teacher_name 폴백 사용
             if (!teacherName) {
               teacherName = students.find(s => s.teacher_name)?.teacher_name || '';
             }
@@ -405,6 +525,7 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
                         userProfile={userProfile}
                         searchQuery={searchQuery}
                         certFilter={certFilter}
+                        customRule={customRule}
                         baseYear={baseYear}
                         isLowerGrade={isLowerGrade}
                       />
@@ -419,6 +540,15 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
           })}
         </div>
       </div>
+
+      {/* 자유 커스텀 조건 조합 모달 */}
+      <CustomCombinationModal
+        isOpen={isCustomModalOpen}
+        onClose={() => setIsCustomModalOpen(false)}
+        onApply={(rule) => setCustomRule(rule)}
+        currentRule={customRule}
+        allCertificates={allCertificates}
+      />
     </div>
   );
 }
