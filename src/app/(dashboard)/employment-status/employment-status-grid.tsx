@@ -188,7 +188,7 @@ function SearchHeader({
         </button>
       </div>
 
-      {/* 자유 커스텀 조합 하이라이트 버튼 */}
+      {/* 커스텀 검색 버튼 */}
       <button
         onClick={onOpenCustomModal}
         className={cn(
@@ -199,18 +199,18 @@ function SearchHeader({
         )}
       >
         <SlidersHorizontal className="h-4 w-4 shrink-0" />
-        {customRule ? '조합 조건 수정' : '🔍 커스텀 조합 설정'}
+        {customRule ? '커스텀 검색 조건 수정' : '🔍 커스텀 검색'}
       </button>
 
-      {/* 커스텀 조합 적용 안내 태그 */}
+      {/* 커스텀 검색 적용 안내 태그 */}
       {customRule && (
         <div className="flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 text-indigo-900 px-3 py-1.5 rounded-full text-xs font-bold shrink-0 animate-in fade-in-50">
           <Sparkles className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
-          <span>[커스텀 조합 강조 ({customRule.operator}): {customMatchedCount ?? 0}명]</span>
+          <span>[커스텀 검색 강조 ({customRule.operator}): {customMatchedCount ?? 0}명]</span>
           <button 
             onClick={onClearCustomRule}
             className="ml-1 text-slate-400 hover:text-rose-600 p-0.5 rounded-full hover:bg-white transition-colors"
-            title="커스텀 조합 해제"
+            title="커스텀 검색 해제"
           >
             <X className="h-3.5 w-3.5" />
           </button>

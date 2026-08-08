@@ -281,7 +281,7 @@ export function CustomCombinationModal({
             <div className="p-2 bg-white/15 rounded-xl backdrop-blur-md border border-white/20">
               <SlidersHorizontal className="h-5 w-5 text-blue-100" />
             </div>
-            자유 커스텀 조건 조합 하이라이트 빌더
+            자유 커스텀 검색 하이라이트 빌더
           </DialogTitle>
           <DialogDescription className="text-blue-100/90 text-xs font-medium mt-1.5 leading-relaxed relative z-10">
             대분류(자격증, 출결, 취업, 성적) 선택 후 세부 항목을 자유롭게 조립하여 원하는 학생을 하이라이트합니다.
