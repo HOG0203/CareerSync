@@ -77,10 +77,37 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
       }
       return (
         <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative z-40 bg-white ring-2 ring-blue-500" style={{ width: config.width }}>
-          <Select value={isInOptions ? localValue : ''} onValueChange={(v) => { if (v === '기타(직접입력)') { isManualRef.current = true; setIsManualInput(true); setLocalValue('기타(직접입력)'); } else { handleCommit(v); } }} onOpenChange={(open) => { if (!open) { setTimeout(() => { if (!isManualRef.current) onEndEdit(); }, 50); } }} defaultOpen={true}>
-            <SelectTrigger className="h-8 w-full border-none shadow-none focus:ring-0 text-[11px] px-1 bg-transparent font-medium"><SelectValue placeholder="선택..." /></SelectTrigger>
-            <SelectContent className="z-[100]">{resolvedOptions?.map((opt:any) => (<SelectItem key={opt.value} value={opt.value} className="text-[11px]">{opt.label}</SelectItem>))}</SelectContent>
-          </Select>
+          <select
+            autoFocus
+            value={isInOptions ? localValue : ''}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === '기타(직접입력)') {
+                isManualRef.current = true;
+                setIsManualInput(true);
+                setLocalValue('기타(직접입력)');
+              } else {
+                handleCommit(v);
+              }
+            }}
+            onBlur={() => {
+              if (!isManualRef.current) onEndEdit();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                onEndEdit();
+              }
+            }}
+            className="h-8 w-full text-[11px] border-none outline-none focus:ring-0 px-1 bg-white font-medium cursor-pointer"
+          >
+            <option value="" disabled hidden>선택...</option>
+            {resolvedOptions?.map((opt: any) => (
+              <option key={opt.value} value={opt.value} className="text-[11px] py-1 bg-white text-slate-800">
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </td>
       )
     }
