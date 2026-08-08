@@ -227,7 +227,7 @@ export function useSpreadsheet({
       container.scrollTop = Math.max(0, targetY - HEADER_HEIGHT - 10);
     }
 
-    // 2. 가로 스크롤 (실제 헤더 TH DOM의 offsetLeft/offsetWidth 연동으로 100% 정밀 보장)
+    // 2. 가로 스크롤 (화면 밖으로 넘어간 셀만 최소 15px 마진으로 스크롤)
     const ths = container.querySelectorAll('thead tr:last-child th');
     const targetTh = ths[col + 1] as HTMLElement;
 
@@ -237,16 +237,15 @@ export function useSpreadsheet({
       const curX = container.scrollLeft;
       const cw = container.clientWidth;
 
-      const RIGHT_PADDING = 140; // 우측 시야 여유 공간 확보
-      const LEFT_PADDING = 60;
+      const MARGIN = 15; // 이미 화면에 잘 보이는 셀 클릭 시 스크롤 이동 100% 방지
 
-      // 열의 우측 끝(endX)이 시야 우측 140px 이내로 접할 때 선제적 우측 스크롤
-      if (endX > curX + cw - RIGHT_PADDING) {
-        container.scrollLeft = endX - cw + RIGHT_PADDING;
+      // 열의 우측 끝(endX)이 실제 시야 우측 끝을 완전히 넘어갈 때만 최소한 스크롤
+      if (endX > curX + cw - MARGIN) {
+        container.scrollLeft = endX - cw + MARGIN;
       }
-      // 열의 좌측 끝(startX)이 시야 좌측 60px 이내로 접할 때 좌측 스크롤
-      else if (startX < curX + LEFT_PADDING) {
-        container.scrollLeft = Math.max(0, startX - LEFT_PADDING);
+      // 열의 좌측 끝(startX)이 실제 시야 좌측 끝 넘어갈 때만 최소한 스크롤
+      else if (startX < curX + MARGIN) {
+        container.scrollLeft = Math.max(0, startX - MARGIN);
       }
     }
   }, [colWidthOffsets, ROW_HEIGHT, HEADER_HEIGHT]);

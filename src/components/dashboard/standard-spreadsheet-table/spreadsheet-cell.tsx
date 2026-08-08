@@ -36,23 +36,20 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
     }
   }, [value, isEditing, resolvedOptions])
 
-  // 더블클릭/수정 모드 진입 즉시 드롭다운 메뉴 팝업 자동 개방 (showPicker)
+  // 더블클릭/수정 모드 진입 즉시 0ms 드롭다운 메뉴 팝업 자동 개방 (showPicker)
   React.useEffect(() => {
     if (isEditing && config.type === 'select' && !isManualInput) {
-      const timer = setTimeout(() => {
-        if (selectRef.current) {
-          try {
-            if (typeof selectRef.current.showPicker === 'function') {
-              selectRef.current.showPicker();
-            } else {
-              selectRef.current.focus();
-            }
-          } catch {
-            selectRef.current?.focus();
+      if (selectRef.current) {
+        try {
+          if (typeof selectRef.current.showPicker === 'function') {
+            selectRef.current.showPicker();
+          } else {
+            selectRef.current.focus();
           }
+        } catch {
+          selectRef.current?.focus();
         }
-      }, 0);
-      return () => clearTimeout(timer);
+      }
     }
   }, [isEditing, config.type, isManualInput]);
 
@@ -110,14 +107,6 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
                 setLocalValue('기타(직접입력)');
               } else {
                 handleCommit(v);
-              }
-            }}
-            onClick={() => {
-              // 동일한 옵션을 클릭하여 onChange가 안 튀었을 경우 편집 모드 즉시 깔끔하게 종료
-              if (!isManualRef.current) {
-                setTimeout(() => {
-                  onEndEdit();
-                }, 100);
               }
             }}
             onBlur={() => {
