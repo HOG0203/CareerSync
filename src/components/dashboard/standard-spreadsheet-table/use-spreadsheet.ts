@@ -368,21 +368,31 @@ export function useSpreadsheet({
     }
     const finalValue = (value === 'CLEARED' || value === '') ? null : value;
     const student = data.find(s => s.id === id);
+    const oldValue = student ? student[field] : null;
 
-    // 2차 확인 모달 / 서버 저장을 먼저 수행하고 승인될 때만 클라이언트 데이터 반영
+    if (oldValue === finalValue) {
+      setEditingCell(null);
+      return { success: true };
+    }
+
+    // 1. 즉시 0ms 낙관적 UI 업데이트 (편집 상자 바로 닫기 및 화면 즉시 변경)
+    setEditingCell(null);
+    if (student) recordHistory([{ id, field, oldValue }]);
+    setData(prev => prev.map(s => s.id === id ? { ...s, [field]: finalValue } : s));
+    setDetailData((prev: any) => (prev && prev.id === id) ? { ...prev, [field]: finalValue } : prev);
+
+    // 2. 백그라운드 서버 DB 저장
     const result = await onSave(id, field, finalValue);
 
-    if (result && result.success) {
-      if (student && student[field] !== finalValue) recordHistory([{ id, field, oldValue: student[field] }]);
-      setEditingCell(null);
-      setData(prev => prev.map(s => s.id === id ? { ...s, [field]: finalValue } : s));
-      setDetailData((prev: any) => (prev && prev.id === id) ? { ...prev, [field]: finalValue } : prev);
-      return result;
-    } else {
-      setEditingCell(null);
+    // 3. 서버 저장 실패 시 원래 값으로 롤백 및 알림
+    if (!result || !result.success) {
+      setData(prev => prev.map(s => s.id === id ? { ...s, [field]: oldValue } : s));
+      toast({ variant: 'destructive', title: '저장 실패', description: result?.error || '서버 저증 중 오류가 발생했습니다.' });
       return result || { success: false };
     }
-  }, [onSave, filteredData, columns, data, recordHistory])
+
+    return result;
+  }, [onSave, filteredData, columns, data, recordHistory, toast])
 
 
 
