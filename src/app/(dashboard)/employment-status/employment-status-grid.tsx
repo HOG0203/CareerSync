@@ -326,14 +326,27 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
           if (cond.value === '0') return certCount === 0;
           return true;
         }
-        if (cond.category === 'attendance') {
-          const absent = rankingSummary?.unexcused_absent_count || 0;
-          const late = rankingSummary?.unexcused_late_count || 0;
-          const score = rankingSummary?.attendance_score ?? 100;
+        const attn = rankingSummary?.attendance;
+        const unexcusedTotal = (attn?.unexcused?.absent || 0) + (attn?.unexcused?.late || 0) + (attn?.unexcused?.early || 0) + (attn?.unexcused?.out || 0) + (rankingSummary?.unexcused_absent_count || 0) + (rankingSummary?.unexcused_late_count || 0);
+        const diseaseTotal = (attn?.disease?.absent || 0) + (attn?.disease?.late || 0) + (attn?.disease?.early || 0) + (attn?.disease?.out || 0);
+        const otherTotal = (attn?.other?.absent || 0) + (attn?.other?.late || 0) + (attn?.other?.early || 0) + (attn?.other?.out || 0);
 
-          if (cond.value === 'perfect') return absent === 0 && late === 0 && score === 100;
-          if (cond.value === 'absent_le_1') return absent <= 1;
-          if (cond.value === 'score_ge_90') return score >= 90;
+        if (cond.category === 'attendance_perfect') {
+          return unexcusedTotal === 0 && diseaseTotal === 0 && otherTotal === 0;
+        }
+        if (cond.category === 'attendance_unexcused') {
+          if (cond.value === '0') return unexcusedTotal === 0;
+          if (cond.value === 'le_1') return unexcusedTotal <= 1;
+          if (cond.value === 'le_2') return unexcusedTotal <= 2;
+          if (cond.value === 'le_3') return unexcusedTotal <= 3;
+          return true;
+        }
+        if (cond.category === 'attendance_disease') {
+          if (cond.value === '0') return diseaseTotal === 0;
+          if (cond.value === 'le_1') return diseaseTotal <= 1;
+          if (cond.value === 'le_2') return diseaseTotal <= 2;
+          if (cond.value === 'le_3') return diseaseTotal <= 3;
+          if (cond.value === 'le_5') return diseaseTotal <= 5;
           return true;
         }
         if (cond.category === 'status') {

@@ -35,7 +35,7 @@ import { cn } from '@/lib/utils';
 
 export interface ConditionItem {
   id: string;
-  category: 'cert_name' | 'cert_count' | 'attendance' | 'status' | 'rank';
+  category: 'cert_name' | 'cert_count' | 'attendance_perfect' | 'attendance_unexcused' | 'attendance_disease' | 'status' | 'rank';
   value: string;
 }
 
@@ -64,12 +64,12 @@ const PRESET_STORAGE_KEY = 'careersync_combination_presets';
 const DEFAULT_PRESETS: PresetItem[] = [
   {
     id: 'preset_1',
-    name: '선반기능사 + 출결 개근',
+    name: '선반기능사 + 완벽 개근 (미인정/질병 0건)',
     rule: {
       operator: 'AND',
       conditions: [
         { id: 'c1', category: 'cert_name', value: '컴퓨터응용선반기능사' },
-        { id: 'c2', category: 'attendance', value: 'perfect' }
+        { id: 'c2', category: 'attendance_perfect', value: '0' }
       ]
     }
   },
@@ -86,12 +86,13 @@ const DEFAULT_PRESETS: PresetItem[] = [
   },
   {
     id: 'preset_3',
-    name: '자격증 2개 이상 + 개근',
+    name: '자격증 2개+ & 미인정 0건 & 질병 3건 이하',
     rule: {
       operator: 'AND',
       conditions: [
         { id: 'c1', category: 'cert_count', value: '2+' },
-        { id: 'c2', category: 'attendance', value: 'perfect' }
+        { id: 'c2', category: 'attendance_unexcused', value: '0' },
+        { id: 'c3', category: 'attendance_disease', value: 'le_3' }
       ]
     }
   }
@@ -121,7 +122,7 @@ export function CustomCombinationModal({
         setOperator('AND');
         setConditions([
           { id: `c_${Date.now()}_1`, category: 'cert_name', value: '컴퓨터응용선반기능사' },
-          { id: `c_${Date.now()}_2`, category: 'attendance', value: 'perfect' }
+          { id: `c_${Date.now()}_2`, category: 'attendance_perfect', value: '0' }
         ]);
       }
 
@@ -164,7 +165,9 @@ export function CustomCombinationModal({
         if (key === 'category') {
           if (val === 'cert_name') updated.value = allCertificates[0] || '컴퓨터응용선반기능사';
           else if (val === 'cert_count') updated.value = '1+';
-          else if (val === 'attendance') updated.value = 'perfect';
+          else if (val === 'attendance_perfect') updated.value = '0';
+          else if (val === 'attendance_unexcused') updated.value = '0';
+          else if (val === 'attendance_disease') updated.value = '0';
           else if (val === 'status') updated.value = '미취업';
           else if (val === 'rank') updated.value = 'top30';
         }
@@ -348,13 +351,15 @@ export function CustomCombinationModal({
                       value={cond.category}
                       onValueChange={val => handleConditionChange(cond.id, 'category', val as any)}
                     >
-                      <SelectTrigger className="w-[140px] h-9 text-xs font-bold bg-white border-slate-200">
+                      <SelectTrigger className="w-[145px] h-9 text-xs font-bold bg-white border-slate-200">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="cert_name" className="text-xs">특정 자격증 명칭</SelectItem>
                         <SelectItem value="cert_count" className="text-xs">자격증 총 개수</SelectItem>
-                        <SelectItem value="attendance" className="text-xs">출결 상태 (개근)</SelectItem>
+                        <SelectItem value="attendance_perfect" className="text-xs">✨ 완벽 개근 (미인정/질병 0건)</SelectItem>
+                        <SelectItem value="attendance_unexcused" className="text-xs">🚨 미인정 (무단) 건수</SelectItem>
+                        <SelectItem value="attendance_disease" className="text-xs">🤒 질병 건수</SelectItem>
                         <SelectItem value="status" className="text-xs">취업/진로 상태</SelectItem>
                         <SelectItem value="rank" className="text-xs">성적/석차 범위</SelectItem>
                       </SelectContent>
@@ -396,18 +401,51 @@ export function CustomCombinationModal({
                         </Select>
                       )}
 
-                      {cond.category === 'attendance' && (
+                      {cond.category === 'attendance_perfect' && (
                         <Select
-                          value={cond.value}
+                          value={cond.value || '0'}
                           onValueChange={val => handleConditionChange(cond.id, 'value', val)}
                         >
                           <SelectTrigger className="h-9 text-xs font-bold bg-white border-slate-200">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="perfect" className="text-xs">개근 (미인정 0회 / 출결 100점)</SelectItem>
-                            <SelectItem value="absent_le_1" className="text-xs">미인정 결석 1회 이하</SelectItem>
-                            <SelectItem value="score_ge_90" className="text-xs">출결 점수 90점 이상</SelectItem>
+                            <SelectItem value="0" className="text-xs">완벽 개근 (미인정+질병 결석/지각 0건)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+
+                      {cond.category === 'attendance_unexcused' && (
+                        <Select
+                          value={cond.value || '0'}
+                          onValueChange={val => handleConditionChange(cond.id, 'value', val)}
+                        >
+                          <SelectTrigger className="h-9 text-xs font-bold bg-white border-slate-200">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0" className="text-xs">미인정 0건 (무단 결석/지각 없음)</SelectItem>
+                            <SelectItem value="le_1" className="text-xs">미인정 1건 이하</SelectItem>
+                            <SelectItem value="le_2" className="text-xs">미인정 2건 이하</SelectItem>
+                            <SelectItem value="le_3" className="text-xs">미인정 3건 이하</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+
+                      {cond.category === 'attendance_disease' && (
+                        <Select
+                          value={cond.value || '0'}
+                          onValueChange={val => handleConditionChange(cond.id, 'value', val)}
+                        >
+                          <SelectTrigger className="h-9 text-xs font-bold bg-white border-slate-200">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0" className="text-xs">질병 0건 (질병 결석/지각 없음)</SelectItem>
+                            <SelectItem value="le_1" className="text-xs">질병 1건 이하</SelectItem>
+                            <SelectItem value="le_2" className="text-xs">질병 2건 이하</SelectItem>
+                            <SelectItem value="le_3" className="text-xs">질병 3건 이하</SelectItem>
+                            <SelectItem value="le_5" className="text-xs">질병 5건 이하</SelectItem>
                           </SelectContent>
                         </Select>
                       )}
