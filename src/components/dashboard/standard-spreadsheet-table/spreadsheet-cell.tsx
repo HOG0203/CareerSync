@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { StudentPopover } from '@/components/dashboard/student-popover'
 
-export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, isEditing, isSelected, isFocused, onMouseDown, onMouseEnter, onStartEdit, onEndEdit, onSave, onAction, rankingMap, isRankingsLoading, userProfile, disableNamePopover, baseYear }: any) => {
+export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, rIdx, cIdx, isEditing, isSelected, isFocused, onMouseDown, onMouseEnter, onStartEdit, onEndEdit, onSave, onAction, rankingMap, isRankingsLoading, userProfile, disableNamePopover, baseYear }: any) => {
   const [localValue, setLocalValue] = React.useState(value || '')
   const [isManualInput, setIsManualInput] = React.useState(false)
   const isManualRef = React.useRef(false)
@@ -67,7 +67,7 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
       const isOtherTrigger = localValue === '기타(직접입력)';
       if (isManualInput || isOtherTrigger) {
         return (
-          <td className="p-0 border-r border-b relative z-40 bg-white ring-2 ring-blue-500" style={{ width: config.width }}>
+          <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative z-40 bg-white ring-2 ring-blue-500" style={{ width: config.width }}>
             <div className="flex items-center w-full bg-white">
               <Input autoFocus value={isOtherTrigger ? '' : localValue} onChange={(e) => { setLocalValue(e.target.value); setIsManualInput(true); isManualRef.current = true; }} onBlur={() => handleCommit(localValue)} onKeyDown={(e) => { if(e.key==='Enter') { e.preventDefault(); e.stopPropagation(); handleCommit(localValue); } if(e.key==='Escape') { e.preventDefault(); e.stopPropagation(); onEndEdit(); } }} className="h-8 w-full text-[11px] border-none rounded-none focus-visible:ring-0 px-1 bg-transparent font-medium" placeholder="내용 입력..." />
               <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-slate-400 hover:text-rose-500" onClick={() => { setLocalValue(''); setIsManualInput(false); isManualRef.current = false; }}><X className="h-3 w-3" /></Button>
@@ -76,7 +76,7 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
         )
       }
       return (
-        <td className="p-0 border-r border-b relative z-40 bg-white ring-2 ring-blue-500" style={{ width: config.width }}>
+        <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative z-40 bg-white ring-2 ring-blue-500" style={{ width: config.width }}>
           <Select value={isInOptions ? localValue : ''} onValueChange={(v) => { if (v === '기타(직접입력)') { isManualRef.current = true; setIsManualInput(true); setLocalValue('기타(직접입력)'); } else { handleCommit(v); } }} onOpenChange={(open) => { if (!open) { setTimeout(() => { if (!isManualRef.current) onEndEdit(); }, 50); } }} defaultOpen={true}>
             <SelectTrigger className="h-8 w-full border-none shadow-none focus:ring-0 text-[11px] px-1 bg-transparent font-medium"><SelectValue placeholder="선택..." /></SelectTrigger>
             <SelectContent className="z-[100]">{resolvedOptions?.map((opt:any) => (<SelectItem key={opt.value} value={opt.value} className="text-[11px]">{opt.label}</SelectItem>))}</SelectContent>
@@ -85,16 +85,16 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
       )
     }
     if (config.type === 'date') return (
-      <td className="p-0 border-r border-b relative z-40 bg-white ring-2 ring-blue-500" style={{ width: config.width }}>
+      <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative z-40 bg-white ring-2 ring-blue-500" style={{ width: config.width }}>
         <Popover open={true} onOpenChange={(open) => !open && onEndEdit()}>
           <PopoverTrigger asChild><div className="h-8 w-full flex items-center justify-center text-[11px] cursor-pointer font-medium">{localValue || '-'}</div></PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={localValue ? new Date(localValue) : undefined} onSelect={(date) => date && handleCommit(format(date, 'yyyy-MM-dd'))} locale={ko} initialFocus /></PopoverContent>
         </Popover>
       </td>
     )
-    if (config.type === 'multi-select') return <td className="p-0 border-r border-b relative z-40 bg-white" />;
+    if (config.type === 'multi-select') return <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative z-40 bg-white" />;
     return (
-      <td className="p-0 border-r border-b relative z-40 bg-white ring-2 ring-blue-500" style={{ width: config.width }}>
+      <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative z-40 bg-white ring-2 ring-blue-500" style={{ width: config.width }}>
         <Input autoFocus value={localValue} onChange={(e) => setLocalValue(e.target.value)} onBlur={() => handleCommit(localValue)} onKeyDown={(e) => { if(e.key==='Enter') { e.preventDefault(); e.stopPropagation(); handleCommit(localValue); } if(e.key==='Escape') { e.preventDefault(); e.stopPropagation(); onEndEdit(); } }} className="h-8 w-full text-[11px] border-none rounded-none focus-visible:ring-0 px-1 bg-transparent font-medium" />
       </td>
     )
@@ -103,6 +103,8 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
 
   return (
     <td
+      data-row={rIdx}
+      data-col={cIdx}
       className={cn("p-0 border-r border-b relative h-8 transition-none select-none cursor-cell text-center overflow-hidden", isSelected && "bg-blue-50/70", isFocused && "ring-2 ring-blue-500 ring-inset z-10")}
       style={{ minWidth: config.width, width: 'auto' }}
       onMouseDown={(e) => onMouseDown(e.shiftKey)} onMouseEnter={onMouseEnter} onDoubleClick={() => !config.readOnly && config.type !== 'action' && onStartEdit()}
