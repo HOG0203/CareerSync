@@ -252,7 +252,10 @@ export function CustomCombinationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl rounded-2xl p-0 border-none shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <DialogContent 
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        className="max-w-2xl rounded-2xl p-0 border-none shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+      >
         <DialogHeader className="p-5 bg-slate-900 text-white shrink-0">
           <DialogTitle className="text-lg font-bold flex items-center gap-2">
             <SlidersHorizontal className="h-5 w-5 text-blue-400" />
