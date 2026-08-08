@@ -226,19 +226,27 @@ export function useSpreadsheet({
       container.scrollTop = targetY + ROW_HEIGHT - ch;
     }
 
-    // 2. 가로 스크롤 (우측 150px / 좌측 80px 선제적 스크롤 감도 적용)
-    const startX = colWidthOffsets[col] ?? 32;
-    const endX = colWidthOffsets[col + 1] ?? (startX + 80);
-    const curX = container.scrollLeft;
-    const cw = container.clientWidth;
+    // 2. 가로 스크롤 (실제 헤더 TH DOM의 offsetLeft/offsetWidth 연동으로 100% 정밀 보장)
+    const ths = container.querySelectorAll('thead tr:last-child th');
+    const targetTh = ths[col + 1] as HTMLElement;
 
-    const LEFT_PADDING = 80;
-    const RIGHT_PADDING = 150; // 우측 여백 150px 사전 확보
+    if (targetTh) {
+      const startX = targetTh.offsetLeft;
+      const endX = targetTh.offsetLeft + targetTh.offsetWidth;
+      const curX = container.scrollLeft;
+      const cw = container.clientWidth;
 
-    if (endX > curX + cw - RIGHT_PADDING) {
-      container.scrollLeft = Math.max(0, endX - cw + RIGHT_PADDING);
-    } else if (startX < curX + LEFT_PADDING) {
-      container.scrollLeft = Math.max(0, startX - LEFT_PADDING);
+      const RIGHT_PADDING = 140; // 우측 시야 여유 공간 확보
+      const LEFT_PADDING = 60;
+
+      // 열의 우측 끝(endX)이 시야 우측 140px 이내로 접할 때 선제적 우측 스크롤
+      if (endX > curX + cw - RIGHT_PADDING) {
+        container.scrollLeft = endX - cw + RIGHT_PADDING;
+      }
+      // 열의 좌측 끝(startX)이 시야 좌측 60px 이내로 접할 때 좌측 스크롤
+      else if (startX < curX + LEFT_PADDING) {
+        container.scrollLeft = Math.max(0, startX - LEFT_PADDING);
+      }
     }
   }, [colWidthOffsets, ROW_HEIGHT, HEADER_HEIGHT]);
 
