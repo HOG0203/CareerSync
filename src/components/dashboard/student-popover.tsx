@@ -27,7 +27,7 @@ import {
   ClipboardList,
   MessageSquare
 } from 'lucide-react';
-import { getStudentScoresById } from '@/app/students/actions';
+import { getStudentScoresById, updateStudentField } from '@/app/students/actions';
 import { Button } from '@/components/ui/button';
 import { CounselingModal } from '@/app/(dashboard)/class-management/counseling-modal';
 
@@ -56,6 +56,7 @@ export function StudentPopover({
   baseYear,
   isLowerGrade: propIsLowerGrade
 }: StudentPopoverProps) {
+  const [open, setOpen] = React.useState(false);
   const isMobile = useIsMobile();
   const resolvedSide = side || (isMobile ? 'bottom' : 'right');
   const resolvedAlign = align || (isMobile ? 'center' : 'start');
@@ -134,15 +135,20 @@ export function StudentPopover({
 
   return (
     <>
-      <Popover modal={false}>
+      <Popover open={open} onOpenChange={setOpen} modal={false}>
         <PopoverTrigger asChild>
           {children}
         </PopoverTrigger>
         <PopoverContent 
           side={resolvedSide} 
           align={resolvedAlign}
-          className="p-4 w-[300px] text-xs shadow-xl border-2 z-[100] max-h-[80vh] overflow-y-auto bg-white"
+          className="p-4 w-[300px] text-xs shadow-xl border-2 z-[100] max-h-[80vh] overflow-y-auto bg-white cursor-pointer"
           sideOffset={5}
+          onClick={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('button') || target.closest('a')) return;
+            setOpen(false);
+          }}
         >
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b-2 pb-1.5 mb-1">
