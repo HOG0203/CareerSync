@@ -210,40 +210,40 @@ export default function CompanyInfoPage() {
 
   return (
     <div className="flex flex-col h-full gap-6">
-      {/* 헤더 섹션 */}
-      <div className="flex items-center justify-between shrink-0 px-1">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
-            <Factory className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
-            업체정보
+      {/* 헤더 섹션 (모바일 반응형 최적화) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 shrink-0 px-1">
+        <div className="flex flex-col gap-1 min-w-0">
+          <h2 className="text-xl xs:text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <Factory className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 shrink-0" />
+            <span className="whitespace-nowrap shrink-0">업체정보</span>
             {isAdmin && (
-              <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-black uppercase">관리자 모드</span>
+              <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-black uppercase whitespace-nowrap shrink-0">관리자 모드</span>
             )}
             {isTeacher && !isAdmin && (
-              <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-black uppercase">조회 모드</span>
+              <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-black uppercase whitespace-nowrap shrink-0">조회 모드</span>
             )}
           </h2>
-          <p className="text-muted-foreground text-xs sm:text-sm font-medium">
+          <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed whitespace-nowrap overflow-hidden text-ellipsis">
             학교 협력 기업 상세 정보 및 취업/실습 현황 관리
           </p>
         </div>
         {isAdmin && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <Button
               variant="outline"
               onClick={() => setIsImportModalOpen(true)}
-              className="bg-white hover:bg-emerald-50 hover:text-emerald-700 border-emerald-300 text-emerald-800 font-bold gap-2 text-xs sm:text-sm"
+              className="flex-1 sm:flex-initial h-9 sm:h-10 bg-white hover:bg-emerald-50 hover:text-emerald-700 border-emerald-300 text-emerald-800 font-bold gap-1.5 text-xs sm:text-sm px-2.5 sm:px-4 whitespace-nowrap"
             >
-              <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> 업체 일괄 등록
+              <FileSpreadsheet className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 shrink-0" /> 업체 일괄 등록
             </Button>
             <Button 
               onClick={() => {
                 setEditingCompany({ name: '' });
                 setIsEditModalOpen(true);
               }}
-              className="bg-blue-600 hover:bg-blue-700 font-bold gap-2 text-xs sm:text-sm"
+              className="flex-1 sm:flex-initial h-9 sm:h-10 bg-blue-600 hover:bg-blue-700 font-bold gap-1.5 text-xs sm:text-sm px-2.5 sm:px-4 whitespace-nowrap"
             >
-              <Plus className="h-4 w-4" /> 신규 업체 등록
+              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" /> 신규 업체 등록
             </Button>
           </div>
         )}
