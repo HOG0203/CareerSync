@@ -93,8 +93,12 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, isRanki
           return bType === '미취업' || bType === '아니오' || status === '미취업' || status === '미설정' || (!bType && !status);
         }
         if (val === '취업') return bType === '취업' || status === '취업';
-        if (val === '현장실습중') return bType === '현장실습중' || student.has_field_training === 'O';
-        if (val === '도제OJT') return bType === '도제OJT';
+        if (val === '현장실습/도제OJT' || val === '현장실습중' || val === '도제OJT') {
+          const isTrainingType = ['현장실습중', '현장실습', '도제OJT', '도제'].some(k => bType.includes(k));
+          const hasRecord = student.has_field_training === 'O' || (student.training_records && student.training_records.length > 0);
+          const isDojeCourse = (student.career_course || '').includes('도제');
+          return isTrainingType || hasRecord || isDojeCourse;
+        }
         if (val === '채용진행중') return bType === '채용진행중';
         if (val === '진학') return status === '진학' || bType === '진학' || aspiration === '진학';
         if (val === '제외인정자') return bType === '제외인정자' || status === '제외인정자' || aspiration === '제외인정자';

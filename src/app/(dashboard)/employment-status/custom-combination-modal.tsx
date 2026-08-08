@@ -518,8 +518,7 @@ export function CustomCombinationModal({
                           <SelectContent>
                             <SelectItem value="미취업" className="text-xs">미취업</SelectItem>
                             <SelectItem value="취업" className="text-xs">취업 (취업완료/재직)</SelectItem>
-                            <SelectItem value="현장실습중" className="text-xs">현장실습중</SelectItem>
-                            <SelectItem value="도제OJT" className="text-xs">도제OJT</SelectItem>
+                            <SelectItem value="현장실습/도제OJT" className="text-xs">현장실습 / 도제OJT</SelectItem>
                             <SelectItem value="채용진행중" className="text-xs">채용진행중</SelectItem>
                             <SelectItem value="진학" className="text-xs">진학</SelectItem>
                             <SelectItem value="제외인정자" className="text-xs">제외인정자</SelectItem>
