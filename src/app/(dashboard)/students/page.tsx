@@ -24,13 +24,7 @@ export default async function StudentsPage({
   searchParams: Promise<{ year?: string; major?: string; class?: string; status?: string; ay?: string; grade?: string }>;
 }) {
   const params = await searchParams;
-  const suspenseKey = `${params.ay || ''}-${params.grade || ''}-${params.year || ''}-${params.major || ''}-${params.class || ''}-${params.status || ''}`;
-
-  return (
-    <React.Suspense key={suspenseKey} fallback={<TableLoadingSkeleton />}>
-      <StudentsPageContent searchParams={params} />
-    </React.Suspense>
-  );
+  return <StudentsPageContent searchParams={params} />;
 }
 
 async function StudentsPageContent({
