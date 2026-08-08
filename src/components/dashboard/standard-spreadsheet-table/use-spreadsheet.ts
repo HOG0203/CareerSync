@@ -215,15 +215,16 @@ export function useSpreadsheet({
     if (!containerRef.current) return;
     const container = containerRef.current;
 
-    // 1. 세로 스크롤 (순수 수식)
+    // 1. 세로 스크롤 (하단 50px 여백 및 헤더 높이 100% 보정)
     const targetY = row * ROW_HEIGHT + HEADER_HEIGHT;
     const curY = container.scrollTop;
     const ch = container.clientHeight;
+    const BOTTOM_PADDING = 50; // 하단 가로 스크롤바 및 시야 넉넉한 여백 확보
 
-    if (targetY < curY + HEADER_HEIGHT) {
-      container.scrollTop = Math.max(0, targetY - HEADER_HEIGHT);
-    } else if (targetY + ROW_HEIGHT > curY + ch) {
-      container.scrollTop = targetY + ROW_HEIGHT - ch;
+    if (targetY + ROW_HEIGHT > curY + ch - BOTTOM_PADDING) {
+      container.scrollTop = targetY + ROW_HEIGHT - ch + BOTTOM_PADDING;
+    } else if (targetY < curY + HEADER_HEIGHT + 10) {
+      container.scrollTop = Math.max(0, targetY - HEADER_HEIGHT - 10);
     }
 
     // 2. 가로 스크롤 (실제 헤더 TH DOM의 offsetLeft/offsetWidth 연동으로 100% 정밀 보장)
