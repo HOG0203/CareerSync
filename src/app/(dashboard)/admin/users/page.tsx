@@ -17,11 +17,7 @@ import { TableLoadingSkeleton } from '@/components/dashboard/loading-skeleton';
 export const dynamic = 'force-dynamic';
 
 export default async function AdminUsersPage() {
-  return (
-    <React.Suspense fallback={<TableLoadingSkeleton />}>
-      <AdminUsersPageContent />
-    </React.Suspense>
-  );
+  return <AdminUsersPageContent />;
 }
 
 async function AdminUsersPageContent() {

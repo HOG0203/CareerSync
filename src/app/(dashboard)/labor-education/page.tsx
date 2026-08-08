@@ -57,13 +57,7 @@ export default async function LaborEducationPage({
   searchParams: Promise<{ year?: string; ay?: string; grade?: string }>;
 }) {
   const params = await searchParams;
-  const suspenseKey = `${params.ay || ''}-${params.grade || ''}-${params.year || ''}`;
-
-  return (
-    <React.Suspense key={suspenseKey} fallback={<GridLoadingSkeleton />}>
-      <LaborEducationPageContent searchParams={params} />
-    </React.Suspense>
-  );
+  return <LaborEducationPageContent searchParams={params} />;
 }
 
 async function LaborEducationPageContent({

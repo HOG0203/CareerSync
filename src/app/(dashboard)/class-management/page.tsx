@@ -25,14 +25,7 @@ export default async function ClassManagementPage({
   searchParams: Promise<{ grade?: string; major?: string; class?: string }>;
 }) {
   const params = await searchParams;
-  // 필터 값이 바뀔 때마다 Suspense가 다시 트리거되도록 고유 키 설정
-  const suspenseKey = `${params.grade || '3'}-${params.major || 'all'}-${params.class || 'all'}`;
-
-  return (
-    <Suspense key={suspenseKey} fallback={<TableLoadingSkeleton />}>
-      <ClassManagementPageContent searchParams={params} />
-    </Suspense>
-  );
+  return <ClassManagementPageContent searchParams={params} />;
 }
 
 async function ClassManagementPageContent({

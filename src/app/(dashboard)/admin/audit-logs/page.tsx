@@ -15,13 +15,7 @@ export default async function AuditLogsPage({
   searchParams: Promise<{ type?: string; search?: string }>;
 }) {
   const params = await searchParams;
-  const suspenseKey = `${params.type || 'all'}-${params.search || 'all'}`;
-
-  return (
-    <Suspense key={suspenseKey} fallback={<TableLoadingSkeleton />}>
-      <AuditLogsPageContent searchParams={params} />
-    </Suspense>
-  );
+  return <AuditLogsPageContent searchParams={params} />;
 }
 
 async function AuditLogsPageContent({
