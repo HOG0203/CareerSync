@@ -31,42 +31,52 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, isRanki
     const certCount = certList.length;
 
     const matches = customRule.conditions.map(cond => {
-      if (cond.category === 'cert_name') {
-        const query = (cond.value || '').toLowerCase().trim();
-        if (!query) return true;
-        return certList.some((c: string) => c.toLowerCase().includes(query));
+      // 1. 자격증 대분류
+      if (cond.mainCategory === 'cert' || (cond as any).category === 'cert_name' || (cond as any).category === 'cert_count') {
+        const isName = cond.subType === 'name' || (cond as any).category === 'cert_name';
+        if (isName) {
+          const query = (cond.value || '').toLowerCase().trim();
+          if (!query) return true;
+          return certList.some((c: string) => c.toLowerCase().includes(query));
+        } else {
+          if (cond.value === '1+') return certCount >= 1;
+          if (cond.value === '2+') return certCount >= 2;
+          if (cond.value === '3+') return certCount >= 3;
+          if (cond.value === '0') return certCount === 0;
+          return true;
+        }
       }
-      if (cond.category === 'cert_count') {
-        if (cond.value === '1+') return certCount >= 1;
-        if (cond.value === '2+') return certCount >= 2;
-        if (cond.value === '3+') return certCount >= 3;
-        if (cond.value === '0') return certCount === 0;
-        return true;
-      }
+
+      // 2. 출결 대분류
       const attn = rankingSummary?.attendance;
       const unexcusedTotal = (attn?.unexcused?.absent || 0) + (attn?.unexcused?.late || 0) + (attn?.unexcused?.early || 0) + (attn?.unexcused?.out || 0) + (rankingSummary?.unexcused_absent_count || 0) + (rankingSummary?.unexcused_late_count || 0);
       const diseaseTotal = (attn?.disease?.absent || 0) + (attn?.disease?.late || 0) + (attn?.disease?.early || 0) + (attn?.disease?.out || 0);
       const otherTotal = (attn?.other?.absent || 0) + (attn?.other?.late || 0) + (attn?.other?.early || 0) + (attn?.other?.out || 0);
 
-      if (cond.category === 'attendance_perfect') {
-        return unexcusedTotal === 0 && diseaseTotal === 0 && otherTotal === 0;
+      if (cond.mainCategory === 'attendance' || (cond as any).category?.startsWith('attendance')) {
+        const sub = cond.subType || (cond as any).category?.replace('attendance_', '');
+        if (sub === 'perfect' || sub === 'attendance_perfect') {
+          return unexcusedTotal === 0 && diseaseTotal === 0 && otherTotal === 0;
+        }
+        if (sub === 'unexcused' || sub === 'attendance_unexcused') {
+          if (cond.value === '0') return unexcusedTotal === 0;
+          if (cond.value === 'le_1') return unexcusedTotal <= 1;
+          if (cond.value === 'le_2') return unexcusedTotal <= 2;
+          if (cond.value === 'le_3') return unexcusedTotal <= 3;
+          return true;
+        }
+        if (sub === 'disease' || sub === 'attendance_disease') {
+          if (cond.value === '0') return diseaseTotal === 0;
+          if (cond.value === 'le_1') return diseaseTotal <= 1;
+          if (cond.value === 'le_2') return diseaseTotal <= 2;
+          if (cond.value === 'le_3') return diseaseTotal <= 3;
+          if (cond.value === 'le_5') return diseaseTotal <= 5;
+          return true;
+        }
       }
-      if (cond.category === 'attendance_unexcused') {
-        if (cond.value === '0') return unexcusedTotal === 0;
-        if (cond.value === 'le_1') return unexcusedTotal <= 1;
-        if (cond.value === 'le_2') return unexcusedTotal <= 2;
-        if (cond.value === 'le_3') return unexcusedTotal <= 3;
-        return true;
-      }
-      if (cond.category === 'attendance_disease') {
-        if (cond.value === '0') return diseaseTotal === 0;
-        if (cond.value === 'le_1') return diseaseTotal <= 1;
-        if (cond.value === 'le_2') return diseaseTotal <= 2;
-        if (cond.value === 'le_3') return diseaseTotal <= 3;
-        if (cond.value === 'le_5') return diseaseTotal <= 5;
-        return true;
-      }
-      if (cond.category === 'status') {
+
+      // 3. 취업/진로 대분류
+      if (cond.mainCategory === 'status' || (cond as any).category === 'status') {
         const status = student.employment_status || '';
         const bType = student.business_type || '';
         if (cond.value === '미취업') return status === '미취업' || status === '미설정' || !status;
@@ -75,13 +85,16 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, isRanki
         if (cond.value === '진학') return status === '진학';
         return true;
       }
-      if (cond.category === 'rank') {
+
+      // 4. 성적/석차 대분류
+      if (cond.mainCategory === 'rank' || (cond as any).category === 'rank') {
         const pct = rankingSummary?.rank_percentile;
         if (pct === undefined || pct === null) return false;
         if (cond.value === 'top30') return pct <= 30;
         if (cond.value === 'top50') return pct <= 50;
         return true;
       }
+
       return true;
     });
 

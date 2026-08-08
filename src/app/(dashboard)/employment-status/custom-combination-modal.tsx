@@ -33,9 +33,12 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+export type MainCategory = 'cert' | 'attendance' | 'status' | 'rank';
+
 export interface ConditionItem {
   id: string;
-  category: 'cert_name' | 'cert_count' | 'attendance_perfect' | 'attendance_unexcused' | 'attendance_disease' | 'status' | 'rank';
+  mainCategory: MainCategory;
+  subType: string; // cert: 'name' | 'count'; attendance: 'perfect' | 'unexcused' | 'disease'; status: 'main'; rank: 'main'
   value: string;
 }
 
@@ -51,14 +54,6 @@ export interface PresetItem {
   rule: CustomRule;
 }
 
-interface CustomCombinationModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onApply: (rule: CustomRule | null) => void;
-  currentRule: CustomRule | null;
-  allCertificates?: string[];
-}
-
 const PRESET_STORAGE_KEY = 'careersync_combination_presets';
 
 const DEFAULT_PRESETS: PresetItem[] = [
@@ -68,8 +63,8 @@ const DEFAULT_PRESETS: PresetItem[] = [
     rule: {
       operator: 'AND',
       conditions: [
-        { id: 'c1', category: 'cert_name', value: '컴퓨터응용선반기능사' },
-        { id: 'c2', category: 'attendance_perfect', value: '0' }
+        { id: 'c1', mainCategory: 'cert', subType: 'name', value: '컴퓨터응용선반기능사' },
+        { id: 'c2', mainCategory: 'attendance', subType: 'perfect', value: '0' }
       ]
     }
   },
@@ -79,8 +74,8 @@ const DEFAULT_PRESETS: PresetItem[] = [
     rule: {
       operator: 'AND',
       conditions: [
-        { id: 'c1', category: 'status', value: '미취업' },
-        { id: 'c2', category: 'cert_count', value: '0' }
+        { id: 'c1', mainCategory: 'status', subType: 'main', value: '미취업' },
+        { id: 'c2', mainCategory: 'cert', subType: 'count', value: '0' }
       ]
     }
   },
@@ -90,13 +85,21 @@ const DEFAULT_PRESETS: PresetItem[] = [
     rule: {
       operator: 'AND',
       conditions: [
-        { id: 'c1', category: 'cert_count', value: '2+' },
-        { id: 'c2', category: 'attendance_unexcused', value: '0' },
-        { id: 'c3', category: 'attendance_disease', value: 'le_3' }
+        { id: 'c1', mainCategory: 'cert', subType: 'count', value: '2+' },
+        { id: 'c2', mainCategory: 'attendance', subType: 'unexcused', value: '0' },
+        { id: 'c3', mainCategory: 'attendance', subType: 'disease', value: 'le_3' }
       ]
     }
   }
 ];
+
+interface CustomCombinationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onApply: (rule: CustomRule | null) => void;
+  currentRule: CustomRule | null;
+  allCertificates?: string[];
+}
 
 export function CustomCombinationModal({
   isOpen,
@@ -118,11 +121,11 @@ export function CustomCombinationModal({
         setOperator(currentRule.operator);
         setConditions(currentRule.conditions);
       } else {
-        // 기본 1개 조건 폼 생성
+        // 기본 2개 조건 폼 생성 (선반기능사 + 완벽 개근)
         setOperator('AND');
         setConditions([
-          { id: `c_${Date.now()}_1`, category: 'cert_name', value: '컴퓨터응용선반기능사' },
-          { id: `c_${Date.now()}_2`, category: 'attendance_perfect', value: '0' }
+          { id: `c_${Date.now()}_1`, mainCategory: 'cert', subType: 'name', value: '컴퓨터응용선반기능사' },
+          { id: `c_${Date.now()}_2`, mainCategory: 'attendance', subType: 'perfect', value: '0' }
         ]);
       }
 
@@ -145,8 +148,9 @@ export function CustomCombinationModal({
   const handleAddCondition = () => {
     const newCond: ConditionItem = {
       id: `c_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
-      category: 'cert_name',
-      value: ''
+      mainCategory: 'cert',
+      subType: 'name',
+      value: allCertificates[0] || '컴퓨터응용선반기능사'
     };
     setConditions([...conditions, newCond]);
   };
@@ -156,25 +160,43 @@ export function CustomCombinationModal({
     setConditions(conditions.filter(c => c.id !== id));
   };
 
-  // 조건 값 수정
-  const handleConditionChange = (id: string, key: keyof ConditionItem, val: string) => {
+  // 대분류 변경 시
+  const handleMainCategoryChange = (id: string, mainCat: MainCategory) => {
     setConditions(conditions.map(c => {
       if (c.id === id) {
-        const updated = { ...c, [key]: val };
-        // 카테고리 변경 시 기본값 세팅
-        if (key === 'category') {
-          if (val === 'cert_name') updated.value = allCertificates[0] || '컴퓨터응용선반기능사';
-          else if (val === 'cert_count') updated.value = '1+';
-          else if (val === 'attendance_perfect') updated.value = '0';
-          else if (val === 'attendance_unexcused') updated.value = '0';
-          else if (val === 'attendance_disease') updated.value = '0';
-          else if (val === 'status') updated.value = '미취업';
-          else if (val === 'rank') updated.value = 'top30';
+        if (mainCat === 'cert') {
+          return { ...c, mainCategory: mainCat, subType: 'name', value: allCertificates[0] || '컴퓨터응용선반기능사' };
+        } else if (mainCat === 'attendance') {
+          return { ...c, mainCategory: mainCat, subType: 'perfect', value: '0' };
+        } else if (mainCat === 'status') {
+          return { ...c, mainCategory: mainCat, subType: 'main', value: '미취업' };
+        } else if (mainCat === 'rank') {
+          return { ...c, mainCategory: mainCat, subType: 'main', value: 'top30' };
         }
-        return updated;
       }
       return c;
     }));
+  };
+
+  // 소분류 변경 시
+  const handleSubTypeChange = (id: string, subType: string) => {
+    setConditions(conditions.map(c => {
+      if (c.id === id) {
+        let defaultValue = '0';
+        if (c.mainCategory === 'cert') {
+          defaultValue = subType === 'name' ? (allCertificates[0] || '컴퓨터응용선반기능사') : '1+';
+        } else if (c.mainCategory === 'attendance') {
+          defaultValue = '0';
+        }
+        return { ...c, subType, value: defaultValue };
+      }
+      return c;
+    }));
+  };
+
+  // 조건 값 변경 시
+  const handleValueChange = (id: string, value: string) => {
+    setConditions(conditions.map(c => c.id === id ? { ...c, value } : c));
   };
 
   // 프리셋 로드
@@ -229,14 +251,14 @@ export function CustomCombinationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-xl rounded-2xl p-0 border-none shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <DialogContent className="max-w-2xl rounded-2xl p-0 border-none shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         <DialogHeader className="p-5 bg-slate-900 text-white shrink-0">
           <DialogTitle className="text-lg font-bold flex items-center gap-2">
             <SlidersHorizontal className="h-5 w-5 text-blue-400" />
             자유 커스텀 조건 조합 하이라이트 빌더
           </DialogTitle>
           <DialogDescription className="text-slate-400 text-xs mt-1">
-            원하는 여러 조건(자격증, 출결, 취업 상태 등)을 직접 자유롭게 조합하여 학생을 하이라이트합니다.
+            대분류(자격증, 출결, 취업, 성적) 선택 후 세부 항목을 자유롭게 조립하여 학생을 강조합니다.
           </DialogDescription>
         </DialogHeader>
 
@@ -343,36 +365,66 @@ export function CustomCombinationModal({
             ) : (
               <div className="space-y-2.5">
                 {conditions.map((cond, index) => (
-                  <div key={cond.id} className="flex items-center gap-2 p-3 bg-slate-50/80 rounded-xl border border-slate-200">
-                    <span className="text-[11px] font-bold text-slate-400 w-5 shrink-0 text-center">#{index + 1}</span>
+                  <div key={cond.id} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-3 bg-slate-50/90 rounded-xl border border-slate-200">
+                    <span className="text-[11px] font-bold text-slate-400 w-5 shrink-0 text-left sm:text-center self-center">#{index + 1}</span>
 
-                    {/* 카테고리 선택 */}
+                    {/* 1차 대분류 선택 */}
                     <Select
-                      value={cond.category}
-                      onValueChange={val => handleConditionChange(cond.id, 'category', val as any)}
+                      value={cond.mainCategory}
+                      onValueChange={val => handleMainCategoryChange(cond.id, val as MainCategory)}
                     >
-                      <SelectTrigger className="w-[145px] h-9 text-xs font-bold bg-white border-slate-200">
+                      <SelectTrigger className="w-full sm:w-[125px] h-9 text-xs font-bold bg-white border-slate-200">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="cert_name" className="text-xs">특정 자격증 명칭</SelectItem>
-                        <SelectItem value="cert_count" className="text-xs">자격증 총 개수</SelectItem>
-                        <SelectItem value="attendance_perfect" className="text-xs">✨ 완벽 개근 (미인정/질병 0건)</SelectItem>
-                        <SelectItem value="attendance_unexcused" className="text-xs">🚨 미인정 (무단) 건수</SelectItem>
-                        <SelectItem value="attendance_disease" className="text-xs">🤒 질병 건수</SelectItem>
-                        <SelectItem value="status" className="text-xs">취업/진로 상태</SelectItem>
-                        <SelectItem value="rank" className="text-xs">성적/석차 범위</SelectItem>
+                        <SelectItem value="cert" className="text-xs font-bold">📜 자격증</SelectItem>
+                        <SelectItem value="attendance" className="text-xs font-bold">🏫 출결</SelectItem>
+                        <SelectItem value="status" className="text-xs font-bold">💼 취업/진로</SelectItem>
+                        <SelectItem value="rank" className="text-xs font-bold">📊 성적/석차</SelectItem>
                       </SelectContent>
                     </Select>
 
-                    {/* 카테고리별 값 선택/입력 UI */}
+                    {/* 2차 세부유형 선택 */}
+                    {cond.mainCategory === 'cert' && (
+                      <Select
+                        value={cond.subType}
+                        onValueChange={val => handleSubTypeChange(cond.id, val)}
+                      >
+                        <SelectTrigger className="w-full sm:w-[130px] h-9 text-xs font-bold bg-white border-slate-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="name" className="text-xs">특정 자격증 명칭</SelectItem>
+                          <SelectItem value="count" className="text-xs">자격증 총 개수</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+
+                    {cond.mainCategory === 'attendance' && (
+                      <Select
+                        value={cond.subType}
+                        onValueChange={val => handleSubTypeChange(cond.id, val)}
+                      >
+                        <SelectTrigger className="w-full sm:w-[155px] h-9 text-xs font-bold bg-white border-slate-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="perfect" className="text-xs">✨ 완벽 개근 (0건)</SelectItem>
+                          <SelectItem value="unexcused" className="text-xs">🚨 미인정(무단) 건수</SelectItem>
+                          <SelectItem value="disease" className="text-xs">🤒 질병 건수</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+
+                    {/* 3차 세부 값 선택/입력 */}
                     <div className="flex-1 min-w-0">
-                      {cond.category === 'cert_name' && (
+                      {/* 자격증 명칭 */}
+                      {cond.mainCategory === 'cert' && cond.subType === 'name' && (
                         <div className="relative">
                           <Input
                             placeholder="예: 컴퓨터응용선반기능사"
                             value={cond.value}
-                            onChange={e => handleConditionChange(cond.id, 'value', e.target.value)}
+                            onChange={e => handleValueChange(cond.id, e.target.value)}
                             className="h-9 text-xs font-bold bg-white border-slate-200"
                             list={`cert_suggestions_${cond.id}`}
                           />
@@ -384,47 +436,50 @@ export function CustomCombinationModal({
                         </div>
                       )}
 
-                      {cond.category === 'cert_count' && (
+                      {/* 자격증 개수 */}
+                      {cond.mainCategory === 'cert' && cond.subType === 'count' && (
                         <Select
                           value={cond.value}
-                          onValueChange={val => handleConditionChange(cond.id, 'value', val)}
+                          onValueChange={val => handleValueChange(cond.id, val)}
                         >
                           <SelectTrigger className="h-9 text-xs font-bold bg-white border-slate-200">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="1+" className="text-xs">자격증 1개 이상</SelectItem>
-                            <SelectItem value="2+" className="text-xs">자격증 2개 이상</SelectItem>
-                            <SelectItem value="3+" className="text-xs">자격증 3개 이상</SelectItem>
-                            <SelectItem value="0" className="text-xs">자격증 0개 (없음)</SelectItem>
+                            <SelectItem value="1+" className="text-xs">1개 이상</SelectItem>
+                            <SelectItem value="2+" className="text-xs">2개 이상</SelectItem>
+                            <SelectItem value="3+" className="text-xs">3개 이상</SelectItem>
+                            <SelectItem value="0" className="text-xs">0개 (없음)</SelectItem>
                           </SelectContent>
                         </Select>
                       )}
 
-                      {cond.category === 'attendance_perfect' && (
+                      {/* 출결: 완벽 개근 */}
+                      {cond.mainCategory === 'attendance' && cond.subType === 'perfect' && (
                         <Select
                           value={cond.value || '0'}
-                          onValueChange={val => handleConditionChange(cond.id, 'value', val)}
+                          onValueChange={val => handleValueChange(cond.id, val)}
                         >
                           <SelectTrigger className="h-9 text-xs font-bold bg-white border-slate-200">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="0" className="text-xs">완벽 개근 (미인정+질병 결석/지각 0건)</SelectItem>
+                            <SelectItem value="0" className="text-xs">완벽 개근 (미인정+질병 0건)</SelectItem>
                           </SelectContent>
                         </Select>
                       )}
 
-                      {cond.category === 'attendance_unexcused' && (
+                      {/* 출결: 미인정 건수 */}
+                      {cond.mainCategory === 'attendance' && cond.subType === 'unexcused' && (
                         <Select
                           value={cond.value || '0'}
-                          onValueChange={val => handleConditionChange(cond.id, 'value', val)}
+                          onValueChange={val => handleValueChange(cond.id, val)}
                         >
                           <SelectTrigger className="h-9 text-xs font-bold bg-white border-slate-200">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="0" className="text-xs">미인정 0건 (무단 결석/지각 없음)</SelectItem>
+                            <SelectItem value="0" className="text-xs">미인정 0건 (무단 지각/결석 없음)</SelectItem>
                             <SelectItem value="le_1" className="text-xs">미인정 1건 이하</SelectItem>
                             <SelectItem value="le_2" className="text-xs">미인정 2건 이하</SelectItem>
                             <SelectItem value="le_3" className="text-xs">미인정 3건 이하</SelectItem>
@@ -432,16 +487,17 @@ export function CustomCombinationModal({
                         </Select>
                       )}
 
-                      {cond.category === 'attendance_disease' && (
+                      {/* 출결: 질병 건수 */}
+                      {cond.mainCategory === 'attendance' && cond.subType === 'disease' && (
                         <Select
                           value={cond.value || '0'}
-                          onValueChange={val => handleConditionChange(cond.id, 'value', val)}
+                          onValueChange={val => handleValueChange(cond.id, val)}
                         >
                           <SelectTrigger className="h-9 text-xs font-bold bg-white border-slate-200">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="0" className="text-xs">질병 0건 (질병 결석/지각 없음)</SelectItem>
+                            <SelectItem value="0" className="text-xs">질병 0건 (질병 지각/결석 없음)</SelectItem>
                             <SelectItem value="le_1" className="text-xs">질병 1건 이하</SelectItem>
                             <SelectItem value="le_2" className="text-xs">질병 2건 이하</SelectItem>
                             <SelectItem value="le_3" className="text-xs">질병 3건 이하</SelectItem>
@@ -450,10 +506,11 @@ export function CustomCombinationModal({
                         </Select>
                       )}
 
-                      {cond.category === 'status' && (
+                      {/* 취업/진로 상태 */}
+                      {cond.mainCategory === 'status' && (
                         <Select
                           value={cond.value}
-                          onValueChange={val => handleConditionChange(cond.id, 'value', val)}
+                          onValueChange={val => handleValueChange(cond.id, val)}
                         >
                           <SelectTrigger className="h-9 text-xs font-bold bg-white border-slate-200">
                             <SelectValue />
@@ -467,10 +524,11 @@ export function CustomCombinationModal({
                         </Select>
                       )}
 
-                      {cond.category === 'rank' && (
+                      {/* 성적/석차 범위 */}
+                      {cond.mainCategory === 'rank' && (
                         <Select
                           value={cond.value}
-                          onValueChange={val => handleConditionChange(cond.id, 'value', val)}
+                          onValueChange={val => handleValueChange(cond.id, val)}
                         >
                           <SelectTrigger className="h-9 text-xs font-bold bg-white border-slate-200">
                             <SelectValue />
@@ -486,7 +544,7 @@ export function CustomCombinationModal({
                     <button
                       type="button"
                       onClick={() => handleRemoveCondition(cond.id)}
-                      className="p-2 text-slate-400 hover:text-rose-600 transition-colors"
+                      className="p-2 text-slate-400 hover:text-rose-600 transition-colors self-end sm:self-center"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
