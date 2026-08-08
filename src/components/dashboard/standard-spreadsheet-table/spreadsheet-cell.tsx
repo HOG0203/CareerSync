@@ -16,6 +16,7 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
   const [localValue, setLocalValue] = React.useState(value || '')
   const [isManualInput, setIsManualInput] = React.useState(false)
   const isManualRef = React.useRef(false)
+  const selectRef = React.useRef<HTMLSelectElement>(null)
 
   const resolvedOptions = React.useMemo(() => {
     if (typeof config.options === 'function') return config.options(rowData);
@@ -34,6 +35,26 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
       isManualRef.current = false
     }
   }, [value, isEditing, resolvedOptions])
+
+  // 더블클릭/수정 모드 진입 즉시 드롭다운 메뉴 팝업 자동 개방 (showPicker)
+  React.useEffect(() => {
+    if (isEditing && config.type === 'select' && !isManualInput) {
+      const timer = setTimeout(() => {
+        if (selectRef.current) {
+          try {
+            if (typeof selectRef.current.showPicker === 'function') {
+              selectRef.current.showPicker();
+            } else {
+              selectRef.current.focus();
+            }
+          } catch {
+            selectRef.current?.focus();
+          }
+        }
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isEditing, config.type, isManualInput]);
 
   React.useEffect(() => {
     if (isEditing && config.type === 'multi-select') {
@@ -78,6 +99,7 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
       return (
         <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative z-40 bg-white ring-2 ring-blue-500" style={{ width: config.width }}>
           <select
+            ref={selectRef}
             autoFocus
             value={isInOptions ? localValue : ''}
             onChange={(e) => {
