@@ -28,9 +28,14 @@ export default function EmploymentStatusFilters({ graduationYears, defaultYear, 
   const currentAY = searchParams.get('ay') || initialAY;
   const currentGrade = searchParams.get('grade') || initialGrade;
 
-  // 로컬 상태로 선택값 관리
+  // 로컬 상태 및 하이드레이션 가드 관리
+  const [mounted, setMounted] = React.useState(false);
   const [selectedAY, setSelectedAY] = React.useState(currentAY);
   const [selectedGrade, setSelectedGrade] = React.useState(currentGrade);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // URL 변경 시 로컬 상태 동기화
   React.useEffect(() => {
@@ -65,6 +70,15 @@ export default function EmploymentStatusFilters({ graduationYears, defaultYear, 
       router.push(`/employment-status?${params.toString()}`);
     });
   };
+
+  if (!mounted) {
+    return (
+      <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-lg border border-slate-200 shadow-sm h-10 w-[240px]">
+        <div className="h-8 w-[110px] bg-white rounded border border-slate-200 animate-pulse" />
+        <div className="h-8 w-[95px] bg-white rounded border border-slate-200 animate-pulse" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-lg border border-slate-200 shadow-sm">

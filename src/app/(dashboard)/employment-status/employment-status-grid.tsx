@@ -130,7 +130,12 @@ function SearchHeader({
   onClearCustomRule,
   customMatchedCount
 }: SearchHeaderProps) {
+  const [mounted, setMounted] = React.useState(false);
   const [localValue, setLocalValue] = React.useState('');
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleSearch = () => {
     onSearch(localValue.trim());
@@ -146,6 +151,15 @@ function SearchHeader({
     setLocalValue('');
     onSearch('');
   };
+
+  if (!mounted) {
+    return (
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-1">
+        <div className="h-11 w-full sm:w-[280px] bg-white rounded-lg border-2 border-slate-200 animate-pulse" />
+        <div className="h-11 w-full sm:w-[140px] bg-white rounded-lg border-2 border-slate-200 animate-pulse" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-1 flex-wrap">
