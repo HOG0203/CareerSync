@@ -110,8 +110,6 @@ interface SearchHeaderProps {
   currentSearchQuery: string;
   isLowerGrade?: boolean;
   matchedCount?: number;
-  certFilter: string;
-  onCertFilterChange: (val: string) => void;
   customRule: CustomRule | null;
   onOpenCustomModal: () => void;
   onClearCustomRule: () => void;
@@ -123,8 +121,6 @@ function SearchHeader({
   currentSearchQuery, 
   isLowerGrade, 
   matchedCount, 
-  certFilter, 
-  onCertFilterChange,
   customRule,
   onOpenCustomModal,
   onClearCustomRule,
@@ -156,7 +152,6 @@ function SearchHeader({
     return (
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-1">
         <div className="h-11 w-full sm:w-[280px] bg-white rounded-lg border-2 border-slate-200 animate-pulse" />
-        <div className="h-11 w-full sm:w-[140px] bg-white rounded-lg border-2 border-slate-200 animate-pulse" />
       </div>
     );
   }
@@ -193,23 +188,6 @@ function SearchHeader({
         </button>
       </div>
 
-      {/* 자격증 개수 필터 */}
-      <div className="flex items-center gap-1.5 px-3 bg-white rounded-lg border-2 border-slate-200 h-11 w-full sm:w-[140px] shadow-sm">
-        <Award className="h-5 w-5 text-slate-400 shrink-0" />
-        <Select value={certFilter} onValueChange={onCertFilterChange}>
-          <SelectTrigger className="w-full h-full text-xs font-bold border-none bg-transparent shadow-none focus:ring-0 px-0">
-            <SelectValue placeholder="자격증 필터" />
-          </SelectTrigger>
-          <SelectContent position="popper" className="w-[140px]">
-            <SelectItem value="all" className="text-xs font-medium">자격증: 전체</SelectItem>
-            <SelectItem value="1+" className="text-xs font-medium">1개 이상</SelectItem>
-            <SelectItem value="2+" className="text-xs font-medium">2개 이상</SelectItem>
-            <SelectItem value="3+" className="text-xs font-medium">3개 이상</SelectItem>
-            <SelectItem value="0" className="text-xs font-medium">자격증 없음</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
       {/* 자유 커스텀 조합 하이라이트 버튼 */}
       <button
         onClick={onOpenCustomModal}
@@ -228,12 +206,11 @@ function SearchHeader({
       {customRule && (
         <div className="flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 text-indigo-900 px-3 py-1.5 rounded-full text-xs font-bold shrink-0 animate-in fade-in-50">
           <Sparkles className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
-          <span>
-            커스텀 조합 강조 ({customRule.operator}): <strong>{customMatchedCount ?? 0}명</strong>
-          </span>
+          <span>[커스텀 조합 강조 ({customRule.operator}): {customMatchedCount ?? 0}명]</span>
           <button 
-            onClick={onClearCustomRule} 
-            className="ml-1 p-0.5 hover:bg-indigo-100 rounded-full text-indigo-500 hover:text-indigo-800"
+            onClick={onClearCustomRule}
+            className="ml-1 text-slate-400 hover:text-rose-600 p-0.5 rounded-full hover:bg-white transition-colors"
+            title="커스텀 조합 해제"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -241,11 +218,9 @@ function SearchHeader({
       )}
 
       {/* 기본 강조 배지 */}
-      {!customRule && (currentSearchQuery || certFilter !== 'all') && (
+      {!customRule && currentSearchQuery && (
         <span className="text-xs font-bold text-blue-600 animate-pulse bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100 shrink-0 self-start sm:self-auto">
-          {certFilter !== 'all' && `[자격증: ${certFilter === '0' ? '없음' : `${certFilter} 이상`}] `}
-          {currentSearchQuery && `"${currentSearchQuery}" `}
-          강조 중 (총 {matchedCount ?? 0}명)
+          "{currentSearchQuery}" 강조 중 (총 {matchedCount ?? 0}명)
         </span>
       )}
     </div>
@@ -254,7 +229,6 @@ function SearchHeader({
 
 export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [], baseYear, grade = 3, graduationYear }: EmploymentStatusGridProps) {
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [certFilter, setCertFilter] = React.useState('all');
   const [customRule, setCustomRule] = React.useState<CustomRule | null>(null);
   const [isCustomModalOpen, setIsCustomModalOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -440,51 +414,39 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
 
   // 강조 검색 대상에 매칭되는 학생 수 계산
   const matchedCount = React.useMemo(() => {
-    if ((!searchQuery || searchQuery.trim() === '') && certFilter === 'all') return 0;
+    if (!searchQuery || searchQuery.trim() === '') return 0;
     
     const query = searchQuery.toLowerCase().trim();
     
     return allData.filter(student => {
-      const certsCount = student.certificates?.length || 0;
-      let certMatch = true;
-      if (certFilter === '1+') certMatch = certsCount >= 1;
-      else if (certFilter === '2+') certMatch = certsCount >= 2;
-      else if (certFilter === '3+') certMatch = certsCount >= 3;
-      else if (certFilter === '0') certMatch = certsCount === 0;
+      const certList = Array.isArray(student.certificates)
+        ? student.certificates
+        : (typeof student.certificates === 'string' ? [student.certificates] : []);
 
-      let searchMatch = true;
-      if (searchQuery && searchQuery.trim() !== '') {
-        const certList = Array.isArray(student.certificates)
-          ? student.certificates
-          : (typeof student.certificates === 'string' ? [student.certificates] : []);
-
-        const fieldsToSearch = isLowerGrade
-          ? [
-              student.student_name,
-              student.career_aspiration,
-              student.career_course,
-              student.special_notes,
-              student.major,
-              student.class_info,
-              ...certList
-            ]
-          : [
-              student.student_name,
-              student.employment_status,
-              student.company_type,
-              student.business_type,
-              student.company,
-              student.latest_training_company,
-              student.major,
-              student.class_info,
-              ...certList
-            ];
-        searchMatch = fieldsToSearch.some(field => field?.toLowerCase().includes(query));
-      }
-
-      return certMatch && searchMatch;
+      const fieldsToSearch = isLowerGrade
+        ? [
+            student.student_name,
+            student.career_aspiration,
+            student.career_course,
+            student.special_notes,
+            student.major,
+            student.class_info,
+            ...certList
+          ]
+        : [
+            student.student_name,
+            student.employment_status,
+            student.company_type,
+            student.business_type,
+            student.company,
+            student.latest_training_company,
+            student.major,
+            student.class_info,
+            ...certList
+          ];
+      return fieldsToSearch.some(field => field?.toLowerCase().includes(query));
     }).length;
-  }, [allData, searchQuery, certFilter, isLowerGrade]);
+  }, [allData, searchQuery, isLowerGrade]);
 
 
   if (isLoading) {
@@ -503,8 +465,6 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
         currentSearchQuery={searchQuery} 
         isLowerGrade={isLowerGrade} 
         matchedCount={matchedCount} 
-        certFilter={certFilter}
-        onCertFilterChange={setCertFilter}
         customRule={customRule}
         onOpenCustomModal={() => setIsCustomModalOpen(true)}
         onClearCustomRule={() => setCustomRule(null)}
@@ -579,7 +539,6 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
                         isRankingsLoading={isRankingsLoading}
                         userProfile={userProfile}
                         searchQuery={searchQuery}
-                        certFilter={certFilter}
                         customRule={customRule}
                         baseYear={baseYear}
                         isLowerGrade={isLowerGrade}

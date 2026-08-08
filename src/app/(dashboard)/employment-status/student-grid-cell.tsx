@@ -14,13 +14,12 @@ interface StudentGridCellProps {
   isRankingsLoading?: boolean; // 성적/석차 로딩 상태
   userProfile?: any; // 권한 확인을 위한 사용자 프로필
   searchQuery?: string; // 검색어 추가
-  certFilter?: string; // 자격증 필터 추가
   customRule?: CustomRule | null; // 커스텀 조합 필터 추가
   baseYear?: number;
   isLowerGrade?: boolean;
 }
 
-export function StudentGridCell({ student, idx, variant, rankingSummary, isRankingsLoading, userProfile, searchQuery, certFilter = 'all', customRule, baseYear, isLowerGrade }: StudentGridCellProps) {
+export function StudentGridCell({ student, idx, variant, rankingSummary, isRankingsLoading, userProfile, searchQuery, customRule, baseYear, isLowerGrade }: StudentGridCellProps) {
   // 1. 커스텀 동적 조합 매칭 평가 (AND / OR)
   const isCustomRuleMatched = React.useMemo(() => {
     if (!customRule || !customRule.conditions || customRule.conditions.length === 0) return false;
@@ -123,51 +122,38 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, isRanki
     return matches.every(m => m === true);
   }, [student, rankingSummary, customRule]);
 
-  // 2. 검색어 및 기본 필터 매칭
+  // 2. 검색어 매칭
   const isMatched = React.useMemo(() => {
-    if (!searchQuery && certFilter === 'all') return false;
-    
-    const certsCount = student.certificates?.length || 0;
-    let certMatch = true;
-    if (certFilter === '1+') certMatch = certsCount >= 1;
-    else if (certFilter === '2+') certMatch = certsCount >= 2;
-    else if (certFilter === '3+') certMatch = certsCount >= 3;
-    else if (certFilter === '0') certMatch = certsCount === 0;
+    if (!searchQuery || searchQuery.trim() === '') return false;
 
-    let searchMatch = true;
-    if (searchQuery && searchQuery.trim() !== '') {
-      const query = searchQuery.toLowerCase().trim();
-      const certList = Array.isArray(student.certificates)
-        ? student.certificates
-        : (typeof student.certificates === 'string' ? [student.certificates] : []);
+    const query = searchQuery.toLowerCase().trim();
+    const certList = Array.isArray(student.certificates)
+      ? student.certificates
+      : (typeof student.certificates === 'string' ? [student.certificates] : []);
 
-      const fieldsToSearch = isLowerGrade
-        ? [
-            student.student_name,
-            student.career_aspiration,
-            student.career_course,
-            student.special_notes,
-            student.major,
-            student.class_info,
-            ...certList
-          ]
-        : [
-            student.student_name,
-            student.employment_status,
-            student.company_type,
-            student.business_type,
-            student.company,
-            student.latest_training_company,
-            student.major,
-            student.class_info,
-            ...certList
-          ];
-      searchMatch = fieldsToSearch.some(field => field?.toLowerCase().includes(query));
-    }
-
-    return certMatch && searchMatch;
-
-  }, [student, searchQuery, certFilter, isLowerGrade]);
+    const fieldsToSearch = isLowerGrade
+      ? [
+          student.student_name,
+          student.career_aspiration,
+          student.career_course,
+          student.special_notes,
+          student.major,
+          student.class_info,
+          ...certList
+        ]
+      : [
+          student.student_name,
+          student.employment_status,
+          student.company_type,
+          student.business_type,
+          student.company,
+          student.latest_training_company,
+          student.major,
+          student.class_info,
+          ...certList
+        ];
+    return fieldsToSearch.some(field => field?.toLowerCase().includes(query));
+  }, [student, searchQuery, isLowerGrade]);
 
   const getDesireColor = (student: StudentEmploymentData) => {
     const isDesiring = student.is_desiring_employment;
