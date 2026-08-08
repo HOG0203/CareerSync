@@ -112,11 +112,19 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
                 handleCommit(v);
               }
             }}
+            onClick={() => {
+              // 동일한 옵션을 클릭하여 onChange가 안 튀었을 경우 편집 모드 즉시 깔끔하게 종료
+              if (!isManualRef.current) {
+                setTimeout(() => {
+                  onEndEdit();
+                }, 100);
+              }
+            }}
             onBlur={() => {
               if (!isManualRef.current) onEndEdit();
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Escape') {
+              if (e.key === 'Escape' || e.key === 'Enter') {
                 e.preventDefault();
                 onEndEdit();
               }
