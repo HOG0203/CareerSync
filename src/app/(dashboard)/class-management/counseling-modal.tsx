@@ -120,7 +120,7 @@ export function CounselingModal({ isOpen, onClose, student }: CounselingModalPro
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[95vw] sm:max-w-[600px] h-[90vh] sm:h-[650px] p-0 overflow-hidden flex flex-col border-none shadow-2xl rounded-2xl sm:rounded-lg">
+      <DialogContent className="w-[95vw] sm:max-w-[600px] h-[90vh] sm:h-[650px] p-0 overflow-hidden flex flex-col border-none shadow-2xl rounded-2xl sm:rounded-lg z-[200]">
         <DialogHeader className="p-5 sm:p-6 bg-blue-600 text-white shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-lg shrink-0">
@@ -193,20 +193,22 @@ export function CounselingModal({ isOpen, onClose, student }: CounselingModalPro
                           <div className="text-[9px] text-slate-400 font-medium whitespace-nowrap">
                             {format(new Date(log.created_at), 'yy.MM.dd HH:mm', { locale: ko })}
                           </div>
-                          {/* 본인 작성글인 경우 수정/삭제 버튼 노출 */}
+                          {/* 본인 작성글인 경우 수정/삭제 버튼 항상 노출 */}
                           {currentUserId === log.author_id && !editingLogId && (
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1">
                               <button 
                                 onClick={() => { setEditingLogId(log.id); setEditContent(log.content); }}
-                                className="p-1 hover:bg-slate-100 rounded text-blue-500"
+                                className="p-1 hover:bg-blue-50 rounded text-blue-500 transition-colors"
+                                title="수정"
                               >
-                                <Edit2 className="h-3 w-3" />
+                                <Edit2 className="h-3.5 w-3.5" />
                               </button>
                               <button 
                                 onClick={() => handleDeleteLog(log.id)}
-                                className="p-1 hover:bg-slate-100 rounded text-rose-500"
+                                className="p-1 hover:bg-rose-50 rounded text-rose-500 transition-colors"
+                                title="삭제"
                               >
-                                <Trash2 className="h-3 w-3" />
+                                <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </div>
                           )}

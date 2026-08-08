@@ -451,7 +451,7 @@ export function StudentPopover({
 
       {/* 성적 상세 모달 */}
       <Dialog open={isGradeModalOpen} onOpenChange={setIsGradeModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-3xl z-[150] [&>button]:text-white [&>button]:opacity-100 [&>button]:hover:bg-white/10 [&>button]:p-2 [&>button]:rounded-full [&>button]:transition-colors bg-white">
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-3xl z-[200] [&>button]:text-white [&>button]:opacity-100 [&>button]:hover:bg-white/10 [&>button]:p-2 [&>button]:rounded-full [&>button]:transition-colors bg-white">
           <DialogHeader className="p-8 bg-slate-900 text-white relative">
             <div className="flex items-center gap-5">
               <div className="h-16 w-16 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/10">
@@ -541,7 +541,7 @@ export function StudentPopover({
 
       {/* 출결 상세 모달 */}
       <Dialog open={isAttendanceModalOpen} onOpenChange={setIsAttendanceModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-3xl z-[150] [&>button]:text-white [&>button]:opacity-100 [&>button]:hover:bg-white/10 [&>button]:p-2 [&>button]:rounded-full [&>button]:transition-colors bg-white">
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-3xl z-[200] [&>button]:text-white [&>button]:opacity-100 [&>button]:hover:bg-white/10 [&>button]:p-2 [&>button]:rounded-full [&>button]:transition-colors bg-white">
           <DialogHeader className="p-8 bg-slate-900 text-white relative">
             <div className="flex items-center gap-5">
               <div className="h-16 w-16 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/10">
