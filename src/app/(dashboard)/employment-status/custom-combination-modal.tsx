@@ -418,21 +418,40 @@ export function CustomCombinationModal({
 
                     {/* 3차 세부 값 선택/입력 */}
                     <div className="flex-1 min-w-0">
-                      {/* 자격증 명칭 */}
+                      {/* 자격증 명칭 (등록된 자격증 드롭다운 선택 + 직접 텍스트 입력 겸용) */}
                       {cond.mainCategory === 'cert' && cond.subType === 'name' && (
-                        <div className="relative">
+                        <div className="flex flex-col sm:flex-row items-center gap-1.5 w-full">
+                          {allCertificates.length > 0 && (
+                            <Select
+                              value={allCertificates.includes(cond.value) ? cond.value : '__custom__'}
+                              onValueChange={val => {
+                                if (val !== '__custom__') {
+                                  handleValueChange(cond.id, val);
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="w-full sm:w-[170px] h-9 text-xs font-bold bg-white border-slate-200 shrink-0">
+                                <SelectValue placeholder="등록 자격증 선택..." />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-[220px]">
+                                <SelectItem value="__custom__" className="text-xs text-indigo-600 font-bold">
+                                  ✏️ 직접 입력
+                                </SelectItem>
+                                {allCertificates.map(cert => (
+                                  <SelectItem key={cert} value={cert} className="text-xs font-medium">
+                                    {cert}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+
                           <Input
-                            placeholder="예: 컴퓨터응용선반기능사"
+                            placeholder="자격증 명칭 직접 입력..."
                             value={cond.value}
                             onChange={e => handleValueChange(cond.id, e.target.value)}
-                            className="h-9 text-xs font-bold bg-white border-slate-200"
-                            list={`cert_suggestions_${cond.id}`}
+                            className="h-9 text-xs font-bold bg-white border-slate-200 flex-1 min-w-0"
                           />
-                          {allCertificates.length > 0 && (
-                            <datalist id={`cert_suggestions_${cond.id}`}>
-                              {allCertificates.map(c => <option key={c} value={c} />)}
-                            </datalist>
-                          )}
                         </div>
                       )}
 
