@@ -30,7 +30,7 @@ const VIVID_COLORS = [
   '#0d9488', // Teal
 ];
 
-const COMPANY_TYPES = ['대기업', '공기업', '공무원', '중견기업', '중소기업', '연계교육', '부사관', '기타'];
+const COMPANY_TYPES = ['대기업', '공기업', '공무원', '중견기업', '강소기업', '연계교육', '부사관', '기타'];
 
 export default function CompanyTypeChart({ 
   data,

@@ -398,10 +398,13 @@ export function useSpreadsheet({
 
   const handleKeyDown = React.useCallback((e: React.KeyboardEvent) => {
     if (editingCell) return;
-    if (e.ctrlKey && e.key === 'c') { e.preventDefault(); handleCopy(); return; }
-    if (e.ctrlKey && e.key === 'v') { e.preventDefault(); handlePaste(); return; }
-    if (e.ctrlKey && e.key === 'z') { e.preventDefault(); handleUndo(); return; }
-    if (e.ctrlKey && e.key === 'y') { e.preventDefault(); handleRedo(); return; }
+    const isCtrl = e.ctrlKey || e.metaKey;
+    const keyLower = (e.key || '').toLowerCase();
+
+    if (isCtrl && keyLower === 'c') { e.preventDefault(); handleCopy(); return; }
+    if (isCtrl && keyLower === 'v') { e.preventDefault(); handlePaste(); return; }
+    if (isCtrl && keyLower === 'z') { e.preventDefault(); handleUndo(); return; }
+    if (isCtrl && keyLower === 'y') { e.preventDefault(); handleRedo(); return; }
     if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); handleDelete(); return; }
     let { row, col } = selectionEnd || selectionStart || { row: 0, col: 0 };
     switch (e.key) {

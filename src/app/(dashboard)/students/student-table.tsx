@@ -230,7 +230,7 @@ const COLUMNS: ColumnConfig[] = [
       { label: '공기업', value: '공기업' }, 
       { label: '공무원', value: '공무원' }, 
       { label: '중견기업', value: '중견기업' }, 
-      { label: '중소기업', value: '중소기업' }, 
+      { label: '강소기업', value: '강소기업' }, 
       { label: '연계교육', value: '연계교육' }, 
       { label: '부사관', value: '부사관' }
     ],
@@ -240,7 +240,7 @@ const COLUMNS: ColumnConfig[] = [
         case '공기업': return 'bg-indigo-50 text-indigo-700 border-indigo-100'
         case '공무원': return 'bg-slate-100 text-slate-700 border-slate-200'
         case '중견기업': return 'bg-orange-50 text-orange-700 border-orange-100'
-        case '중소기업': return 'bg-cyan-50 text-cyan-700 border-cyan-100'
+        case '강소기업': return 'bg-cyan-50 text-cyan-700 border-cyan-100'
         case '연계교육': return 'bg-orange-50 text-orange-700 border-orange-100'
         case '부사관': return 'bg-emerald-50 text-emerald-700 border-emerald-100'
         default: return val ? 'bg-slate-50 text-slate-600 border-slate-100' : ''

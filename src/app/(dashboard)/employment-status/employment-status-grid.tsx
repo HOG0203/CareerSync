@@ -84,7 +84,7 @@ const getCompanyTypeVariant = (type?: string, businessType?: string, careerAspir
       case '공무원':
       case '부사관': return 'bg-indigo-700 text-white border-indigo-800';
       case '중견기업': return 'bg-purple-600 text-white border-purple-700';
-      case '중소기업': return 'bg-cyan-500 text-white border-cyan-600';
+      case '강소기업': return 'bg-cyan-500 text-white border-cyan-600';
       case '연계교육': return 'bg-orange-500 text-white border-orange-600';
       default: return 'bg-emerald-500 text-white border-emerald-600';
     }
