@@ -58,19 +58,12 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, isRanki
           return unexcusedTotal === 0 && diseaseTotal === 0 && otherTotal === 0;
         }
         if (sub === 'unexcused' || sub === 'attendance_unexcused') {
-          if (cond.value === '0') return unexcusedTotal === 0;
-          if (cond.value === 'le_1') return unexcusedTotal <= 1;
-          if (cond.value === 'le_2') return unexcusedTotal <= 2;
-          if (cond.value === 'le_3') return unexcusedTotal <= 3;
-          return true;
+          const limit = parseInt(String(cond.value).replace('le_', '')) || 0;
+          return unexcusedTotal <= limit;
         }
         if (sub === 'disease' || sub === 'attendance_disease') {
-          if (cond.value === '0') return diseaseTotal === 0;
-          if (cond.value === 'le_1') return diseaseTotal <= 1;
-          if (cond.value === 'le_2') return diseaseTotal <= 2;
-          if (cond.value === 'le_3') return diseaseTotal <= 3;
-          if (cond.value === 'le_5') return diseaseTotal <= 5;
-          return true;
+          const limit = parseInt(String(cond.value).replace('le_', '')) || 0;
+          return diseaseTotal <= limit;
         }
       }
 

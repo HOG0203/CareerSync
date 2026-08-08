@@ -462,9 +462,7 @@ export function CustomCombinationModal({
                                 size="sm"
                                 onClick={() => {
                                   setDirectInputMap({ ...directInputMap, [cond.id]: false });
-                                  if (allCertificates.length > 0) {
-                                    handleValueChange(cond.id, allCertificates[0]);
-                                  }
+                                  handleValueChange(cond.id, '');
                                 }}
                                 className="h-9 px-2 text-xs font-bold text-slate-600 hover:bg-slate-100 shrink-0"
                               >
@@ -473,7 +471,7 @@ export function CustomCombinationModal({
                             </div>
                           ) : (
                             <Select
-                              value={allCertificates.includes(cond.value) ? cond.value : (cond.value ? '__custom__' : (allCertificates[0] || '__custom__'))}
+                              value={allCertificates.includes(cond.value) ? cond.value : ''}
                               onValueChange={val => {
                                 if (val === '__custom__') {
                                   setDirectInputMap({ ...directInputMap, [cond.id]: true });
@@ -484,7 +482,7 @@ export function CustomCombinationModal({
                               }}
                             >
                               <SelectTrigger className="w-full h-9 text-xs font-bold bg-white border-slate-200">
-                                <SelectValue placeholder="등록 자격증 선택..." />
+                                <SelectValue placeholder="자격증 선택..." />
                               </SelectTrigger>
                               <SelectContent className="max-h-[220px]">
                                 <SelectItem value="__custom__" className="text-xs text-indigo-600 font-bold bg-indigo-50/50">
@@ -519,56 +517,41 @@ export function CustomCombinationModal({
                         </Select>
                       )}
 
-                      {/* 출결: 완벽 개근 */}
+                      {/* 출결: 완벽 개근 (우측 드롭다운 숨김) */}
                       {cond.mainCategory === 'attendance' && cond.subType === 'perfect' && (
-                        <Select
-                          value={cond.value || '0'}
-                          onValueChange={val => handleValueChange(cond.id, val)}
-                        >
-                          <SelectTrigger className="h-9 text-xs font-bold bg-white border-slate-200">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="0" className="text-xs">완벽 개근 (미인정+질병 0건)</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <div className="h-9 px-3 bg-emerald-50/70 text-emerald-700 border border-emerald-200 rounded-lg font-bold text-xs flex items-center justify-between">
+                          <span>✨ 결석/지각/조퇴/결과 0건</span>
+                        </div>
                       )}
 
-                      {/* 출결: 미인정 건수 */}
+                      {/* 출결: 미인정 건수 직접 입력 */}
                       {cond.mainCategory === 'attendance' && cond.subType === 'unexcused' && (
-                        <Select
-                          value={cond.value || '0'}
-                          onValueChange={val => handleValueChange(cond.id, val)}
-                        >
-                          <SelectTrigger className="h-9 text-xs font-bold bg-white border-slate-200">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="0" className="text-xs">미인정 0건 (무단 지각/결석 없음)</SelectItem>
-                            <SelectItem value="le_1" className="text-xs">미인정 1건 이하</SelectItem>
-                            <SelectItem value="le_2" className="text-xs">미인정 2건 이하</SelectItem>
-                            <SelectItem value="le_3" className="text-xs">미인정 3건 이하</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <div className="flex items-center gap-1.5 w-full">
+                          <Input
+                            type="number"
+                            min={0}
+                            placeholder="0"
+                            value={cond.value}
+                            onChange={e => handleValueChange(cond.id, e.target.value)}
+                            className="h-9 text-xs font-bold bg-white border-slate-200 focus-visible:ring-indigo-500 flex-1 min-w-0"
+                          />
+                          <span className="text-xs font-bold text-slate-500 shrink-0">건 이하</span>
+                        </div>
                       )}
 
-                      {/* 출결: 질병 건수 */}
+                      {/* 출결: 질병 건수 직접 입력 */}
                       {cond.mainCategory === 'attendance' && cond.subType === 'disease' && (
-                        <Select
-                          value={cond.value || '0'}
-                          onValueChange={val => handleValueChange(cond.id, val)}
-                        >
-                          <SelectTrigger className="h-9 text-xs font-bold bg-white border-slate-200">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="0" className="text-xs">질병 0건 (질병 지각/결석 없음)</SelectItem>
-                            <SelectItem value="le_1" className="text-xs">질병 1건 이하</SelectItem>
-                            <SelectItem value="le_2" className="text-xs">질병 2건 이하</SelectItem>
-                            <SelectItem value="le_3" className="text-xs">질병 3건 이하</SelectItem>
-                            <SelectItem value="le_5" className="text-xs">질병 5건 이하</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <div className="flex items-center gap-1.5 w-full">
+                          <Input
+                            type="number"
+                            min={0}
+                            placeholder="0"
+                            value={cond.value}
+                            onChange={e => handleValueChange(cond.id, e.target.value)}
+                            className="h-9 text-xs font-bold bg-white border-slate-200 focus-visible:ring-indigo-500 flex-1 min-w-0"
+                          />
+                          <span className="text-xs font-bold text-slate-500 shrink-0">건 이하</span>
+                        </div>
                       )}
 
                       {/* 취업/진로 상태 */}

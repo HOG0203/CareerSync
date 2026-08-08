@@ -85,12 +85,16 @@ export function CertificateSummaryClient({
 
 
 
-  // 클라이언트 사이드 필터링 (학과, 반, 검색어)
+  // 클라이언트 사이드 필터링 (학과, 반, 검색어: 이름/학번/자격증명)
   const filteredData = React.useMemo(() => {
+    const termLower = searchTerm.toLowerCase().trim();
     let filtered = initialSummaries.filter(s => {
       const matchMajor = selectedMajor === 'all' || s.major === selectedMajor;
       const matchClass = selectedClass === 'all' || s.classInfo === selectedClass;
-      const matchSearch = s.name.includes(searchTerm) || s.number.includes(searchTerm);
+      const matchSearch = !termLower ||
+        (s.name && s.name.toLowerCase().includes(termLower)) ||
+        (s.number && s.number.toLowerCase().includes(termLower)) ||
+        (s.certificates && s.certificates.some(cert => cert.toLowerCase().includes(termLower)));
       return matchMajor && matchClass && matchSearch;
     });
 
@@ -221,7 +225,7 @@ export function CertificateSummaryClient({
         <div className="relative w-full md:flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input 
-            placeholder="학생 이름 또는 번호 검색..." 
+            placeholder="학생 이름, 번호 또는 자격증 명칭 검색..." 
             className="pl-9 bg-white border-slate-200 text-xs sm:text-sm h-9 sm:h-10" 
             value={searchTerm} 
             onChange={(e) => setSearchText(e.target.value)} 

@@ -165,7 +165,7 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
                   <Link href="/dashboard" onClick={() => handleNavClick('/dashboard')}>
                     <LayoutDashboard className={cn("mr-2 h-4 w-4 flex-shrink-0", isDashActive ? "text-blue-600" : "")} />
                     <span className="font-bold flex-1">대시보드</span>
-                    {isDashNav && <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin text-blue-600 shrink-0" />}
+                    {isDashNav && <div className="ml-auto h-3.5 w-3.5 rounded-full border-2 border-blue-600 border-t-transparent animate-spin shrink-0" />}
                   </Link>
                 </SidebarMenuButton>
               );
@@ -193,7 +193,7 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
                     <Link href={item.href} onClick={() => handleNavClick(item.href)}>
                       <group.icon className={cn("mr-2 h-4 w-4 flex-shrink-0", isActive ? "text-blue-600" : "")} />
                       <span className="font-bold flex-1">{group.title}</span>
-                      {isItemNav && <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin text-blue-600 shrink-0" />}
+                      {isItemNav && <div className="ml-auto h-3.5 w-3.5 rounded-full border-2 border-blue-600 border-t-transparent animate-spin shrink-0" />}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -262,7 +262,7 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
                               <Link href={item.href} onClick={() => handleNavClick(item.href)}>
                                 <item.icon className="mr-2 h-3.5 w-3.5 flex-shrink-0" />
                                 <span className="flex-1">{item.label}</span>
-                                {isNavThis && <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin text-blue-600 shrink-0" />}
+                                {isNavThis && <div className="ml-auto h-3.5 w-3.5 rounded-full border-2 border-blue-600 border-t-transparent animate-spin shrink-0" />}
                               </Link>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>

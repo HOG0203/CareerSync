@@ -188,8 +188,8 @@ export function StandardSpreadsheetTable({
                   </div>
                   {statusCol && <Badge className={cn("text-[10px] px-2 py-0.5 shrink-0", statusCol.variant?.(row[statusCol.key]))}>{row[statusCol.key] || '미설정'}</Badge>}
                 </div>
-                <div className={`grid gap-x-2 gap-y-3 border-t border-slate-50 pt-3 ${infoCols.length >= 5 ? 'grid-cols-2' : 'grid-cols-3'}`}>
-                  {infoCols.map(col => (
+                <div className="grid grid-cols-3 gap-x-2 gap-y-2.5 border-t border-slate-100 pt-2.5">
+                  {infoCols.slice(0, 6).map(col => (
                     <div key={col.key} className="space-y-0.5 min-w-0">
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate">{col.label.replace(/\\n/g, ' ')}</p>
                       {col.variant && row[col.key] ? (
@@ -197,12 +197,11 @@ export function StandardSpreadsheetTable({
                           {row[col.key]}
                         </span>
                       ) : col.key === 'phone_number' && row[col.key] ? (
-                        <a href={`tel:${row[col.key]}`} onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-blue-600 hover:underline text-xs font-semibold">
-                          <span>{row[col.key]}</span>
-                          <Phone className="h-3 w-3 text-blue-500 shrink-0" />
+                        <a href={`tel:${row[col.key]}`} onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-blue-600 hover:underline text-[11px] font-semibold truncate">
+                          <span className="truncate">{row[col.key]}</span>
                         </a>
                       ) : (
-                        <p className="text-xs font-semibold text-slate-700 truncate">{row[col.key] || '-'}</p>
+                        <p className="text-[11px] font-semibold text-slate-700 truncate">{row[col.key] || '-'}</p>
                       )}
                     </div>
                   ))}
