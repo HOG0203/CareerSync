@@ -65,11 +65,9 @@ async function StudentsPageContent({
   const defaultGradYear = (settings.baseYear + 1).toString();
   const selectedYear = params.year || calculatedGradYear || defaultGradYear;
 
-  // 2. 타겟 데이터 및 랭킹 요약 패칭 (서버 메모리 캐시 적용)
-  const [rawStudentData, rankingMap] = await Promise.all([
-    getCachedFilteredStudentData(selectedYear, ay),
-    getCachedYearlyRankingsSummary(parseInt(selectedYear), settings.baseYear)
-  ]);
+  // 2. 타겟 학생 데이터 패칭 (서버 메모리 캐시 적용)
+  const rawStudentData = await getCachedFilteredStudentData(selectedYear, ay);
+  const rankingMap = {}; // 클라이언트 백그라운드 비동기 로딩으로 전환
 
   
   let allStudentData = rawStudentData;

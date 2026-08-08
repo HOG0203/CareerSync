@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { StandardSpreadsheetTable, ColumnConfig } from '@/components/dashboard/standard-spreadsheet-table'
 import { updateStudentField, bulkUpdateStudentData } from '@/app/students/actions'
+import { fetchYearlyRankings } from '../employment-status/actions'
 import { MasterCertificate } from '@/app/(dashboard)/admin/settings/actions'
 import { FieldTrainingModal } from './field-training-modal'
 
@@ -282,6 +283,29 @@ export function StudentTable({
   const [selectedStudent, setSelectedStudent] = React.useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = React.useState(false)
 
+  const [asyncRankingMap, setAsyncRankingMap] = React.useState<Record<string, any>>(rankingMap || {});
+  const [isRankingsLoading, setIsRankingsLoading] = React.useState(false);
+
+  const gradYear = initialData[0]?.graduation_year;
+
+  React.useEffect(() => {
+    if (rankingMap && Object.keys(rankingMap).length > 0) {
+      setAsyncRankingMap(rankingMap);
+      return;
+    }
+    if (!gradYear) return;
+    setIsRankingsLoading(true);
+    fetchYearlyRankings(gradYear, baseYear || 2026)
+      .then(rankings => {
+        setAsyncRankingMap(rankings);
+        setIsRankingsLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to load yearly rankings:', err);
+        setIsRankingsLoading(false);
+      });
+  }, [gradYear, baseYear, rankingMap]);
+
   // 모든 핸들러 함수를 useCallback으로 메모이제이션
   const handleSave = React.useCallback(async (id: string, field: string, value: any) => {
     if (!isAdmin) return { success: false, error: '권한이 없습니다.' };
@@ -326,7 +350,8 @@ export function StudentTable({
           onAction={handleAction}
           searchPlaceholder="빠른 학생 검색..."
           masterCertificates={masterCertificates}
-          rankingMap={rankingMap}
+          rankingMap={asyncRankingMap}
+          isRankingsLoading={isRankingsLoading}
           userProfile={userProfile}
           baseYear={baseYear}
           mobileInfoKeys={[
