@@ -118,17 +118,26 @@ export function CustomCombinationModal({
   // 모달 열릴 때 기존 상태 또는 기본 상태 로드
   React.useEffect(() => {
     if (isOpen) {
+      const initDirectMap: Record<string, boolean> = {};
       if (currentRule && currentRule.conditions.length > 0) {
         setOperator(currentRule.operator);
         setConditions(currentRule.conditions);
+        currentRule.conditions.forEach(c => {
+          if (c.mainCategory === 'cert' && c.subType === 'name') {
+            initDirectMap[c.id] = true;
+          }
+        });
       } else {
-        // 기본 2개 조건 폼 생성 (선반기능사 + 완벽 개근)
+        const id1 = `c_${Date.now()}_1`;
+        const id2 = `c_${Date.now()}_2`;
         setOperator('AND');
         setConditions([
-          { id: `c_${Date.now()}_1`, mainCategory: 'cert', subType: 'name', value: '컴퓨터응용선반기능사' },
-          { id: `c_${Date.now()}_2`, mainCategory: 'attendance', subType: 'perfect', value: '0' }
+          { id: id1, mainCategory: 'cert', subType: 'name', value: '' },
+          { id: id2, mainCategory: 'attendance', subType: 'perfect', value: '0' }
         ]);
+        initDirectMap[id1] = true;
       }
+      setDirectInputMap(initDirectMap);
 
       // 로컬 스토리지에서 프리셋 가져오기
       try {
@@ -147,13 +156,15 @@ export function CustomCombinationModal({
 
   // 조건 행 추가
   const handleAddCondition = () => {
+    const newId = `c_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
     const newCond: ConditionItem = {
-      id: `c_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+      id: newId,
       mainCategory: 'cert',
       subType: 'name',
-      value: allCertificates[0] || '컴퓨터응용선반기능사'
+      value: ''
     };
     setConditions([...conditions, newCond]);
+    setDirectInputMap(prev => ({ ...prev, [newId]: true }));
   };
 
   // 조건 행 삭제
@@ -166,7 +177,8 @@ export function CustomCombinationModal({
     setConditions(conditions.map(c => {
       if (c.id === id) {
         if (mainCat === 'cert') {
-          return { ...c, mainCategory: mainCat, subType: 'name', value: allCertificates[0] || '컴퓨터응용선반기능사' };
+          setDirectInputMap(prev => ({ ...prev, [id]: true }));
+          return { ...c, mainCategory: mainCat, subType: 'name', value: '' };
         } else if (mainCat === 'attendance') {
           return { ...c, mainCategory: mainCat, subType: 'perfect', value: '0' };
         } else if (mainCat === 'status') {
@@ -185,7 +197,12 @@ export function CustomCombinationModal({
       if (c.id === id) {
         let defaultValue = '0';
         if (c.mainCategory === 'cert') {
-          defaultValue = subType === 'name' ? (allCertificates[0] || '컴퓨터응용선반기능사') : '1+';
+          if (subType === 'name') {
+            setDirectInputMap(prev => ({ ...prev, [id]: true }));
+            defaultValue = '';
+          } else {
+            defaultValue = '1+';
+          }
         } else if (c.mainCategory === 'attendance') {
           defaultValue = '0';
         }
@@ -422,10 +439,10 @@ export function CustomCombinationModal({
 
                     {/* 3차 세부 값 선택/입력 */}
                     <div className="flex-1 min-w-0">
-                      {/* 자격증 명칭 (드롭다운 / 직접입력 단일 컨트롤 전환) */}
+                      {/* 자격증 명칭 (기본값: 직접입력 창, 버튼 클릭 시 등록 자격증 목록 선택) */}
                       {cond.mainCategory === 'cert' && cond.subType === 'name' && (
                         <div className="w-full">
-                          {directInputMap[cond.id] ? (
+                          {directInputMap[cond.id] !== false ? (
                             <div className="flex items-center gap-1.5 w-full">
                               <Input
                                 placeholder="자격증 명칭 직접 입력..."
