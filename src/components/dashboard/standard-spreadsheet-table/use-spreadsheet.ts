@@ -198,57 +198,62 @@ export function useSpreadsheet({
   const syncSelected = React.useCallback((ids: string[]) => onSelectionChange ? onSelectionChange(ids) : setInternalSelectedRowIds(ids), [onSelectionChange])
   const handleSelectAll = React.useCallback((checked: any) => syncSelected(checked ? filteredData.map(r => r.id) : []), [filteredData, syncSelected])
   
-  // 커서/셀 위치에 따른 DOM 기반 100% 정밀 가로 및 세로 자동 스크롤
-  const scrollToCellDom = React.useCallback((row: number, col: number) => {
+  // 0.001ms 오프셋 사전 계산 (DOM layout thrashing 완전 제거)
+  const colWidthOffsets = React.useMemo(() => {
+    const offsets: number[] = [32];
+    let accum = 32;
+    for (let i = 0; i < columns.length; i++) {
+      const w = typeof columns[i]?.width === 'number' ? (columns[i].width as number) : 80;
+      accum += w;
+      offsets.push(accum);
+    }
+    return offsets;
+  }, [columns]);
+
+  // 초고속 가로/세로 자동 스크롤 함수
+  const scrollToCell = React.useCallback((row: number, col: number) => {
     if (!containerRef.current) return;
     const container = containerRef.current;
-    const cellEl = container.querySelector(`[data-row="${row}"][data-col="${col}"]`) as HTMLElement;
 
-    if (cellEl) {
-      const cellRect = cellEl.getBoundingClientRect();
-      const containerRect = container.getBoundingClientRect();
+    // 1. 세로 스크롤 (순수 수식)
+    const targetY = row * ROW_HEIGHT + HEADER_HEIGHT;
+    const curY = container.scrollTop;
+    const ch = container.clientHeight;
 
-      // 1. 가로 스크롤 (화면 밖으로 넘어간 열을 부드럽게 안쪽으로 당겨옴)
-      if (cellRect.left < containerRect.left) {
-        container.scrollLeft -= (containerRect.left - cellRect.left + 30);
-      } else if (cellRect.right > containerRect.right) {
-        container.scrollLeft += (cellRect.right - containerRect.right + 30);
-      }
-
-      // 2. 세로 스크롤
-      const effectiveHeaderTop = containerRect.top + HEADER_HEIGHT;
-      if (cellRect.top < effectiveHeaderTop) {
-        container.scrollTop -= (effectiveHeaderTop - cellRect.top + 10);
-      } else if (cellRect.bottom > containerRect.bottom) {
-        container.scrollTop += (cellRect.bottom - containerRect.bottom + 10);
-      }
-    } else {
-      // 폴백: 수식 기반 스크롤
-      const targetY = row * ROW_HEIGHT + HEADER_HEIGHT;
-      const curY = container.scrollTop;
-      const ch = container.clientHeight;
-
-      if (targetY < curY + HEADER_HEIGHT) {
-        container.scrollTop = Math.max(0, targetY - HEADER_HEIGHT);
-      } else if (targetY + ROW_HEIGHT > curY + ch) {
-        container.scrollTop = targetY + ROW_HEIGHT - ch;
-      }
-
-      let targetX = 32;
-      for (let i = 0; i < col; i++) {
-        targetX += (typeof columns[i]?.width === 'number' ? (columns[i].width as number) : 80);
-      }
-      const colWidth = (typeof columns[col]?.width === 'number' ? (columns[col].width as number) : 80);
-      const curX = container.scrollLeft;
-      const cw = container.clientWidth;
-
-      if (targetX < curX) {
-        container.scrollLeft = Math.max(0, targetX - 10);
-      } else if (targetX + colWidth > curX + cw) {
-        container.scrollLeft = targetX + colWidth - cw + 30;
-      }
+    if (targetY < curY + HEADER_HEIGHT) {
+      container.scrollTop = Math.max(0, targetY - HEADER_HEIGHT);
+    } else if (targetY + ROW_HEIGHT > curY + ch) {
+      container.scrollTop = targetY + ROW_HEIGHT - ch;
     }
-  }, [columns, ROW_HEIGHT, HEADER_HEIGHT]);
+
+    // 2. 가로 스크롤 (미리 계산된 오프셋 배열 사용)
+    const startX = colWidthOffsets[col] ?? 32;
+    const endX = colWidthOffsets[col + 1] ?? (startX + 80);
+    const curX = container.scrollLeft;
+    const cw = container.clientWidth;
+
+    if (startX < curX) {
+      container.scrollLeft = Math.max(0, startX - 10);
+    } else if (endX > curX + cw) {
+      container.scrollLeft = endX - cw + 30;
+    }
+  }, [colWidthOffsets, ROW_HEIGHT, HEADER_HEIGHT]);
+
+  const rafRef = React.useRef<number | null>(null);
+  const requestScrollToCell = React.useCallback((row: number, col: number) => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      scrollToCell(row, col);
+    });
+  }, [scrollToCell]);
+
+  // 셀 선택 또는 수정 모드 전환 시 커서 위치로 비동기 프레임 스크롤
+  React.useEffect(() => {
+    const target = editingCell || selectionStart;
+    if (target && typeof target.row === 'number' && typeof target.col === 'number') {
+      requestScrollToCell(target.row, target.col);
+    }
+  }, [selectionStart, editingCell, requestScrollToCell]);
 
   const handleMouseDown = React.useCallback((row: any, col: any, multi: any) => {
     isSelectingRef.current = true;
@@ -256,8 +261,8 @@ export function useSpreadsheet({
     if (multi && selectionStart) setSelectionEnd({ row, col });
     else { setSelectionStart({ row, col }); setSelectionEnd({ row, col }); }
     if (containerRef.current) containerRef.current.focus({ preventScroll: true });
-    scrollToCellDom(row, col);
-  }, [selectionStart, scrollToCellDom])
+    requestScrollToCell(row, col);
+  }, [selectionStart, requestScrollToCell])
 
   const handleMouseEnter = React.useCallback((row: any, col: any) => {
     if (isSelectingRef.current) setSelectionEnd({ row, col });
@@ -370,36 +375,6 @@ export function useSpreadsheet({
 
 
 
-  // 테이블 내 셀/입력창 Focus 이벤트 발생 시 자동 가로/세로 스크롤
-  React.useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const handleFocusIn = (e: FocusEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target) return;
-      const td = target.closest('td[data-row]');
-      if (td) {
-        const r = td.getAttribute('data-row');
-        const c = td.getAttribute('data-col');
-        if (r !== null && c !== null) {
-          scrollToCellDom(parseInt(r, 10), parseInt(c, 10));
-        }
-      }
-    };
-
-    container.addEventListener('focusin', handleFocusIn);
-    return () => container.removeEventListener('focusin', handleFocusIn);
-  }, [scrollToCellDom]);
-
-  // 셀 선택 또는 수정 모드 전환 시 커서 위치로 자동 스크롤
-  React.useEffect(() => {
-    const target = editingCell || selectionStart;
-    if (target && typeof target.row === 'number' && typeof target.col === 'number') {
-      scrollToCellDom(target.row, target.col);
-    }
-  }, [selectionStart, editingCell, scrollToCellDom]);
-
   const handleKeyDown = React.useCallback((e: React.KeyboardEvent) => {
     if (editingCell) return;
     if (e.ctrlKey && e.key === 'c') { e.preventDefault(); handleCopy(); return; }
@@ -427,8 +402,8 @@ export function useSpreadsheet({
     if (e.shiftKey) setSelectionEnd({ row, col });
     else { setSelectionStart({ row, col }); setSelectionEnd({ row, col }); }
     
-    scrollToCellDom(row, col);
-  }, [editingCell, selectionStart, selectionEnd, filteredData, columns, handleDelete, handleCopy, handlePaste, handleUndo, handleRedo, scrollToCellDom])
+    requestScrollToCell(row, col);
+  }, [editingCell, selectionStart, selectionEnd, filteredData, columns, handleDelete, handleCopy, handlePaste, handleUndo, handleRedo, requestScrollToCell])
 
   return {
     data,
