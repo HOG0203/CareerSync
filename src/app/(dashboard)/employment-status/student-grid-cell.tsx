@@ -82,12 +82,21 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, isRanki
         const aspiration = student.career_aspiration || '';
         const val = cond.value;
 
-        if (val === '미취업') return bType === '미취업' || status === '미취업' || status === '미설정' || (!bType && !status);
+        if (val === '미취업') {
+          // 진학자/진학희망자는 미취업이 아님
+          if (bType === '진학' || status === '진학' || aspiration === '진학') return false;
+          // 제외인정자 제외
+          if (bType === '제외인정자' || status === '제외인정자' || aspiration === '제외인정자') return false;
+          // 이미 취업, 현장실습, 도제, 채용진행 중인 학생 제외
+          if (['취업', '현장실습중', '도제OJT', '채용진행중'].includes(bType) || status === '취업') return false;
+          
+          return bType === '미취업' || bType === '아니오' || status === '미취업' || status === '미설정' || (!bType && !status);
+        }
         if (val === '취업') return bType === '취업' || status === '취업';
         if (val === '현장실습중') return bType === '현장실습중' || student.has_field_training === 'O';
         if (val === '도제OJT') return bType === '도제OJT';
         if (val === '채용진행중') return bType === '채용진행중';
-        if (val === '진학') return status === '진학' || aspiration === '진학';
+        if (val === '진학') return status === '진학' || bType === '진학' || aspiration === '진학';
         if (val === '제외인정자') return bType === '제외인정자' || status === '제외인정자' || aspiration === '제외인정자';
         return true;
       }
