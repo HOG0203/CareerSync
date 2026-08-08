@@ -113,6 +113,7 @@ export function CustomCombinationModal({
   const [presets, setPresets] = React.useState<PresetItem[]>([]);
   const [newPresetName, setNewPresetName] = React.useState('');
   const [isSavingPreset, setIsSavingPreset] = React.useState(false);
+  const [directInputMap, setDirectInputMap] = React.useState<Record<string, boolean>>({});
 
   // 모달 열릴 때 기존 상태 또는 기본 상태 로드
   React.useEffect(() => {
@@ -418,24 +419,51 @@ export function CustomCombinationModal({
 
                     {/* 3차 세부 값 선택/입력 */}
                     <div className="flex-1 min-w-0">
-                      {/* 자격증 명칭 (등록된 자격증 드롭다운 선택 + 직접 텍스트 입력 겸용) */}
+                      {/* 자격증 명칭 (드롭다운 / 직접입력 단일 컨트롤 전환) */}
                       {cond.mainCategory === 'cert' && cond.subType === 'name' && (
-                        <div className="flex flex-col sm:flex-row items-center gap-1.5 w-full">
-                          {allCertificates.length > 0 && (
+                        <div className="w-full">
+                          {directInputMap[cond.id] ? (
+                            <div className="flex items-center gap-1.5 w-full">
+                              <Input
+                                placeholder="자격증 명칭 직접 입력..."
+                                value={cond.value}
+                                onChange={e => handleValueChange(cond.id, e.target.value)}
+                                className="h-9 text-xs font-bold bg-white border-blue-400 focus-visible:ring-blue-400 flex-1 min-w-0"
+                                autoFocus
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setDirectInputMap({ ...directInputMap, [cond.id]: false });
+                                  if (allCertificates.length > 0) {
+                                    handleValueChange(cond.id, allCertificates[0]);
+                                  }
+                                }}
+                                className="h-9 px-2 text-xs font-bold text-slate-600 hover:bg-slate-100 shrink-0"
+                              >
+                                <RotateCcw className="h-3.5 w-3.5 mr-1" /> 목록
+                              </Button>
+                            </div>
+                          ) : (
                             <Select
-                              value={allCertificates.includes(cond.value) ? cond.value : '__custom__'}
+                              value={allCertificates.includes(cond.value) ? cond.value : (cond.value ? '__custom__' : (allCertificates[0] || '__custom__'))}
                               onValueChange={val => {
-                                if (val !== '__custom__') {
+                                if (val === '__custom__') {
+                                  setDirectInputMap({ ...directInputMap, [cond.id]: true });
+                                  handleValueChange(cond.id, '');
+                                } else {
                                   handleValueChange(cond.id, val);
                                 }
                               }}
                             >
-                              <SelectTrigger className="w-full sm:w-[170px] h-9 text-xs font-bold bg-white border-slate-200 shrink-0">
+                              <SelectTrigger className="w-full h-9 text-xs font-bold bg-white border-slate-200">
                                 <SelectValue placeholder="등록 자격증 선택..." />
                               </SelectTrigger>
                               <SelectContent className="max-h-[220px]">
-                                <SelectItem value="__custom__" className="text-xs text-indigo-600 font-bold">
-                                  ✏️ 직접 입력
+                                <SelectItem value="__custom__" className="text-xs text-indigo-600 font-bold bg-indigo-50/50">
+                                  ✏️ 직접 입력하기
                                 </SelectItem>
                                 {allCertificates.map(cert => (
                                   <SelectItem key={cert} value={cert} className="text-xs font-medium">
@@ -445,13 +473,6 @@ export function CustomCombinationModal({
                               </SelectContent>
                             </Select>
                           )}
-
-                          <Input
-                            placeholder="자격증 명칭 직접 입력..."
-                            value={cond.value}
-                            onChange={e => handleValueChange(cond.id, e.target.value)}
-                            className="h-9 text-xs font-bold bg-white border-slate-200 flex-1 min-w-0"
-                          />
                         </div>
                       )}
 
