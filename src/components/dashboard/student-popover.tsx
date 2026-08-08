@@ -133,291 +133,321 @@ export function StudentPopover({
     return (rankingSummary.attnRecords as any[]).sort((a, b) => a.grade - b.grade);
   }, [rankingSummary]);
 
+  const popoverBody = (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between border-b-2 pb-1.5 mb-1">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="font-bold text-[15px] text-blue-900">{student.student_name}</span>
+          {student.teacher_name && (
+            <span className="text-[10px] text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 font-bold shrink-0">
+              {student.teacher_name}T
+            </span>
+          )}
+        </div>
+        <span className={cn(
+          "text-[10px] px-2 py-0.5 rounded-full font-bold",
+          isLowerGrade ? (
+            student.career_aspiration === '취업' ? "bg-emerald-100 text-emerald-700" : 
+            student.career_aspiration === '진학' ? "bg-rose-100 text-rose-700" : 
+            student.career_aspiration === '제외인정자' ? "bg-slate-100 text-slate-600" : "bg-slate-100 text-slate-600"
+          ) : (
+            student.is_desiring_employment === '예' ? "bg-emerald-100 text-emerald-700" : 
+            student.is_desiring_employment === '아니오' ? "bg-rose-100 text-rose-700" : 
+            "bg-slate-100 text-slate-600"
+          )
+        )}>
+          희망: {isLowerGrade ? (student.career_aspiration || '미정') : (student.is_desiring_employment || '미정')}
+        </span>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] text-blue-800 font-black uppercase tracking-tight flex items-center gap-1">
+            <BarChart3 className="h-3 w-3" /> {isLowerGrade ? '진로희망' : '취업 상세'}
+          </p>
+          {!isLowerGrade && (
+            <span className={cn(
+              "text-[9px] px-2 py-0.5 rounded-full font-black",
+              student.business_type === '취업' ? "bg-emerald-100 text-emerald-700" : 
+              student.business_type === '미취업' ? "bg-rose-100 text-rose-700" :
+              student.business_type === '채용진행중' ? "bg-amber-100 text-amber-700" :
+              student.business_type === '현장실습중' ? "bg-blue-100 text-blue-700" :
+              student.business_type === '도제OJT' ? "bg-emerald-50 text-emerald-600" :
+              (student.business_type === '제외인정자' || student.career_aspiration === '제외인정자') ? "bg-slate-100 text-slate-700" :
+              "bg-slate-50 text-slate-400"
+            )}>
+              현황: {student.business_type || (student.career_aspiration === '진학' ? '진학희망' : '미결정')}
+            </span>
+          )}
+        </div>
+        <div className="space-y-1 bg-slate-50 p-2 rounded-lg border border-slate-100">
+          {isLowerGrade ? (
+            <>
+              <div className="text-[10px]">
+                <p className="flex justify-between">
+                  <span className="text-slate-400">희망기업유형</span> 
+                  <span className="font-black text-blue-600 text-right">{student.special_notes || '미설정'}</span>
+                </p>
+              </div>
+              <div className="pt-1 border-t border-slate-200 mt-1">
+                <p className="text-[9px] text-slate-400 font-bold uppercase mb-0.5">희망진로코스</p>
+                <p className="font-black text-blue-600 text-[17px] leading-tight truncate">
+                  {student.career_course || '미설정'}
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-x-3 text-[10px]">
+                <p className="flex justify-between">
+                  <span className="text-slate-400">진로코스</span> 
+                  <span className="font-bold text-slate-700 text-right">{student.employment_status || '미정'}</span>
+                </p>
+                <p className="flex justify-between">
+                  <span className="text-slate-400 pl-2">기업구분</span> 
+                  <span className="font-black text-blue-600 text-right">{student.company_type || '미분류'}</span>
+                </p>
+              </div>
+              <div className="pt-1 border-t border-slate-200 mt-1">
+                <p className="text-[9px] text-slate-400 font-bold uppercase mb-0.5">취업처</p>
+                <p className="font-black text-blue-600 text-[17px] leading-tight truncate">
+                  {student.company || '미정'}
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {(student.has_field_training === 'O' || (student.training_records && student.training_records.length > 0)) && (
+        <div className="pt-1 space-y-2">
+          <p className="text-[11px] text-emerald-800 font-black uppercase tracking-tight flex items-center gap-1">
+            <Briefcase className="h-3 w-3" /> 현장실습 상세
+          </p>
+          <div className="space-y-1 bg-emerald-50/30 p-2 rounded-lg border border-emerald-100">
+            <div className="grid grid-cols-2 gap-x-3 text-[10px]">
+              <p className="flex justify-between"><span className="text-slate-400">실습결과</span> <span className={cn(
+                "font-black text-right",
+                student.is_hiring_conversion ? "text-blue-600" : 
+                student.is_returned === 'O' ? "text-rose-600" : "text-emerald-700"
+              )}>{student.is_hiring_conversion ? '채용전환' : student.is_returned === 'O' ? '복교' : student.has_field_training === 'O' ? '진행중' : '-'}</span></p>
+              <p className="flex justify-between"><span className="text-slate-400 pl-2">지원금</span> <span className="font-bold text-slate-700">{student.training_stipend_status || '-'}</span></p>
+            </div>
+            <div className="pt-1 border-t border-emerald-100 mt-1 space-y-1">
+              <p className="flex justify-between text-[10px]">
+                <span className="text-slate-400">실습기간</span>
+                <span className="font-bold text-slate-700 text-right">{student.start_date || '?'} ~ {student.end_date || '?'}</span>
+              </p>
+              <div className="pt-1 border-t border-emerald-100/50">
+                <p className="text-[9px] text-emerald-500 font-bold uppercase mb-0.5">실습처</p>
+                <p className="font-black text-emerald-700 text-[17px] leading-tight truncate">
+                  {student.latest_training_company || '미정'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="pt-1 space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] text-indigo-800 font-black uppercase tracking-tight flex items-center gap-1">
+            <Trophy className="h-3 w-3" /> 성적 및 석차
+          </p>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={(e) => { e.stopPropagation(); setIsGradeModalOpen(true); }}
+            className="h-6 px-2 text-[9px] font-black text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 gap-1"
+          >
+            상세보기 <ExternalLink className="h-2.5 w-2.5" />
+          </Button>
+        </div>
+
+        {isRankingsLoading ? (
+          <div className="space-y-2 bg-slate-50 p-2 rounded-lg border border-slate-100 animate-pulse">
+            <div className="h-3 bg-slate-200 rounded w-3/4 mb-1"></div>
+            <div className="h-3 bg-slate-200 rounded w-1/2"></div>
+          </div>
+        ) : rankingSummary && rankingSummary.subjectCount > 0 ? (
+          <div className="space-y-1 bg-slate-50 p-2 rounded-lg border border-slate-100">
+            <div className="grid grid-cols-2 gap-x-3 text-[10px]">
+              <p className="flex justify-between">
+                <span className="text-slate-400">전교 석차</span>
+                <span className="font-black text-indigo-700 text-right">
+                  {rankingSummary.totalRank}
+                  <span className="text-[8px] text-indigo-400 font-medium ml-0.5">/ {rankingSummary.schoolTotal}</span>
+                </span>
+              </p>
+              <p className="flex justify-between">
+                <span className="text-slate-400 pl-2">반 석차</span>
+                <span className="font-black text-amber-700 text-right">
+                  {rankingSummary.classRank}
+                  <span className="text-[8px] text-amber-500 font-medium ml-0.5">/ {rankingSummary.classTotal}</span>
+                </span>
+              </p>
+            </div>
+
+            <div className="pt-1 border-t border-slate-200 mt-1">
+              <p className="text-[9px] text-slate-400 font-bold mb-1.5 flex justify-between uppercase tracking-tighter">
+                <span>성취도별 과목 수 (A-E)</span>
+                <span>총 {rankingSummary.subjectCount}개 과목</span>
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {Object.entries(rankingSummary.gradeCounts || {}).map(([grade, count]) => (
+                  <div key={grade} className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-200 min-w-[36px] justify-center">
+                    <span className={cn(
+                      "text-[9px] font-black",
+                      grade === 'A' ? "text-emerald-600" :
+                      grade === 'B' ? "text-blue-600" :
+                      grade === 'C' ? "text-amber-600" :
+                      grade === 'D' ? "text-orange-600" :
+                      "text-rose-600"
+                    )}>{grade}</span>
+                    <span className="text-[10px] font-bold text-slate-700">{count as number}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-[10px] text-slate-400 italic bg-slate-50 p-2 rounded-lg text-center border border-dashed">등록된 성적 데이터가 없습니다.</p>
+        )}
+      </div>
+
+      <div className="pt-0.5 space-y-1">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] text-rose-800 font-black uppercase tracking-tight flex items-center gap-1">
+            <CalendarClock className="h-3 w-3" /> 출결 현황
+          </p>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={(e) => { e.stopPropagation(); setIsAttendanceModalOpen(true); }}
+            className="h-6 px-2 text-[9px] font-black text-rose-500 hover:text-rose-700 hover:bg-rose-50 gap-1"
+          >
+            상세보기 <ExternalLink className="h-2.5 w-2.5" />
+          </Button>
+        </div>
+        {isRankingsLoading ? (
+          <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 animate-pulse">
+            <div className="h-6 bg-slate-200 rounded w-full"></div>
+          </div>
+        ) : rankingSummary?.attendance ? (
+          <div className="bg-slate-50 p-1 rounded-lg border border-slate-100 overflow-hidden">
+            <table className="w-full text-[9px] border-collapse">
+              <thead>
+                <tr className="text-slate-400 font-black uppercase text-[9px] border-b border-slate-200">
+                  <th className="py-0.5 text-left">구분</th>
+                  <th className="py-0.5">결석</th><th className="py-0.5">지각</th><th className="py-0.5">조퇴</th><th className="py-0.5">결과</th>
+                </tr>
+              </thead>
+              <tbody className="font-bold text-center">
+                <tr className="border-b border-slate-100">
+                  <td className="py-1 text-left text-rose-600 font-black">미인정</td>
+                  <td className={cn(rankingSummary.attendance.unexcused.absent > 0 && "text-rose-600 font-black")}>{rankingSummary.attendance.unexcused.absent}</td>
+                  <td className={cn(rankingSummary.attendance.unexcused.late > 0 && "text-rose-500")}>{rankingSummary.attendance.unexcused.late}</td>
+                  <td className={cn(rankingSummary.attendance.unexcused.early > 0 && "text-rose-500")}>{rankingSummary.attendance.unexcused.early}</td>
+                  <td className={cn(rankingSummary.attendance.unexcused.out > 0 && "text-rose-500")}>{rankingSummary.attendance.unexcused.out}</td>
+                </tr>
+                <tr>
+                  <td className="py-1 text-left text-blue-600 font-black">질병</td>
+                  <td className="text-slate-600">{rankingSummary.attendance.disease.absent}</td>
+                  <td className="text-slate-600">{rankingSummary.attendance.disease.late}</td>
+                  <td className="text-slate-600">{rankingSummary.attendance.disease.early}</td>
+                  <td className="text-slate-600">{rankingSummary.attendance.disease.out}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-[10px] text-slate-400 italic bg-slate-50 p-1.5 rounded-lg text-center border border-dashed">등록된 출결 데이터가 없습니다.</p>
+        )}
+      </div>
+
+      {student.certificates && student.certificates.length > 0 && (
+        <div className="pt-1 space-y-1.5">
+          <p className="text-[11px] text-slate-500 font-black uppercase tracking-tight flex items-center gap-1">
+            <Award className="h-3 w-3" /> 취득 자격증
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {student.certificates.map((cert, i) => (
+              <span key={i} className="bg-white text-slate-700 px-2 py-0.5 rounded border border-slate-200 text-[9px] font-bold shadow-sm">
+                {cert}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {hasCounselingAccess && (
+        <div className="pt-2 flex justify-center">
+          <Button 
+            variant="outline"
+            size="sm"
+            onClick={(e) => { e.stopPropagation(); setIsCounselingModalOpen(true); }}
+            className="px-3 h-7 text-[9px] font-black text-blue-600 border-blue-200 hover:bg-blue-50 gap-1 shadow-sm"
+          >
+            <MessageSquare className="h-3 w-3" />
+            상담일지 보기
+          </Button>
+        </div>
+      )}
+
+      {student.remarks && (
+        <div className="mt-2 p-2 bg-amber-50/50 rounded-lg text-[10px] text-amber-700 italic border-l-2 border-amber-200 leading-relaxed">
+          "{student.remarks}"
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <>
-      <Popover open={open} onOpenChange={setOpen} modal={false}>
-        <PopoverTrigger asChild>
-          {children}
-        </PopoverTrigger>
-        <PopoverContent 
-          side={resolvedSide} 
-          align={resolvedAlign}
-          className="p-4 w-[300px] text-xs shadow-xl border-2 z-[100] max-h-[80vh] overflow-y-auto bg-white cursor-pointer"
-          sideOffset={5}
-          onClick={(e) => {
-            const target = e.target as HTMLElement;
-            if (target.closest('button') || target.closest('a')) return;
-            setOpen(false);
-          }}
-        >
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b-2 pb-1.5 mb-1">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className="font-bold text-[15px] text-blue-900">{student.student_name}</span>
-                {student.teacher_name && (
-                  <span className="text-[10px] text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 font-bold shrink-0">
-                    {student.teacher_name}T
-                  </span>
-                )}
-              </div>
-              <span className={cn(
-                "text-[10px] px-2 py-0.5 rounded-full font-bold",
-                isLowerGrade ? (
-                  student.career_aspiration === '취업' ? "bg-emerald-100 text-emerald-700" : 
-                  student.career_aspiration === '진학' ? "bg-rose-100 text-rose-700" : 
-                  student.career_aspiration === '제외인정자' ? "bg-slate-100 text-slate-600" : "bg-slate-100 text-slate-600"
-                ) : (
-                  student.is_desiring_employment === '예' ? "bg-emerald-100 text-emerald-700" : 
-                  student.is_desiring_employment === '아니오' ? "bg-rose-100 text-rose-700" : 
-                  "bg-slate-100 text-slate-600"
-                )
-              )}>
-                희망: {isLowerGrade ? (student.career_aspiration || '미정') : (student.is_desiring_employment || '미정')}
-              </span>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] text-blue-800 font-black uppercase tracking-tight flex items-center gap-1">
-                  <BarChart3 className="h-3 w-3" /> {isLowerGrade ? '진로희망' : '취업 상세'}
-                </p>
-                {!isLowerGrade && (
-                  <span className={cn(
-                    "text-[9px] px-2 py-0.5 rounded-full font-black",
-                    student.business_type === '취업' ? "bg-emerald-100 text-emerald-700" : 
-                    student.business_type === '미취업' ? "bg-rose-100 text-rose-700" :
-                    student.business_type === '채용진행중' ? "bg-amber-100 text-amber-700" :
-                    student.business_type === '현장실습중' ? "bg-blue-100 text-blue-700" :
-                    student.business_type === '도제OJT' ? "bg-emerald-50 text-emerald-600" :
-                    (student.business_type === '제외인정자' || student.career_aspiration === '제외인정자') ? "bg-slate-100 text-slate-700" :
-                    "bg-slate-50 text-slate-400"
-                  )}>
-                    현황: {student.business_type || (student.career_aspiration === '진학' ? '진학희망' : '미결정')}
-                  </span>
-                )}
-              </div>
-              <div className="space-y-1 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                {isLowerGrade ? (
-                  <>
-                    <div className="text-[10px]">
-                      <p className="flex justify-between">
-                        <span className="text-slate-400">희망기업유형</span> 
-                        <span className="font-black text-blue-600 text-right">{student.special_notes || '미설정'}</span>
-                      </p>
-                    </div>
-                    <div className="pt-1 border-t border-slate-200 mt-1">
-                      <p className="text-[9px] text-slate-400 font-bold uppercase mb-0.5">희망진로코스</p>
-                      <p className="font-black text-blue-600 text-[17px] leading-tight truncate">
-                        {student.career_course || '미설정'}
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-2 gap-x-3 text-[10px]">
-                      <p className="flex justify-between">
-                        <span className="text-slate-400">진로코스</span> 
-                        <span className="font-bold text-slate-700 text-right">{student.employment_status || '미정'}</span>
-                      </p>
-                      <p className="flex justify-between">
-                        <span className="text-slate-400 pl-2">기업구분</span> 
-                        <span className="font-black text-blue-600 text-right">{student.company_type || '미분류'}</span>
-                      </p>
-                    </div>
-                    <div className="pt-1 border-t border-slate-200 mt-1">
-                      <p className="text-[9px] text-slate-400 font-bold uppercase mb-0.5">취업처</p>
-                      <p className="font-black text-blue-600 text-[17px] leading-tight truncate">
-                        {student.company || '미정'}
-                      </p>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {(student.has_field_training === 'O' || (student.training_records && student.training_records.length > 0)) && (
-              <div className="pt-1 space-y-2">
-                <p className="text-[11px] text-emerald-800 font-black uppercase tracking-tight flex items-center gap-1">
-                  <Briefcase className="h-3 w-3" /> 현장실습 상세
-                </p>
-                <div className="space-y-1 bg-emerald-50/30 p-2 rounded-lg border border-emerald-100">
-                  <div className="grid grid-cols-2 gap-x-3 text-[10px]">
-                    <p className="flex justify-between"><span className="text-slate-400">실습결과</span> <span className={cn(
-                      "font-black text-right",
-                      student.is_hiring_conversion ? "text-blue-600" : 
-                      student.is_returned === 'O' ? "text-rose-600" : "text-emerald-700"
-                    )}>{student.is_hiring_conversion ? '채용전환' : student.is_returned === 'O' ? '복교' : student.has_field_training === 'O' ? '진행중' : '-'}</span></p>
-                    <p className="flex justify-between"><span className="text-slate-400 pl-2">지원금</span> <span className="font-bold text-slate-700">{student.training_stipend_status || '-'}</span></p>
-                  </div>
-                  <div className="pt-1 border-t border-emerald-100 mt-1 space-y-1">
-                    <p className="flex justify-between text-[10px]">
-                      <span className="text-slate-400">실습기간</span>
-                      <span className="font-bold text-slate-700 text-right">{student.start_date || '?'} ~ {student.end_date || '?'}</span>
-                    </p>
-                    <div className="pt-1 border-t border-emerald-100/50">
-                      <p className="text-[9px] text-emerald-500 font-bold uppercase mb-0.5">실습처</p>
-                      <p className="font-black text-emerald-700 text-[17px] leading-tight truncate">
-                        {student.latest_training_company || '미정'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="pt-1 space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] text-indigo-800 font-black uppercase tracking-tight flex items-center gap-1">
-                  <Trophy className="h-3 w-3" /> 성적 및 석차
-                </p>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={(e) => { e.stopPropagation(); setIsGradeModalOpen(true); }}
-                  className="h-6 px-2 text-[9px] font-black text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 gap-1"
-                >
-                  상세보기 <ExternalLink className="h-2.5 w-2.5" />
-                </Button>
-              </div>
-
-              {isRankingsLoading ? (
-                <div className="space-y-2 bg-slate-50 p-2 rounded-lg border border-slate-100 animate-pulse">
-                  <div className="h-3 bg-slate-200 rounded w-3/4 mb-1"></div>
-                  <div className="h-3 bg-slate-200 rounded w-1/2"></div>
-                </div>
-              ) : rankingSummary && rankingSummary.subjectCount > 0 ? (
-                <div className="space-y-1 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                  <div className="grid grid-cols-2 gap-x-3 text-[10px]">
-                    <p className="flex justify-between">
-                      <span className="text-slate-400">전교 석차</span>
-                      <span className="font-black text-indigo-700 text-right">
-                        {rankingSummary.totalRank}
-                        <span className="text-[8px] text-indigo-400 font-medium ml-0.5">/ {rankingSummary.schoolTotal}</span>
-                      </span>
-                    </p>
-                    <p className="flex justify-between">
-                      <span className="text-slate-400 pl-2">반 석차</span>
-                      <span className="font-black text-amber-700 text-right">
-                        {rankingSummary.classRank}
-                        <span className="text-[8px] text-amber-500 font-medium ml-0.5">/ {rankingSummary.classTotal}</span>
-                      </span>
-                    </p>
-                  </div>
-
-                  <div className="pt-1 border-t border-slate-200 mt-1">
-                    <p className="text-[9px] text-slate-400 font-bold mb-1.5 flex justify-between uppercase tracking-tighter">
-                      <span>성취도별 과목 수 (A-E)</span>
-                      <span>총 {rankingSummary.subjectCount}개 과목</span>
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {Object.entries(rankingSummary.gradeCounts || {}).map(([grade, count]) => (
-                        <div key={grade} className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-200 min-w-[36px] justify-center">
-                          <span className={cn(
-                            "text-[9px] font-black",
-                            grade === 'A' ? "text-emerald-600" :
-                            grade === 'B' ? "text-blue-600" :
-                            grade === 'C' ? "text-amber-600" :
-                            grade === 'D' ? "text-orange-600" :
-                            "text-rose-600"
-                          )}>{grade}</span>
-                          <span className="text-[10px] font-bold text-slate-700">{count as number}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-[10px] text-slate-400 italic bg-slate-50 p-2 rounded-lg text-center border border-dashed">등록된 성적 데이터가 없습니다.</p>
-              )}
-            </div>
-
-            <div className="pt-0.5 space-y-1">
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] text-rose-800 font-black uppercase tracking-tight flex items-center gap-1">
-                  <CalendarClock className="h-3 w-3" /> 출결 현황
-                </p>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={(e) => { e.stopPropagation(); setIsAttendanceModalOpen(true); }}
-                  className="h-6 px-2 text-[9px] font-black text-rose-500 hover:text-rose-700 hover:bg-rose-50 gap-1"
-                >
-                  상세보기 <ExternalLink className="h-2.5 w-2.5" />
-                </Button>
-              </div>
-              {isRankingsLoading ? (
-                <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 animate-pulse">
-                  <div className="h-6 bg-slate-200 rounded w-full"></div>
-                </div>
-              ) : rankingSummary?.attendance ? (
-                <div className="bg-slate-50 p-1 rounded-lg border border-slate-100 overflow-hidden">
-                  <table className="w-full text-[9px] border-collapse">
-                    <thead>
-                      <tr className="text-slate-400 font-black uppercase text-[9px] border-b border-slate-200">
-                        <th className="py-0.5 text-left">구분</th>
-                        <th className="py-0.5">결석</th><th className="py-0.5">지각</th><th className="py-0.5">조퇴</th><th className="py-0.5">결과</th>
-                      </tr>
-                    </thead>
-                    <tbody className="font-bold text-center">
-                      <tr className="border-b border-slate-100">
-                        <td className="py-1 text-left text-rose-600 font-black">미인정</td>
-                        <td className={cn(rankingSummary.attendance.unexcused.absent > 0 && "text-rose-600 font-black")}>{rankingSummary.attendance.unexcused.absent}</td>
-                        <td className={cn(rankingSummary.attendance.unexcused.late > 0 && "text-rose-500")}>{rankingSummary.attendance.unexcused.late}</td>
-                        <td className={cn(rankingSummary.attendance.unexcused.early > 0 && "text-rose-500")}>{rankingSummary.attendance.unexcused.early}</td>
-                        <td className={cn(rankingSummary.attendance.unexcused.out > 0 && "text-rose-500")}>{rankingSummary.attendance.unexcused.out}</td>
-                      </tr>
-                      <tr>
-                        <td className="py-1 text-left text-blue-600 font-black">질병</td>
-                        <td className="text-slate-600">{rankingSummary.attendance.disease.absent}</td>
-                        <td className="text-slate-600">{rankingSummary.attendance.disease.late}</td>
-                        <td className="text-slate-600">{rankingSummary.attendance.disease.early}</td>
-                        <td className="text-slate-600">{rankingSummary.attendance.disease.out}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="text-[10px] text-slate-400 italic bg-slate-50 p-1.5 rounded-lg text-center border border-dashed">등록된 출결 데이터가 없습니다.</p>
-              )}
-            </div>
-
-            {student.certificates && student.certificates.length > 0 && (
-              <div className="pt-1 space-y-1.5">
-                <p className="text-[11px] text-slate-500 font-black uppercase tracking-tight flex items-center gap-1">
-                  <Award className="h-3 w-3" /> 취득 자격증
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {student.certificates.map((cert, i) => (
-                    <span key={i} className="bg-white text-slate-700 px-2 py-0.5 rounded border border-slate-200 text-[9px] font-bold shadow-sm">
-                      {cert}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {hasCounselingAccess && (
-              <div className="pt-2 flex justify-center">
-                <Button 
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => { e.stopPropagation(); setIsCounselingModalOpen(true); }}
-                  className="px-3 h-7 text-[9px] font-black text-blue-600 border-blue-200 hover:bg-blue-50 gap-1 shadow-sm"
-                >
-                  <MessageSquare className="h-3 w-3" />
-                  상담일지 보기
-                </Button>
-              </div>
-            )}
-
-            {student.remarks && (
-              <div className="mt-2 p-2 bg-amber-50/50 rounded-lg text-[10px] text-amber-700 italic border-l-2 border-amber-200 leading-relaxed">
-                "{student.remarks}"
-              </div>
-            )}
+      {isMobile ? (
+        <>
+          <div onClick={() => setOpen(true)} className="cursor-pointer">
+            {children}
           </div>
-        </PopoverContent>
-      </Popover>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogContent 
+              className="w-[92vw] max-w-[360px] max-h-[85vh] p-4 overflow-y-auto rounded-2xl shadow-2xl bg-white border-none z-[100] [&>button]:hidden"
+              onClick={(e) => {
+                const target = e.target as HTMLElement;
+                if (target.closest('button') || target.closest('a')) return;
+                setOpen(false);
+              }}
+            >
+              <DialogHeader className="sr-only">
+                <DialogTitle>{student.student_name} 학생 정보</DialogTitle>
+                <DialogDescription>{student.student_name} 학생의 취업, 성적 및 출결 상세 정보 모달</DialogDescription>
+              </DialogHeader>
+              {popoverBody}
+            </DialogContent>
+          </Dialog>
+        </>
+      ) : (
+        <Popover open={open} onOpenChange={setOpen} modal={false}>
+          <PopoverTrigger asChild>
+            {children}
+          </PopoverTrigger>
+          <PopoverContent 
+            side={resolvedSide} 
+            align={resolvedAlign}
+            className="p-4 w-[300px] text-xs shadow-xl border-2 z-[100] max-h-[80vh] overflow-y-auto bg-white cursor-pointer"
+            sideOffset={5}
+            collisionPadding={16}
+            avoidCollisions={true}
+            onClick={(e) => {
+              const target = e.target as HTMLElement;
+              if (target.closest('button') || target.closest('a')) return;
+              setOpen(false);
+            }}
+          >
+            {popoverBody}
+          </PopoverContent>
+        </Popover>
+      )}
 
       {/* 성적 상세 모달 */}
       <Dialog open={isGradeModalOpen} onOpenChange={setIsGradeModalOpen}>
