@@ -178,8 +178,7 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, isRanki
         className={cn(
           "h-7 border-b border-gray-200 flex items-center justify-between px-0.5 text-[10px] transition-colors hover:opacity-80 cursor-pointer active:bg-slate-100 relative pr-[5px]",
           variant,
-          isMatched && "search-highlight",
-          isCustomRuleMatched && "ring-2 ring-blue-600 bg-blue-100/90 shadow-md text-blue-950 font-bold z-10 scale-[1.02] border-blue-400"
+          (isMatched || isCustomRuleMatched) && "search-highlight"
         )}
       >
         <span className="opacity-60 text-[7px] w-2">{student.student_number || idx + 1}</span>
