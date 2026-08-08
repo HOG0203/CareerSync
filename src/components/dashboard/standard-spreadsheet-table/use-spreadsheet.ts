@@ -315,6 +315,46 @@ export function useSpreadsheet({
   }, [onSave, filteredData, columns, data, recordHistory])
 
 
+  // 커서/셀 위치에 따른 가로 및 세로 자동 스크롤
+  const scrollToCell = React.useCallback((row: number, col: number) => {
+    if (!containerRef.current) return;
+    const container = containerRef.current;
+
+    // 1. 세로 스크롤
+    const targetY = row * ROW_HEIGHT + HEADER_HEIGHT;
+    const curY = container.scrollTop;
+    const ch = container.clientHeight;
+
+    if (targetY < curY + HEADER_HEIGHT) {
+      container.scrollTop = Math.max(0, targetY - HEADER_HEIGHT);
+    } else if (targetY + ROW_HEIGHT > curY + ch) {
+      container.scrollTop = targetY + ROW_HEIGHT - ch;
+    }
+
+    // 2. 가로 스크롤 (커서 위치에 맞추어 화면 안으로 자동 이동)
+    let targetX = 32; // 체크박스 열 너비
+    for (let i = 0; i < col; i++) {
+      targetX += (columns[i]?.width || 80);
+    }
+    const colWidth = columns[col]?.width || 80;
+    const curX = container.scrollLeft;
+    const cw = container.clientWidth;
+
+    if (targetX < curX) {
+      container.scrollLeft = Math.max(0, targetX - 10);
+    } else if (targetX + colWidth > curX + cw) {
+      container.scrollLeft = targetX + colWidth - cw + 30;
+    }
+  }, [columns, ROW_HEIGHT, HEADER_HEIGHT]);
+
+  // 셀 선택 또는 수정 모드 전환 시 커서 위치로 자동 스크롤
+  React.useEffect(() => {
+    const target = editingCell || selectionStart;
+    if (target && typeof target.row === 'number' && typeof target.col === 'number') {
+      scrollToCell(target.row, target.col);
+    }
+  }, [selectionStart, editingCell, scrollToCell]);
+
   const handleKeyDown = React.useCallback((e: React.KeyboardEvent) => {
     if (editingCell) return;
     if (e.ctrlKey && e.key === 'c') { e.preventDefault(); handleCopy(); return; }
@@ -341,13 +381,9 @@ export function useSpreadsheet({
     e.preventDefault();
     if (e.shiftKey) setSelectionEnd({ row, col });
     else { setSelectionStart({ row, col }); setSelectionEnd({ row, col }); }
-    if (containerRef.current) {
-      const targetY = row * ROW_HEIGHT + HEADER_HEIGHT;
-      const curS = containerRef.current.scrollTop;
-      if (targetY < curS + HEADER_HEIGHT) containerRef.current.scrollTop = targetY - HEADER_HEIGHT;
-      else if (targetY + ROW_HEIGHT > curS + containerHeight) containerRef.current.scrollTop = targetY + ROW_HEIGHT - containerHeight;
-    }
-  }, [editingCell, selectionStart, selectionEnd, filteredData, columns, HEADER_HEIGHT, containerHeight, handleDelete, handleCopy, handlePaste, handleUndo, handleRedo])
+    
+    scrollToCell(row, col);
+  }, [editingCell, selectionStart, selectionEnd, filteredData, columns, handleDelete, handleCopy, handlePaste, handleUndo, handleRedo, scrollToCell])
 
   return {
     data,
