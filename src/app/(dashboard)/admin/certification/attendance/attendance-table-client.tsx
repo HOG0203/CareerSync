@@ -316,83 +316,73 @@ export function AttendanceTableClient({
           {/* 출결 카드 목록 영역 */}
           <div className="flex-1 overflow-auto p-3 sm:p-6">
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-2.5 sm:gap-3">
           {studentGroups.map((group) => {
             return (
               <div 
                 key={group.id} 
                 onClick={() => setSelectedStudentId(group.id)}
                 className={cn(
-                  "group bg-white border-2 rounded-2xl p-3.5 sm:p-4 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden",
-                  group.hasAnyUnexcused ? "border-rose-100 hover:border-rose-200" : "border-slate-100 hover:border-indigo-100"
+                  "group bg-white border border-slate-200 rounded-xl p-2.5 shadow-xs hover:shadow-md transition-all cursor-pointer relative overflow-hidden hover:border-indigo-400",
+                  group.hasAnyUnexcused ? "border-rose-200 bg-rose-50/20" : "border-slate-200"
                 )}
               >
-                <div className={cn(
-                  "absolute -right-2 -top-2 h-16 w-16 rounded-full opacity-[0.03] group-hover:scale-110 transition-transform",
-                  group.hasAnyUnexcused ? "bg-rose-500" : "bg-indigo-500"
-                )} />
-
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
                       <div className={cn(
-                        "h-9 w-9 sm:h-10 sm:w-10 rounded-xl flex items-center justify-center shrink-0",
-                        group.hasAnyUnexcused ? "bg-rose-50 text-rose-500" : "bg-indigo-50 text-indigo-500"
+                        "h-7 w-7 rounded-lg flex items-center justify-center shrink-0",
+                        group.hasAnyUnexcused ? "bg-rose-100 text-rose-600" : "bg-indigo-50 text-indigo-600"
                       )}>
-                        <User className="h-4 w-4 sm:h-5 sm:w-5" />
+                        <User className="h-3.5 w-3.5" />
                       </div>
                       <div className="flex flex-col text-left min-w-0">
-                        <span className="font-black text-slate-800 text-sm sm:text-base leading-tight truncate">{group.name}</span>
-                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{group.classInfo.replace('반', '')}반 {group.number}번</span>
+                        <span className="font-black text-slate-800 text-xs sm:text-sm leading-tight truncate">{group.name}</span>
+                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">{group.classInfo.replace('반', '')}반 {group.number}번</span>
                       </div>
                     </div>
                     {group.hasAnyUnexcused ? (
-                      <div className="bg-rose-500 text-white p-1 rounded-lg animate-pulse shadow-sm shrink-0">
-                        <AlertTriangle className="h-3.5 w-3.5" />
+                      <div className="bg-rose-500 text-white p-0.5 rounded-md animate-pulse shadow-xs shrink-0">
+                        <AlertTriangle className="h-3 w-3" />
                       </div>
                     ) : (
-                      <div className="bg-emerald-50 text-emerald-600 p-1 rounded-lg shrink-0">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      <div className="bg-emerald-50 text-emerald-600 p-0.5 rounded-md shrink-0">
+                        <CheckCircle2 className="h-3 w-3" />
                       </div>
                     )}
                   </div>
 
-                  <div className="space-y-0.5 sm:space-y-1">
-                    <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-bold">
-                      <GraduationCap className="h-3 w-3 text-slate-400 shrink-0" />
-                      <span>{group.gradYear}년 졸업예정</span>
-                    </div>
-                    <div className="text-[11px] text-slate-600 font-black truncate">
-                      {group.major.replace('공업계', '')}
-                    </div>
+                  <div className="flex items-center justify-between text-[9px] text-slate-500 font-bold px-0.5">
+                    <span className="truncate text-slate-600 font-black">{group.major.replace('공업계', '')}</span>
+                    <span className="text-slate-400 shrink-0">{group.gradYear}년</span>
                   </div>
 
                   {/* 출결 매트릭스 표 */}
-                  <div className="pt-2.5 sm:pt-3 border-t border-slate-50">
-                    <table className="w-full text-[8.5px] border-collapse bg-slate-50/50 rounded-lg overflow-hidden border border-slate-100">
+                  <div className="pt-1.5 border-t border-slate-100">
+                    <table className="w-full text-[8px] border-collapse bg-slate-50/70 rounded-md overflow-hidden border border-slate-100">
                       <thead>
                         <tr className="text-slate-400 font-black uppercase text-[7px] border-b border-slate-100">
-                          <th className="py-1 pl-1.5 text-left border-r border-slate-100">구분</th>
-                          <th className="py-1">결</th><th className="py-1">지</th><th className="py-1">조</th><th className="py-1">과</th>
+                          <th className="py-0.5 pl-1 text-left border-r border-slate-100">구분</th>
+                          <th className="py-0.5">결</th><th className="py-0.5">지</th><th className="py-0.5">조</th><th className="py-0.5">과</th>
                         </tr>
                       </thead>
                       <tbody className="font-bold text-center">
                         <tr className="border-b border-slate-100/50">
-                          <td className="py-1 pl-1.5 text-left text-rose-500 font-black border-r border-slate-100">미인정</td>
-                          <td className={cn(group.stats.unexcused.absent > 0 && "text-rose-600 font-black")}>{group.stats.unexcused.absent}</td>
+                          <td className="py-0.5 pl-1 text-left text-rose-500 font-black border-r border-slate-100">미인정</td>
+                          <td className={cn(group.stats.unexcused.absent > 0 && "text-rose-600 font-black bg-rose-50")}>{group.stats.unexcused.absent}</td>
                           <td className={cn(group.stats.unexcused.late > 0 && "text-rose-500")}>{group.stats.unexcused.late}</td>
                           <td className={cn(group.stats.unexcused.early > 0 && "text-rose-500")}>{group.stats.unexcused.early}</td>
                           <td className={cn(group.stats.unexcused.out > 0 && "text-rose-500")}>{group.stats.unexcused.out}</td>
                         </tr>
                         <tr className="border-b border-slate-100/50">
-                          <td className="py-1 pl-1.5 text-left text-blue-500 border-r border-slate-100">질병</td>
+                          <td className="py-0.5 pl-1 text-left text-blue-500 border-r border-slate-100">질병</td>
                           <td className="text-slate-500">{group.stats.disease.absent}</td>
                           <td className="text-slate-500">{group.stats.disease.late}</td>
                           <td className="text-slate-500">{group.stats.disease.early}</td>
                           <td className="text-slate-500">{group.stats.disease.out}</td>
                         </tr>
                         <tr>
-                          <td className="py-1 pl-1.5 text-left text-slate-400 border-r border-slate-100">기타</td>
+                          <td className="py-0.5 pl-1 text-left text-slate-400 border-r border-slate-100">기타</td>
                           <td className="text-slate-400">{group.stats.other.absent}</td>
                           <td className="text-slate-400">{group.stats.other.late}</td>
                           <td className="text-slate-400">{group.stats.other.early}</td>
