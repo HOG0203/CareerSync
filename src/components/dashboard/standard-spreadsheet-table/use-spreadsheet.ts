@@ -226,20 +226,18 @@ export function useSpreadsheet({
       container.scrollTop = targetY + ROW_HEIGHT - ch;
     }
 
-    // 2. 가로 스크롤 (커서 위치에 따라 가로 스크롤을 시야 최적 위치로 이동)
+    // 2. 가로 스크롤 (선택된 열 오프셋 위치로 정밀 자동 이동)
     const startX = colWidthOffsets[col] ?? 32;
-    const endX = colWidthOffsets[col + 1] ?? (startX + 80);
     const curX = container.scrollLeft;
     const cw = container.clientWidth;
 
     if (col <= 1) {
-      container.scrollTop = container.scrollTop; // keep Y
       if (curX > 0) container.scrollLeft = 0;
     } else {
-      // 커서가 잘 보이고 여유 있게(120px 여백) 시야 안으로 들어오도록 가로 스크롤 자동 이동
-      const idealScrollX = Math.max(0, startX - 120);
-      if (startX < curX + 60 || endX > curX + cw - 60) {
-        container.scrollLeft = idealScrollX;
+      // 선택된 열의 시작점 startX가 항상 시야에 여유 있게(100px 오프셋) 들어오도록 직관적 가로 이동
+      const targetScrollX = Math.max(0, startX - 100);
+      if (Math.abs(container.scrollLeft - targetScrollX) > 5) {
+        container.scrollLeft = targetScrollX;
       }
     }
   }, [colWidthOffsets, ROW_HEIGHT, HEADER_HEIGHT]);
