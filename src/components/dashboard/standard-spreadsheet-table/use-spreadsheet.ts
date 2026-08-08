@@ -226,24 +226,19 @@ export function useSpreadsheet({
       container.scrollTop = targetY + ROW_HEIGHT - ch;
     }
 
-    // 2. 가로 스크롤 (엑셀/구글스프레드시트 표준 방식: 이미 보이는 셀은 스크롤 이동 안 함)
+    // 2. 가로 스크롤 (우측 150px / 좌측 80px 선제적 스크롤 감도 적용)
     const startX = colWidthOffsets[col] ?? 32;
     const endX = colWidthOffsets[col + 1] ?? (startX + 80);
     const curX = container.scrollLeft;
     const cw = container.clientWidth;
 
-    // 이미 화면 안(현재 시야)에 완전히 잘 보이는 셀을 클릭한 경우 스크롤 위치를 절대 변경하지 않음 (화면 튐 방지)
-    if (startX >= curX + 10 && endX <= curX + cw - 10) {
-      return;
-    }
+    const LEFT_PADDING = 80;
+    const RIGHT_PADDING = 150; // 우측 여백 150px 사전 확보
 
-    // 화면 좌측 밖으로 가려진 경우: 좌측으로 최소한만 이동
-    if (startX < curX + 10) {
-      container.scrollLeft = Math.max(0, startX - 20);
-    } 
-    // 화면 우측 밖으로 가려진 경우: 우측으로 최소한만 이동
-    else if (endX > curX + cw - 10) {
-      container.scrollLeft = endX - cw + 20;
+    if (endX > curX + cw - RIGHT_PADDING) {
+      container.scrollLeft = Math.max(0, endX - cw + RIGHT_PADDING);
+    } else if (startX < curX + LEFT_PADDING) {
+      container.scrollLeft = Math.max(0, startX - LEFT_PADDING);
     }
   }, [colWidthOffsets, ROW_HEIGHT, HEADER_HEIGHT]);
 
