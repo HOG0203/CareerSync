@@ -362,10 +362,16 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
         if (cond.mainCategory === 'status' || (cond as any).category === 'status') {
           const status = student.employment_status || '';
           const bType = student.business_type || '';
-          if (cond.value === '미취업') return status === '미취업' || status === '미설정' || !status;
-          if (cond.value === '취업') return status === '취업' || bType === '취업' || bType === '도제OJT';
-          if (cond.value === '현장실습중') return bType === '현장실습중' || bType === '채용진행중';
-          if (cond.value === '진학') return status === '진학';
+          const aspiration = student.career_aspiration || '';
+          const val = cond.value;
+
+          if (val === '미취업') return bType === '미취업' || status === '미취업' || status === '미설정' || (!bType && !status);
+          if (val === '취업') return bType === '취업' || status === '취업';
+          if (val === '현장실습중') return bType === '현장실습중' || student.has_field_training === 'O';
+          if (val === '도제OJT') return bType === '도제OJT';
+          if (val === '채용진행중') return bType === '채용진행중';
+          if (val === '진학') return status === '진학' || aspiration === '진학';
+          if (val === '제외인정자') return bType === '제외인정자' || status === '제외인정자' || aspiration === '제외인정자';
           return true;
         }
 
