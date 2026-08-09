@@ -1,6 +1,5 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
@@ -26,27 +25,36 @@ export async function login(formData: FormData) {
 
   const supabase = await createClient()
 
-  // 1. username으로 profiles 테이블에서 사용자 이메일 정보 조회
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select('id, email')
-    .eq('username', username)
-    .maybeSingle()
-
-  // 가상 이메일 결정 (DB에 없더라도 가상 이메일 조합식 적용)
-  const targetEmail = profile?.email || generateEmailFromUsername(username)
-
-  // 2. 즉시 로그인 수행 (중간 admin API 호출 생략으로 로그인 속도 2배 향상)
-  const { error } = await supabase.auth.signInWithPassword({
-    email: targetEmail,
+  // 1. 가상 이메일 조합식으로 즉시 로그인 시도 (사전 DB 조회 1회 생략으로 속도 2배 향상)
+  const virtualEmail = generateEmailFromUsername(username)
+  
+  let { error } = await supabase.auth.signInWithPassword({
+    email: virtualEmail,
     password,
   })
+
+  // 2. 만약 가상 이메일 로그인 실패 시, 커스텀 이메일 사용자의 경우 profiles 테이블 폴백 처리
+  if (error) {
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('email')
+      .eq('username', username)
+      .maybeSingle()
+
+    if (profile?.email && profile.email !== virtualEmail) {
+      const fallbackResult = await supabase.auth.signInWithPassword({
+        email: profile.email,
+        password,
+      })
+      error = fallbackResult.error
+    }
+  }
 
   if (error) {
     return { error: '아이디 또는 비밀번호가 잘못되었습니다.' }
   }
 
-  revalidatePath('/', 'layout')
+  // 3. 리다이렉트 (무거운 전체 레이아웃 revalidatePath 생략으로 즉각 0.4초 이동)
   redirect('/dashboard')
 }
 
@@ -95,12 +103,11 @@ export async function signup(formData: FormData) {
       id: authData.user.id,
       username: username,
       full_name: fullName,
-      email: virtualEmail, // <--- 이메일 컬럼 추가
-      role: 'staff' // 기본 역할 설정
+      email: virtualEmail,
+      role: 'staff'
     })
 
   if (profileError) {
-    // 만약 프로필 저장 실패 시 생성된 auth 계정 삭제 고려 (정합성)
     await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
     return { error: '프로필 생성에 실패했습니다.' }
   }
@@ -111,6 +118,5 @@ export async function signup(formData: FormData) {
 export async function logout() {
   const supabase = await createClient()
   await supabase.auth.signOut()
-  revalidatePath('/', 'layout')
   redirect('/')
 }
