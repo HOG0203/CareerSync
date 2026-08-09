@@ -96,9 +96,7 @@ export async function logAuditAction(params: {
 /**
  * [캐싱] Audit Log 전체 목록 서버 메모리 캐싱 조회
  */
-export async function getCachedAuditLogs(options?: { action_type?: string; search?: string }) {
-  const searchKey = `${options?.action_type || 'all'}-${options?.search || 'all'}`;
-
+export async function getCachedAuditLogs() {
   return unstable_cache(
     async () => {
       const supabase = createAdminClient();
@@ -133,26 +131,11 @@ export async function getCachedAuditLogs(options?: { action_type?: string; searc
         logs = fallbackData?.value ? (fallbackData.value as any).logs || [] : [];
       }
 
-      // 필터링 적용
-      let filtered = logs;
-      if (options?.action_type && options.action_type !== 'all') {
-        filtered = filtered.filter(l => l.action_type === options.action_type);
-      }
-
-      if (options?.search && options.search.trim() !== '') {
-        const query = options.search.toLowerCase().trim();
-        filtered = filtered.filter(l => 
-          l.actor_name.toLowerCase().includes(query) ||
-          l.target_name.toLowerCase().includes(query) ||
-          JSON.stringify(l.details || '').toLowerCase().includes(query)
-        );
-      }
-
-      return filtered;
+      return logs;
     },
-    [`audit-logs-list-${searchKey}`],
+    ['audit-logs-list-all-500'],
     {
-      revalidate: 3600,
+      revalidate: 86400,
       tags: ['audit-logs']
     }
   )();

@@ -31,11 +31,8 @@ async function AuditLogsPageContent({
     redirect('/dashboard');
   }
 
-  // 2. Audit Log 캐시 데이터 조회
-  const auditLogs = await getCachedAuditLogs({
-    action_type: params.type,
-    search: params.search
-  });
+  // 2. Audit Log 전체 캐시 데이터 조회 (1회만)
+  const auditLogs = await getCachedAuditLogs();
 
   return (
     <div className="flex flex-col h-full gap-4 sm:gap-6">

@@ -38,34 +38,57 @@ const ACTION_TYPE_CONFIG: Record<string, { label: string; color: string }> = {
 
 export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsClientProps) {
   const [search, setSearch] = React.useState(currentSearch);
+  const [activeType, setActiveType] = React.useState(currentType);
   const [selectedLog, setSelectedLog] = React.useState<AuditLogEntry | null>(null);
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
 
-  // 검색어 디바운스 적용
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (search) {
-        params.set('search', search);
-      } else {
-        params.delete('search');
-      }
-      router.push(`${pathname}?${params.toString()}`);
-    }, 300);
+  // 각 유형별 개수 집계 (0ms 메모이제이션)
+  const typeCounts = React.useMemo(() => {
+    const counts: Record<string, number> = { all: logs.length };
+    logs.forEach(l => {
+      counts[l.action_type] = (counts[l.action_type] || 0) + 1;
+    });
+    return counts;
+  }, [logs]);
 
-    return () => clearTimeout(timer);
-  }, [search]);
+  // 브라우저 0ms 메모이제이션 클라이언트 필터링
+  const filteredLogs = React.useMemo(() => {
+    let list = logs;
+    if (activeType && activeType !== 'all') {
+      list = list.filter(l => l.action_type === activeType);
+    }
+    if (search && search.trim() !== '') {
+      const q = search.toLowerCase().trim();
+      list = list.filter(l =>
+        (l.actor_name || '').toLowerCase().includes(q) ||
+        (l.target_name || '').toLowerCase().includes(q) ||
+        JSON.stringify(l.details || '').toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [logs, activeType, search]);
 
   const handleTypeChange = (type: string) => {
-    const params = new URLSearchParams(searchParams.toString());
+    setActiveType(type);
+    const params = new URLSearchParams(window.location.search);
     if (type !== 'all') {
       params.set('type', type);
     } else {
       params.delete('type');
     }
-    router.push(`${pathname}?${params.toString()}`);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    const params = new URLSearchParams(window.location.search);
+    if (val.trim() !== '') {
+      params.set('search', val);
+    } else {
+      params.delete('search');
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
   const formatDate = (isoString: string) => {
@@ -91,23 +114,29 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
         <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
           <Button
             size="sm"
-            variant={currentType === 'all' ? 'default' : 'outline'}
+            variant={activeType === 'all' ? 'default' : 'outline'}
             onClick={() => handleTypeChange('all')}
-            className={cn("text-xs font-bold rounded-xl", currentType === 'all' && "bg-indigo-600 hover:bg-indigo-700")}
+            className={cn("text-xs font-bold rounded-xl", activeType === 'all' && "bg-indigo-600 hover:bg-indigo-700")}
           >
-            전체 ({logs.length})
+            전체 ({typeCounts['all'] || 0})
           </Button>
-          {Object.entries(ACTION_TYPE_CONFIG).map(([key, cfg]) => (
-            <Button
-              key={key}
-              size="sm"
-              variant={currentType === key ? 'default' : 'outline'}
-              onClick={() => handleTypeChange(key)}
-              className={cn("text-xs font-medium rounded-xl whitespace-nowrap", currentType === key && "bg-indigo-600 hover:bg-indigo-700")}
-            >
-              {cfg.label}
-            </Button>
-          ))}
+          {Object.entries(ACTION_TYPE_CONFIG).map(([key, cfg]) => {
+            const count = typeCounts[key] || 0;
+            return (
+              <Button
+                key={key}
+                size="sm"
+                variant={activeType === key ? 'default' : 'outline'}
+                onClick={() => handleTypeChange(key)}
+                className={cn("text-xs font-medium rounded-xl whitespace-nowrap gap-1", activeType === key && "bg-indigo-600 hover:bg-indigo-700")}
+              >
+                <span>{cfg.label}</span>
+                <span className={cn("text-[10px] px-1.5 py-0.2 rounded-full font-bold", activeType === key ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500")}>
+                  {count}
+                </span>
+              </Button>
+            );
+          })}
         </div>
 
         <div className="relative w-full md:w-72 shrink-0">
@@ -115,7 +144,7 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
           <Input
             placeholder="작업자, 대상, 내용 검색..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-9 h-9 text-xs rounded-xl border-slate-200 bg-slate-50 focus:bg-white transition-colors"
           />
         </div>
@@ -130,12 +159,12 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
               작업 기록 목록
             </CardTitle>
             <CardDescription className="text-xs text-slate-500">
-              최근 발생한 시스템 작업 이력이 시각적으로 기록됩니다. (총 {logs.length}건)
+              최근 발생한 시스템 작업 이력이 시각적으로 기록됩니다. (필터링: {filteredLogs.length}건 / 전체 {logs.length}건)
             </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          {logs.length === 0 ? (
+          {filteredLogs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-slate-400">
               <History className="h-10 w-10 text-slate-300 mb-2" />
               <p className="text-xs font-medium">기록된 작업 이력이 없습니다.</p>
@@ -153,7 +182,7 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {logs.map((log) => {
+                  {filteredLogs.map((log) => {
                     const typeCfg = ACTION_TYPE_CONFIG[log.action_type] || { label: log.action_type, color: 'bg-slate-100 text-slate-700 border-slate-200' };
                     return (
                       <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
