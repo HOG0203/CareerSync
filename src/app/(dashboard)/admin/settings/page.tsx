@@ -50,15 +50,8 @@ import {
   getAchievementScores, 
   updateAchievementScores 
 } from '../grades/actions';
-import { 
-  getCachedAcademicSnapshots, 
-  createAcademicHistorySnapshot, 
-  getSnapshotDetails, 
-  AcademicSnapshotItem 
-} from '@/lib/academic-snapshots';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { FileSpreadsheet, History, Archive, Download, Clock, ShieldCheck } from 'lucide-react';
 
 export default function AdminSettingsPage() {
   const [certs, setCerts] = React.useState<MasterCertificate[]>([]);
@@ -83,16 +76,13 @@ export default function AdminSettingsPage() {
   const [newCertLevels, setNewCertLevels] = React.useState('');
   const [certSearch, setCertSearch] = React.useState('');
   const [baseYear, setBaseYear] = React.useState<number>(new Date().getFullYear());
-  const [snapshots, setSnapshots] = React.useState<AcademicSnapshotItem[]>([]);
   const [isPending, setIsPending] = React.useState(false);
-  const [isSnapshotPending, setIsSnapshotPending] = React.useState(false);
   const { toast } = useToast();
 
   React.useEffect(() => {
     getMasterCertificates().then(setCerts);
     getSystemSettings().then(settings => setBaseYear(settings.baseYear));
     getAchievementScores().then(setAchievementWeights);
-    getCachedAcademicSnapshots().then(setSnapshots);
     getCertificationConfig().then(config => {
       setCertConfig(config);
       if (config.gradeWeights) {
@@ -156,32 +146,7 @@ export default function AdminSettingsPage() {
       c.name.toLowerCase().includes(query) || 
       c.levels.some(l => l.toLowerCase().includes(query))
     );
-  }, [certs, certSearch]);
-
-  const handleCreateManualSnapshot = async () => {
-    setIsSnapshotPending(true);
-    try {
-      const res = await createAcademicHistorySnapshot({
-        baseYear,
-        snapshotName: `${baseYear}학년도 학적 및 취업이력 최종 마감 백업`
-      });
-      if (res.success) {
-        toast({
-          title: '스냅샷 백업 생성 완료 🎉',
-          description: `${res.snapshotName} (${res.count}명 학생 데이터 백업됨)`
-        });
-        getCachedAcademicSnapshots().then(setSnapshots);
-      } else {
-        toast({ variant: 'destructive', title: '스냅샷 생성 실패', description: res.error });
-      }
-    } catch (err: any) {
-      toast({ variant: 'destructive', title: '오류 발생', description: err.message });
-    } finally {
-      setIsSnapshotPending(false);
-    }
-  };
-
-  {/* 공통 1: 학사학년도 콘텐츠 */}
+  }, [certs, certSearch]);  {/* 공통 1: 학사학년도 콘텐츠 */}
   const renderYearSettingsContent = () => (
     <div className="space-y-4">
       <div className="flex flex-col gap-2">
@@ -196,53 +161,8 @@ export default function AdminSettingsPage() {
       <div className="p-4 rounded-xl bg-blue-50 border border-blue-100 space-y-2">
         <p className="text-[11px] text-blue-700 leading-relaxed font-semibold">
           💡 <strong>입력 가이드</strong><br/>
-          실제 졸업하는 해보다 <strong>1년 앞선 연도</strong>를 입력하세요. (예: 3학년이 2027년 졸업이면 2026 선택)<br/>
-          * 기준년도를 변경하면 기존 학년도 학적 데이터가 <strong>자동으로 마감 백업 스냅샷으로 저장</strong>됩니다.
+          실제 졸업하는 해보다 <strong>1년 앞선 연도</strong>를 입력하세요. (예: 3학년이 2027년 졸업이면 2026 선택)
         </p>
-      </div>
-
-      {/* 백업 스냅샷 관리 섹션 */}
-      <div className="pt-3 border-t border-slate-200 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <Archive className="h-4 w-4 text-emerald-600" />
-            <h4 className="text-xs font-bold text-slate-800">학적 마감 백업 스냅샷 ({snapshots.length}건)</h4>
-          </div>
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleCreateManualSnapshot}
-            disabled={isSnapshotPending}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-8 px-3 rounded-lg shadow-sm"
-          >
-            {isSnapshotPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Archive className="h-3.5 w-3.5 mr-1" />}
-            수동 백업 스냅샷 생성
-          </Button>
-        </div>
-
-        <div className="border rounded-xl overflow-hidden max-h-[180px] overflow-y-auto text-xs bg-slate-50/50">
-          {snapshots.length === 0 ? (
-            <div className="p-4 text-center text-slate-400 italic text-[11px]">
-              생성된 마감 백업 스냅샷이 없습니다. (기준년도 변경 시 자동 생성됩니다)
-            </div>
-          ) : (
-            <div className="divide-y bg-white">
-              {snapshots.map(s => (
-                <div key={s.id} className="p-2.5 px-3 flex items-center justify-between text-[11px] hover:bg-slate-50 transition-colors">
-                  <div className="min-w-0 pr-2">
-                    <p className="font-bold text-slate-800 truncate">{s.snapshot_name}</p>
-                    <p className="text-[10px] text-slate-500 font-mono">
-                      {new Date(s.created_at).toLocaleDateString()} | 생성자: {s.created_by} | 학생: {s.student_count}명
-                    </p>
-                  </div>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded shrink-0">
-                    백업 완료
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );
@@ -626,7 +546,6 @@ export default function AdminSettingsPage() {
           </AccordionItem>
         </Accordion>
       </div>
-
     </div>
   );
 }
