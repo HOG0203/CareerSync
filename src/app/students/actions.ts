@@ -236,6 +236,7 @@ export async function updateStudentField(id: string, field: string, value: any) 
   revalidatePath('/admin/students'); 
   revalidatePath('/class-management');
   revalidatePath('/employment-status');
+  revalidatePath('/labor-education');
   revalidatePath('/dashboard');
   return { success: true }
 }
@@ -260,6 +261,7 @@ export async function bulkUpdateStudentData(updates: { id: string, field: string
   revalidatePath('/admin/students'); 
   revalidatePath('/class-management');
   revalidatePath('/employment-status');
+  revalidatePath('/labor-education');
   revalidatePath('/dashboard');
   return { success: true }
 }
@@ -274,6 +276,7 @@ export async function createStudent(data: { graduation_year: number, major: stri
   revalidatePath('/students'); 
   revalidatePath('/class-management');
   revalidatePath('/employment-status');
+  revalidatePath('/labor-education');
   revalidatePath('/dashboard');
   return { success: true }
 }
@@ -287,6 +290,7 @@ export async function deleteStudents(ids: string[]) {
   revalidatePath('/students'); 
   revalidatePath('/class-management');
   revalidatePath('/employment-status');
+  revalidatePath('/labor-education');
   revalidatePath('/dashboard');
   return { success: true }
 }

@@ -113,7 +113,7 @@ export function StandardSpreadsheetTable({
           <table className="text-[11px] border-collapse table-auto min-w-max text-center relative border-none">
             <colgroup>
               <col style={{ width: 32 }} />
-              {columns.map((c, i) => <col key={i} style={{ minWidth: c.width }} />)}
+              {columns.map((c, i) => <col key={i} style={{ width: c.width, minWidth: c.width }} />)}
             </colgroup>
             <TableHeader
               columns={columns}

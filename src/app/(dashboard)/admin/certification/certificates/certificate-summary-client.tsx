@@ -497,15 +497,26 @@ export function CertificateSummaryClient({
       {/* 자격증 직접 수정 다이얼로그 */}
 
       <Dialog open={!!editingStudent} onOpenChange={(open) => !open && setEditingStudent(null)}>
-        <DialogContent className="max-w-md w-[95vw] sm:w-full bg-white p-4 sm:p-6 rounded-2xl shadow-2xl">
-          <DialogHeader className="text-left">
-            <DialogTitle className="text-base sm:text-lg font-black text-slate-900">자격증 정보 수정</DialogTitle>
-            <DialogDescription className="text-xs text-slate-500 mt-1">
-              {editingStudent?.name} 학생({editingStudent?.major} {editingStudent?.classInfo})의 취득 자격증을 수정합니다.
-            </DialogDescription>
+        <DialogContent className="max-w-md w-[95vw] sm:w-full bg-white p-0 rounded-2xl shadow-2xl overflow-hidden border-none">
+          <DialogHeader className="p-4 sm:p-5 bg-white border-b border-slate-100 shrink-0">
+            <div className="flex items-center gap-3 sm:gap-4 mr-6">
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-amber-50 flex items-center justify-center shrink-0 border border-amber-100">
+                <Award className="h-5 w-5 sm:h-6 sm:w-6 text-amber-600" />
+              </div>
+              <div className="flex flex-col text-left min-w-0">
+                <DialogTitle className="text-base sm:text-lg font-black flex items-center gap-2 text-slate-900 truncate">
+                  {editingStudent?.name}
+                  <span className="text-[10px] sm:text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full font-bold shrink-0">
+                    {editingStudent?.number}번
+                  </span>
+                </DialogTitle>
+                <DialogDescription className="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
+                  {editingStudent?.major} • {editingStudent?.classInfo}반 자격증 수정
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
-
-          <div className="py-3 sm:py-4 space-y-4">
+          <div className="p-4 sm:p-6 pt-3 space-y-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700">자격증 목록 (쉼표 또는 세미콜론 구분)</label>
               <Input 

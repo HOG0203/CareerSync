@@ -409,24 +409,30 @@ export function AttendanceTableClient({
 
       {/* 상세 모달 */}
       <Dialog open={!!selectedStudentId} onOpenChange={(open) => !open && setSelectedStudentId(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] sm:max-h-[85vh] w-[95vw] sm:w-full overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-2xl sm:rounded-3xl [&>button]:text-white [&>button]:opacity-100 [&>button]:hover:bg-white/10 [&>button]:p-2 [&>button]:rounded-full [&>button]:transition-colors">
-          <DialogHeader className="p-4 sm:p-8 bg-slate-900 text-white relative shrink-0">
-            <div className="flex items-center gap-3 sm:gap-5 mr-6 sm:mr-8">
-              <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-xl sm:rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/10 shrink-0">
-                <User className="h-6 w-6 sm:h-8 sm:w-8 text-white/80" />
-              </div>
-              <div className="flex flex-col text-left min-w-0">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <DialogTitle className="text-lg sm:text-2xl font-black text-white truncate">{selectedGroup?.name}</DialogTitle>
-                  <span className="text-[10px] sm:text-[11px] bg-indigo-500 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-widest shadow-sm shrink-0">
-                    {selectedGroup?.gradYear}년 졸업예정
-                  </span>
+        <DialogContent className="max-w-4xl max-h-[90vh] sm:max-h-[85vh] w-[95vw] sm:w-full overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-2xl sm:rounded-3xl bg-white">
+          <DialogHeader className="p-4 sm:p-6 bg-white border-b border-slate-100 shrink-0">
+            <div className="flex items-center justify-between mr-6 sm:mr-8">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-rose-50 flex items-center justify-center shrink-0 border border-rose-100">
+                  <User className="h-5 w-5 sm:h-6 sm:w-6 text-rose-600" />
                 </div>
-                <DialogDescription className="text-slate-400 text-xs sm:text-sm font-bold mt-1 sm:mt-1.5 flex items-center gap-2 truncate">
-                  <span>{selectedGroup?.major.replace('공업계', '')}</span>
-                  <span className="h-1 w-1 rounded-full bg-slate-700 shrink-0" />
-                  <span>{selectedGroup?.classInfo.replace('반', '')}반 {selectedGroup?.number}번</span>
-                </DialogDescription>
+                <div className="flex flex-col text-left min-w-0">
+                  <DialogTitle className="text-base sm:text-xl font-black flex items-center gap-2 text-slate-900 truncate">
+                    {selectedGroup?.name}
+                    <span className="text-[10px] sm:text-xs bg-rose-600 text-white px-2 py-0.5 rounded-full font-bold shrink-0">
+                      {selectedGroup?.number}번
+                    </span>
+                  </DialogTitle>
+                  <DialogDescription className="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
+                    {selectedGroup?.major.replace('공업계', '')} • {selectedGroup?.classInfo.replace('반', '')}반 • {selectedGroup?.gradYear}년 졸업예정
+                  </DialogDescription>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-[9px] sm:text-[10px] text-slate-400 font-black uppercase tracking-tighter mb-0.5 sm:mb-1">미인정 결석</p>
+                <p className="text-lg sm:text-2xl font-black text-rose-600">
+                  {selectedGroup?.stats?.unexcused?.absent ? `${selectedGroup.stats.unexcused.absent}회` : '0회'}
+                </p>
               </div>
             </div>
           </DialogHeader>

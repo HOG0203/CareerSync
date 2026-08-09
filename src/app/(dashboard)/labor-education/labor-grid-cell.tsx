@@ -13,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { CheckCircle2, XCircle, ShieldCheck } from 'lucide-react';
 import * as React from 'react';
 
+import { useRouter } from 'next/navigation';
+
 interface LaborEducationGridCellProps {
   student: StudentEmploymentData;
   idx: number;
@@ -20,16 +22,30 @@ interface LaborEducationGridCellProps {
 }
 
 export function LaborEducationGridCell({ student, idx, isAdmin }: LaborEducationGridCellProps) {
+  const router = useRouter();
   const { toast } = useToast();
   const [isUpdating, setIsUpdating] = React.useState(false);
 
-  const status = student.labor_education_status || '미이수';
-  const isCompleted = status === '이수';
+  const serverStatus = student.labor_education_status || '미이수';
+  const [optimisticStatus, setOptimisticStatus] = React.useState<string | null>(null);
+
+  // 서버 데이터 갱신 시 낙관적 상태 초기화
+  React.useEffect(() => {
+    setOptimisticStatus(null);
+  }, [student.labor_education_status]);
+
+  const currentStatus = optimisticStatus ?? serverStatus;
+  const isCompleted = currentStatus === '이수';
 
   const handleUpdateStatus = async (newStatus: string) => {
     if (!isAdmin) return;
+    if (newStatus === currentStatus) return;
     
+    // 1. 0ms 화면 즉시 반영 (낙관적 업데이트)
+    setOptimisticStatus(newStatus);
     setIsUpdating(true);
+
+    // 2. 백그라운드 DB 업데이트
     const result = await updateStudentField(student.id, 'labor_education_status', newStatus);
     
     if (result.success) {
@@ -37,7 +53,10 @@ export function LaborEducationGridCell({ student, idx, isAdmin }: LaborEducation
         title: "업데이트 완료",
         description: `${student.student_name} 학생의 이수 여부가 '${newStatus}'로 변경되었습니다.`,
       });
+      router.refresh();
     } else {
+      // 실패 시 기존 상태로 원복
+      setOptimisticStatus(serverStatus);
       toast({
         variant: "destructive",
         title: "업데이트 실패",
@@ -73,7 +92,7 @@ export function LaborEducationGridCell({ student, idx, isAdmin }: LaborEducation
               "text-[10px] px-2 py-0.5 rounded-full font-bold",
               isCompleted ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
             )}>
-              {status}
+              {currentStatus}
             </span>
           </div>
 

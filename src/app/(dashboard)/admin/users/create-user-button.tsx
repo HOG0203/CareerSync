@@ -55,14 +55,20 @@ export function CreateUserButton() {
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[450px] rounded-2xl p-0 overflow-hidden border-none shadow-2xl">
-        <DialogHeader className="p-6 bg-slate-900 text-white">
-          <DialogTitle className="flex items-center gap-2 text-xl font-black">
-            <UserPlus className="h-6 w-6 text-blue-400" />
-            사용자 등록
-          </DialogTitle>
-          <DialogDescription className="text-slate-400 text-xs mt-1">
-            시스템에 접속할 수 있는 새로운 계정을 생성합니다.
-          </DialogDescription>
+        <DialogHeader className="p-4 sm:p-5 bg-white border-b border-slate-100 shrink-0">
+          <div className="flex items-center gap-3 sm:gap-4 mr-6">
+            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100">
+              <UserPlus className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
+            </div>
+            <div className="flex flex-col text-left min-w-0">
+              <DialogTitle className="text-base sm:text-lg font-black flex items-center gap-2 text-slate-900 truncate">
+                신규 사용자 등록
+              </DialogTitle>
+              <DialogDescription className="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
+                시스템 접속 신규 계정 생성
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="bg-white">

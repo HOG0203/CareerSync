@@ -451,26 +451,30 @@ export function StudentPopover({
 
       {/* 성적 상세 모달 */}
       <Dialog open={isGradeModalOpen} onOpenChange={setIsGradeModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-3xl z-[200] [&>button]:text-white [&>button]:opacity-100 [&>button]:hover:bg-white/10 [&>button]:p-2 [&>button]:rounded-full [&>button]:transition-colors bg-white">
-          <DialogHeader className="p-8 bg-slate-900 text-white relative">
-            <div className="flex items-center gap-5">
-              <div className="h-16 w-16 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/10">
-                <User className="h-8 w-8 text-white/80" />
-              </div>
-              <div className="flex flex-col text-left">
-                <div className="flex items-center gap-3">
-                  <DialogTitle className="text-2xl font-black text-white">{student.student_name}</DialogTitle>
-                  <span className="text-[11px] bg-indigo-500 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-widest shadow-sm">
-                    {student.student_number}번
-                  </span>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-3xl z-[200] bg-white">
+          <DialogHeader className="p-4 sm:p-6 bg-white border-b border-slate-100 shrink-0">
+            <div className="flex items-center justify-between mr-6 sm:mr-8">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0 border border-indigo-100">
+                  <User className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-600" />
                 </div>
-                <DialogDescription className="text-slate-400 text-sm font-bold mt-1.5 flex items-center gap-2">
-                  <span>{student.major}</span>
-                  <span className="h-1 w-1 rounded-full bg-slate-700" />
-                  <span>{student.class_info}</span>
-                  <span className="h-1 w-1 rounded-full bg-slate-700" />
-                  <span className="text-indigo-400">{student.graduation_year}년 졸업예정</span>
-                </DialogDescription>
+                <div className="flex flex-col text-left min-w-0">
+                  <DialogTitle className="text-base sm:text-xl font-black flex items-center gap-2 text-slate-900 truncate">
+                    {student.student_name}
+                    <span className="text-[10px] sm:text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full font-bold shrink-0">
+                      {student.student_number}번
+                    </span>
+                  </DialogTitle>
+                  <DialogDescription className="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
+                    {student.major} • {student.class_info}반 • {student.graduation_year}년 졸업예정
+                  </DialogDescription>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-[9px] sm:text-[10px] text-slate-400 font-black uppercase tracking-tighter mb-0.5 sm:mb-1">전교 석차</p>
+                <p className="text-lg sm:text-2xl font-black text-indigo-600">
+                  {rankingSummary?.totalRank ? `${rankingSummary.totalRank}위` : '-'}
+                </p>
               </div>
             </div>
           </DialogHeader>
@@ -541,26 +545,30 @@ export function StudentPopover({
 
       {/* 출결 상세 모달 */}
       <Dialog open={isAttendanceModalOpen} onOpenChange={setIsAttendanceModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-3xl z-[200] [&>button]:text-white [&>button]:opacity-100 [&>button]:hover:bg-white/10 [&>button]:p-2 [&>button]:rounded-full [&>button]:transition-colors bg-white">
-          <DialogHeader className="p-8 bg-slate-900 text-white relative">
-            <div className="flex items-center gap-5">
-              <div className="h-16 w-16 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/10">
-                <User className="h-8 w-8 text-white/80" />
-              </div>
-              <div className="flex flex-col text-left">
-                <div className="flex items-center gap-3">
-                  <DialogTitle className="text-2xl font-black text-white">{student.student_name}</DialogTitle>
-                  <span className="text-[11px] bg-rose-500 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-widest shadow-sm">
-                    {student.student_number}번
-                  </span>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-3xl z-[200] bg-white">
+          <DialogHeader className="p-4 sm:p-6 bg-white border-b border-slate-100 shrink-0">
+            <div className="flex items-center justify-between mr-6 sm:mr-8">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-rose-50 flex items-center justify-center shrink-0 border border-rose-100">
+                  <User className="h-5 w-5 sm:h-6 sm:w-6 text-rose-600" />
                 </div>
-                <DialogDescription className="text-slate-400 text-sm font-bold mt-1.5 flex items-center gap-2">
-                  <span>{student.major}</span>
-                  <span className="h-1 w-1 rounded-full bg-slate-700" />
-                  <span>{student.class_info}</span>
-                  <span className="h-1 w-1 rounded-full bg-slate-700" />
-                  <span className="text-rose-400">{student.graduation_year}년 졸업예정</span>
-                </DialogDescription>
+                <div className="flex flex-col text-left min-w-0">
+                  <DialogTitle className="text-base sm:text-xl font-black flex items-center gap-2 text-slate-900 truncate">
+                    {student.student_name}
+                    <span className="text-[10px] sm:text-xs bg-rose-600 text-white px-2 py-0.5 rounded-full font-bold shrink-0">
+                      {student.student_number}번
+                    </span>
+                  </DialogTitle>
+                  <DialogDescription className="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
+                    {student.major} • {student.class_info}반 • {student.graduation_year}년 졸업예정
+                  </DialogDescription>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-[9px] sm:text-[10px] text-slate-400 font-black uppercase tracking-tighter mb-0.5 sm:mb-1">미인정 결석</p>
+                <p className="text-lg sm:text-2xl font-black text-rose-600">
+                  {rankingSummary?.attendance?.unexcused?.absent ? `${rankingSummary.attendance.unexcused.absent}회` : '0회'}
+                </p>
               </div>
             </div>
           </DialogHeader>

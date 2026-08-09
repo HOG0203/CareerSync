@@ -79,14 +79,18 @@ export function AddStudentModal({ isOpen, onClose, baseYear, majors }: AddStuden
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-none shadow-2xl">
-        <DialogHeader className="p-6 bg-indigo-600 text-white shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <UserPlus className="h-6 w-6 text-white" />
+        <DialogHeader className="p-4 sm:p-5 bg-white border-b border-slate-100 shrink-0">
+          <div className="flex items-center gap-3 sm:gap-4 mr-6">
+            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0 border border-indigo-100">
+              <UserPlus className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-600" />
             </div>
-            <div>
-              <DialogTitle className="text-xl font-bold">신규 학생 등록</DialogTitle>
-              <DialogDescription className="text-indigo-100 text-xs mt-1">개별 학생 정보를 시스템에 추가합니다.</DialogDescription>
+            <div className="flex flex-col text-left min-w-0">
+              <DialogTitle className="text-base sm:text-lg font-black flex items-center gap-2 text-slate-900 truncate">
+                신규 학생 등록
+              </DialogTitle>
+              <DialogDescription className="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
+                개별 학생 신규 추가 등록
+              </DialogDescription>
             </div>
           </div>
         </DialogHeader>

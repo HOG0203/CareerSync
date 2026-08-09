@@ -24,9 +24,9 @@ export const TableHeader = React.memo(({ columns, groupHeaders, filterOptions, c
         {columns.map((col: any) => {
           const isFilterActive = columnFilters[col.key] !== undefined;
           return (
-            <th key={col.key} className={cn("sticky z-40 group text-center border-r border-b font-semibold p-0 hover:bg-slate-100 bg-slate-50 shadow-[0_1px_0_0_rgba(0,0,0,0.1)]", hasGroup ? "top-10" : "top-0")} style={{ minWidth: col.width, width: 'auto' }}>
-              <div className="flex items-center justify-center px-2 gap-1 h-full min-h-[40px]">
-                <span className="whitespace-pre-line leading-tight py-1">{col.label}</span>
+            <th key={col.key} className={cn("sticky z-40 group text-center border-r border-b font-semibold p-0 hover:bg-slate-100 bg-slate-50 shadow-[0_1px_0_0_rgba(0,0,0,0.1)]", hasGroup ? "top-10" : "top-0")} style={{ minWidth: col.width, width: col.width }}>
+              <div className="flex items-center justify-center px-1.5 gap-0.5 h-full min-h-[40px] overflow-hidden">
+                <span className={cn("leading-tight py-1 select-none", col.label?.includes('\n') ? "whitespace-pre-line" : "whitespace-nowrap")}>{col.label}</span>
                 <Popover modal={false}>
                   <PopoverTrigger asChild>
                     <button className={cn(

@@ -114,15 +114,20 @@ export function ImportUserButton() {
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[450px] rounded-2xl p-0 overflow-hidden border-none shadow-2xl flex flex-col">
-        <DialogHeader className="p-6 bg-slate-900 text-white">
-          <DialogTitle className="flex items-center gap-2 text-xl font-black">
-            <FileUp className="h-6 w-6 text-blue-400" />
-            사용자 일괄 등록
-          </DialogTitle>
-          <DialogDescription className="text-slate-400 text-xs mt-1">
-            엑셀 파일을 업로드하여 여러 계정을 한 번에 생성합니다.<br />
-            초기 비밀번호는 <span className="font-bold text-blue-600 underline">123123</span>으로 설정됩니다.
-          </DialogDescription>
+        <DialogHeader className="p-4 sm:p-5 bg-white border-b border-slate-100 shrink-0">
+          <div className="flex items-center gap-3 sm:gap-4 mr-6">
+            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100">
+              <FileUp className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
+            </div>
+            <div className="flex flex-col text-left min-w-0">
+              <DialogTitle className="text-base sm:text-lg font-black flex items-center gap-2 text-slate-900 truncate">
+                사용자 일괄 등록
+              </DialogTitle>
+              <DialogDescription className="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
+                엑셀 업로드 방식 다수 계정 등록 (기본 PW: 123123)
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
         <div className="grid gap-6 p-6">

@@ -121,25 +121,33 @@ export function CounselingModal({ isOpen, onClose, student }: CounselingModalPro
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="w-[95vw] sm:max-w-[600px] h-[90vh] sm:h-[650px] p-0 overflow-hidden flex flex-col border-none shadow-2xl rounded-2xl sm:rounded-lg z-[200]">
-        <DialogHeader className="p-5 sm:p-6 bg-blue-600 text-white shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg shrink-0">
-              <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+        <DialogHeader className="p-4 sm:p-6 bg-white border-b border-slate-100 shrink-0">
+          <div className="flex items-center justify-between mr-6 sm:mr-8">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100">
+                <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
+              </div>
+              <div className="flex flex-col text-left min-w-0">
+                <DialogTitle className="text-base sm:text-xl font-black flex items-center gap-2 text-slate-900 truncate">
+                  {student.student_name}
+                  <span className="text-[10px] sm:text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold shrink-0">
+                    {student.student_number}번
+                  </span>
+                </DialogTitle>
+                <DialogDescription className="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
+                  {isLoading ? (
+                    <span className="animate-pulse italic">정보 불러오는 중...</span>
+                  ) : (
+                    <>
+                      {student.major} • {student.class_info}반
+                    </>
+                  )}
+                </DialogDescription>
+              </div>
             </div>
-            <div className="min-w-0">
-              <DialogTitle className="text-lg sm:text-xl font-bold truncate">
-                {student.student_name} <span className="font-normal opacity-80 text-base sm:text-lg">상담 일지</span>
-              </DialogTitle>
-              <DialogDescription className="text-blue-100 text-[10px] sm:text-xs mt-1 truncate font-medium">
-                {isLoading ? (
-                  <span className="animate-pulse italic">정보 불러오는 중...</span>
-                ) : (
-                  <>
-                    {history.length > 0 ? `${Math.max(...history.map(h => h.grade))}학년 ` : ''}
-                    {student.major} {student.class_info}반 {student.student_number}번
-                  </>
-                )}
-              </DialogDescription>
+            <div className="text-right shrink-0">
+              <p className="text-[9px] sm:text-[10px] text-slate-400 font-black uppercase tracking-tighter mb-0.5 sm:mb-1">상담 일지</p>
+              <p className="text-lg sm:text-2xl font-black text-blue-600">{logs.length}건</p>
             </div>
           </div>
         </DialogHeader>

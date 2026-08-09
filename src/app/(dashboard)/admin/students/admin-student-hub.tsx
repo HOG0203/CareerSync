@@ -299,70 +299,75 @@ export function AdminStudentHub({
 
       {/* 학생 정보 변경 확인 2차 모달 */}
       <Dialog open={!!pendingSave} onOpenChange={(open) => { if (!open) handleCancelSave(); }}>
-        <DialogContent className="sm:max-w-md bg-white rounded-2xl p-6 shadow-xl border border-slate-100">
-          <DialogHeader className="flex flex-col items-center sm:items-start gap-2">
-            <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-200">
-              <AlertTriangle className="h-4 w-4 shrink-0" />
-              <span className="text-xs font-bold">학생 정보 변경 확인</span>
+        <DialogContent className="sm:max-w-md bg-white rounded-2xl p-0 overflow-hidden border-none shadow-2xl">
+          <DialogHeader className="p-4 sm:p-5 bg-white border-b border-slate-100 shrink-0">
+            <div className="flex items-center gap-3 sm:gap-4 mr-6">
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-amber-50 flex items-center justify-center shrink-0 border border-amber-100">
+                <AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6 text-amber-600" />
+              </div>
+              <div className="flex flex-col text-left min-w-0">
+                <DialogTitle className="text-base sm:text-lg font-black flex items-center gap-2 text-slate-900 truncate">
+                  학생 정보 변경 확인
+                </DialogTitle>
+                <DialogDescription className="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
+                  인적사항 변경사항 학사 이력 즉시 반영
+                </DialogDescription>
+              </div>
             </div>
-            <DialogTitle className="text-xl font-black text-slate-900">
-              학생 정보를 변경하시겠습니까?
-            </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500 font-medium leading-relaxed">
-              인적사항 변경은 학사 관리 및 이력 데이터에 직접 반영됩니다. 아래 내용을 확인 후 적용해 주세요.
-            </DialogDescription>
           </DialogHeader>
 
-          {pendingSave && (
-            <div className="my-3 p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2 text-xs">
-              <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
-                <span className="font-bold text-slate-500">학생 성명</span>
-                <span className="font-black text-slate-900 text-sm">{pendingSave.studentName}</span>
-              </div>
-              <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
-                <span className="font-bold text-slate-500">수정 항목</span>
-                <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">{pendingSave.fieldLabel}</span>
-              </div>
-              <div className="flex items-center justify-between pt-1">
-                <div className="flex flex-col">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase">기존 값</span>
-                  <span className="font-semibold text-slate-600 line-through">{String(pendingSave.oldValue)}</span>
+          <div className="p-4 sm:p-6 space-y-4">
+            {pendingSave && (
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2 text-xs">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                  <span className="font-bold text-slate-500">학생 성명</span>
+                  <span className="font-black text-slate-900 text-sm">{pendingSave.studentName}</span>
                 </div>
-                <span className="text-slate-400 font-bold">➔</span>
-                <div className="flex flex-col items-end">
-                  <span className="text-[10px] text-emerald-600 font-bold uppercase">변경할 값</span>
-                  <span className="font-black text-emerald-600 text-sm">{String(pendingSave.value)}</span>
+                <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                  <span className="font-bold text-slate-500">수정 항목</span>
+                  <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">{pendingSave.fieldLabel}</span>
+                </div>
+                <div className="flex items-center justify-between pt-1">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase">기존 값</span>
+                    <span className="font-semibold text-slate-600 line-through">{String(pendingSave.oldValue)}</span>
+                  </div>
+                  <span className="text-slate-400 font-bold">➔</span>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[10px] text-emerald-600 font-bold uppercase">변경할 값</span>
+                    <span className="font-black text-emerald-600 text-sm">{String(pendingSave.value)}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <DialogFooter className="flex sm:justify-end gap-2 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleCancelSave}
-              disabled={isSavingConfirm}
-              className="h-10 px-4 text-xs font-bold text-slate-600 rounded-xl"
-            >
-              취소
-            </Button>
-            <Button
-              type="button"
-              onClick={handleConfirmSave}
-              disabled={isSavingConfirm}
-              className="h-10 px-5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md"
-            >
-              {isSavingConfirm ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  저장 중...
-                </>
-              ) : (
-                '변경 적용'
-              )}
-            </Button>
-          </DialogFooter>
+            <DialogFooter className="flex sm:justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCancelSave}
+                disabled={isSavingConfirm}
+                className="h-10 px-4 text-xs font-bold text-slate-600 rounded-xl"
+              >
+                취소
+              </Button>
+              <Button
+                type="button"
+                onClick={handleConfirmSave}
+                disabled={isSavingConfirm}
+                className="h-10 px-5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md"
+              >
+                {isSavingConfirm ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    저장 중...
+                  </>
+                ) : (
+                  '변경 적용'
+                )}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -100,15 +100,23 @@ export function PromotionImportButton({ currentData, baseYear }: PromotionImport
           엑셀 일괄 진급
         </Button>
       </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>엑셀로 학생 일괄 진급 처리</DialogTitle>
-          <DialogDescription>
-            현재 명단을 다운로드하여 신규 배정된 학과/반/번호를 작성한 후 업로드하세요.
-            과거 이력(담당 교사 포함)이 자동으로 안전하게 보존됩니다.
-          </DialogDescription>
+      <DialogContent className="sm:max-w-[450px] rounded-2xl p-0 overflow-hidden border-none shadow-2xl flex flex-col">
+        <DialogHeader className="p-4 sm:p-5 bg-white border-b border-slate-100 shrink-0">
+          <div className="flex items-center gap-3 sm:gap-4 mr-6">
+            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0 border border-emerald-100">
+              <ArrowRight className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
+            </div>
+            <div className="flex flex-col text-left min-w-0">
+              <DialogTitle className="text-base sm:text-lg font-black flex items-center gap-2 text-slate-900 truncate">
+                학생 일괄 진급 처리
+              </DialogTitle>
+              <DialogDescription className="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
+                엑셀 데이터 기반 신규 학반 일괄 진급 업로드
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <div className="grid gap-4 p-6">
           <div className="flex items-center justify-between p-4 border rounded-md bg-emerald-50 border-emerald-100">
             <div className="space-y-1">
               <p className="text-sm font-bold text-emerald-800">1. 진급 서식 다운로드</p>

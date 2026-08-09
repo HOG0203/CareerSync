@@ -89,18 +89,47 @@ async function LaborEducationPageContent({
   const defaultGradYear = (settings.baseYear + 1).toString();
   const selectedYear = params.year || calculatedGradYear || defaultGradYear;
 
-  const allData = await getCachedFilteredStudentData(selectedYear, ay);
+  let allData = await getCachedFilteredStudentData(selectedYear, ay);
   const displayAY = ay;
 
   const groupedData: Record<string, StudentEmploymentData[]> = {};
   
-  for (const student of allData) {
-    const major = student.major || '';
-    const classInfo = student.class_info || '';
-    const displayClassName = getShortClassName(major, grade, classInfo);
-    
-    if (!groupedData[displayClassName]) groupedData[displayClassName] = [];
-    groupedData[displayClassName].push(student);
+  // 3학년 조회 시 '기계2-1' 컬럼에 실제 2학년 1반 기계과 학생 DB 데이터 연동
+  if (grade === 3) {
+    const grade2GradYear = (ay + 2).toString();
+    const grade2Data = await getCachedFilteredStudentData(grade2GradYear, ay);
+    const actualGrade2Mech1 = grade2Data.filter(s => {
+      const shortMajor = MAJOR_MAP[s.major || ''] || s.major || '';
+      const cleanClass = (s.class_info || '').replace(/반|학년/g, '').trim();
+      return shortMajor === '기계' && cleanClass === '1';
+    });
+
+    // 3학년 데이터에서 기계1반을 제외하고 실제 2학년 1반 기계과 데이터로 대체
+    allData = allData.filter(s => {
+      const shortMajor = MAJOR_MAP[s.major || ''] || s.major || '';
+      const cleanClass = (s.class_info || '').replace(/반|학년/g, '').trim();
+      return !(shortMajor === '기계' && cleanClass === '1');
+    });
+
+    for (const student of allData) {
+      const major = student.major || '';
+      const classInfo = student.class_info || '';
+      const displayClassName = getShortClassName(major, grade, classInfo);
+      if (!groupedData[displayClassName]) groupedData[displayClassName] = [];
+      groupedData[displayClassName].push(student);
+    }
+
+    if (actualGrade2Mech1.length > 0) {
+      groupedData['기계2-1'] = actualGrade2Mech1;
+    }
+  } else {
+    for (const student of allData) {
+      const major = student.major || '';
+      const classInfo = student.class_info || '';
+      const displayClassName = getShortClassName(major, grade, classInfo);
+      if (!groupedData[displayClassName]) groupedData[displayClassName] = [];
+      groupedData[displayClassName].push(student);
+    }
   }
 
   const majorOrderMap = new Map(SORT_ORDER.map((m, i) => [MAJOR_MAP[m] || m, i]));
@@ -164,7 +193,9 @@ async function LaborEducationPageContent({
             const sampleStudent = students[0];
             const studentMajor = sampleStudent?.major || '';
             const studentClass = sampleStudent?.class_info || '';
-            const targetGrade = grade;
+            // 기계2-1반으로 변환된 경우 대상 학년을 2학년으로 맞춰 담임 교사 탐색
+            const matchGrade = className.match(/\d+/);
+            const targetGrade = matchGrade ? parseInt(matchGrade[0]) : grade;
 
             let teacherName = '';
 
@@ -177,7 +208,7 @@ async function LaborEducationPageContent({
                 const tClass = (t.assigned_class || '').replace(/반|학년/g, '').trim();
                 const isM = tMajor === cleanM || cleanM.includes(tMajor) || tMajor.includes(cleanM);
                 const isC = tClass === cleanC;
-                const isG = t.assigned_grade ? t.assigned_grade === targetGrade : (t.assigned_year ? t.assigned_year === ((settings.baseYear || 2026) + (4 - targetGrade)) : true);
+                const isG = t.assigned_grade ? t.assigned_grade === targetGrade : (t.assigned_year ? t.assigned_year === (ay + (4 - targetGrade)) : true);
                 return isM && isC && isG;
               });
               if (matchedT) {

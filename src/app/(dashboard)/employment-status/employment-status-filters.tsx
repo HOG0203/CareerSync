@@ -81,7 +81,7 @@ export default function EmploymentStatusFilters({ graduationYears, defaultYear, 
   }
 
   return (
-    <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-lg border border-slate-200 shadow-sm">
+    <div suppressHydrationWarning className="flex items-center gap-2 bg-slate-50 p-1 rounded-lg border border-slate-200 shadow-sm">
       {/* 학사학년도 */}
       <div className="flex items-center gap-1.5 px-2 bg-white rounded border border-slate-200 h-8 w-[110px]">
         <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />

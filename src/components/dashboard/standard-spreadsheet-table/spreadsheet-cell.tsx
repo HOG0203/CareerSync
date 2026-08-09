@@ -88,19 +88,32 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
           <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative z-40 bg-white ring-2 ring-blue-500" style={{ width: config.width }}>
             <div className="flex items-center w-full bg-white">
               <Input autoFocus value={isOtherTrigger ? '' : localValue} onChange={(e) => { setLocalValue(e.target.value); setIsManualInput(true); isManualRef.current = true; }} onBlur={() => handleCommit(localValue)} onKeyDown={(e) => { if(e.key==='Enter') { e.preventDefault(); e.stopPropagation(); handleCommit(localValue); } if(e.key==='Escape') { e.preventDefault(); e.stopPropagation(); onEndEdit(); } }} className="h-8 w-full text-[11px] border-none rounded-none focus-visible:ring-0 px-1 bg-transparent font-medium" placeholder="내용 입력..." />
-              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-slate-400 hover:text-rose-500" onClick={() => { setLocalValue(''); setIsManualInput(false); isManualRef.current = false; }}><X className="h-3 w-3" /></Button>
+              <Button 
+                type="button"
+                variant="ghost" 
+                size="icon" 
+                className="h-7 w-7 shrink-0 text-slate-400 hover:text-rose-500" 
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  isManualRef.current = false;
+                  setIsManualInput(false);
+                  setLocalValue('');
+                  handleCommit('');
+                }}
+              >
+                <X className="h-3 w-3" />
+              </Button>
             </div>
           </td>
         )
       }
       return (
         <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative z-40 bg-white ring-2 ring-blue-500" style={{ width: config.width }}>
-          <select
-            ref={selectRef}
-            autoFocus
+          <Select
+            open={true}
             value={isInOptions ? localValue : ''}
-            onChange={(e) => {
-              const v = e.target.value;
+            onValueChange={(v) => {
               if (v === '기타(직접입력)') {
                 isManualRef.current = true;
                 setIsManualInput(true);
@@ -109,24 +122,29 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
                 handleCommit(v);
               }
             }}
-            onBlur={() => {
-              if (!isManualRef.current) onEndEdit();
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape' || e.key === 'Enter') {
-                e.preventDefault();
+            onOpenChange={(open) => {
+              if (!open && !isManualRef.current) {
                 onEndEdit();
               }
             }}
-            className="h-8 w-full text-[11px] border-none outline-none focus:ring-0 px-1 bg-white font-medium cursor-pointer"
           >
-            <option value="" disabled hidden>선택...</option>
-            {resolvedOptions?.map((opt: any) => (
-              <option key={opt.value} value={opt.value} className="text-[11px] py-1 bg-white text-slate-800">
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="h-8 w-full text-[11px] border-none outline-none focus:ring-0 px-1 bg-white font-medium cursor-pointer rounded-none">
+              <SelectValue placeholder="선택..." />
+            </SelectTrigger>
+            <SelectContent 
+              position="popper" 
+              side="bottom" 
+              avoidCollisions={true} 
+              collisionPadding={10}
+              className="z-[200] max-h-60 duration-0 animate-none transition-none"
+            >
+              {resolvedOptions?.map((opt: any) => (
+                <SelectItem key={opt.value} value={opt.value} className="text-[11px] py-1">
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </td>
       )
     }
@@ -134,7 +152,9 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
       <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative z-40 bg-white ring-2 ring-blue-500" style={{ width: config.width }}>
         <Popover open={true} onOpenChange={(open) => !open && onEndEdit()}>
           <PopoverTrigger asChild><div className="h-8 w-full flex items-center justify-center text-[11px] cursor-pointer font-medium">{localValue || '-'}</div></PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={localValue ? new Date(localValue) : undefined} onSelect={(date) => date && handleCommit(format(date, 'yyyy-MM-dd'))} locale={ko} initialFocus /></PopoverContent>
+          <PopoverContent className="w-auto p-0 z-[200]" align="start" side="bottom" avoidCollisions={true} collisionPadding={10}>
+            <Calendar mode="single" selected={localValue ? new Date(localValue) : undefined} onSelect={(date) => date && handleCommit(format(date, 'yyyy-MM-dd'))} locale={ko} initialFocus />
+          </PopoverContent>
         </Popover>
       </td>
     )

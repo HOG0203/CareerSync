@@ -495,14 +495,20 @@ export function UserTable({ initialProfiles, graduationYears, fullClassMapping, 
 
       <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
         <DialogContent className="sm:max-w-[450px] rounded-2xl p-0 overflow-hidden border-none shadow-2xl">
-          <DialogHeader className="p-6 bg-slate-900 text-white">
-            <DialogTitle className="flex items-center gap-2 text-xl font-black">
-              <GraduationCap className="h-6 w-6 text-blue-400" />
-              담당 학반 설정
-            </DialogTitle>
-            <DialogDescription className="text-slate-400 text-xs mt-1">
-              {selectedProfile?.full_name} 선생님의 담당 학사 정보를 선택하세요.
-            </DialogDescription>
+          <DialogHeader className="p-4 sm:p-5 bg-white border-b border-slate-100 shrink-0">
+            <div className="flex items-center gap-3 sm:gap-4 mr-6">
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100">
+                <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
+              </div>
+              <div className="flex flex-col text-left min-w-0">
+                <DialogTitle className="text-base sm:text-lg font-black flex items-center gap-2 text-slate-900 truncate">
+                  담당 학반 설정
+                </DialogTitle>
+                <DialogDescription className="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
+                  {selectedProfile?.full_name} 선생님의 담당 학사 정보 설정
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
 
           <div className="p-6 space-y-6 bg-white">
