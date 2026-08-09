@@ -448,13 +448,13 @@ export function GradeSummaryClient({
                   <User className="h-5 w-5 sm:h-6 sm:w-6 text-slate-400" />
                 </div>
                 <div className="flex flex-col text-left min-w-0">
-                  <DialogTitle className="text-base sm:text-xl font-black flex items-center gap-2 text-slate-900 truncate">
+                  <DialogTitle className="text-lg sm:text-2xl font-extrabold flex items-center gap-2 text-slate-900 truncate">
                     {selectedStudent?.name} 
-                    <span className="text-[10px] sm:text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full font-bold shrink-0">
+                    <span className="text-xs bg-indigo-600 text-white px-2.5 py-0.5 rounded-full font-bold shrink-0">
                       {selectedStudent?.number}번
                     </span>
                   </DialogTitle>
-                  <DialogDescription className="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
+                  <DialogDescription className="text-slate-500 text-xs sm:text-sm font-bold uppercase tracking-wide mt-1 truncate">
                     {selectedStudent?.major} • {selectedStudent?.classInfo} • {selectedStudent?.finalScore}점
                   </DialogDescription>
                 </div>

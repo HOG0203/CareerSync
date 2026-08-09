@@ -62,7 +62,7 @@ const getDashboardStudentDataCached = unstable_cache(
     });
   },
   ['dashboard-student-data'],
-  { revalidate: 1800, tags: ['students'] }
+  { revalidate: 86400, tags: ['students'] }
 );
 
 export async function getDashboardStudentData(graduationYear: string): Promise<StudentEmploymentData[]> {
@@ -201,7 +201,7 @@ export async function getCachedFilteredStudentData(graduationYear: string, baseY
       async () => getFilteredStudentData(graduationYear, baseYear),
       [`filtered-student-data-${cacheKey}`],
       {
-        revalidate: 3600,
+        revalidate: 86400,
         tags: [`emp-status-${graduationYear}`, 'students']
       }
     );
@@ -619,7 +619,7 @@ export async function getCachedYearlyRankingsSummary(graduationYear: number, bas
     async () => getYearlyRankingsSummary(graduationYear, baseYear),
     [`yearly-rankings-summary-${graduationYear}-${baseYear}`],
     {
-      revalidate: 3600,
+      revalidate: 86400,
       tags: [`cert-grades-${graduationYear}`, 'cert-grades']
     }
   )();
@@ -642,7 +642,7 @@ export async function getCachedClassStructureCombinations() {
     },
     ['class-structure-combinations'],
     {
-      revalidate: 3600,
+      revalidate: 86400,
       tags: ['students']
     }
   )();
@@ -663,7 +663,7 @@ export async function getCachedTeacherProfiles() {
     },
     ['teacher-profiles-all'],
     {
-      revalidate: 3600,
+      revalidate: 86400,
       tags: ['teachers']
     }
   )();

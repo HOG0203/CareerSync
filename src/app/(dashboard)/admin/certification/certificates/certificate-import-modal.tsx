@@ -10,6 +10,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { 
   FileUp, 
   Settings, 
@@ -18,7 +19,11 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Award,
+  Sparkles,
+  Trash2,
+  Info
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
@@ -36,9 +41,7 @@ interface ParsedClassPreview {
   rawRows: any[][];
 }
 
-// 브라우저 내 파싱을 위한 로컬 헬퍼 함수
 function parseNeisCertificates(rawRows: any[][]) {
-  // 1. 학과/학년/반 감지 (모든 행 탐색)
   let major = '';
   let grade = 0;
   let classInfo = '';
@@ -63,7 +66,6 @@ function parseNeisCertificates(rawRows: any[][]) {
     throw new Error('학과 및 학년 반 정보를 감지할 수 없습니다. (예: 스마트전기과 3학년 1반)');
   }
 
-  // 2. 헤더 행 감지
   let headerRowIndex = -1;
   for (let i = classRowIndex + 1; i < rawRows.length; i++) {
     const row = rawRows[i];
@@ -77,10 +79,9 @@ function parseNeisCertificates(rawRows: any[][]) {
   }
 
   if (headerRowIndex === -1) {
-    headerRowIndex = classRowIndex + 1; // 폴백
+    headerRowIndex = classRowIndex + 1;
   }
 
-  // 3. 학생별 자격증 정보 수집
   const studentCerts: Record<string, string[]> = {};
   let currentNum = '';
   let currentName = '';
@@ -129,7 +130,6 @@ export function CertificateImportModal() {
   const { toast } = useToast();
   const router = useRouter();
 
-  // 결과 리셋
   React.useEffect(() => {
     if (!open) {
       setPreviews([]);
@@ -139,7 +139,6 @@ export function CertificateImportModal() {
     }
   }, [open]);
 
-  // 다중 파일 선택 및 브라우저 파싱 (미리보기 빌드)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -194,16 +193,13 @@ export function CertificateImportModal() {
 
     setPreviews(prev => [...prev, ...newPreviews]);
     setIsProcessing(false);
-    // 파일 input 값 리셋하여 동일 파일 재선택 가능하게 함
     e.target.value = '';
   };
 
-  // 상세 보기 토글
   const toggleExpand = (idx: number) => {
     setExpandedIndices(prev => ({ ...prev, [idx]: !prev[idx] }));
   };
 
-  // 대기 목록 개별 삭제
   const removePreview = (idxToRemove: number) => {
     setPreviews(prev => prev.filter((_, idx) => idx !== idxToRemove));
     setExpandedIndices(prev => {
@@ -213,7 +209,6 @@ export function CertificateImportModal() {
     });
   };
 
-  // 미리보기 데이터 데이터베이스 반영
   const handleApplyImport = async () => {
     if (previews.length === 0) return;
     setIsProcessing(true);
@@ -267,49 +262,54 @@ export function CertificateImportModal() {
           <span className="sm:hidden">자격증 업로드</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-3xl flex flex-col p-0 border-none shadow-2xl [&>button]:text-white [&>button]:opacity-100 [&>button]:hover:bg-white/10 [&>button]:p-2 [&>button]:rounded-full [&>button]:transition-colors overflow-hidden">
-        <DialogHeader className="p-6 bg-slate-900 text-white shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-500 rounded-lg">
-              <Settings className="h-5 w-5 text-white" />
+
+      <DialogContent className="max-w-4xl h-[88vh] flex flex-col p-0 border-none shadow-2xl rounded-2xl overflow-hidden">
+        {/* 통일된 상단 헤더 */}
+        <DialogHeader className="p-4 sm:p-6 bg-white border-b border-slate-100 shrink-0 flex flex-row items-center justify-start text-left w-full">
+          <div className="flex items-center gap-3.5 text-left justify-start">
+            <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold shrink-0 shadow-sm">
+              <Award className="h-6 w-6 sm:h-7 sm:w-7" />
             </div>
-            <div>
-              <DialogTitle className="text-xl font-black tracking-tight">자격증 일괄 등록 시스템</DialogTitle>
-              <DialogDescription className="text-slate-400 text-xs font-medium mt-1">
-                여러 개의 NEIS 자격증 엑셀 파일을 가져와 미리 확인하고 일괄 등록합니다.
+            <div className="flex flex-col items-start text-left">
+              <div className="flex items-center gap-2 text-left">
+                <DialogTitle className="text-lg sm:text-2xl font-extrabold text-slate-900 tracking-tight text-left">자격증 현황 일괄 업로드</DialogTitle>
+                <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200/60 text-xs px-2.5 py-0.5 rounded-md font-bold">NEIS 연동</Badge>
+              </div>
+              <DialogDescription className="text-slate-500 text-xs sm:text-sm font-medium mt-1 text-left">
+                NEIS 자격증 엑셀 파일(.xlsx, .xls)을 가져와 전교생 자격증 현황을 자동 업로드합니다.
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        <div className="p-6 space-y-6 bg-white max-h-[70vh] overflow-y-auto custom-scrollbar">
-          {/* 가이드 안내 */}
-          <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 flex gap-3 text-slate-600">
-            <AlertCircle className="h-5 w-5 text-slate-500 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <p className="text-xs font-bold text-slate-800">NEIS 자격증 엑셀 파일 업로드 가이드</p>
-              <p className="text-[11px] leading-relaxed text-slate-500">
-                • 여러 개의 엑셀 파일을 마우스 드래그나 Shift 키를 이용해 **한꺼번에 여러 개 선택하여 업로드**할 수 있습니다.<br />
-                • 업로드 시 DB에 바로 저장되지 않고, 학급명과 학생별 파싱된 자격증 내역을 **먼저 보여주는 미리보기 기능**이 제공됩니다.
-              </p>
+        {/* 본문 대화상자 내용 */}
+        <div className="p-5 sm:p-6 space-y-5 bg-white flex-1 overflow-y-auto custom-scrollbar">
+          {/* 통일된 가이드 안내 카테고리 */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-xs text-slate-700">
+            <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl shrink-0 mt-0.5 border border-indigo-100">
+              <Info className="h-5 w-5" />
+            </div>
+            <div className="space-y-1.5">
+              <h5 className="text-sm sm:text-base font-extrabold text-slate-900">NEIS 자격증 업로드 가이드</h5>
+              <div className="text-xs sm:text-sm leading-relaxed text-slate-700 space-y-1 font-medium">
+                <p>• <strong className="text-slate-900 font-bold">자격증 파일 다운 방법</strong>: NEIS &gt; 학생부 &gt; 학교생활기록부 &gt; 학생부 항목별 조회 &gt; 학반 선택 &gt; 자격증/인증취득상황 &gt; 자격증/인증취득상황 &gt; <span className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded px-1.5 py-0.5 shadow-xs font-bold text-slate-900 text-xs mx-0.5"><img src="/images/neis-floppy.png" alt="디스켓 아이콘" className="h-4 w-4 object-contain inline" /></span> 클릭 &gt; XLS data 클릭 &gt; 엑셀 파일 다운</p>
+                <p>• 엑셀 파일(기계1-3, 전기3-1 등)을 <strong className="text-slate-900 font-bold">드래그앤드롭 또는 복수 선택</strong>하여 한꺼번에 업로드할 수 있습니다.</p>
+                <p>• 업로드 즉시 파싱 내역 미리보기가 생성되며, 이상이 없을 때 <strong className="text-slate-900 font-bold">[대기 리스트 전체 DB 반영하기]</strong>를 눌러 반영합니다.</p>
+              </div>
             </div>
           </div>
 
-          {/* 파일 uploader 카드 */}
-          <div className="border border-slate-200 bg-slate-50/10 rounded-xl p-6 flex flex-col items-center justify-center space-y-4 text-center">
-            <div className="h-12 w-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
-              <FileUp className="h-6 w-6" />
+          {/* 통일된 업로드 드롭존 영역 */}
+          <div className="border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-indigo-50/30 rounded-2xl p-6 transition-all text-center flex flex-col items-center justify-center space-y-3">
+            <div className="h-12 w-12 rounded-2xl bg-white shadow-sm border border-slate-200/80 flex items-center justify-center text-indigo-600">
+              <FileSpreadsheet className="h-6 w-6" />
             </div>
             <div className="space-y-1">
-              <h4 className="font-black text-sm text-slate-900">
-                자격증 엑셀 파일 선택
-              </h4>
-              <p className="text-[11px] leading-relaxed text-slate-500 max-w-md">
-                개인 컴퓨터에서 NEIS 양식 엑셀 파일(기계1-3, 전기3-1 등)을 불러옵니다.
-              </p>
+              <h4 className="text-sm font-extrabold text-slate-800">NEIS 자격증 엑셀 파일 선택</h4>
+              <p className="text-[11px] text-slate-500 max-w-md">컴퓨터에서 자격증 엑셀 파일(.xlsx, .xls)을 가져옵니다.</p>
             </div>
 
-            <div className="relative w-full max-w-xs">
+            <div className="relative pt-1">
               <input 
                 type="file" 
                 multiple
@@ -317,94 +317,89 @@ export function CertificateImportModal() {
                 onChange={handleFileUpload}
                 disabled={isProcessing}
                 className="hidden" 
-                id="excel-file-uploader" 
+                id="cert-excel-uploader" 
               />
               <label 
-                htmlFor="excel-file-uploader"
-                className={`w-full h-11 border-2 border-dashed rounded-lg flex items-center justify-center font-bold text-xs cursor-pointer transition-colors ${
+                htmlFor="cert-excel-uploader"
+                className={`inline-flex items-center gap-2 h-9 px-5 rounded-xl font-bold text-xs cursor-pointer shadow-sm transition-all ${
                   isProcessing
-                    ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed" 
-                    : "border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-50 text-slate-700"
+                    ? "bg-slate-100 text-slate-400 cursor-not-allowed border" 
+                    : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-100"
                 }`}
               >
                 {isProcessing ? (
-                  <span className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    엑셀 파일 분석 중...
-                  </span>
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    파일 분석 중...
+                  </>
                 ) : (
-                  "컴퓨터에서 복수 파일 선택"
+                  <>
+                    <FileUp className="h-3.5 w-3.5" />
+                    엑셀 파일 선택하기
+                  </>
                 )}
               </label>
             </div>
           </div>
 
-          {/* 미리보기 리스트 */}
+          {/* 미리보기 대기목록 파트 */}
           {previews.length > 0 && (
-            <div className="space-y-3">
+            <div className="space-y-3 border border-slate-200 rounded-2xl p-4 bg-slate-50/30">
               <div className="flex items-center justify-between">
-                <span className="font-black text-xs text-slate-700">
-                  업로드 대기 리스트 ({previews.length}개 파일)
-                </span>
-                <span className="text-[10px] text-slate-400 font-medium">적용하기 버튼을 누르면 최종 DB에 병합 반영됩니다.</span>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-indigo-600 text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full">대기 {previews.length}개</Badge>
+                  <span className="text-xs font-bold text-slate-800">업로드 파싱 미리보기</span>
+                </div>
+                <span className="text-[11px] text-slate-400">최종 확인 후 DB 반영 버튼을 클릭하세요.</span>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {previews.map((preview, idx) => (
-                  <div key={idx} className="border border-slate-200/80 rounded-xl p-4 bg-white hover:shadow-sm transition-all space-y-2">
+                  <div key={idx} className="border border-slate-200/80 rounded-xl p-3.5 bg-white shadow-xs space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 bg-amber-50 rounded-lg text-amber-600 border border-amber-100">
+                        <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100">
                           <FileSpreadsheet className="h-4 w-4" />
                         </div>
                         <div className="flex flex-col text-left">
-                          <span className="text-xs font-black text-slate-800">{preview.fileName}</span>
-                          <span className="text-[10px] text-slate-400 font-bold">
+                          <span className="text-xs font-bold text-slate-900">{preview.fileName}</span>
+                          <span className="text-[10px] text-slate-400 font-semibold">
                             {preview.major} • {preview.grade}학년 {preview.classInfo}
                           </span>
                         </div>
                       </div>
                       
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full shrink-0">
+                        <Badge variant="outline" className="bg-slate-50 text-slate-600 text-[10px] px-2 py-0.5">
                           학생 {preview.totalStudents}명
-                        </span>
-                        <span className="text-[10px] font-black bg-amber-100/60 text-amber-700 px-2 py-0.5 rounded-full shrink-0">
+                        </Badge>
+                        <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] px-2 py-0.5">
                           자격증 {preview.totalCerts}건
-                        </span>
+                        </Badge>
                         
                         <Button 
                           variant="ghost" 
                           size="sm"
                           onClick={() => toggleExpand(idx)}
-                          className="h-7 px-1.5 hover:bg-slate-100 text-slate-500 rounded-md gap-0.5 text-[10px] font-bold"
+                          className="h-7 px-2 text-[10px] font-bold text-slate-500 hover:bg-slate-100 rounded-md"
                         >
-                          {expandedIndices[idx] ? (
-                            <>
-                              접기
-                              <ChevronUp className="h-3 w-3" />
-                            </>
-                          ) : (
-                            <>
-                              상세보기
-                              <ChevronDown className="h-3 w-3" />
-                            </>
-                          )}
+                          {expandedIndices[idx] ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                         </Button>
 
-                        <button 
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
                           onClick={() => removePreview(idx)}
-                          className="text-[10px] font-bold text-rose-500 hover:bg-rose-50 px-2 py-1 rounded-md transition-colors"
+                          className="h-7 px-2 text-[10px] font-bold text-rose-500 hover:bg-rose-50 hover:text-rose-600 rounded-md"
                         >
                           삭제
-                        </button>
+                        </Button>
                       </div>
                     </div>
 
-                    {/* 학생별 자격증 상세 미리보기 */}
                     {expandedIndices[idx] && (
-                      <div className="mt-3 border-t pt-3 text-left space-y-1.5 max-h-[180px] overflow-y-auto custom-scrollbar bg-slate-50/50 p-3 rounded-lg">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mb-2">실제 파싱된 자격증 내역 미리보기</p>
+                      <div className="mt-2 border-t pt-2 text-left space-y-1.5 max-h-[160px] overflow-y-auto custom-scrollbar bg-slate-50/70 p-3 rounded-xl border-slate-100">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight mb-1.5">실제 파싱 내역 상세</p>
                         {Object.entries(preview.studentCerts).map(([studentName, certs]) => (
                           <div key={studentName} className="flex justify-between items-start py-1 border-b border-slate-200/40 last:border-none text-[11px]">
                             <span className="font-bold text-slate-700 w-16 shrink-0">{studentName}</span>
@@ -423,70 +418,69 @@ export function CertificateImportModal() {
                 ))}
               </div>
 
-              {/* 일괄 적용 제출 버튼 영역 */}
               <div className="flex justify-end gap-2 pt-2">
                 <Button 
                   variant="outline" 
                   onClick={() => { setPreviews([]); setExpandedIndices({}); }}
-                  className="font-bold text-xs h-9 px-4 border-slate-200"
+                  className="font-bold text-xs h-9 px-4 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-100"
                 >
-                  대기 목록 전체 비우기
+                  대기 목록 비우기
                 </Button>
                 <Button 
                   onClick={handleApplyImport}
                   disabled={isProcessing}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-9 px-5 text-xs gap-1.5 shadow-md shadow-indigo-100"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 px-5 rounded-xl text-xs gap-1.5 shadow-md shadow-emerald-100"
                 >
                   {isProcessing ? (
                     <>
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      DB 반영 저장 중...
+                      DB 반영 중...
                     </>
                   ) : (
-                    "대기 리스트 전체 DB 반영하기"
+                    <>
+                      <Sparkles className="h-3.5 w-3.5" />
+                      대기 리스트 전체 DB 반영하기
+                    </>
                   )}
                 </Button>
               </div>
             </div>
           )}
 
-          {/* 업로드 결과 표시 */}
+          {/* 최종 반영 결과 */}
           {importResult && (
-            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm animate-in fade-in-50 duration-200">
-              <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center justify-between">
-                <span className="font-black text-xs text-slate-700 flex items-center gap-1.5">
+            <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs animate-in fade-in duration-200">
+              <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+                <span className="font-extrabold text-xs text-slate-800 flex items-center gap-1.5">
                   <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                   최종 반영 결과 리포트
                 </span>
-                <span className="text-[10px] font-bold text-slate-400">
-                  성공: {importResult.successCount}명 / 실패·보류: {importResult.skippedCount}명
+                <span className="text-[11px] font-bold text-slate-400">
+                  성공: {importResult.successCount}명 / 보류: {importResult.skippedCount}명
                 </span>
               </div>
-              <div className="p-4 space-y-3 bg-slate-50/30">
-                <div className="grid grid-cols-2 gap-4 text-center">
-                  <div className="bg-white border rounded-lg p-3">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">성공 학생 수</p>
-                    <p className="text-xl font-black text-emerald-600 mt-1">{importResult.successCount}명</p>
+              <div className="p-4 space-y-3 bg-white">
+                <div className="grid grid-cols-2 gap-3 text-center">
+                  <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3">
+                    <p className="text-[10px] font-bold text-emerald-600 uppercase">성공 반영 학생 수</p>
+                    <p className="text-lg font-black text-emerald-700 mt-0.5">{importResult.successCount}명</p>
                   </div>
-                  <div className="bg-white border rounded-lg p-3">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">실패/미매칭 학생 수</p>
-                    <p className="text-xl font-black text-rose-500 mt-1">{importResult.skippedCount}명</p>
+                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-3">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">미매칭/보류 학생 수</p>
+                    <p className="text-lg font-black text-slate-600 mt-0.5">{importResult.skippedCount}명</p>
                   </div>
                 </div>
 
                 {importResult.errors && importResult.errors.length > 0 && (
                   <div className="space-y-1">
-                    <p className="text-[10px] font-bold text-rose-600">미매칭/오류 상세 내역 (최대 10건):</p>
-                    <div className="bg-white border border-rose-100 rounded-lg p-3 max-h-[150px] overflow-y-auto text-[10px] text-slate-600 space-y-1 custom-scrollbar">
+                    <p className="text-[10px] font-bold text-rose-600">상세 보류 내역:</p>
+                    <div className="bg-rose-50/30 border border-rose-100 rounded-xl p-3 max-h-[140px] overflow-y-auto text-[10px] text-slate-600 space-y-1 custom-scrollbar">
                       {importResult.errors.slice(0, 10).map((err, i) => (
-                        <div key={i} className="flex gap-1.5 items-start text-left leading-normal">
+                        <div key={i} className="flex gap-1.5 items-start text-left">
                           <span className="text-rose-400 shrink-0 font-bold">•</span>
                           <span>{err}</span>
                         </div>
                       ))}
-                      {importResult.errors.length > 10 && (
-                        <p className="text-[9px] text-slate-400 italic text-center mt-2">외 {importResult.errors.length - 10}건의 내역이 더 있습니다.</p>
-                      )}
                     </div>
                   </div>
                 )}

@@ -10,7 +10,8 @@ import {
   DialogDescription
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { FileUp, Settings } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { FileUp, CalendarCheck } from 'lucide-react';
 import { AttendanceImportClient } from './attendance-import-client';
 
 export function AttendanceImportModal({ baseYear }: { baseYear: number }) {
@@ -25,23 +26,27 @@ export function AttendanceImportModal({ baseYear }: { baseYear: number }) {
           <span className="sm:hidden">출결 업로드</span>
         </Button>
       </DialogTrigger>
-      {/* max-h와 overflow-y-auto 설정을 강화하여 내부 스크롤이 반드시 작동하도록 수정 */}
-      <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 border-none shadow-2xl [&>button]:text-white [&>button]:opacity-100 [&>button]:hover:bg-white/10 [&>button]:p-2 [&>button]:rounded-full [&>button]:transition-colors overflow-hidden">
-        <DialogHeader className="p-6 bg-slate-900 text-white shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-500 rounded-lg">
-              <Settings className="h-5 w-5 text-white" />
+
+      <DialogContent className="max-w-4xl h-[88vh] flex flex-col p-0 border-none shadow-2xl rounded-2xl overflow-hidden">
+        {/* 통일된 상단 헤더 */}
+        <DialogHeader className="p-4 sm:p-6 bg-white border-b border-slate-100 shrink-0 flex flex-row items-center justify-start text-left w-full">
+          <div className="flex items-center gap-3.5 text-left justify-start">
+            <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold shrink-0 shadow-sm">
+              <CalendarCheck className="h-6 w-6 sm:h-7 sm:w-7" />
             </div>
-            <div>
-              <DialogTitle className="text-xl font-black tracking-tight">출결 관리 시스템 설정</DialogTitle>
-              <DialogDescription className="text-slate-400 text-xs font-medium mt-1">
-                엑셀 파일을 업로드하여 전교생의 출결 현황을 일괄 업데이트합니다.
+            <div className="flex flex-col items-start text-left">
+              <div className="flex items-center gap-2 text-left">
+                <DialogTitle className="text-lg sm:text-2xl font-extrabold text-slate-900 tracking-tight text-left">출결 현황 일괄 업로드</DialogTitle>
+                <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200/60 text-xs px-2.5 py-0.5 rounded-md font-bold">NEIS 연동</Badge>
+              </div>
+              <DialogDescription className="text-slate-500 text-xs sm:text-sm font-medium mt-1 text-left">
+                NEIS 출결 엑셀 파일(.xlsx, .xls)을 가져와 전교생 출결 현황을 자동 업로드합니다.
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
         
-        {/* 내부 컨텐츠 영역에 독립적인 스크롤 부여 */}
+        {/* 내부 컨텐츠 영역 */}
         <div className="flex-1 overflow-y-auto bg-white custom-scrollbar">
           <AttendanceImportClient baseYear={baseYear} />
         </div>

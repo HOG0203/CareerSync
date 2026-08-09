@@ -82,14 +82,14 @@ export function PromotionModal({ isOpen, onClose, selectedStudents }: PromotionM
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[850px] h-[700px] p-0 overflow-hidden flex flex-col border-none shadow-2xl">
-        <DialogHeader className="p-6 bg-indigo-600 text-white shrink-0">
+        <DialogHeader className="p-4 sm:p-5 bg-white border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <GraduationCap className="h-6 w-6 text-white" />
+            <div className="h-10 w-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold shrink-0">
+              <GraduationCap className="h-5 w-5" />
             </div>
             <div>
-              <DialogTitle className="text-xl font-bold">학생 소속 정보 변경</DialogTitle>
-              <DialogDescription className="text-indigo-100 text-xs mt-1">
+              <DialogTitle className="text-base font-bold text-slate-900 tracking-tight">학생 소속 정보 변경</DialogTitle>
+              <DialogDescription className="text-slate-500 text-xs font-medium mt-0.5">
                 선택된 {selectedStudents.length}명의 학생에 대한 새로운 학과/학반 정보를 설정합니다.
               </DialogDescription>
             </div>

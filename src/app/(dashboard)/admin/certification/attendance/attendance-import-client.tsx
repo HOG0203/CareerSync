@@ -3,6 +3,7 @@
 import * as React from 'react';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { 
   FileUp, 
   AlertCircle, 
@@ -10,8 +11,9 @@ import {
   User, 
   Trash2,
   Info,
-  GraduationCap,
-  X
+  FileSpreadsheet,
+  Sparkles,
+  CheckCircle2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -68,10 +70,9 @@ export function AttendanceImportClient({ baseYear }: { baseYear: number }) {
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const rawRows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as any[][];
 
-        // 1. 학과/학년/반 정보 검색 (상단 10행 스캔)
         let fileMajor = '';
         let fileClass = '';
-        let fileGrade = 3; // 기본값 3학년
+        let fileGrade = 3;
         for (let i = 0; i < Math.min(10, rawRows.length); i++) {
           const rowText = (rawRows[i]?.join(' ') || '').replace(/\s+/g, '');
           const classMatch = rowText.match(/([가-힣]+)(\d)학년?-?(\d+)반?/);
@@ -81,7 +82,6 @@ export function AttendanceImportClient({ baseYear }: { baseYear: number }) {
             fileClass = classMatch[3].trim();
             break;
           } else {
-            // 개별 매칭 시도
             const gradeMatch = rowText.match(/(\d)학년/);
             if (gradeMatch) {
               fileGrade = parseInt(gradeMatch[1]) || 3;
@@ -92,7 +92,6 @@ export function AttendanceImportClient({ baseYear }: { baseYear: number }) {
         let currentStudentName = '';
         let currentStudentNumber = '';
 
-        // 2. 데이터 파싱
         for (let i = 0; i < rawRows.length; i++) {
           const row = rawRows[i];
           if (!row || row.length < 4) continue;
@@ -145,10 +144,8 @@ export function AttendanceImportClient({ baseYear }: { baseYear: number }) {
         }
       }
 
-      // 3. 누적 데이터 업데이트
       const updatedTotalData = [...parsedData, ...allNewRecords];
       
-      // 4. 매칭 및 중복 제거
       const uniqueKeys = Array.from(new Set(updatedTotalData.map(s => `${s.major}_${s.classInfo}_${s.studentNumber}_${s.studentName}_${s.currentGrade}`)))
         .map(k => {
           const parts = k.split('_');
@@ -166,7 +163,7 @@ export function AttendanceImportClient({ baseYear }: { baseYear: number }) {
 
       setParsedData(finalData);
       setIsParsing(false);
-      toast({ title: "파일 분석 완료", description: `총 ${files.length}개의 파일을 성공적으로 읽어왔습니다.` });
+      toast({ title: "파일 분석 완료", description: `총 ${files.length}개의 출결 파일을 성공적으로 읽어왔습니다.` });
     } catch (error) {
       console.error('Parsing error:', error);
       setIsParsing(false);
@@ -221,106 +218,157 @@ export function AttendanceImportClient({ baseYear }: { baseYear: number }) {
   }, [parsedData]);
 
   return (
-    <div className="p-6 space-y-8">
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Trash2 className="h-5 w-5 text-rose-500" />
-            <h3 className="font-bold text-slate-800 text-sm">출결 데이터 초기화</h3>
-          </div>
-          <Button variant="outline" size="sm" onClick={handleDeleteAll} disabled={isDeleting} className="h-8 text-xs font-bold border-rose-200 text-rose-600 hover:bg-rose-50">
-            {isDeleting ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Trash2 className="mr-1 h-3 w-3" />}
-            미리보기 및 DB 초기화
-          </Button>
+    <div className="p-5 sm:p-6 space-y-5">
+      {/* 통일된 가이드 안내 카드 */}
+      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-xs text-slate-700">
+        <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl shrink-0 mt-0.5 border border-indigo-100">
+          <Info className="h-5 w-5" />
         </div>
-        <p className="text-[11px] text-slate-500">시스템에 저장된 모든 학생의 출결 데이터를 영구적으로 삭제하거나 미리보기를 비웁니다.</p>
+        <div className="space-y-1.5">
+          <h5 className="text-sm sm:text-base font-extrabold text-slate-900">NEIS 출결 엑셀 파일 업로드 가이드</h5>
+          <div className="text-xs sm:text-sm leading-relaxed text-slate-700 space-y-1 font-medium">
+            <p>• <strong className="text-slate-900 font-bold">출결 파일 다운 방법</strong>: NEIS &gt; 학생부 &gt; 학교생활기록부 &gt; 학생부 항목별 조회 &gt; 학반 선택 &gt; 출결상황 &gt; 출결상황 &gt; <span className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded px-1.5 py-0.5 shadow-xs font-bold text-slate-900 text-xs mx-0.5"><img src="/images/neis-floppy.png" alt="디스켓 아이콘" className="h-4 w-4 object-contain inline" /></span> 클릭 &gt; XLS data 클릭 &gt; 엑셀 파일 다운</p>
+            <p>• 엑셀 파일(기계1-3, 전기3-1 등)을 <strong className="text-slate-900 font-bold">드래그앤드롭 또는 복수 선택</strong>하여 한꺼번에 업로드할 수 있습니다.</p>
+            <p>• 업로드 즉시 학년별 출결 파싱 미리보기가 표시되며, <strong className="text-slate-900 font-bold">[대기 리스트 전체 DB 반영하기]</strong>를 클릭하여 반영합니다.</p>
+          </div>
+        </div>
       </div>
 
-      <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-lg p-10 bg-slate-50/50 hover:bg-slate-50 transition-colors relative">
-        <input type="file" id="xlsx-upload-attn" className="hidden" accept=".xlsx, .xls" onChange={handleFileUpload} disabled={isParsing || isUploading} multiple />
-        <label htmlFor="xlsx-upload-attn" className="flex flex-col items-center cursor-pointer w-full">
-          <div className="bg-white p-4 rounded-full shadow-sm border border-slate-100 mb-4">
-            {isParsing ? <Loader2 className="h-8 w-8 text-indigo-500 animate-spin" /> : <FileUp className="h-8 w-8 text-indigo-500" />}
-          </div>
-          <span className="text-sm font-semibold text-slate-700">출결 엑셀 파일(들) 선택 (다중 선택 가능)</span>
-          <p className="text-[10px] text-slate-400 mt-2 italic">파일을 하나씩 여러 번 올려도 데이터가 누적됩니다.</p>
-        </label>
+      {/* 통일된 파일 업로드 드롭존 영역 */}
+      <div className="border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-indigo-50/30 rounded-2xl p-6 transition-all text-center flex flex-col items-center justify-center space-y-3">
+        <div className="h-12 w-12 rounded-2xl bg-white shadow-sm border border-slate-200/80 flex items-center justify-center text-indigo-600">
+          <FileSpreadsheet className="h-6 w-6" />
+        </div>
+        <div className="space-y-1">
+          <h4 className="text-sm font-extrabold text-slate-800">NEIS 출결 엑셀 파일 선택</h4>
+          <p className="text-[11px] text-slate-500 max-w-md">컴퓨터에서 출결 엑셀 파일(.xlsx, .xls)을 가져옵니다. 다중 선택 가능합니다.</p>
+        </div>
+
+        <div className="flex items-center justify-center pt-1">
+          <input 
+            type="file" 
+            id="xlsx-upload-attn" 
+            className="hidden" 
+            accept=".xlsx, .xls" 
+            onChange={handleFileUpload} 
+            disabled={isParsing || isUploading} 
+            multiple 
+          />
+          <label 
+            htmlFor="xlsx-upload-attn" 
+            className={`inline-flex items-center gap-2 h-9 px-5 rounded-xl font-bold text-xs cursor-pointer shadow-sm transition-all ${
+              isParsing || isUploading
+                ? "bg-slate-100 text-slate-400 cursor-not-allowed border" 
+                : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-100"
+            }`}
+          >
+            {isParsing ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                파일 분석 중...
+              </>
+            ) : (
+              <>
+                <FileUp className="h-3.5 w-3.5" />
+                엑셀 파일 선택하기
+              </>
+            )}
+          </label>
+        </div>
       </div>
 
       {fileNames.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5 bg-slate-50/70 p-3 rounded-xl border border-slate-100">
+          <span className="text-[11px] font-bold text-slate-500 mr-1 self-center">선택 파일 ({fileNames.length}개):</span>
           {fileNames.map((name, i) => (
-            <div key={i} className="bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-full flex items-center gap-2">
-              <span className="text-[10px] font-bold text-indigo-600">{name}</span>
-            </div>
+            <Badge key={i} variant="outline" className="bg-white border-slate-200 text-slate-700 text-[10px] px-2 py-0.5">
+              {name}
+            </Badge>
           ))}
         </div>
       )}
 
+      {/* 미리보기 리스트 */}
       {parsedData.length > 0 && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <div className="flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-10 py-3 border-b">
-            <h3 className="font-bold text-slate-800">분석 결과 미리보기 (정제 후: {groupedData.length}명)</h3>
-            <Button onClick={handleApply} disabled={isUploading} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold">
-              {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              DB에 최종 적용하기
+        <div className="space-y-3 border border-slate-200 rounded-2xl p-4 bg-slate-50/30">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Badge className="bg-indigo-600 text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full">학생 {groupedData.length}명 감지</Badge>
+              <span className="text-xs font-bold text-slate-800">출결 미리보기 (정제 후)</span>
+            </div>
+            <Button 
+              onClick={handleApply} 
+              disabled={isUploading} 
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 px-5 rounded-xl text-xs gap-1.5 shadow-md shadow-emerald-100"
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  DB 반영 중...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  대기 리스트 전체 DB 반영하기
+                </>
+              )}
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 gap-6">
+          <div className="space-y-3">
             {groupedData.map((group) => {
               const matchKey = `${group.major}_${group.classInfo}_${group.studentNumber}_${group.studentName}`;
               const match = studentMatchMap[matchKey];
               const isMatched = !!match;
 
               return (
-                <div key={group.key} className={cn("bg-white border rounded-xl shadow-sm overflow-hidden", isMatched ? "border-slate-200" : "border-rose-200 bg-rose-50/10")}>
-                  <div className={cn("px-4 py-3 border-b flex items-center justify-between", isMatched ? "bg-slate-50" : "bg-rose-50")}>
-                    <div className="flex items-center gap-3">
+                <div key={group.key} className={cn("bg-white border rounded-xl shadow-xs overflow-hidden", isMatched ? "border-slate-200" : "border-rose-200 bg-rose-50/10")}>
+                  <div className={cn("px-3.5 py-2.5 border-b flex items-center justify-between", isMatched ? "bg-slate-50/80" : "bg-rose-50/60")}>
+                    <div className="flex items-center gap-2.5">
                       <User className={cn("h-4 w-4", isMatched ? "text-slate-400" : "text-rose-400")} />
-                      <div className="flex flex-col text-left">
-                        <div className="flex items-center gap-2">
-                          <span className="font-black text-slate-800 text-base">{group.studentName}</span>
-                          <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-black">{group.studentNumber}번</span>
-                          {isMatched ? (
-                            <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
-                              {match.gradYear}년 졸업예정
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-rose-500 font-bold underline decoration-rose-300">DB 매칭 실패 (정보 불일치)</span>
-                          )}
-                        </div>
-                        <div className="text-[10px] text-slate-500 font-medium mt-0.5">
-                          {group.items[0]?.currentGrade}학년 • {group.major.replace('공업계', '')} • {group.classInfo.replace('반', '')}반
-                        </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 text-sm">{group.studentName}</span>
+                        <Badge variant="outline" className="bg-white text-slate-600 text-[10px] px-1.5 py-0">{group.studentNumber}번</Badge>
+                        {isMatched ? (
+                          <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] px-2 py-0">
+                            {match.gradYear}년 졸업예정
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-rose-50 text-rose-600 border-rose-200 text-[10px] px-2 py-0">
+                            DB 매칭 실패
+                          </Badge>
+                        )}
                       </div>
                     </div>
+                    <span className="text-[10px] text-slate-400 font-semibold">
+                      {group.items[0]?.currentGrade}학년 • {group.major.replace('공업계', '')} • {group.classInfo.replace('반', '')}반
+                    </span>
                   </div>
                   <div className="p-0 overflow-x-auto">
                     <table className="w-full text-[10px] text-center border-collapse min-w-[500px]">
-                      <thead className="bg-slate-50/50 text-slate-400 border-b">
+                      <thead className="bg-slate-50/50 text-slate-500 border-b">
                         <tr>
-                          <th className="py-2 border-r w-12">대상 학년</th>
-                          <th className="py-2 border-r text-rose-600 font-black">미인정(결석/지각/조퇴/결과)</th>
-                          <th className="py-2 border-r text-blue-600 font-black">질병(결석/지각/조퇴/결과)</th>
-                          <th className="py-2 border-r text-slate-600 font-black">기타(결석/지각/조퇴/결과)</th>
-                          <th className="py-2 w-16">수업일수</th>
+                          <th className="py-1.5 border-r w-14 font-bold">학년</th>
+                          <th className="py-1.5 border-r text-rose-600 font-bold">미인정 (결석/지각/조퇴/결과)</th>
+                          <th className="py-1.5 border-r text-blue-600 font-bold">질병 (결석/지각/조퇴/결과)</th>
+                          <th className="py-1.5 border-r text-slate-600 font-bold">기타 (결석/지각/조퇴/결과)</th>
+                          <th className="py-1.5 w-16 font-bold">수업일수</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {group.items.sort((a,b) => a.gradeObtained - b.gradeObtained).map((item, idx) => (
                           <tr key={idx} className="hover:bg-slate-50/50">
-                            <td className="py-2 font-bold border-r text-slate-700">{item.gradeObtained}학년</td>
-                            <td className="py-2 font-black border-r text-rose-600">
+                            <td className="py-1.5 font-bold border-r text-slate-700">{item.gradeObtained}학년</td>
+                            <td className="py-1.5 font-extrabold border-r text-rose-600">
                               {item.absentUnexcused} / {item.lateUnexcused} / {item.earlyUnexcused} / {item.outUnexcused}
                             </td>
-                            <td className="py-2 font-bold border-r text-blue-600">
+                            <td className="py-1.5 font-bold border-r text-blue-600">
                               {item.absentDisease} / {item.lateDisease} / {item.earlyDisease} / {item.outDisease}
                             </td>
-                            <td className="py-2 font-bold border-r text-slate-500">
+                            <td className="py-1.5 font-bold border-r text-slate-500">
                               {item.absentOther} / {item.lateOther} / {item.earlyOther} / {item.outOther}
                             </td>
-                            <td className="py-2 font-medium text-slate-400">{item.schoolDays}일</td>
+                            <td className="py-1.5 font-medium text-slate-500">{item.schoolDays}일</td>
                           </tr>
                         ))}
                       </tbody>
