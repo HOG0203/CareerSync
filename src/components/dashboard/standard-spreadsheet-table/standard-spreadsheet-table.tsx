@@ -109,7 +109,7 @@ export function StandardSpreadsheetTable({
 
       {/* 데스크톱: 스프레드시트 테이블 */}
       {!isMobile ? (
-        <div ref={containerRef} className="relative outline-none bg-white overflow-auto border rounded-md shadow-inner custom-scrollbar flex-1 max-h-[calc(100vh-210px)] focus-visible:ring-0" onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)} onKeyDown={handleKeyDown} tabIndex={0}>
+        <div ref={containerRef} className="relative outline-none bg-white overflow-auto border rounded-md shadow-inner custom-scrollbar flex-1 min-h-0 focus-visible:ring-0" onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)} onKeyDown={handleKeyDown} tabIndex={0}>
           <table className="text-[11px] border-collapse table-auto min-w-max text-center relative border-none">
             <colgroup>
               <col style={{ width: 32 }} />

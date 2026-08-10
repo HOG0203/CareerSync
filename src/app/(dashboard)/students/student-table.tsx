@@ -96,7 +96,7 @@ const COLUMNS: ColumnConfig[] = [
   },
   { 
     key: 'special_notes', 
-    label: '희망\n기업유형', 
+    label: '희망기업유형', 
     width: 90, 
     type: 'select',
     options: (rowData) => GET_CAREER_COURSE_OPTIONS(rowData),
@@ -122,8 +122,8 @@ const COLUMNS: ColumnConfig[] = [
   },
   { 
     key: 'career_course', 
-    label: '희망\n진로코스', 
-    width: 100, 
+    label: '희망진로코스', 
+    width: 90, 
     type: 'select',
     options: (rowData) => GET_SPECIFIC_COURSE_OPTIONS(rowData),
     variant: (val) => {
@@ -146,7 +146,7 @@ const COLUMNS: ColumnConfig[] = [
     }
   },
   { 
-    key: 'is_desiring_employment', label: '취업\n희망', width: 50, type: 'select', 
+    key: 'is_desiring_employment', label: '취업희망', width: 65, type: 'select', 
     options: [
       { label: '예', value: '예' }, 
       { label: '아니오', value: '아니오' }
@@ -158,7 +158,7 @@ const COLUMNS: ColumnConfig[] = [
     }
   },
   { 
-    key: 'employment_status', label: '최종\n진로코스', width: 95, type: 'select', 
+    key: 'employment_status', label: '최종진로코스', width: 90, type: 'select', 
     options: [
       { label: '청솔반', value: '청솔반' }, 
       { label: '취업맞춤반', value: '취업맞춤반' }, 

@@ -126,12 +126,12 @@ export function ClassTable({
   const columns: ColumnConfig[] = React.useMemo(() => {
     const baseCols: ColumnConfig[] = [
       { key: 'student_number', label: '번호', width: 35, readOnly: true },
-      { key: 'student_name', label: '성명', width: 65, readOnly: true },
-      { key: 'phone_number', label: '휴대전화번호', width: 110, readOnly: true },
+      { key: 'student_name', label: '성명', width: 55, readOnly: true },
+      { key: 'phone_number', label: '휴대전화번호', width: 100, readOnly: true },
       { 
         key: 'career_aspiration', 
         label: '진로희망', 
-        width: 120, 
+        width: 75, 
         type: 'select', 
         options: GET_CAREER_OPTIONS(currentGrade),
         variant: (val) => {
@@ -147,8 +147,8 @@ export function ClassTable({
       },
       { 
         key: 'special_notes', 
-        label: '희망\n기업유형', 
-        width: 100, 
+        label: '희망기업유형', 
+        width: 90, 
         type: 'select',
         options: (rowData) => GET_CAREER_COURSE_OPTIONS(rowData),
         variant: (val) => {
@@ -173,8 +173,8 @@ export function ClassTable({
       },
       { 
         key: 'career_course', 
-        label: '희망\n진로코스', 
-        width: 120, 
+        label: '희망진로코스', 
+        width: 90, 
         type: 'select',
         options: (rowData) => GET_SPECIFIC_COURSE_OPTIONS(rowData),
         variant: (val) => {
@@ -196,11 +196,11 @@ export function ClassTable({
           return 'bg-slate-50 text-slate-600 border-slate-100';
         }
       },
-      { key: 'certificates', label: '취득자격증', width: 150, type: 'multi-select' },
+      { key: 'certificates', label: '취득자격증', width: 110, type: 'multi-select' },
       { 
         key: 'military_status', 
         label: '병역희망', 
-        width: 80, 
+        width: 70, 
         type: 'select',
         options: [
           { label: '부사관', value: '부사관' },
@@ -217,7 +217,7 @@ export function ClassTable({
       {
         key: 'desired_work_area',
         label: '취업희망지역',
-        width: 120,
+        width: 95,
         type: 'select',
         options: [
           { label: '대구인근', value: '대구인근' },
@@ -229,7 +229,7 @@ export function ClassTable({
       { 
         key: 'parents_opinion', 
         label: '부모님의견', 
-        width: 130,
+        width: 85,
         type: 'select',
         options: [
           { label: '취업', value: '취업' },
@@ -244,12 +244,12 @@ export function ClassTable({
     ];
 
     if (currentGrade === 3) {
-      baseCols.push({ key: 'shoe_size', label: '신발', width: 50 });
-      baseCols.push({ key: 'top_size', label: '상의', width: 50 });
+      baseCols.push({ key: 'shoe_size', label: '신발', width: 40 });
+      baseCols.push({ key: 'top_size', label: '상의', width: 40 });
     }
 
-    baseCols.push({ key: 'personal_remarks', label: '비고(특이사항)', width: 150 });
-    baseCols.push({ key: 'counseling_log_action', label: '상담일지', width: 100, type: 'action' });
+    baseCols.push({ key: 'personal_remarks', label: '비고', width: 100 });
+    baseCols.push({ key: 'counseling_log_action', label: '상담일지', width: 70, type: 'action' });
 
     return baseCols;
   }, [currentGrade]);
@@ -283,7 +283,7 @@ export function ClassTable({
   }, [initialData]);
 
   return (
-    <div className="w-full overflow-hidden">
+    <div className="w-full h-full flex flex-col min-h-0 flex-1 overflow-hidden">
       <StandardSpreadsheetTable 
         data={initialData}
         columns={columns}

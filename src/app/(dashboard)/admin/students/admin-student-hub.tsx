@@ -208,8 +208,8 @@ export function AdminStudentHub({
   const selectedStudentsForPromotion = processedData.filter((s: any) => selectedIdsForPromotion.includes(s.id))
 
   return (
-    <div className="flex flex-col h-full gap-4 sm:gap-6">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between px-1 gap-4">
+    <div className="flex flex-col h-full gap-3 sm:gap-4 overflow-hidden">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between px-1 gap-4 shrink-0">
         <div className="flex flex-col gap-1">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
             <UserPlus className="h-7 w-7 sm:h-8 sm:w-8 text-indigo-600" />
@@ -231,7 +231,7 @@ export function AdminStudentHub({
         </div>
       </div>
 
-      <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div className="w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
           <React.Suspense fallback={<div className="h-10 w-[450px] bg-slate-50 animate-pulse rounded-lg" />}>
             <DashboardFilters 
@@ -254,7 +254,7 @@ export function AdminStudentHub({
         </div>
       </div>
 
-      <Card className="flex-1 min-h-0 shadow-md border-none bg-white flex flex-col rounded-2xl overflow-hidden min-w-full">
+      <Card className="flex-1 min-h-0 shadow-md border-none bg-white flex flex-col rounded-2xl overflow-hidden min-w-full mb-0">
         <CardHeader className="py-3 sm:py-4 px-4 sm:px-6 border-b bg-slate-50/50 flex flex-row items-center justify-between shrink-0">
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="bg-indigo-100 p-1.5 sm:p-2 rounded-xl text-indigo-600">
@@ -272,7 +272,7 @@ export function AdminStudentHub({
             </div>
           </div>
         </CardHeader>
-        <CardContent className="flex-1 p-0 relative">
+        <CardContent className="flex-1 p-0 relative min-h-0 flex flex-col overflow-hidden">
           <StandardSpreadsheetTable 
             data={processedData}
             columns={COLUMNS}

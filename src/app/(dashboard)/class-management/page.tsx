@@ -156,7 +156,7 @@ async function ClassManagementPageContent({
   const displayClass = targetClass && !targetClass.includes('-') ? `${selectedGrade}-${targetClass}` : targetClass;
 
   return (
-    <div className="flex flex-col h-full gap-4 sm:gap-6">
+    <div className="flex flex-col h-full gap-3 sm:gap-4 overflow-hidden">
       <div className="flex items-center justify-between shrink-0 px-1">
         <div className="flex flex-col gap-1 min-w-0">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2 whitespace-nowrap">
@@ -182,8 +182,8 @@ async function ClassManagementPageContent({
       </div>
 
       {isViewable ? (
-        <Card className="shadow-sm border bg-white rounded-xl overflow-hidden">
-          <CardHeader className="py-3 px-4 border-b bg-white/50 flex flex-row items-center justify-between">
+        <Card className="flex-1 min-h-0 shadow-sm border bg-white rounded-xl overflow-hidden flex flex-col mb-0">
+          <CardHeader className="py-3 px-4 border-b bg-white/50 flex flex-row items-center justify-between shrink-0">
             <div>
               <CardTitle className="text-base font-bold text-gray-900">
                 {targetMajor} {displayClass}반 학생별 상세 데이터
@@ -196,7 +196,7 @@ async function ClassManagementPageContent({
               총 {studentData.length}명
             </div>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="p-0 flex-1 min-h-0 flex flex-col overflow-hidden">
             <ClassTable 
               initialData={studentData} 
               masterCertificates={masterCertificates} 
