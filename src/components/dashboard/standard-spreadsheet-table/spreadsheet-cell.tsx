@@ -79,7 +79,7 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
     onEndEdit();
   }, [id, field, value, onSave, onEndEdit]);
 
-  if (isEditing) {
+  if (isEditing && !config.readOnly && config.type !== 'action') {
     if (config.type === 'select') {
       const isInOptions = resolvedOptions?.some((o: any) => o.value === localValue);
       const isOtherTrigger = localValue === '기타(직접입력)';

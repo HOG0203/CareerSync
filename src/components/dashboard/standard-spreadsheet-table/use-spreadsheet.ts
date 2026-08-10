@@ -435,6 +435,7 @@ export function useSpreadsheet({
       case 'Enter':
         if (selectionStart) {
           const config = columns[selectionStart.col];
+          if (!config || config.readOnly || config.type === 'action') return;
           if (config.type === 'multi-select') { setEditingCell({ row: selectionStart.row, col: selectionStart.col }); setIsPickerOpen(true); }
           else setEditingCell({ row: selectionStart.row, col: selectionStart.col });
         }

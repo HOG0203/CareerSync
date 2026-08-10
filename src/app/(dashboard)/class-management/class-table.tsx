@@ -127,7 +127,7 @@ export function ClassTable({
     const baseCols: ColumnConfig[] = [
       { key: 'student_number', label: '번호', width: 35, readOnly: true },
       { key: 'student_name', label: '성명', width: 65, readOnly: true },
-      { key: 'phone_number', label: '휴대전화번호', width: 110 },
+      { key: 'phone_number', label: '휴대전화번호', width: 110, readOnly: true },
       { 
         key: 'career_aspiration', 
         label: '진로희망', 
