@@ -273,22 +273,26 @@ export function CustomCombinationModal({
         onOpenAutoFocus={(e) => e.preventDefault()}
         className="max-w-2xl rounded-3xl p-0 border-none shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
       >
-        {/* 화사하고 감각적인 블루-인디고 오로라 헤더 */}
-        <DialogHeader className="p-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white shrink-0 relative overflow-hidden">
-          <div className="absolute -right-8 -top-8 w-36 h-36 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-          <div className="absolute -left-8 -bottom-8 w-28 h-28 bg-blue-400/20 rounded-full blur-xl pointer-events-none" />
-          <DialogTitle className="text-xl font-black tracking-tight text-white flex items-center gap-2.5 relative z-10">
-            <div className="p-2 bg-white/15 rounded-xl backdrop-blur-md border border-white/20">
-              <SlidersHorizontal className="h-5 w-5 text-blue-100" />
+        {/* 시스템 표준 화이트 테마 헤더 */}
+        <DialogHeader className="p-4 sm:p-6 bg-white border-b border-slate-100 shrink-0">
+          <div className="flex items-center justify-between mr-6 sm:mr-8">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100 shadow-sm">
+                <SlidersHorizontal className="h-5 w-5 sm:h-6 sm:w-6" />
+              </div>
+              <div className="flex flex-col text-left min-w-0">
+                <DialogTitle className="text-base sm:text-xl font-extrabold flex items-center gap-2 text-slate-900 truncate">
+                  자유 커스텀 검색 하이라이트 빌더
+                </DialogTitle>
+                <DialogDescription className="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
+                  대분류(자격증, 출결, 취업, 성적) 선택 후 세부 항목을 자유롭게 조립하여 하이라이트합니다.
+                </DialogDescription>
+              </div>
             </div>
-            자유 커스텀 검색 하이라이트 빌더
-          </DialogTitle>
-          <DialogDescription className="text-blue-100/90 text-xs font-medium mt-1.5 leading-relaxed relative z-10">
-            대분류(자격증, 출결, 취업, 성적) 선택 후 세부 항목을 자유롭게 조립하여 원하는 학생을 하이라이트합니다.
-          </DialogDescription>
+          </div>
         </DialogHeader>
 
-        <div className="p-6 overflow-y-auto space-y-6 bg-gradient-to-b from-slate-50/90 via-white to-blue-50/20 flex-1">
+        <div className="p-6 overflow-y-auto space-y-6 bg-slate-50/50 flex-1">
           {/* 마이 프리셋 (나만의 조합) 불러오기 영역 */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
@@ -605,23 +609,23 @@ export function CustomCombinationModal({
           </div>
         </div>
 
-        <DialogFooter className="p-4 bg-slate-50/90 border-t border-slate-100 flex flex-row items-center justify-between gap-2 shrink-0">
+        <DialogFooter className="p-4 bg-white border-t border-slate-100 flex flex-row items-center justify-between gap-2 shrink-0">
           <Button
             type="button"
             variant="ghost"
             onClick={handleReset}
-            className="text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"
+            className="text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100"
           >
             <RotateCcw className="h-3.5 w-3.5 mr-1" /> 필터 초기화
           </Button>
           <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={onClose} className="text-xs font-bold border-slate-300">
+            <Button type="button" variant="outline" onClick={onClose} className="text-xs font-bold border-slate-200">
               취소
             </Button>
             <Button
               type="button"
               onClick={handleApply}
-              className="text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md shadow-blue-500/20 active:scale-95 px-6"
+              className="text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-sm px-6"
             >
               <Check className="h-4 w-4 mr-1" /> 하이라이트 적용
             </Button>
