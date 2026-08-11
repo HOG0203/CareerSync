@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions'
 
@@ -295,20 +295,44 @@ export async function deleteStudents(ids: string[]) {
   return { success: true }
 }
 
+import { getCurrentUserProfile } from '@/lib/data'
+
 export async function upsertFieldTrainingRecord(record: any) {
+  const profile = await getCurrentUserProfile()
+  if (profile?.role !== 'admin') {
+    return { error: '현장실습 이력 입력 및 수정은 관리자 권한이 필요합니다.' }
+  }
+
   const supabase = await createClient(); const { id, ...data } = record
   const sanitized = { ...data, start_date: data.start_date || null, end_date: data.end_date || null, conversion_date: data.conversion_date || null }
   const { data: upserted, error } = await supabase.from('field_training_records').upsert({ ...(id ? { id } : {}), ...sanitized, updated_at: new Date().toISOString() }).select().single()
   if (error) return { error: error.message }
   if (data.hiring_status === '채용전환') await supabase.from('student_employments').upsert({ id: data.student_id, company: data.company, updated_at: new Date().toISOString() }, { onConflict: 'id' })
-  revalidatePath('/students'); return { success: true, data: upserted }
+  revalidateTag('students');
+  revalidatePath('/field-training');
+  revalidatePath('/students');
+  revalidatePath('/class-management');
+  revalidatePath('/company-info');
+  revalidatePath('/employment-status');
+  return { success: true, data: upserted }
 }
 
 export async function deleteFieldTrainingRecord(id: string) {
+  const profile = await getCurrentUserProfile()
+  if (profile?.role !== 'admin') {
+    return { error: '현장실습 이력 삭제는 관리자 권한이 필요합니다.' }
+  }
+
   const supabase = await createClient()
   const { error } = await supabase.from('field_training_records').delete().eq('id', id)
   if (error) return { error: error.message }
-  revalidatePath('/students'); return { success: true }
+  revalidateTag('students');
+  revalidatePath('/field-training');
+  revalidatePath('/students');
+  revalidatePath('/class-management');
+  revalidatePath('/company-info');
+  revalidatePath('/employment-status');
+  return { success: true }
 }
 
 /**

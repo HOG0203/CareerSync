@@ -89,6 +89,7 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
       icon: Briefcase,
       items: [
         { href: '/employment-status', label: '취업진로현황', icon: Grid3X3 },
+        ...(!isLowerGradeTeacher ? [{ href: '/field-training', label: '현장실습현황', icon: CalendarCheck }] : []),
         { href: '/company-info', label: '업체정보', icon: Factory },
         ...(!isLowerGradeTeacher ? [{ href: '/students', label: '취업상세데이터', icon: ClipboardList }] : []),
       ]

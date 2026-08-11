@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import {
   Select,
   SelectContent,
@@ -20,6 +20,7 @@ interface AdminClassSelectorProps {
   defaultGrade: number;
   defaultMajor: string;
   defaultClass: string;
+  baseUrl?: string;
 }
 
 export default function AdminClassSelector({
@@ -29,9 +30,11 @@ export default function AdminClassSelector({
   defaultGrade,
   defaultMajor,
   defaultClass,
+  baseUrl,
 }: AdminClassSelectorProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const [isLoading, setIsLoading] = React.useState(false);
 
   // 로컬 선택 상태 관리
@@ -77,12 +80,13 @@ export default function AdminClassSelector({
 
   const handleSearch = () => {
     setIsLoading(true);
+    const targetBaseUrl = baseUrl || pathname || '/class-management';
     const params = new URLSearchParams();
     params.set('grade', selectedGrade);
     params.set('major', selectedMajor);
     params.set('class', selectedClass);
     startTransition(() => {
-      router.push(`/class-management?${params.toString()}`);
+      router.push(`${targetBaseUrl}?${params.toString()}`);
     });
   };
 

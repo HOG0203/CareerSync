@@ -369,6 +369,7 @@ export function StudentTable({
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         student={selectedStudent}
+        isAdmin={isAdmin}
       />
     </div>
   )

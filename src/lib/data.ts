@@ -228,10 +228,8 @@ export async function getCachedGraduationYears(): Promise<number[]> {
 export async function getAssignedStudentDetails(major: string, classInfo: string, graduationYear: number, baseYear?: number) {
   const supabase = createAdminClient();
 
-  
-  // [최적화] Promise.all을 활용해 학생 정보, 실습 기록, 학적 이력을 병렬로 조회
-  // [컬럼 슬림화 최적화] 불필요한 대용량 컬럼(전화번호, 옷/신발 사이즈, 학부모 의견 등)을 제외하고 필수 데이터만 골라서 select 합니다.
-  const [studentsResult, trainingsResult, historyResult] = await Promise.all([
+  // 1. 학생 기본 정보 및 학적 이력 병렬 조회
+  const [studentsResult, historyResult] = await Promise.all([
     supabase
       .from('students')
       .select('id, student_id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, labor_education_status, military_status, desired_work_area, parents_opinion, shoe_size, top_size, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks), student_counseling_logs (*)')
@@ -239,34 +237,47 @@ export async function getAssignedStudentDetails(major: string, classInfo: string
       .eq('class_info', classInfo)
       .eq('graduation_year', graduationYear)
       .order('student_number'),
-    supabase
-      .from('field_training_records')
-      .select('id, student_id, training_order, company, start_date, end_date, stipend_status, hiring_status, conversion_date, students!inner(graduation_year, major, class_info)')
-      .eq('students.graduation_year', graduationYear)
-      .eq('students.major', major)
-      .eq('students.class_info', classInfo)
-      .order('training_order', { ascending: false }),
     baseYear 
       ? supabase
           .from('student_academic_history')
-          .select('id, student_id, major, class_info, student_number, teacher_name, grade, students!inner(graduation_year, major, class_info)')
+          .select('id, student_id, major, class_info, student_number, teacher_name, grade, students!inner(id, student_id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, labor_education_status, military_status, desired_work_area, parents_opinion, shoe_size, top_size, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks), student_counseling_logs (*))')
           .eq('academic_year', baseYear)
           .eq('students.graduation_year', graduationYear)
-          .eq('students.major', major)
-          .eq('students.class_info', classInfo)
+          .eq('major', major)
+          .eq('class_info', classInfo)
       : Promise.resolve({ data: [] as any[], error: null })
   ]);
 
   if (studentsResult.error || !studentsResult.data) return [];
-  const students = studentsResult.data;
-  const trainings = trainingsResult.data || [];
+  
+  let students = [...studentsResult.data];
   const historyData = historyResult?.data || [];
+
+  // 학적 이력에만 존재하는 학생이 있다면 병합
+  historyData.forEach((h: any) => {
+    if (h.students && !students.some(s => s.id === h.students.id)) {
+      students.push(h.students);
+    }
+  });
+
+  const studentIds = students.map(s => s.id);
+
+  // 2. 해당 학반 학생 ID 목록으로 현장실습 이력 전체 직접 조회 (누락 방지)
+  let trainings: any[] = [];
+  if (studentIds.length > 0) {
+    const { data: tData } = await supabase
+      .from('field_training_records')
+      .select('id, student_id, training_order, company, start_date, end_date, stipend_status, hiring_status, conversion_date, return_reason, updated_at')
+      .in('student_id', studentIds)
+      .order('training_order', { ascending: false });
+    trainings = tData || [];
+  }
 
   return students.map(s => {
     const studentEmployments = Array.isArray(s.student_employments) ? s.student_employments[0] : s.student_employments;
     const { student_employments, ...studentBase } = s;
     const emp = studentEmployments || {};
-    const studentTrainings = (trainings || []).filter(t => t.student_id === s.id);
+    const studentTrainings = trainings.filter(t => t.student_id === s.id);
     const latestTraining = studentTrainings[0];
     const hist = historyData.find(h => h.student_id === s.id);
     
