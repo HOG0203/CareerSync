@@ -29,6 +29,7 @@ interface DashboardFiltersProps {
   hideYear?: boolean;
   hideGrade?: boolean; // 추가
   baseYear: number;
+  defaultGrade?: number; // 담임교사 배정 학년 기본값
 }
 
 export default function DashboardFilters({ 
@@ -40,7 +41,8 @@ export default function DashboardFilters({
   baseUrl = '/dashboard', 
   hideYear = false,
   hideGrade = false, // 기본값
-  baseYear
+  baseYear,
+  defaultGrade = 3,
 }: DashboardFiltersProps) {
   const [mounted, setMounted] = React.useState(false);
   const router = useRouter();
@@ -51,7 +53,7 @@ export default function DashboardFilters({
   }, []);
 
   const currentAY = searchParams.get('ay') || baseYear.toString();
-  const currentGrade = searchParams.get('grade') || '3';
+  const currentGrade = searchParams.get('grade') || String(defaultGrade);
   const currentMajor = searchParams.get('major') || 'all';
   const currentClass = searchParams.get('class') || 'all';
   const currentStatus = searchParams.get('status') || 'all';

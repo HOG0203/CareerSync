@@ -42,10 +42,83 @@ interface FieldTrainingModalProps {
   isAdmin?: boolean
 }
 
+// 텍스트 자유 입력, 복사-붙여넣기, 자동 형식 정제 및 달력 선택을 동시 지원하는 스마트 날짜 인풋
+function SmartDateInput({
+  value,
+  onChange,
+  disabled,
+  className,
+  placeholder = 'YYYY-MM-DD'
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  disabled?: boolean;
+  className?: string;
+  placeholder?: string;
+}) {
+  const [textVal, setTextVal] = React.useState(value || '');
+
+  React.useEffect(() => {
+    setTextVal(value || '');
+  }, [value]);
+
+  const normalizeDateStr = (raw: string) => {
+    if (!raw) return '';
+    const cleaned = raw.replace(/[^\d]/g, ''); // 숫자만 추출
+    if (cleaned.length === 8) {
+      // YYYYMMDD -> YYYY-MM-DD
+      const y = cleaned.slice(0, 4);
+      const m = cleaned.slice(4, 6);
+      const d = cleaned.slice(6, 8);
+      return `${y}-${m}-${d}`;
+    }
+    // 2026.08.01 or 2026/08/01 -> 2026-08-01
+    return raw.trim().replace(/[\.\/]/g, '-');
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setTextVal(raw);
+    const normalized = normalizeDateStr(raw);
+    onChange(normalized);
+  };
+
+  const handleBlur = () => {
+    const normalized = normalizeDateStr(textVal);
+    setTextVal(normalized);
+    onChange(normalized);
+  };
+
+  return (
+    <div className="relative flex items-center">
+      <Input
+        type="text"
+        value={textVal}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        placeholder={placeholder}
+        disabled={disabled}
+        className={cn("pr-8 font-mono text-xs sm:text-sm bg-white border-slate-200 focus:ring-emerald-500", className)}
+      />
+      <input
+        type="date"
+        value={value || ''}
+        onChange={(e) => {
+          setTextVal(e.target.value);
+          onChange(e.target.value);
+        }}
+        disabled={disabled}
+        className="absolute right-1 w-6 h-6 opacity-0 cursor-pointer disabled:cursor-not-allowed z-10"
+        title="달력에서 날짜 선택"
+      />
+      <CalendarIcon className="absolute right-2 h-4 w-4 text-slate-400 pointer-events-none" />
+    </div>
+  );
+}
+
 export function FieldTrainingModal({ isOpen, onClose, student, isAdmin = false }: FieldTrainingModalProps) {
   const [records, setRecords] = React.useState<any[]>([])
   const [isSaving, setIsSaving] = React.useState(false)
-  const [openPopovers, setOpenPopovers] = React.useState<Record<string, boolean>>({})
   const { toast } = useToast()
   const router = useRouter()
 
@@ -55,7 +128,6 @@ export function FieldTrainingModal({ isOpen, onClose, student, isAdmin = false }
     } else {
       setRecords([])
     }
-    setOpenPopovers({})
 
     if (!isOpen) {
       // Radix UI 모달 닫힘 후 body의 pointer-events: none 고립 현상 방지 구원 코드
@@ -68,14 +140,10 @@ export function FieldTrainingModal({ isOpen, onClose, student, isAdmin = false }
     }
   }, [student, isOpen])
 
-  const togglePopover = (key: string, open: boolean) => {
-    setOpenPopovers(prev => ({ ...prev, [key]: open }))
-  }
-
   const handleAddRecord = () => {
     const nextOrder = records.length > 0 ? Math.max(...records.map(r => r.training_order)) + 1 : 1
     const newRecord = {
-      id: `temp-${Date.now()}`, // 임시 ID 부여로 고유 키 보장
+      id: `temp-${Date.now()}`,
       student_id: student.id,
       training_order: nextOrder,
       company: '',
@@ -95,13 +163,6 @@ export function FieldTrainingModal({ isOpen, onClose, student, isAdmin = false }
     setRecords(newRecords)
   }
 
-  const handleDateSelect = (index: number, field: string, date: Date | undefined, popoverKey: string) => {
-    if (!date || !isValid(date)) return;
-    const dateStr = format(date, 'yyyy-MM-dd')
-    handleUpdateLocal(index, field, dateStr)
-    togglePopover(popoverKey, false) // 날짜 선택 후 팝업 닫기
-  }
-
   const handleSaveRecord = async (index: number) => {
     setIsSaving(true)
     const record = { ...records[index] }
@@ -112,7 +173,6 @@ export function FieldTrainingModal({ isOpen, onClose, student, isAdmin = false }
       return
     }
 
-    // 임시 ID 제거 후 저장
     if (typeof record.id === 'string' && record.id.startsWith('temp-')) {
       delete record.id
     }
@@ -152,12 +212,6 @@ export function FieldTrainingModal({ isOpen, onClose, student, isAdmin = false }
       toast({ variant: 'destructive', title: '삭제 실패', description: result.error })
     }
     setIsSaving(false)
-  }
-
-  const safeParseDate = (dateStr: string) => {
-    if (!dateStr) return undefined
-    const date = parseISO(dateStr)
-    return isValid(date) ? date : undefined
   }
 
   if (!student) return null
@@ -276,24 +330,24 @@ export function FieldTrainingModal({ isOpen, onClose, student, isAdmin = false }
 
                       <div className="grid grid-cols-2 gap-2 md:col-span-2">
                         <div className="space-y-1">
-                          <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">시작일</Label>
-                          <Input 
-                            type="date"
+                          <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">시작일 (직접 입력/복사 가능)</Label>
+                          <SmartDateInput 
                             value={record.start_date || ''} 
-                            onChange={(e) => handleUpdateLocal(index, 'start_date', e.target.value)}
+                            onChange={(val) => handleUpdateLocal(index, 'start_date', val)}
                             disabled={!isAdmin}
-                            className="h-8 sm:h-9 text-xs sm:text-sm font-semibold border-slate-200 focus:ring-emerald-500 bg-white"
+                            placeholder="2026-08-01"
+                            className="h-8 sm:h-9"
                           />
                         </div>
 
                         <div className="space-y-1">
-                          <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">종료일</Label>
-                          <Input 
-                            type="date"
+                          <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">종료일 (직접 입력/복사 가능)</Label>
+                          <SmartDateInput 
                             value={record.end_date || ''} 
-                            onChange={(e) => handleUpdateLocal(index, 'end_date', e.target.value)}
+                            onChange={(val) => handleUpdateLocal(index, 'end_date', val)}
                             disabled={!isAdmin}
-                            className="h-8 sm:h-9 text-xs sm:text-sm font-semibold border-slate-200 focus:ring-emerald-500 bg-white"
+                            placeholder="2026-11-30"
+                            className="h-8 sm:h-9"
                           />
                         </div>
                       </div>
@@ -317,13 +371,13 @@ export function FieldTrainingModal({ isOpen, onClose, student, isAdmin = false }
 
                       {record.hiring_status === '채용전환' ? (
                         <div className="space-y-1 animate-in fade-in zoom-in-95">
-                          <Label className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">채용 전환일</Label>
-                          <Input 
-                            type="date"
+                          <Label className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">채용 전환일 (직접 입력/복사 가능)</Label>
+                          <SmartDateInput 
                             value={record.conversion_date || ''} 
-                            onChange={(e) => handleUpdateLocal(index, 'conversion_date', e.target.value)}
+                            onChange={(val) => handleUpdateLocal(index, 'conversion_date', val)}
                             disabled={!isAdmin}
-                            className="h-8 sm:h-9 text-xs sm:text-sm font-semibold border-blue-200 bg-blue-50/30 text-blue-900 focus:ring-blue-500"
+                            placeholder="2026-12-01"
+                            className="h-8 sm:h-9 text-blue-900 border-blue-200 bg-blue-50/30"
                           />
                         </div>
                       ) : record.hiring_status === '복교' ? (

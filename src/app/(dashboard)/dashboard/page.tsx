@@ -131,6 +131,7 @@ export default async function DashboardPage({
                 defaultYear={selectedYear}
                 baseYear={settings.baseYear}
                 hideGrade={false}
+                defaultGrade={defaultGrade}
               />
             </React.Suspense>
           </div>

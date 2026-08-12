@@ -28,7 +28,7 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen w-full flex bg-background">
+      <div className="h-screen w-full flex bg-background overflow-hidden">
         {/* Desktop Sidebar */}
         <div className="hidden lg:block">
           <Sidebar>
@@ -45,7 +45,7 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
             <Header userProfile={userProfile} />
           </div>
 
-          <main className="flex-1 p-2 lg:p-6 lg:mt-0 mt-14 lg:mb-0 mb-16 overflow-auto min-w-0">
+          <main className="flex-1 p-2 lg:p-6 lg:mt-0 mt-14 lg:mb-0 mb-16 overflow-hidden flex flex-col min-h-0 min-w-0">
             {children}
           </main>
 

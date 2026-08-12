@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Search, GraduationCap, Trash2, Loader2, Phone, ChevronRight } from 'lucide-react'
+import { Search, GraduationCap, Trash2, Loader2, Phone, ChevronRight, ChevronLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -39,6 +39,11 @@ export function StandardSpreadsheetTable({
   const [mounted, setMounted] = React.useState(false)
   const isMobile = useIsMobile()
 
+  // 가로 스크롤 동기화 상태
+  const [scrollLeft, setScrollLeft] = React.useState(0)
+  const [scrollWidth, setScrollWidth] = React.useState(0)
+  const [clientWidth, setClientWidth] = React.useState(0)
+
   React.useEffect(() => { setMounted(true); }, [])
 
   const {
@@ -71,6 +76,42 @@ export function StandardSpreadsheetTable({
     handleKeyDown,
   } = useSpreadsheet({ initialData, columns, onSave, onBulkSave, groupHeaders, externalSelectedRowIds, onSelectionChange })
 
+  // 스크롤 메타데이터 동기화
+  const updateScrollMeta = React.useCallback(() => {
+    if (containerRef.current) {
+      setScrollLeft(containerRef.current.scrollLeft)
+      setScrollWidth(containerRef.current.scrollWidth)
+      setClientWidth(containerRef.current.clientWidth)
+    }
+  }, [containerRef])
+
+  React.useEffect(() => {
+    updateScrollMeta()
+    const timer = setTimeout(updateScrollMeta, 300)
+    return () => clearTimeout(timer)
+  }, [filteredData, columns, mounted, updateScrollMeta])
+
+  const handleTableScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    setScrollTop(e.currentTarget.scrollTop)
+    setScrollLeft(e.currentTarget.scrollLeft)
+    setScrollWidth(e.currentTarget.scrollWidth)
+    setClientWidth(e.currentTarget.clientWidth)
+  }
+
+  const handleTopScrollChange = (newLeft: number) => {
+    if (containerRef.current) {
+      containerRef.current.scrollLeft = newLeft
+      setScrollLeft(newLeft)
+    }
+  }
+
+  const handleScrollStep = (dir: 'left' | 'right') => {
+    if (containerRef.current) {
+      const delta = dir === 'left' ? -350 : 350
+      containerRef.current.scrollBy({ left: delta, behavior: 'smooth' })
+    }
+  }
+
   if (!mounted) {
     return (
       <div className="flex h-[400px] w-full items-center justify-center bg-slate-50/50 rounded-2xl animate-pulse">
@@ -80,7 +121,7 @@ export function StandardSpreadsheetTable({
   }
 
   return (
-    <div className="flex flex-col gap-4 w-full h-full overflow-hidden">
+    <div className="flex flex-col gap-3 w-full h-full overflow-hidden">
       {/* 검색 및 선택 툴바 */}
       <div className="flex items-center justify-between p-2 bg-muted/20 rounded-md border-dashed border shrink-0">
         <div className="flex items-center gap-3">
@@ -109,7 +150,7 @@ export function StandardSpreadsheetTable({
 
       {/* 데스크톱: 스프레드시트 테이블 */}
       {!isMobile ? (
-        <div ref={containerRef} className="relative outline-none bg-white overflow-auto border rounded-md shadow-inner custom-scrollbar flex-1 min-h-0 focus-visible:ring-0" onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)} onKeyDown={handleKeyDown} tabIndex={0}>
+        <div ref={containerRef} className="relative outline-none bg-white overflow-auto border rounded-md shadow-inner custom-scrollbar flex-1 min-h-0 focus-visible:ring-0" onScroll={handleTableScroll} onKeyDown={handleKeyDown} tabIndex={0}>
           <table className="text-[11px] border-collapse table-auto min-w-max text-center relative border-none">
             <colgroup>
               <col style={{ width: 32 }} />
@@ -127,9 +168,14 @@ export function StandardSpreadsheetTable({
             <tbody>
               {(() => {
                 const totalCount = filteredData.length;
-                // 가상 스크롤 비활성화: 모든 행을 항상 렌더링 (300명 수준은 성능 문제 없음)
-                const start = 0;
-                const end = totalCount - 1;
+                // 가상 스크롤 활성화: 화면에 보이는 행 + 편집 중 행만 렌더링
+                const OVERSCAN = 8; // 화면 위아래로 여분 렌더 행 수
+                const visStart = Math.max(0, Math.floor((scrollTop - HEADER_HEIGHT) / ROW_HEIGHT) - OVERSCAN);
+                const visEnd = Math.min(totalCount - 1, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + OVERSCAN);
+                // 편집 중인 셀이 가상 스크롤 범위 밖으로 잘리지 않도록 범위에 포함
+                const editRow = editingCell?.row ?? -1;
+                const start = editRow >= 0 && editRow < visStart ? editRow : visStart;
+                const end = editRow > visEnd ? editRow : visEnd;
                 const sMinR = selectionStart && selectionEnd ? Math.min(selectionStart.row, selectionEnd.row) : -1;
                 const sMaxR = selectionStart && selectionEnd ? Math.max(selectionStart.row, selectionEnd.row) : -1;
                 const sMinC = selectionStart && selectionEnd ? Math.min(selectionStart.col, selectionEnd.col) : -1;

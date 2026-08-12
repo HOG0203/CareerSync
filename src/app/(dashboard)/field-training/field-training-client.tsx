@@ -19,7 +19,8 @@ import {
   ExternalLink,
   ChevronRight,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  X
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -328,86 +329,139 @@ export function FieldTrainingClient({
       </div>
 
       {/* 2. 툴바 & 뷰 모드 전환 및 검색 필터 */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-sm shrink-0">
-        <div className="flex items-center gap-1.5">
-          {/* 뷰 모드 토글 */}
-          <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+      <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-sm shrink-0 space-y-2.5">
+        {/* 상단: 뷰 모드 토글 + 검색창 */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+          {/* 뷰 모드 토글 (모바일 1:1 세그먼트, 데스크톱 콤팩트) */}
+          <div className="grid grid-cols-2 sm:flex bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1 w-full sm:w-auto">
             <Button
               size="sm"
               variant={viewMode === 'timeline' ? 'default' : 'ghost'}
               onClick={() => setViewMode('timeline')}
-              className={cn("h-7 px-2.5 text-xs font-bold rounded-md gap-1.5", viewMode === 'timeline' && "bg-slate-900 text-white shadow-sm")}
+              className={cn(
+                "h-8 px-3 text-xs font-extrabold rounded-lg gap-1.5 transition-all justify-center",
+                viewMode === 'timeline' ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"
+              )}
             >
               <Calendar className="h-3.5 w-3.5" />
-              월별 간트 타임라인
+              <span>간트 타임라인</span>
             </Button>
             <Button
               size="sm"
               variant={viewMode === 'grid' ? 'default' : 'ghost'}
               onClick={() => setViewMode('grid')}
-              className={cn("h-7 px-2.5 text-xs font-bold rounded-md gap-1.5", viewMode === 'grid' && "bg-slate-900 text-white shadow-sm")}
+              className={cn(
+                "h-8 px-3 text-xs font-extrabold rounded-lg gap-1.5 transition-all justify-center",
+                viewMode === 'grid' ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"
+              )}
             >
               <LayoutList className="h-3.5 w-3.5" />
-              학생별 카드/명부
+              <span>카드/명부 뷰</span>
             </Button>
           </div>
 
-          <div className="h-4 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
-
-          {/* 상태 필터 뱃지 버튼 */}
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 custom-scrollbar">
-            <Button
-              size="sm"
-              variant={statusFilter === 'all' ? 'default' : 'outline'}
-              onClick={() => setStatusFilter('all')}
-              className={cn("h-7 text-[11px] font-bold rounded-lg px-2", statusFilter === 'all' && "bg-blue-600 hover:bg-blue-700")}
-            >
-              전체 ({students.length})
-            </Button>
-            <Button
-              size="sm"
-              variant={statusFilter === 'ongoing' ? 'default' : 'outline'}
-              onClick={() => setStatusFilter('ongoing')}
-              className={cn("h-7 text-[11px] font-bold rounded-lg px-2 text-emerald-700 border-emerald-200 hover:bg-emerald-50", statusFilter === 'ongoing' && "bg-emerald-600 text-white hover:bg-emerald-700")}
-            >
-              실습중 ({stats.ongoingCount})
-            </Button>
-            <Button
-              size="sm"
-              variant={statusFilter === 'converted' ? 'default' : 'outline'}
-              onClick={() => setStatusFilter('converted')}
-              className={cn("h-7 text-[11px] font-bold rounded-lg px-2 text-purple-700 border-purple-200 hover:bg-purple-50", statusFilter === 'converted' && "bg-purple-600 text-white hover:bg-purple-700")}
-            >
-              채용전환 ({stats.convertedCount})
-            </Button>
-            <Button
-              size="sm"
-              variant={statusFilter === 'returned' ? 'default' : 'outline'}
-              onClick={() => setStatusFilter('returned')}
-              className={cn("h-7 text-[11px] font-bold rounded-lg px-2 text-amber-700 border-amber-200 hover:bg-amber-50", statusFilter === 'returned' && "bg-amber-600 text-white hover:bg-amber-700")}
-            >
-              복교 ({stats.returnedCount})
-            </Button>
-            <Button
-              size="sm"
-              variant={statusFilter === 'none' ? 'default' : 'outline'}
-              onClick={() => setStatusFilter('none')}
-              className={cn("h-7 text-[11px] font-bold rounded-lg px-2 text-slate-600 border-slate-200", statusFilter === 'none' && "bg-slate-700 text-white")}
-            >
-              미실습 ({students.length - stats.participatingCount})
-            </Button>
+          {/* 학생 & 업체 검색창 */}
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="학생 성명, 번호, 실습처 검색..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 pr-8 h-9 text-xs sm:text-sm bg-slate-50 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:bg-white font-medium"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* 학생 & 업체 검색창 */}
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
-          <Input
-            placeholder="학생 성명, 번호, 실습처 검색..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-8 h-7 text-xs bg-slate-50 border-slate-200 rounded-lg focus-visible:bg-white"
-          />
+        {/* 하단: 상태 필터 칩 레일 (가로 스크롤 가능한 고시인성 칩 바) */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 custom-scrollbar scrollbar-hide pt-0.5">
+          <button
+            type="button"
+            onClick={() => setStatusFilter('all')}
+            className={cn(
+              "h-7 px-2.5 rounded-lg text-xs font-extrabold transition-all border shrink-0 flex items-center gap-1.5",
+              statusFilter === 'all'
+                ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
+                : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+            )}
+          >
+            <span>전체</span>
+            <span className={cn("text-[10.5px] px-1.5 py-0.2 rounded-full font-black", statusFilter === 'all' ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700")}>
+              {students.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter('ongoing')}
+            className={cn(
+              "h-7 px-2.5 rounded-lg text-xs font-extrabold transition-all border shrink-0 flex items-center gap-1.5",
+              statusFilter === 'ongoing'
+                ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
+                : "bg-emerald-50/70 text-emerald-800 border-emerald-200 hover:bg-emerald-100/70"
+            )}
+          >
+            <span>실습중</span>
+            <span className={cn("text-[10.5px] px-1.5 py-0.2 rounded-full font-black", statusFilter === 'ongoing' ? "bg-white/20 text-white" : "bg-emerald-200/80 text-emerald-900")}>
+              {stats.ongoingCount}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter('converted')}
+            className={cn(
+              "h-7 px-2.5 rounded-lg text-xs font-extrabold transition-all border shrink-0 flex items-center gap-1.5",
+              statusFilter === 'converted'
+                ? "bg-purple-600 text-white border-purple-600 shadow-2xs"
+                : "bg-purple-50/70 text-purple-800 border-purple-200 hover:bg-purple-100/70"
+            )}
+          >
+            <span>채용전환</span>
+            <span className={cn("text-[10.5px] px-1.5 py-0.2 rounded-full font-black", statusFilter === 'converted' ? "bg-white/20 text-white" : "bg-purple-200/80 text-purple-900")}>
+              {stats.convertedCount}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter('returned')}
+            className={cn(
+              "h-7 px-2.5 rounded-lg text-xs font-extrabold transition-all border shrink-0 flex items-center gap-1.5",
+              statusFilter === 'returned'
+                ? "bg-rose-600 text-white border-rose-600 shadow-2xs"
+                : "bg-rose-50/70 text-rose-800 border-rose-200 hover:bg-rose-100/70"
+            )}
+          >
+            <span>복교</span>
+            <span className={cn("text-[10.5px] px-1.5 py-0.2 rounded-full font-black", statusFilter === 'returned' ? "bg-white/20 text-white" : "bg-rose-200/80 text-rose-900")}>
+              {stats.returnedCount}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusFilter('none')}
+            className={cn(
+              "h-7 px-2.5 rounded-lg text-xs font-extrabold transition-all border shrink-0 flex items-center gap-1.5",
+              statusFilter === 'none'
+                ? "bg-slate-800 text-white border-slate-800 shadow-2xs"
+                : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200/80"
+            )}
+          >
+            <span>미실습</span>
+            <span className={cn("text-[10.5px] px-1.5 py-0.2 rounded-full font-black", statusFilter === 'none' ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700")}>
+              {students.length - stats.participatingCount}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -445,12 +499,12 @@ export function FieldTrainingClient({
               </span>
             </div>
 
-            {/* 메인 간트 테이블 표 (헤더 고정 + 바디 세로 스크롤) */}
-            <div className="flex-1 overflow-auto custom-scrollbar relative">
+            {/* ===== [DESKTOP / TABLET TIMELINE VIEW] (md 이상 화면에서 표시) ===== */}
+            <div className="hidden md:block flex-1 overflow-auto custom-scrollbar relative">
               <div className="w-full" style={{ minWidth: `${Math.max(900, 240 + timelineMonths.length * 105)}px` }}>
-                {/* 헤더 행: 학생 정보 컬럼 + 가변 월별 컬럼 */}
-                <div className="sticky top-0 z-20 bg-slate-100 border-b border-slate-200 flex text-xs font-extrabold text-slate-700 shadow-sm">
-                  <div className="w-[240px] shrink-0 p-2.5 pl-4 border-r border-slate-200 bg-slate-100 flex items-center">
+                {/* 헤더 행: 좌측 고정 학생 정보 컬럼 + 가변 월별 컬럼 */}
+                <div className="sticky top-0 z-30 bg-slate-100 border-b border-slate-200 flex text-xs font-extrabold text-slate-700 shadow-sm">
+                  <div className="w-[240px] shrink-0 p-2.5 pl-4 border-r border-slate-200 bg-slate-100 flex items-center sticky left-0 z-30 shadow-xs">
                     학생 기본 정보 (성명 / 학번)
                   </div>
                   <div className="flex-1 grid relative" style={{ gridTemplateColumns: `repeat(${timelineMonths.length}, minmax(0, 1fr))` }}>
@@ -487,8 +541,8 @@ export function FieldTrainingClient({
 
                       return (
                         <div key={s.id} className="flex hover:bg-slate-50/70 transition-colors group min-h-[52px]">
-                          {/* 좌측 학생 프로필 정보 영역 */}
-                          <div className="w-[240px] shrink-0 p-2.5 pl-4 border-r border-slate-200/80 flex items-center justify-between bg-white group-hover:bg-slate-50/70">
+                          {/* 좌측 학생 프로필 정보 영역 (가로 스크롤 시 좌측 Sticky 고정) */}
+                          <div className="w-[240px] shrink-0 p-2.5 pl-4 border-r border-slate-200/80 flex items-center justify-between bg-white group-hover:bg-slate-50/70 sticky left-0 z-20 shadow-xs">
                             <div className="flex items-center gap-2.5 min-w-0">
                               <div className="h-8 w-8 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 font-extrabold text-xs flex items-center justify-center shrink-0">
                                 {s.student_number ? `${s.student_number}번` : (sIdx + 1)}
@@ -520,16 +574,16 @@ export function FieldTrainingClient({
                             </Button>
                           </div>
 
-                          {/* 우측 월별 타임라인 그리드 영역 (실습 차수에 따라 높이 자동 가변 확장) */}
+                          {/* 우측 월별 타임라인 그리드 영역 */}
                           <div className="flex-1 relative bg-white group-hover:bg-slate-50/70 flex flex-col justify-center min-h-[52px]">
-                            {/* 가변 월별 배경 세로 격자선 (절대위치로 전체 높이 추종) */}
+                            {/* 가변 월별 배경 세로 격자선 */}
                             <div className="absolute inset-0 grid pointer-events-none z-0" style={{ gridTemplateColumns: `repeat(${timelineMonths.length}, minmax(0, 1fr))` }}>
                               {timelineMonths.map((m, idx) => (
                                 <div key={m.key} className={cn("h-full border-r border-slate-100", idx === timelineMonths.length - 1 && "border-r-0")} />
                               ))}
                             </div>
 
-                            {/* 오늘 날짜 세로 가이드라인 (몸통 영역) */}
+                            {/* 오늘 날짜 세로 가이드라인 */}
                             {todayPositionPercent > 0 && todayPositionPercent < 100 && (
                               <div 
                                 className="absolute top-0 bottom-0 z-10 w-[2px] bg-rose-400/80 pointer-events-none"
@@ -543,10 +597,8 @@ export function FieldTrainingClient({
                                 <span className="text-[11px] text-slate-300 italic font-medium">현장실습 미배정</span>
                               </div>
                             ) : (
-                              /* 다차수 실습 막대들 렌더링 (차수 개수만큼 세로로 자연스럽게 늘어남) */
                               <div className="relative z-10 p-1.5 flex flex-col justify-center gap-1.5 w-full min-h-[44px]">
                                 {records.map((r: any) => {
-                                  // 시작일과 종료일 기반 위치 계산
                                   let startPct = 0;
                                   let endPct = 100;
                                   let startDateFormatted = '';
@@ -558,7 +610,7 @@ export function FieldTrainingClient({
                                       startDateFormatted = format(sDate, 'MM.dd');
                                       if (isBefore(sDate, timelineStart)) startPct = 0;
                                       else if (isAfter(sDate, timelineEnd)) startPct = 100;
-                                      else startPct = (differenceInDays(sDate, timelineStart) / totalDays) * 100;
+                                      else startPct = Math.min(100, Math.max(0, (differenceInDays(sDate, timelineStart) / totalDays) * 100));
                                     }
                                   }
 
@@ -568,25 +620,11 @@ export function FieldTrainingClient({
                                       endDateFormatted = format(eDate, 'MM.dd');
                                       if (isBefore(eDate, timelineStart)) endPct = 0;
                                       else if (isAfter(eDate, timelineEnd)) endPct = 100;
-                                      else endPct = (differenceInDays(eDate, timelineStart) / totalDays) * 100;
+                                      else endPct = Math.min(100, Math.max(0, (differenceInDays(eDate, timelineStart) / totalDays) * 100));
                                     }
                                   }
 
-                                  const barWidthPct = Math.max(3, Math.min(100 - startPct, endPct - startPct));
-
-                                  // D-Day 및 상태 판별
-                                  let dDayText = '';
-                                  if (r.end_date) {
-                                    const eDate = parseISO(r.end_date);
-                                    if (isValid(eDate)) {
-                                      const daysLeft = differenceInDays(eDate, new Date());
-                                      if (daysLeft > 0) dDayText = `D-${daysLeft}일`;
-                                      else if (daysLeft === 0) dDayText = 'D-Day';
-                                      else dDayText = '만료';
-                                    }
-                                  }
-
-                                  // 상태에 따른 바 테마 스타일
+                                  const barWidthPct = Math.max(2, endPct - startPct);
                                   const isConverted = r.hiring_status === '채용전환';
                                   const isReturned = r.hiring_status === '복교';
 
@@ -597,69 +635,37 @@ export function FieldTrainingClient({
                                           <div
                                             onClick={() => handleOpenModal(s)}
                                             className={cn(
-                                              "h-7 rounded-lg px-2.5 text-white flex items-center justify-between text-xs font-bold shadow-sm transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer relative overflow-hidden group/bar",
-                                              isConverted && "bg-gradient-to-r from-purple-600 to-indigo-600 border border-purple-400",
-                                              isReturned && "bg-gradient-to-r from-amber-500 to-rose-500 border border-amber-400",
-                                              !isConverted && !isReturned && "bg-gradient-to-r from-emerald-500 to-teal-600 border border-emerald-400"
+                                              "h-7 rounded-lg shadow-sm border flex items-center px-2 cursor-pointer transition-all duration-200 hover:shadow-md relative overflow-hidden group/bar",
+                                              isConverted 
+                                                ? "bg-gradient-to-r from-purple-600 to-indigo-600 border-purple-400 text-white" 
+                                                : isReturned
+                                                ? "bg-gradient-to-r from-amber-500 to-rose-500 border-rose-400 text-white"
+                                                : "bg-gradient-to-r from-emerald-500 to-teal-600 border-emerald-400 text-white"
                                             )}
                                             style={{
-                                              marginLeft: `${Math.max(0, startPct)}%`,
-                                              width: `${barWidthPct}%`,
-                                              minWidth: '120px'
+                                              marginLeft: `${startPct}%`,
+                                              width: `${barWidthPct}%`
                                             }}
                                           >
-                                            {/* 왼쪽: 차수 & 실습처 명칭 */}
-                                            <div className="flex items-center gap-1.5 truncate pr-1">
-                                              <span className="bg-white/20 text-white font-extrabold text-[10px] px-1.5 py-0.2 rounded shrink-0">
-                                                {r.training_order}차
-                                              </span>
-                                              <span className="font-extrabold truncate text-[11px]">
-                                                {r.company || '업체미지정'}
-                                              </span>
-                                            </div>
-
-                                            {/* 오른쪽: 날짜, 지원금 뱃지 및 상태 정보 */}
-                                            <div className="flex items-center gap-1.5 shrink-0 text-[10px] font-medium">
-                                              {startDateFormatted && endDateFormatted && (
-                                                <span className="opacity-90 font-mono hidden lg:inline">
-                                                  {startDateFormatted}~{endDateFormatted}
+                                            <div className="flex items-center justify-between w-full min-w-0 gap-1 z-10 text-[11px] font-bold">
+                                              <div className="flex items-center gap-1 min-w-0">
+                                                <span className="bg-black/20 text-white text-[9.5px] px-1 py-0.2 rounded shrink-0 font-extrabold">
+                                                  {r.training_order}차
                                                 </span>
-                                              )}
-
-                                              {/* 지원금 뱃지 */}
-                                              <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  handleToggleStipend(r.id, r.stipend_status);
-                                                }}
-                                                className={cn(
-                                                  "px-1.5 py-0.2 rounded font-extrabold text-[9px] border transition-transform active:scale-95",
-                                                  r.stipend_status === 'O' 
-                                                    ? "bg-white text-emerald-700 border-emerald-200" 
-                                                    : "bg-black/20 text-white/80 border-white/30 hover:bg-black/40"
+                                                <span className="truncate">{r.company || '업체미입력'}</span>
+                                              </div>
+                                              <div className="flex items-center gap-1 shrink-0">
+                                                {r.stipend_status === 'O' && (
+                                                  <span className="bg-white/20 text-white text-[9px] px-1 rounded font-extrabold shrink-0">
+                                                    지원금O
+                                                  </span>
                                                 )}
-                                                title="클릭하여 지원금 신청 상태 변경"
-                                              >
-                                                지원금 {r.stipend_status === 'O' ? 'O' : 'X'}
-                                              </button>
-
-                                              {/* 채용전환 / 복교 / D-Day 뱃지 */}
-                                              {isConverted && (
-                                                <span className="bg-white text-purple-700 font-extrabold text-[9px] px-1.5 py-0.2 rounded shrink-0 flex items-center gap-0.5">
-                                                  🎉 채용전환
-                                                </span>
-                                              )}
-                                              {isReturned && (
-                                                <span className="bg-white text-rose-700 font-extrabold text-[9px] px-1.5 py-0.2 rounded shrink-0 flex items-center gap-0.5">
-                                                  ↩️ 복교
-                                                </span>
-                                              )}
-                                              {!isConverted && !isReturned && dDayText && (
-                                                <span className="bg-emerald-900/40 text-emerald-100 text-[9.5px] font-bold px-1.5 py-0.2 rounded shrink-0">
-                                                  {dDayText}
-                                                </span>
-                                              )}
+                                                {startDateFormatted && (
+                                                  <span className="text-[9.5px] opacity-90 hidden xl:inline-block font-mono">
+                                                    {startDateFormatted}~{endDateFormatted}
+                                                  </span>
+                                                )}
+                                              </div>
                                             </div>
                                           </div>
                                         </TooltipTrigger>
@@ -670,13 +676,9 @@ export function FieldTrainingClient({
                                               {r.hiring_status || '진행중'}
                                             </Badge>
                                           </div>
-                                          <p className="font-bold text-slate-100 flex items-center gap-1">
-                                            <Building2 className="h-3.5 w-3.5 text-blue-400" />
-                                            {r.company}
-                                          </p>
-                                          <p className="text-slate-300 font-mono text-[11px] flex items-center gap-1">
-                                            <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                                            실습 기간: {r.start_date || '미정'} ~ {r.end_date || '미정'}
+                                          <p className="font-bold text-slate-200">🏢 업체명: {r.company || '미입력'}</p>
+                                          <p className="text-slate-300 font-mono text-[11px]">
+                                            📅 실습기간: {r.start_date || '미정'} ~ {r.end_date || '미정'}
                                           </p>
                                           <div className="flex items-center justify-between text-[11px] pt-1">
                                             <span>지원금 신청 여부: <strong className={r.stipend_status === 'O' ? "text-emerald-400 font-bold" : "text-slate-400"}>{r.stipend_status === 'O' ? '신청완료 (O)' : '미신청 (X)'}</strong></span>
@@ -703,100 +705,281 @@ export function FieldTrainingClient({
                 </div>
               </div>
             </div>
+
+            {/* ===== [MOBILE TIMELINE VIEW] (md 미만 모바일 전용: 가로 스크롤 0% 스마트폰 최적화) ===== */}
+            <div className="block md:hidden flex-1 overflow-y-auto custom-scrollbar relative bg-slate-50/50">
+              {/* 모바일 고정 월 헤더 트랙 */}
+              <div className="sticky top-0 z-30 bg-slate-100 border-b border-slate-200 flex text-[10px] font-extrabold text-slate-700 shadow-xs">
+                <div className="w-20 shrink-0 p-2 pl-2.5 bg-slate-100 border-r border-slate-200 flex items-center">
+                  학생
+                </div>
+                <div className="flex-1 grid relative" style={{ gridTemplateColumns: `repeat(${timelineMonths.length}, minmax(0, 1fr))` }}>
+                  {timelineMonths.map((m, idx) => (
+                    <div key={m.key} className={cn("py-2 text-center border-r border-slate-200/70 bg-slate-100/90 text-[9px] font-bold text-slate-800", idx === timelineMonths.length - 1 && "border-r-0")}>
+                      {m.month}월
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 모바일 학생별 타임라인 행 리스트 */}
+              <div className="divide-y divide-slate-100 bg-white">
+                {filteredStudents.length === 0 ? (
+                  <div className="p-10 text-center text-slate-400 italic text-xs font-medium">
+                    조회 조건과 일치하는 실습 학생이 없습니다.
+                  </div>
+                ) : (
+                  filteredStudents.map((s, sIdx) => {
+                    const records = [...(s.training_records || [])].sort((a, b) => a.training_order - b.training_order);
+                    const hasRecords = records.length > 0;
+
+                    return (
+                      <div key={s.id} onClick={() => handleOpenModal(s)} className="flex items-stretch hover:bg-slate-50 transition-colors cursor-pointer min-h-[48px]">
+                        {/* 학생 성명 & 번호 컬럼 */}
+                        <div className="w-20 shrink-0 p-1.5 pl-2.5 flex flex-col justify-center border-r border-slate-200/80 bg-white">
+                          <span className="font-extrabold text-slate-900 text-xs truncate">{s.student_name}</span>
+                          <span className="text-[9.5px] text-slate-400 font-mono truncate">{s.student_number ? `${s.student_number}번` : (sIdx + 1)}</span>
+                        </div>
+
+                        {/* 100% 폭 화면 슬림 타임라인 바 */}
+                        <div className="flex-1 relative bg-white flex flex-col justify-center p-1">
+                          {/* 월 분할 배경 트랙 */}
+                          <div className="absolute inset-0 grid pointer-events-none z-0" style={{ gridTemplateColumns: `repeat(${timelineMonths.length}, minmax(0, 1fr))` }}>
+                            {timelineMonths.map((m, idx) => (
+                              <div key={m.key} className={cn("h-full border-r border-slate-100", idx === timelineMonths.length - 1 && "border-r-0")} />
+                            ))}
+                          </div>
+
+                          {!hasRecords ? (
+                            <span className="text-[9.5px] text-slate-300 italic text-center relative z-10">미배정</span>
+                          ) : (
+                            <div className="relative z-10 flex flex-col gap-1 w-full">
+                              {records.map((r: any) => {
+                                let startPct = 0;
+                                let endPct = 100;
+                                let startDateFormatted = '';
+                                let endDateFormatted = '';
+
+                                if (r.start_date) {
+                                  const sDate = parseISO(r.start_date);
+                                  if (isValid(sDate)) {
+                                    startDateFormatted = format(sDate, 'MM.dd');
+                                    if (isBefore(sDate, timelineStart)) startPct = 0;
+                                    else if (isAfter(sDate, timelineEnd)) startPct = 100;
+                                    else startPct = Math.min(100, Math.max(0, (differenceInDays(sDate, timelineStart) / totalDays) * 100));
+                                  }
+                                }
+
+                                if (r.end_date) {
+                                  const eDate = parseISO(r.end_date);
+                                  if (isValid(eDate)) {
+                                    endDateFormatted = format(eDate, 'MM.dd');
+                                    if (isBefore(eDate, timelineStart)) endPct = 0;
+                                    else if (isAfter(eDate, timelineEnd)) endPct = 100;
+                                    else endPct = Math.min(100, Math.max(0, (differenceInDays(eDate, timelineStart) / totalDays) * 100));
+                                  }
+                                }
+
+                                const barWidthPct = Math.max(6, endPct - startPct);
+                                const isConverted = r.hiring_status === '채용전환';
+                                const isReturned = r.hiring_status === '복교';
+
+                                return (
+                                  <div
+                                    key={r.id || r.training_order}
+                                    className={cn(
+                                      "h-6 rounded-md shadow-2xs border flex items-center px-1 text-[8.5px] font-extrabold text-white truncate transition-all",
+                                      isConverted 
+                                        ? "bg-gradient-to-r from-purple-600 to-indigo-600 border-purple-400" 
+                                        : isReturned
+                                        ? "bg-gradient-to-r from-rose-500 to-amber-500 border-rose-400"
+                                        : "bg-gradient-to-r from-emerald-500 to-teal-600 border-emerald-400"
+                                    )}
+                                    style={{
+                                      marginLeft: `${startPct}%`,
+                                      width: `${barWidthPct}%`
+                                    }}
+                                  >
+                                    <span className="truncate drop-shadow-xs">{r.company || `${r.training_order}차`}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           </div>
         ) : (
-          /* ===== [VIEW 2] 학생별 명부/카드 상세 뷰 ===== */
-          <div className="flex-1 overflow-auto p-4 custom-scrollbar bg-slate-50/50">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          /* ===== [VIEW 2] 모바일 최적화 미니 스트립 막대(Concept 1) 카드 뷰 ===== */
+          <div className="flex-1 overflow-auto p-3 sm:p-4 custom-scrollbar bg-slate-50/50">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {filteredStudents.length === 0 ? (
                 <div className="col-span-full py-16 text-center text-slate-400 italic font-medium">
                   조회 조건과 일치하는 실습 학생 데이터가 없습니다.
                 </div>
               ) : (
                 filteredStudents.map((s, idx) => {
-                  const records = s.training_records || [];
-                  const latest = records[0];
+                  const records = [...(s.training_records || [])].sort((a, b) => a.training_order - b.training_order);
+                  const hasRecords = records.length > 0;
 
                   return (
-                    <Card key={s.id} className="bg-white border-slate-200/80 shadow-sm rounded-xl p-4 flex flex-col justify-between hover:border-blue-300 transition-all">
+                    <Card key={s.id} className="bg-white border-slate-200/80 shadow-sm rounded-2xl p-3.5 space-y-3 hover:border-blue-300 transition-all flex flex-col justify-between">
                       <div className="space-y-3">
-                        {/* 상단 프로필 */}
+                        {/* 상단 프로필 헤더 */}
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <div className="h-10 w-10 rounded-full bg-blue-50 text-blue-700 font-extrabold text-sm flex items-center justify-center shrink-0 border border-blue-100">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="h-9 w-9 rounded-full bg-blue-50 text-blue-700 font-extrabold text-xs flex items-center justify-center shrink-0 border border-blue-100">
                               {s.student_number ? `${s.student_number}번` : (idx + 1)}
                             </div>
-                            <div>
+                            <div className="min-w-0">
                               <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
                                 {s.student_name}
-                                <span className="text-xs text-slate-500 font-normal">({s.major} {s.class_info}반)</span>
+                                <span className="text-xs text-slate-500 font-normal truncate">({s.major} {s.class_info}반)</span>
                               </h3>
-                              <p className="text-[11px] text-slate-500 font-mono mt-0.5">{s.phone_number || '전화번호 미입력'}</p>
+                              <p className="text-[11px] text-slate-400 font-mono">{s.phone_number || '전화번호 미입력'}</p>
                             </div>
                           </div>
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleOpenModal(s)}
-                            className="h-7 text-xs font-bold text-blue-700 border-blue-200 hover:bg-blue-50 rounded-lg gap-1"
+                            className="h-7 px-2 text-[11px] font-bold text-blue-700 border-blue-200 hover:bg-blue-50 rounded-lg gap-1 shrink-0"
                           >
                             <Edit3 className="h-3 w-3" />
-                            실습관리
+                            {isAdmin ? '실습 관리' : '실습 조회'}
                           </Button>
                         </div>
 
-                        {/* 실습 이력 리스트 */}
-                        <div className="space-y-2 pt-2 border-t border-slate-100">
-                          {records.length === 0 ? (
+                        {/* 100% 폭 모바일 미니 스트립 막대 (Concept 1) */}
+                        <div className="space-y-2.5 pt-2 border-t border-slate-100">
+                          {!hasRecords ? (
                             <div className="p-3 bg-slate-50 rounded-xl text-center text-xs text-slate-400 italic">
                               등록된 현장실습 이력이 없습니다.
                             </div>
                           ) : (
-                            records.map((r: any) => (
-                              <div key={r.id || r.training_order} className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-200/60 space-y-1.5 text-xs">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-1.5 min-w-0">
-                                    <span className="bg-slate-900 text-white font-extrabold text-[10px] px-1.5 py-0.2 rounded">
-                                      {r.training_order}차
-                                    </span>
-                                    <span className="font-bold text-slate-900 truncate">{r.company || '업체미지정'}</span>
+                            records.map((r: any) => {
+                              let startPct = 0;
+                              let endPct = 100;
+                              let startDateFormatted = r.start_date || '미정';
+                              let endDateFormatted = r.end_date || '미정';
+
+                              if (r.start_date) {
+                                const sDate = parseISO(r.start_date);
+                                if (isValid(sDate)) {
+                                  startDateFormatted = format(sDate, 'MM.dd');
+                                  if (isBefore(sDate, timelineStart)) startPct = 0;
+                                  else if (isAfter(sDate, timelineEnd)) startPct = 100;
+                                  else startPct = Math.min(100, Math.max(0, (differenceInDays(sDate, timelineStart) / totalDays) * 100));
+                                }
+                              }
+
+                              if (r.end_date) {
+                                const eDate = parseISO(r.end_date);
+                                if (isValid(eDate)) {
+                                  endDateFormatted = format(eDate, 'MM.dd');
+                                  if (isBefore(eDate, timelineStart)) endPct = 0;
+                                  else if (isAfter(eDate, timelineEnd)) endPct = 100;
+                                  else endPct = Math.min(100, Math.max(0, (differenceInDays(eDate, timelineStart) / totalDays) * 100));
+                                }
+                              }
+
+                              const barWidthPct = Math.max(8, endPct - startPct);
+                              const isConverted = r.hiring_status === '채용전환';
+                              const isReturned = r.hiring_status === '복교';
+
+                              return (
+                                <div key={r.id || r.training_order} className="bg-slate-50/90 border border-slate-200/80 rounded-xl p-2.5 space-y-2">
+                                  {/* 헤더: 차수, 업체명, 상태 뱃지, 지원금 버튼 */}
+                                  <div className="flex items-center justify-between text-xs gap-1">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <Badge variant="outline" className="bg-white font-extrabold text-slate-800 text-[10px] px-1.5 h-4 border-slate-300 shrink-0">
+                                        {r.training_order}차
+                                      </Badge>
+                                      <span className="font-extrabold text-slate-900 truncate text-xs">{r.company || '업체 미지정'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <Badge className={cn("text-[10px] font-extrabold px-1.5 py-0.2 rounded-full", isConverted ? "bg-purple-600 text-white" : isReturned ? "bg-rose-500 text-white" : "bg-emerald-600 text-white")}>
+                                        {r.hiring_status || '진행중'}
+                                      </Badge>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleStipend(r.id, r.stipend_status)}
+                                        className={cn(
+                                          "px-1.5 py-0.5 rounded font-extrabold text-[10px] border transition-transform active:scale-95",
+                                          r.stipend_status === 'O' ? "bg-emerald-50 text-emerald-700 border-emerald-300" : "bg-slate-100 text-slate-400 border-slate-200"
+                                        )}
+                                      >
+                                        지원금 {r.stipend_status === 'O' ? 'O' : 'X'}
+                                      </button>
+                                    </div>
                                   </div>
-                                  <Badge className={cn(
-                                    "text-[10px] font-bold px-1.5 py-0.2",
-                                    r.hiring_status === '채용전환' && "bg-purple-100 text-purple-800 border-purple-200",
-                                    r.hiring_status === '복교' && "bg-rose-100 text-rose-800 border-rose-200",
-                                    (!r.hiring_status || r.hiring_status === '진행중') && "bg-emerald-100 text-emerald-800 border-emerald-200"
-                                  )}>
-                                    {r.hiring_status || '진행중'}
-                                  </Badge>
-                                </div>
 
-                                <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono">
-                                  <span>📅 {r.start_date || '미정'} ~ {r.end_date || '미정'}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleToggleStipend(r.id, r.stipend_status)}
-                                    className={cn(
-                                      "px-1.5 py-0.5 rounded font-bold text-[10px] border transition-transform active:scale-95",
-                                      r.stipend_status === 'O' ? "bg-sky-100 text-sky-800 border-sky-300" : "bg-slate-200 text-slate-600 border-slate-300"
+                                  {/* 100% 폭 모바일 월 트랙 (7월 · 8월 · 9월 · 10월 · 11월 · 12월 · 1월 · 2월) */}
+                                  <div className="relative h-7 bg-slate-200/70 rounded-lg overflow-visible border border-slate-200 shadow-inner">
+                                    {/* 월별 배경 세로 트랙 격자선 및 라벨 */}
+                                    <div className="absolute inset-0 grid pointer-events-none overflow-hidden rounded-lg" style={{ gridTemplateColumns: `repeat(${timelineMonths.length}, minmax(0, 1fr))` }}>
+                                      {timelineMonths.map((m, mIdx) => (
+                                        <div key={m.key} className={cn("h-full border-r border-slate-300/40 flex items-end justify-center pb-0.5", mIdx === timelineMonths.length - 1 && "border-r-0")}>
+                                          <span className="text-[8px] font-bold text-slate-400 leading-none">{m.month}월</span>
+                                        </div>
+                                      ))}
+                                    </div>
+
+                                    {/* 100% 폭 트랙 위에 얹어지는 그라데이션 실습 기간 가로바 */}
+                                    <div 
+                                      className={cn(
+                                        "absolute top-0.5 bottom-0.5 rounded-md shadow-md flex items-center px-1.5 transition-all z-10",
+                                        isConverted 
+                                          ? "bg-gradient-to-r from-purple-600 to-indigo-600 border border-purple-400 text-white"
+                                          : isReturned
+                                          ? "bg-gradient-to-r from-amber-500 to-rose-500 border-rose-400 text-white"
+                                          : "bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 border border-emerald-300 text-white"
+                                      )}
+                                      style={{
+                                        left: `${startPct}%`,
+                                        width: `${barWidthPct}%`
+                                      }}
+                                    >
+                                      <span className="text-[9px] font-black tracking-tighter truncate drop-shadow-xs">
+                                        {startDateFormatted} ~ {endDateFormatted}
+                                      </span>
+                                    </div>
+
+                                    {/* 오늘 날짜 위치 마커 */}
+                                    {todayPositionPercent > 0 && todayPositionPercent < 100 && (
+                                      <div
+                                        className="absolute top-0 bottom-0 z-20 pointer-events-none"
+                                        style={{ left: `${todayPositionPercent}%` }}
+                                      >
+                                        {/* 세로 점선 */}
+                                        <div className="absolute top-0 bottom-0 w-[1.5px] bg-red-500/80 border-l border-dashed border-red-400" />
+                                        {/* 오늘 라벨 — 막대 위에 살짝 튀어나옴 */}
+                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-red-500 text-white text-[8px] font-black px-1 py-0.5 rounded whitespace-nowrap leading-none shadow">
+                                          오늘
+                                        </div>
+                                      </div>
                                     )}
-                                  >
-                                    지원금: {r.stipend_status === 'O' ? '신청 (O)' : '미신청 (X)'}
-                                  </button>
-                                </div>
+                                  </div>
 
-                                {r.hiring_status === '채용전환' && r.conversion_date && (
-                                  <p className="text-[11px] font-bold text-purple-700 bg-purple-50 p-1 px-2 rounded border border-purple-100">
-                                    🎉 채용 전환일: {r.conversion_date}
-                                  </p>
-                                )}
-                                {r.hiring_status === '복교' && r.return_reason && (
-                                  <p className="text-[11px] font-bold text-rose-700 bg-rose-50 p-1 px-2 rounded border border-rose-100">
-                                    ⚠️ 복교 사유: {r.return_reason}
-                                  </p>
-                                )}
-                              </div>
-                            ))
+                                  {/* 추가 상세 정보 */}
+                                  {isConverted && r.conversion_date && (
+                                    <p className="text-[10.5px] font-bold text-purple-700 bg-purple-50 p-1 px-2 rounded-lg border border-purple-100">
+                                      🎉 채용 전환일: {r.conversion_date}
+                                    </p>
+                                  )}
+                                  {isReturned && r.return_reason && (
+                                    <p className="text-[10.5px] font-bold text-rose-700 bg-rose-50 p-1 px-2 rounded-lg border border-rose-100">
+                                      ⚠️ 복교 사유: {r.return_reason}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })
                           )}
                         </div>
                       </div>
