@@ -104,7 +104,7 @@ export default async function DashboardPage({
   const employmentRate = analysisTargetCount > 0 ? (employedStudents / analysisTargetCount) * 100 : 0;
 
   return (
-    <div className="flex flex-col h-full gap-4 lg:gap-6">
+    <div className="flex flex-col gap-4 lg:gap-6">
       <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between shrink-0 gap-4 px-1">
         <div className="flex flex-col gap-1 min-w-0 items-start">
           <h2 className="text-2xl lg:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2 whitespace-nowrap">
