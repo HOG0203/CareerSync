@@ -130,7 +130,7 @@ async function FieldTrainingPageContent({
   }
 
   return (
-    <div className="flex flex-col h-full gap-3 sm:gap-4 overflow-hidden">
+    <div className="flex flex-col gap-3 sm:gap-4">
       {/* 타이틀 헤더 */}
       <div className="flex items-center justify-between shrink-0 px-1">
         <div className="flex flex-col gap-1 min-w-0">
@@ -138,7 +138,7 @@ async function FieldTrainingPageContent({
             <CalendarCheck className="h-7 w-7 sm:h-8 sm:w-8 text-emerald-600 shrink-0" />
             현장실습현황
           </h2>
-          <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed whitespace-nowrap overflow-hidden text-ellipsis">
+          <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed break-keep">
             {isAdmin ? '관리자 권한으로 전교생 학반의 현장실습 일정을 시각적으로 점검합니다.' : '담당 학반 학생들의 현장실습 일정, 지원금 신청 및 채용전환/복교 상태를 그래픽 타임라인으로 관리합니다.'}
           </p>
         </div>
@@ -159,7 +159,7 @@ async function FieldTrainingPageContent({
 
       {/* 메인 실습 뷰 */}
       {isViewable ? (
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div className="flex flex-col">
           <FieldTrainingClient 
             initialStudents={studentData}
             baseYear={settings.baseYear}

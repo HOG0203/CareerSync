@@ -13,7 +13,7 @@ import {
   DialogDescription, 
   DialogFooter 
 } from '@/components/ui/dialog';
-import { Search, Filter, History, Eye, Info, Clock, User, ShieldCheck } from 'lucide-react';
+import { Search, Filter, History, Eye, Info, Clock, User, ShieldCheck, ChevronRight } from 'lucide-react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
@@ -107,16 +107,29 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
     }
   };
 
+  const formatDateShort = (isoString: string) => {
+    try {
+      const d = new Date(isoString);
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const h = String(d.getHours()).padStart(2, '0');
+      const min = String(d.getMinutes()).padStart(2, '0');
+      return `${m}-${day} ${h}:${min}`;
+    } catch (e) {
+      return isoString;
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4">
       {/* 필터 및 검색 바 */}
       <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
           <Button
             size="sm"
             variant={activeType === 'all' ? 'default' : 'outline'}
             onClick={() => handleTypeChange('all')}
-            className={cn("text-xs font-bold rounded-xl", activeType === 'all' && "bg-indigo-600 hover:bg-indigo-700")}
+            className={cn("text-xs font-bold rounded-xl shrink-0 h-8", activeType === 'all' && "bg-indigo-600 hover:bg-indigo-700")}
           >
             전체 ({typeCounts['all'] || 0})
           </Button>
@@ -128,7 +141,7 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
                 size="sm"
                 variant={activeType === key ? 'default' : 'outline'}
                 onClick={() => handleTypeChange(key)}
-                className={cn("text-xs font-medium rounded-xl whitespace-nowrap gap-1", activeType === key && "bg-indigo-600 hover:bg-indigo-700")}
+                className={cn("text-xs font-medium rounded-xl whitespace-nowrap gap-1 shrink-0 h-8", activeType === key && "bg-indigo-600 hover:bg-indigo-700")}
               >
                 <span>{cfg.label}</span>
                 <span className={cn("text-[10px] px-1.5 py-0.2 rounded-full font-bold", activeType === key ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500")}>
@@ -150,16 +163,16 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
         </div>
       </div>
 
-      {/* 작업 이력 테이블 */}
+      {/* 작업 이력 목록 (데스크톱: 테이블, 모바일: 슬림 스마트 카드) */}
       <Card className="shadow-sm border-none bg-white rounded-2xl overflow-hidden">
-        <CardHeader className="pb-3 border-b py-4 px-4 sm:px-6 flex flex-row items-center justify-between">
+        <CardHeader className="pb-3 border-b py-3.5 px-4 sm:px-6 flex flex-row items-center justify-between">
           <div>
             <CardTitle className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-indigo-600" />
               작업 기록 목록
             </CardTitle>
-            <CardDescription className="text-xs text-slate-500">
-              최근 발생한 시스템 작업 이력이 시각적으로 기록됩니다. (필터링: {filteredLogs.length}건 / 전체 {logs.length}건)
+            <CardDescription className="text-xs text-slate-500 mt-0.5">
+              시스템 주요 작업 이력입니다. (필터링: {filteredLogs.length}건 / 전체 {logs.length}건)
             </CardDescription>
           </div>
         </CardHeader>
@@ -170,67 +183,131 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
               <p className="text-xs font-medium">기록된 작업 이력이 없습니다.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-slate-50 font-bold text-slate-700 border-b border-slate-200">
-                  <tr>
-                    <th className="p-3 pl-4 sm:pl-6 w-[170px]">일시</th>
-                    <th className="p-3 w-[120px]">작업자</th>
-                    <th className="p-3 w-[130px]">작업 유형</th>
-                    <th className="p-3 min-w-[150px]">작업 대상</th>
-                    <th className="p-3 pr-4 sm:pr-6 w-[90px] text-center">상세 보기</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
-                  {filteredLogs.map((log) => {
-                    const typeCfg = ACTION_TYPE_CONFIG[log.action_type] || { label: log.action_type, color: 'bg-slate-100 text-slate-700 border-slate-200' };
-                    return (
-                      <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="p-3 pl-4 sm:pl-6 font-mono text-[11px] text-slate-500 flex items-center gap-1.5">
-                          <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                          {formatDate(log.created_at)}
-                        </td>
-                        <td className="p-3 font-semibold text-slate-900">
-                          <div className="flex items-center gap-1.5">
+            <>
+              {/* 데스크톱 테이블 뷰 (md 이상) */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-slate-50 font-bold text-slate-700 border-b border-slate-200">
+                    <tr>
+                      <th className="p-3 pl-4 sm:pl-6 w-[170px]">일시</th>
+                      <th className="p-3 w-[120px]">작업자</th>
+                      <th className="p-3 w-[130px]">작업 유형</th>
+                      <th className="p-3 min-w-[150px]">작업 대상</th>
+                      <th className="p-3 pr-4 sm:pr-6 w-[90px] text-center">상세 보기</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {filteredLogs.map((log) => {
+                      const typeCfg = ACTION_TYPE_CONFIG[log.action_type] || { label: log.action_type, color: 'bg-slate-100 text-slate-700 border-slate-200' };
+                      return (
+                        <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="p-3 pl-4 sm:pl-6 font-mono text-[11px] text-slate-500 flex items-center gap-1.5">
+                            <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                            {formatDate(log.created_at)}
+                          </td>
+                          <td className="p-3 font-semibold text-slate-900">
+                            <div className="flex items-center gap-1.5">
+                              <User className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+                              {log.actor_name}
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-bold border", typeCfg.color)}>
+                              {typeCfg.label}
+                            </span>
+                          </td>
+                          <td className="p-3 font-bold text-slate-800">
+                            <div>{log.target_name}</div>
+                            {log.details && typeof log.details === 'object' && (log.details.old_value !== undefined || log.details.new_value !== undefined) && (
+                              <div className="flex items-center gap-1 mt-1 text-[10.5px]">
+                                <span className="bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded font-mono border border-rose-200 max-w-[130px] truncate">
+                                  {String(log.details.old_value ?? '(빈값)')}
+                                </span>
+                                <span className="text-slate-400 font-black shrink-0">➔</span>
+                                <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-mono border border-emerald-200 max-w-[130px] truncate">
+                                  {String(log.details.new_value ?? '(빈값)')}
+                                </span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-3 pr-4 sm:pr-6 text-center">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setSelectedLog(log)}
+                              className="h-7 px-2 text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg"
+                            >
+                              <Eye className="h-3.5 w-3.5 mr-1" /> 상세
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 모바일 슬림 스마트 카드 뷰 (md 미만) */}
+              <div className="md:hidden flex flex-col gap-2 p-2 bg-slate-50/50">
+                {filteredLogs.map((log) => {
+                  const typeCfg = ACTION_TYPE_CONFIG[log.action_type] || { label: log.action_type, color: 'bg-slate-100 text-slate-700 border-slate-200' };
+                  const shortDate = formatDateShort(log.created_at);
+                  const detailsObj = (log.details && typeof log.details === 'object' && !Array.isArray(log.details)) ? log.details as Record<string, any> : null;
+                  const hasValues = detailsObj && (detailsObj.old_value !== undefined || detailsObj.new_value !== undefined);
+
+                  return (
+                    <div
+                      key={log.id}
+                      onClick={() => setSelectedLog(log)}
+                      className="bg-white rounded-xl border border-slate-200/90 p-2.5 shadow-xs active:scale-[0.99] transition-all cursor-pointer hover:border-indigo-200 flex flex-col gap-1.5"
+                    >
+                      {/* 1행: 작업자 & 작업유형 배지 (좌) | 시각 (우) */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <div className="flex items-center gap-1 text-slate-900 font-bold text-xs shrink-0">
                             <User className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
-                            {log.actor_name}
+                            <span className="truncate max-w-[90px] sm:max-w-[120px]">{log.actor_name}</span>
                           </div>
-                        </td>
-                        <td className="p-3">
-                          <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-bold border", typeCfg.color)}>
+                          <span className={cn("inline-flex items-center px-1.5 py-0.2 rounded-md text-[10px] font-extrabold border shrink-0", typeCfg.color)}>
                             {typeCfg.label}
                           </span>
-                        </td>
-                        <td className="p-3 font-bold text-slate-800">
-                          <div>{log.target_name}</div>
-                          {log.details && typeof log.details === 'object' && (log.details.old_value !== undefined || log.details.new_value !== undefined) && (
-                            <div className="flex items-center gap-1 mt-1 text-[10.5px]">
-                              <span className="bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded font-mono border border-rose-200 max-w-[130px] truncate">
-                                {String(log.details.old_value ?? '(빈값)')}
-                              </span>
-                              <span className="text-slate-400 font-black shrink-0">➔</span>
-                              <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-mono border border-emerald-200 max-w-[130px] truncate">
-                                {String(log.details.new_value ?? '(빈값)')}
-                              </span>
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-3 pr-4 sm:pr-6 text-center">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setSelectedLog(log)}
-                            className="h-7 px-2 text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg"
-                          >
-                            <Eye className="h-3.5 w-3.5 mr-1" /> 상세
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        </div>
+
+                        <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono shrink-0">
+                          <Clock className="h-3 w-3 text-slate-400 shrink-0" />
+                          <span>{shortDate}</span>
+                        </div>
+                      </div>
+
+                      {/* 2행: 대상 명칭 & 변경 사항 요약 (Before ➔ After) */}
+                      <div className="flex items-center justify-between gap-2 text-xs border-t border-slate-100/80 pt-1.5">
+                        <div className="font-semibold text-slate-800 min-w-0 truncate">
+                          <span className="text-[10px] text-slate-400 font-bold mr-1">대상:</span>
+                          <span className="text-slate-900 font-bold text-[11px]">{log.target_name}</span>
+                        </div>
+
+                        {hasValues && detailsObj ? (
+                          <div className="flex items-center gap-1 text-[10px] shrink-0">
+                            <span className="bg-rose-50 text-rose-700 px-1.5 py-0.2 rounded font-mono border border-rose-200 max-w-[65px] truncate text-[9.5px]">
+                              {String(detailsObj.old_value ?? '(빈값)')}
+                            </span>
+                            <span className="text-slate-400 font-black text-[9px]">➔</span>
+                            <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded font-mono border border-emerald-200 max-w-[65px] truncate text-[9.5px]">
+                              {String(detailsObj.new_value ?? '(빈값)')}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-0.5 text-[10px] text-indigo-600 font-bold shrink-0">
+                            <span>상세보기</span>
+                            <ChevronRight className="h-3 w-3 text-indigo-400" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

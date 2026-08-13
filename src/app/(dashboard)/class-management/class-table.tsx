@@ -297,6 +297,7 @@ export function ClassTable({
         isRankingsLoading={isRankingsLoading}
         userProfile={userProfile}
         baseYear={baseYear}
+        pageType="class-management"
       />
 
       <CounselingModal 

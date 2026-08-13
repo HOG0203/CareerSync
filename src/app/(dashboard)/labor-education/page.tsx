@@ -153,7 +153,7 @@ async function LaborEducationPageContent({
   });
 
   return (
-    <div className="flex flex-col h-full gap-4 sm:gap-6">
+    <div className="flex flex-col gap-4 sm:gap-6">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between shrink-0 gap-4 px-1">
         <div className="flex flex-col gap-1">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
@@ -181,7 +181,7 @@ async function LaborEducationPageContent({
         </div>
       </div>
 
-      <div className="flex-1 overflow-x-auto overflow-y-auto bg-gray-50/50 rounded-xl border border-slate-200 shadow-sm p-2 sm:p-4">
+      <div className="w-full overflow-x-auto bg-gray-50/50 rounded-xl border border-slate-200 shadow-sm p-2 sm:p-4">
         <div className="flex gap-px bg-gray-300 border border-gray-300 min-w-max mx-auto shadow-sm">
           {classNames.map((className) => {
             const students = [...groupedData[className]].sort((a, b) => 

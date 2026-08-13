@@ -27,9 +27,10 @@ interface DashboardFiltersProps {
   defaultYear: string;
   baseUrl?: string; 
   hideYear?: boolean;
-  hideGrade?: boolean; // 추가
+  hideGrade?: boolean;
+  hideStatus?: boolean;
   baseYear: number;
-  defaultGrade?: number; // 담임교사 배정 학년 기본값
+  defaultGrade?: number;
 }
 
 export default function DashboardFilters({ 
@@ -40,7 +41,8 @@ export default function DashboardFilters({
   defaultYear,
   baseUrl = '/dashboard', 
   hideYear = false,
-  hideGrade = false, // 기본값
+  hideGrade = false,
+  hideStatus = false,
   baseYear,
   defaultGrade = 3,
 }: DashboardFiltersProps) {
@@ -64,7 +66,6 @@ export default function DashboardFilters({
   const [selectedClass, setSelectedClass] = React.useState(currentClass);
   const [selectedStatus, setSelectedStatus] = React.useState(currentStatus);
 
-  // URL 변경 시 로컬 상태 동기화
   React.useEffect(() => {
     setSelectedAY(currentAY);
     setSelectedGrade(currentGrade);
@@ -116,7 +117,6 @@ export default function DashboardFilters({
     });
   };
 
-
   const academicYears = React.useMemo(() => {
     const years = new Set<number>();
     graduationYears.forEach(gy => years.add(gy - 1));
@@ -127,7 +127,7 @@ export default function DashboardFilters({
   if (!mounted) {
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-200 h-10 w-[450px] animate-pulse" />
+        <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-200 h-10 w-[350px] animate-pulse" />
       </div>
     );
   }
@@ -136,7 +136,7 @@ export default function DashboardFilters({
   const hasActiveFilters = searchParams.get('ay') || searchParams.get('grade') || searchParams.get('major') || searchParams.get('class') || searchParams.get('status');
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-1.5">
       <div className="flex items-center flex-wrap gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-200">
         {/* 학사학년도 및 학년 */}
         {!hideYear && (
@@ -220,43 +220,46 @@ export default function DashboardFilters({
           </Select>
         </div>
 
-        <div className="w-[1px] h-4 bg-slate-200" />
-
-        {/* 취업여부 필터 */}
-        <div className="flex items-center gap-1 px-1">
-          <ListFilter className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-          <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-            <SelectTrigger className="w-[115px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 overflow-hidden">
-              <SelectValue placeholder="취업여부" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" className="text-xs">전체 여부</SelectItem>
-              {statuses.map((s) => (
-                <SelectItem key={s.value} value={s.value} className="text-xs">
-                  <div className="flex justify-between w-full items-center gap-2">
-                    <span>{s.label}</span>
-                    <span className="text-[10px] text-muted-foreground opacity-70">({s.count})</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {!hideStatus && (
+          <>
+            <div className="w-[1px] h-4 bg-slate-200" />
+            {/* 취업여부 필터 */}
+            <div className="flex items-center gap-1 px-1">
+              <ListFilter className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger className="w-[115px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 overflow-hidden">
+                  <SelectValue placeholder="취업여부" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-xs">전체 여부</SelectItem>
+                  {statuses.map((s) => (
+                    <SelectItem key={s.value} value={s.value} className="text-xs">
+                      <div className="flex justify-between w-full items-center gap-2">
+                        <span>{s.label}</span>
+                        <span className="text-[10px] text-muted-foreground opacity-70">({s.count})</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
       </div>
-      
+
+      {/* 조회 및 초기화 버튼 */}
       <Button 
         onClick={handleSearch}
         disabled={isPending}
-        className="h-9 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-sm transition-all active:scale-95 shrink-0"
+        className="h-8.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-2xs transition-all active:scale-95 shrink-0"
       >
         {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
         조회
       </Button>
 
-      
       {hasActiveFilters && (
-        <Button variant="ghost" size="sm" onClick={resetFilters} className="h-9 px-2 text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50">
-          <X className="mr-1 h-3.5 w-3.5" /> 초기화
+        <Button variant="ghost" size="sm" onClick={resetFilters} className="h-8.5 px-2 text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg shrink-0">
+          <X className="mr-0.5 h-3.5 w-3.5" /> 초기화
         </Button>
       )}
     </div>

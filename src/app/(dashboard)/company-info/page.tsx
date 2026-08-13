@@ -209,12 +209,12 @@ export default function CompanyInfoPage() {
   };
 
   return (
-    <div className="flex flex-col h-full gap-6">
-      {/* 헤더 섹션 (모바일 반응형 최적화) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 shrink-0 px-1">
-        <div className="flex flex-col gap-1 min-w-0">
-          <h2 className="text-xl xs:text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            <Factory className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 shrink-0" />
+    <div className="flex flex-col h-full gap-2.5 sm:gap-6">
+      {/* 헤더 섹션 (모바일 반응형 공간 최적화) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 shrink-0 px-1">
+        <div className="flex flex-col gap-0.5 sm:gap-1 min-w-0">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <Factory className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600 shrink-0" />
             <span className="whitespace-nowrap shrink-0">업체정보</span>
             {isAdmin && (
               <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-black uppercase whitespace-nowrap shrink-0">관리자 모드</span>
@@ -228,11 +228,11 @@ export default function CompanyInfoPage() {
           </p>
         </div>
         {isAdmin && (
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
             <Button
               variant="outline"
               onClick={() => setIsImportModalOpen(true)}
-              className="flex-1 sm:flex-initial h-9 sm:h-10 bg-white hover:bg-emerald-50 hover:text-emerald-700 border-emerald-300 text-emerald-800 font-bold gap-1.5 text-xs sm:text-sm px-2.5 sm:px-4 whitespace-nowrap"
+              className="flex-1 sm:flex-initial h-8 sm:h-10 bg-white hover:bg-emerald-50 hover:text-emerald-700 border-emerald-300 text-emerald-800 font-bold gap-1 text-[11px] sm:text-sm px-2 sm:px-4 whitespace-nowrap"
             >
               <FileSpreadsheet className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 shrink-0" /> 업체 일괄 등록
             </Button>
@@ -241,7 +241,7 @@ export default function CompanyInfoPage() {
                 setEditingCompany({ name: '' });
                 setIsEditModalOpen(true);
               }}
-              className="flex-1 sm:flex-initial h-9 sm:h-10 bg-blue-600 hover:bg-blue-700 font-bold gap-1.5 text-xs sm:text-sm px-2.5 sm:px-4 whitespace-nowrap"
+              className="flex-1 sm:flex-initial h-8 sm:h-10 bg-blue-600 hover:bg-blue-700 font-bold gap-1 text-[11px] sm:text-sm px-2 sm:px-4 whitespace-nowrap"
             >
               <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" /> 신규 업체 등록
             </Button>
@@ -249,47 +249,45 @@ export default function CompanyInfoPage() {
         )}
       </div>
 
-      {/* 모바일 전용 탭 스위처 */}
+      {/* 모바일 전용 탭 스위처 (높이 슬림화) */}
       <div className="lg:hidden shrink-0">
         <Tabs value={mobileTab} onValueChange={(v) => setMobileTab(v as any)} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 h-10 p-1 bg-slate-100 rounded-xl">
-            <TabsTrigger value="list" className="rounded-lg font-bold text-xs">업체 목록</TabsTrigger>
-            <TabsTrigger value="details" className="rounded-lg font-bold text-xs">상세 정보</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 h-8.5 sm:h-10 p-0.5 sm:p-1 bg-slate-100 rounded-xl">
+            <TabsTrigger value="list" className="rounded-lg font-bold text-[11px] sm:text-xs">업체 목록</TabsTrigger>
+            <TabsTrigger value="details" className="rounded-lg font-bold text-[11px] sm:text-xs">상세 정보</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-0">
-        {/* 왼쪽: 업체 목록 및 검색 */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-6 flex-1 min-h-0">
+        {/* 왼쪽: 업체 목록 및 통합 검색 */}
         <div className={cn(
-          "lg:col-span-4 flex flex-col gap-4 min-h-0",
+          "lg:col-span-4 flex flex-col gap-3 min-h-0",
           mobileTab !== 'list' && "hidden lg:flex"
         )}>
-          <Card className="shrink-0">
-            <CardContent className="p-4">
-              <form onSubmit={handleSearch} className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Card className="flex-1 overflow-hidden flex flex-col">
+            <div className="p-2.5 sm:p-4 border-b space-y-2 bg-slate-50/50">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs sm:text-sm font-bold flex items-center gap-1.5 text-slate-800">
+                  <Building2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500" />
+                  <span>업체 리스트</span>
+                  <span className="text-[9.5px] sm:text-[10px] bg-blue-50 text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded-full font-bold">
+                    {companies.length}개 업체
+                  </span>
+                </div>
+              </div>
+              <form onSubmit={handleSearch} className="relative w-full">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                 <Input 
                   placeholder="기업명 검색..." 
-                  className="pl-10"
+                  className="pl-8 h-8 text-xs bg-white border-slate-200 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </form>
-            </CardContent>
-          </Card>
+            </div>
 
-          <Card className="flex-1 overflow-hidden flex flex-col">
-            <CardHeader className="py-4 border-b">
-              <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-blue-500" />
-                업체 리스트
-                <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium ml-auto">
-                  {companies.length}개 업체
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 overflow-y-auto">
+            <CardContent className="p-0 overflow-y-auto flex-1 min-h-0">
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3">
                   <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
@@ -302,7 +300,7 @@ export default function CompanyInfoPage() {
                       key={company.id}
                       onClick={() => handleSelectCompany(company.name)}
                       className={cn(
-                        "p-4 cursor-pointer hover:bg-slate-50 transition-all group relative",
+                        "p-2.5 sm:p-4 cursor-pointer hover:bg-slate-50 transition-all group relative",
                         selectedCompany?.company?.name === company.name 
                           ? "bg-blue-50/80 border-l-4 border-blue-600 shadow-sm" 
                           : "border-l-4 border-transparent"

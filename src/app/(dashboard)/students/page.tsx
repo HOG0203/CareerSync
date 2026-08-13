@@ -106,27 +106,27 @@ async function StudentsPageContent({
   });
 
   return (
-    <div className="flex flex-col h-full gap-3 overflow-hidden">
-      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between shrink-0 px-1 gap-3">
-        <div className="flex flex-col gap-1 min-w-0">
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2 whitespace-nowrap">
-            <Users className="h-6 w-6 sm:h-7 sm:w-7 text-blue-600 shrink-0" />
+    <div className="flex flex-col h-full gap-2 sm:gap-2.5 overflow-hidden">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between shrink-0 px-1 gap-2 sm:gap-3">
+        <div className="flex flex-col gap-0.5 sm:gap-1 min-w-0">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2 whitespace-nowrap">
+            <Users className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600 shrink-0" />
             학생 취업 현황
-            <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold whitespace-nowrap">3학년 통합관리</span>
+            <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold whitespace-nowrap">{grade}학년 데이터</span>
           </h2>
           <div className="flex items-center gap-2.5 text-muted-foreground text-xs font-medium">
             <p className="hidden sm:block text-slate-500">졸업 예정자 취업 이력 및 현장실습 통합 데이터</p>
             <span className="hidden sm:inline text-slate-300">|</span>
             <p className="text-blue-600 font-bold whitespace-nowrap">
-              {parseInt(selectedYear) - 1}학년도 3학년 {params.major && params.major !== 'all' ? `${params.major} ` : '전체 학과 '}
+              {parseInt(selectedYear) - 1}학년도 {grade}학년 {params.major && params.major !== 'all' ? `${params.major} ` : '전체 학과 '}
               {params.class && params.class !== 'all' ? `${params.class}반 ` : ''}
               (총 {filteredData.length}명)
             </p>
           </div>
         </div>
         
-        <div className="shrink-0 overflow-x-auto w-full xl:w-auto">
-          <div className="flex justify-start xl:justify-end">
+        <div className="shrink-0 overflow-x-auto w-full lg:w-auto">
+          <div className="flex justify-start lg:justify-end">
             <React.Suspense fallback={<div className="h-10 w-[450px] bg-slate-50 animate-pulse rounded-lg" />}>
               <DashboardFilters 
                 graduationYears={graduationYears}
@@ -136,7 +136,8 @@ async function StudentsPageContent({
                 defaultYear={defaultGradYear}
                 baseUrl="/students"
                 baseYear={settings.baseYear}
-                hideGrade={true}
+                hideGrade={false}
+                hideStatus={true}
               />
             </React.Suspense>
           </div>

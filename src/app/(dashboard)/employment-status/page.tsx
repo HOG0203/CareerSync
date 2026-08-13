@@ -65,7 +65,7 @@ async function EmploymentStatusPageContent({
   const displayAY = ay;
 
   return (
-    <div className="flex flex-col h-full gap-4 sm:gap-6">
+    <div className="flex flex-col gap-4 sm:gap-6">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between shrink-0 gap-4 px-1">
         <div className="flex flex-col gap-1">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
@@ -89,22 +89,22 @@ async function EmploymentStatusPageContent({
           </div>
           
           {grade === 1 || grade === 2 ? (
-            <div className="grid grid-cols-3 xs:grid-cols-3 sm:flex sm:flex-wrap gap-x-2 gap-y-2 sm:gap-x-3 sm:gap-y-1.5 text-[9px] sm:text-[10px] font-medium pt-2 sm:pt-0 border-t sm:border-none w-full sm:w-auto justify-between sm:justify-end">
-              <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-emerald-500 border border-emerald-600 rounded-sm shrink-0"></div> 취업</div>
-              <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-rose-500 border border-rose-600 rounded-sm shrink-0"></div> 진학</div>
-              <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-slate-400 border border-slate-500 rounded-sm shrink-0"></div> 제외인정자</div>
+            <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar scrollbar-hide py-1 text-[10px] font-semibold whitespace-nowrap w-full sm:w-auto justify-start sm:justify-end">
+              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-emerald-500 rounded-full shrink-0"></div> 취업</div>
+              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-rose-500 rounded-full shrink-0"></div> 진학</div>
+              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-slate-400 rounded-full shrink-0"></div> 제외인정자</div>
             </div>
           ) : (
-            <div className="grid grid-cols-3 xs:grid-cols-3 sm:flex sm:flex-wrap gap-x-2 gap-y-2 sm:gap-x-3 sm:gap-y-1.5 text-[9px] sm:text-[10px] font-medium pt-2 sm:pt-0 border-t sm:border-none w-full sm:w-auto justify-between sm:justify-end">
-              <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-blue-600 rounded-sm shrink-0"></div> 대/공기업</div>
-              <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-indigo-700 rounded-sm shrink-0"></div> 공무원/부사관</div>
-              <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-purple-600 rounded-sm shrink-0"></div> 중견기업</div>
-              <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-cyan-500 rounded-sm shrink-0"></div> 강소기업</div>
-              <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-orange-500 rounded-sm shrink-0"></div> 연계교육</div>
-              <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-sm shrink-0"></div> 기타</div>
-              <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-amber-100 rounded-sm shrink-0 border border-amber-500"></div> 채용진행중</div>
-              <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-blue-400 rounded-sm shrink-0 border border-blue-500"></div> 현장실습중</div>
-              <div className="flex items-center gap-1 whitespace-nowrap"><div className="w-2.5 h-2.5 bg-emerald-100 rounded-sm shrink-0 border border-emerald-500"></div> 도제OJT</div>
+            <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar scrollbar-hide py-1 text-[10px] font-semibold whitespace-nowrap w-full sm:w-auto justify-start sm:justify-end">
+              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-blue-600 rounded-full shrink-0"></div> 대/공기업</div>
+              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-indigo-700 rounded-full shrink-0"></div> 공무원/부사관</div>
+              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-purple-600 rounded-full shrink-0"></div> 중견기업</div>
+              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-cyan-500 rounded-full shrink-0"></div> 강소기업</div>
+              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-orange-500 rounded-full shrink-0"></div> 연계교육</div>
+              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-emerald-500 rounded-full shrink-0"></div> 기타</div>
+              <div className="flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-amber-500 rounded-full shrink-0"></div> 채용진행중</div>
+              <div className="flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-blue-500 rounded-full shrink-0"></div> 현장실습중</div>
+              <div className="flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-emerald-600 rounded-full shrink-0"></div> 도제OJT</div>
             </div>
           )}
         </div>

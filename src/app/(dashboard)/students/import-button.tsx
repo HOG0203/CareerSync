@@ -73,8 +73,8 @@ export function ImportButton() {
   // 서버 사이드 렌더링 및 하이드레이션 중에는 기본 버튼만 표시
   if (!mounted) {
     return (
-      <Button variant="outline" size="sm">
-        <FileUp className="mr-2 h-4 w-4" />
+      <Button variant="outline" size="sm" className="h-8 sm:h-9 px-2 sm:px-3 text-[11px] sm:text-xs font-bold">
+        <FileUp className="mr-1 sm:mr-1.5 h-3.5 w-3.5" />
         가져오기
       </Button>
     )
@@ -83,8 +83,8 @@ export function ImportButton() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <FileUp className="mr-2 h-4 w-4" />
+        <Button variant="outline" size="sm" className="h-8 sm:h-9 px-2 sm:px-3 text-[11px] sm:text-xs font-bold">
+          <FileUp className="mr-1 sm:mr-1.5 h-3.5 w-3.5" />
           가져오기
         </Button>
       </DialogTrigger>

@@ -95,9 +95,9 @@ export function PromotionImportButton({ currentData, baseYear }: PromotionImport
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 shadow-md">
-          <ArrowRight className="mr-2 h-4 w-4" />
-          엑셀 일괄 진급
+        <Button size="sm" className="h-8 sm:h-9 px-1.5 sm:px-3 text-[11px] sm:text-xs font-bold bg-emerald-600 hover:bg-emerald-700 shadow-xs shrink-0">
+          <ArrowRight className="mr-1 sm:mr-1.5 h-3.5 w-3.5 shrink-0" />
+          <span><span className="hidden xs:inline">엑셀 </span>일괄진급</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[450px] rounded-2xl p-0 overflow-hidden border-none shadow-2xl flex flex-col">

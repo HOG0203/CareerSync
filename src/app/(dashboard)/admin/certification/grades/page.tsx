@@ -44,15 +44,13 @@ export default async function CertificationPage({
   const studentSummaries = Object.values(summaryMap);
 
   return (
-    <div className="flex-1 min-h-0 bg-white/50 backdrop-blur-sm rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-      <GradeSummaryClient 
-        initialSummaries={studentSummaries as any[]} 
-        weights={weights}
-        currentGrade={selectedGradeNum} 
-        isAdmin={profile?.role === 'admin'}
-        userProfile={profile}
-      />
-    </div>
+    <GradeSummaryClient 
+      initialSummaries={studentSummaries as any[]} 
+      weights={weights}
+      currentGrade={selectedGradeNum} 
+      isAdmin={profile?.role === 'admin'}
+      userProfile={profile}
+    />
   );
 
 }

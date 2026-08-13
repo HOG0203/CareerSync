@@ -82,8 +82,8 @@ export function ExportButton({ data, filename = '학생_취업_현황.csv' }: Ex
   };
 
   return (
-    <Button variant="outline" size="sm" className="h-8" onClick={handleExport}>
-      <Download className="mr-2 h-3.5 w-3.5" />
+    <Button variant="outline" size="sm" className="h-8 sm:h-9 px-2 sm:px-3 text-[11px] sm:text-xs font-bold" onClick={handleExport}>
+      <Download className="mr-1 sm:mr-1.5 h-3.5 w-3.5" />
       내보내기
     </Button>
   );

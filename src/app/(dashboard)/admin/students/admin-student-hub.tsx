@@ -208,11 +208,12 @@ export function AdminStudentHub({
   const selectedStudentsForPromotion = processedData.filter((s: any) => selectedIdsForPromotion.includes(s.id))
 
   return (
-    <div className="flex flex-col h-full gap-3 sm:gap-4 overflow-hidden">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between px-1 gap-4 shrink-0">
-        <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1.5 sm:gap-2.5">
+      {/* 헤더 섹션 (제목 크기 유지 & 모바일 상단 유격 콤팩트화) */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between px-1 gap-1.5 sm:gap-3 shrink-0">
+        <div className="flex flex-col gap-0.5 sm:gap-1">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
-            <UserPlus className="h-7 w-7 sm:h-8 sm:w-8 text-indigo-600" />
+            <UserPlus className="h-7 w-7 sm:h-8 sm:w-8 text-indigo-600 shrink-0" />
             학생 등록 및 진급 관리
           </h2>
           <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed">
@@ -220,7 +221,7 @@ export function AdminStudentHub({
           </p>
         </div>
         
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap border-t lg:border-none pt-3 lg:pt-0">
+        <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto custom-scrollbar scrollbar-hide whitespace-nowrap pt-1 lg:pt-0 w-full sm:w-auto shrink-0 pb-0.5 sm:pb-0">
           <PromotionImportButton currentData={processedData} baseYear={settings.baseYear} />
           <ImportButton />
           <ExportButton data={processedData} filename={`전교생_학생명부_${new Date().toLocaleDateString()}.csv`} />
@@ -231,9 +232,10 @@ export function AdminStudentHub({
         </div>
       </div>
 
-      <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
-        <div className="w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-          <React.Suspense fallback={<div className="h-10 w-[450px] bg-slate-50 animate-pulse rounded-lg" />}>
+      {/* 필터 및 학생 수 카운터 (모바일 슬림화) */}
+      <div className="bg-white p-1.5 sm:p-2.5 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-3 shrink-0">
+        <div className="w-full sm:w-auto">
+          <React.Suspense fallback={<div className="h-10 w-[350px] bg-slate-50 animate-pulse rounded-lg" />}>
             <DashboardFilters 
               graduationYears={graduationYears}
               majors={majors}
@@ -242,26 +244,28 @@ export function AdminStudentHub({
               defaultYear={(settings.baseYear + 1).toString()}
               baseUrl="/admin/students"
               baseYear={settings.baseYear}
+              hideStatus={true}
             />
           </React.Suspense>
         </div>
         
-        <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-l sm:border-t-0 pt-3 sm:pt-0 sm:pl-4 border-slate-100 shrink-0">
-          <div className="flex flex-col items-start sm:items-end">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Students</span>
-            <span className="text-base sm:text-lg font-black text-indigo-600">{processedData.length}명</span>
+        <div className="flex items-center justify-between sm:justify-end gap-2 border-t sm:border-l sm:border-t-0 pt-1.5 sm:pt-0 sm:pl-3 border-slate-100 shrink-0">
+          <div className="flex items-center gap-1.5 sm:flex-col sm:items-end">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total</span>
+            <span className="text-sm sm:text-base font-black text-indigo-600">{processedData.length}명</span>
           </div>
         </div>
       </div>
 
-      <Card className="flex-1 min-h-0 shadow-md border-none bg-white flex flex-col rounded-2xl overflow-hidden min-w-full mb-0">
-        <CardHeader className="py-3 sm:py-4 px-4 sm:px-6 border-b bg-slate-50/50 flex flex-row items-center justify-between shrink-0">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="bg-indigo-100 p-1.5 sm:p-2 rounded-xl text-indigo-600">
-              <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5" />
+      {/* 카드 및 명부 테이블 */}
+      <Card className="shadow-sm border-none bg-white flex flex-col rounded-xl min-w-full mb-0">
+        <CardHeader className="py-2 sm:py-2.5 px-3 sm:px-5 border-b bg-slate-50/50 flex flex-row items-center justify-between shrink-0">
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            <div className="bg-indigo-100 p-1 sm:p-1.5 rounded-lg text-indigo-600">
+              <GraduationCap className="h-4 w-4 text-indigo-600" />
             </div>
             <div>
-              <CardTitle className="text-sm sm:text-lg font-bold text-slate-800">
+              <CardTitle className="text-sm sm:text-base font-bold text-slate-800">
                 통합 학생 명부 관리
               </CardTitle>
               <CardDescription className="text-[10px] sm:text-xs font-medium mt-0.5">
@@ -272,7 +276,7 @@ export function AdminStudentHub({
             </div>
           </div>
         </CardHeader>
-        <CardContent className="flex-1 p-0 relative min-h-0 flex flex-col overflow-hidden">
+        <CardContent className="p-0 relative flex flex-col">
           <StandardSpreadsheetTable 
             data={processedData}
             columns={COLUMNS}
@@ -287,6 +291,7 @@ export function AdminStudentHub({
             masterCertificates={masterCertificates}
             disableNamePopover={true}
             baseYear={settings.baseYear}
+            pageType="admin-students"
           />
         </CardContent>
       </Card>

@@ -362,6 +362,7 @@ export function StudentTable({
             'company',             // 취업처(회사명)
             'latest_training_company', // 실습처(회사명)
           ]}
+          pageType="students"
         />
       </div>
 

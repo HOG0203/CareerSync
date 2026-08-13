@@ -93,10 +93,7 @@ body {
   }
 }
 
-/* 루트 레벨에서 스크롤바 공간을 미리 확보하여 레이아웃 시프트를 원천 차단 */
 html {
-  overflow-y: scroll !important;
-  scrollbar-gutter: stable both-edges;
   padding-right: 0px !important;
 }
 
@@ -158,6 +155,7 @@ html {
   background: #475569;
 }
 .custom-scrollbar {
-  scrollbar-width: auto;
+  scrollbar-width: thin;
   scrollbar-color: #94a3b8 #f1f5f9;
+  -webkit-overflow-scrolling: touch;
 }

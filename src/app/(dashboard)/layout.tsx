@@ -36,18 +36,18 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
           </Sidebar>
         </div>
 
-        <SidebarInset className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        <SidebarInset className="flex flex-col flex-1 min-w-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
           {/* Mobile Navigation */}
           <MobileTopBar isAdmin={isAdmin} userProfile={userProfile} />
           
           {/* Desktop Header */}
-          <div className="hidden lg:block">
+          <div className="hidden lg:block sticky top-0 z-40 bg-white/80 backdrop-blur-md">
             <Header userProfile={userProfile} />
           </div>
 
-          <main className="flex-1 p-2 lg:p-6 lg:mt-0 mt-14 lg:mb-0 mb-16 overflow-auto flex flex-col min-h-0 min-w-0">
+          <div className="flex-1 p-2 lg:p-6 lg:mt-0 mt-14 lg:mb-0 mb-16 flex flex-col min-w-0">
             {children}
-          </main>
+          </div>
 
           {/* Mobile Bottom Tab */}
           <MobileBottomTab isAdmin={isAdmin} role={userProfile?.role} userGrade={userProfile?.assigned_grade} />

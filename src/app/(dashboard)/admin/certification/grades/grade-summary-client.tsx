@@ -192,7 +192,7 @@ export function GradeSummaryClient({
   }, [detailedScores]);
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-w-0">
+    <div className="flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm min-w-0">
       {/* 헤더 바: 페이지 타이틀 및 성적 데이터 업로드 버튼 */}
       <div className="px-3 py-3 sm:px-6 sm:py-4 border-b flex justify-between items-center bg-white min-w-0 shrink-0">
         <div className="flex items-center gap-2 min-w-0 shrink">
@@ -300,7 +300,7 @@ export function GradeSummaryClient({
 
 
       {/* 데스크톱: 테이블 뷰 (md 이상) */}
-      <div className="hidden md:block flex-1 overflow-auto">
+      <div className="hidden md:block w-full overflow-x-auto">
         <table className="w-full text-sm text-left border-collapse">
           <thead className="bg-slate-50 text-slate-500 sticky top-0 z-10 border-b">
             <tr>
@@ -361,7 +361,7 @@ export function GradeSummaryClient({
       </div>
 
       {/* 모바일: 카드 목록 뷰 (md 미만) */}
-      <div className="md:hidden flex-1 overflow-y-auto p-3 space-y-2.5">
+      <div className="md:hidden w-full p-3 space-y-2.5">
         {paginatedData.map((student) => (
           <div 
             key={student.id} 

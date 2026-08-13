@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Check, Search, Loader2 } from 'lucide-react';
+import { Check, Search, Loader2, GraduationCap, Building2, LayoutGrid } from 'lucide-react';
 
 interface AdminClassSelectorProps {
   availableGrades: number[];
@@ -90,7 +90,6 @@ export default function AdminClassSelector({
     });
   };
 
-
   // 현재 선택된 학년 기준의 학과 목록
   const currentMajors = React.useMemo(() => {
     if (!isAdmin) return [defaultMajor];
@@ -107,54 +106,63 @@ export default function AdminClassSelector({
   }, [selectedGrade, selectedMajor, classStructure, isAdmin, defaultClass]);
 
   return (
-    <div className="flex flex-wrap items-center gap-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100 shadow-sm">
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-bold text-blue-700 whitespace-nowrap uppercase tracking-wider">학년</span>
-        <Select value={selectedGrade} onValueChange={handleGradeChange} disabled={!isAdmin || isLoading}>
-          <SelectTrigger className="w-[120px] h-9 text-xs bg-white border-blue-200">
-            <SelectValue placeholder="학년 선택" />
-          </SelectTrigger>
-          <SelectContent>
-            {availableGrades.sort().map(grade => (
-              <SelectItem key={grade} value={String(grade)} className="text-xs">{grade}학년</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center flex-wrap gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-200">
+        {/* 학년 선택 */}
+        <div className="flex items-center gap-1 px-1">
+          <GraduationCap className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+          <Select value={selectedGrade} onValueChange={handleGradeChange} disabled={!isAdmin || isLoading}>
+            <SelectTrigger className="w-[75px] sm:w-[90px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 overflow-hidden">
+              <SelectValue placeholder="학년" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableGrades.sort().map(grade => (
+                <SelectItem key={grade} value={String(grade)} className="text-xs">{grade}학년</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-bold text-blue-700 whitespace-nowrap uppercase tracking-wider">학과</span>
-        <Select value={selectedMajor} onValueChange={handleMajorChange} disabled={!isAdmin || isLoading}>
-          <SelectTrigger className={cn("w-[180px] h-9 text-xs bg-white border-blue-200", !isAdmin && "bg-slate-50 opacity-80")}>
-            <SelectValue placeholder="학과 선택" />
-          </SelectTrigger>
-          <SelectContent>
-            {currentMajors.map(m => (
-              <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+        <div className="w-[1px] h-4 bg-slate-200" />
 
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-bold text-blue-700 whitespace-nowrap uppercase tracking-wider">반</span>
-        <Select value={selectedClass} onValueChange={setSelectedClass} disabled={!isAdmin || isLoading}>
-          <SelectTrigger className={cn("w-[100px] h-9 text-xs bg-white border-blue-200", !isAdmin && "bg-slate-50 opacity-80")}>
-            <SelectValue placeholder="반 선택" />
-          </SelectTrigger>
-          <SelectContent>
-            {currentClasses.sort().map(c => (
-              <SelectItem key={c} value={c} className="text-xs">{c}반</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* 학과 선택 */}
+        <div className="flex items-center gap-1 px-1">
+          <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+          <Select value={selectedMajor} onValueChange={handleMajorChange} disabled={!isAdmin || isLoading}>
+            <SelectTrigger className={cn("w-[125px] sm:w-[145px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 overflow-hidden", !isAdmin && "opacity-80")}>
+              <SelectValue placeholder="학과" />
+            </SelectTrigger>
+            <SelectContent>
+              {currentMajors.map(m => (
+                <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="w-[1px] h-4 bg-slate-200" />
+
+        {/* 반 선택 */}
+        <div className="flex items-center gap-1 px-1">
+          <LayoutGrid className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+          <Select value={selectedClass} onValueChange={setSelectedClass} disabled={!isAdmin || isLoading}>
+            <SelectTrigger className={cn("w-[65px] sm:w-[80px] h-8 text-[11px] font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 overflow-hidden", !isAdmin && "opacity-80")}>
+              <SelectValue placeholder="반" />
+            </SelectTrigger>
+            <SelectContent>
+              {currentClasses.sort().map(c => (
+                <SelectItem key={c} value={c} className="text-xs">{c}반</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {isAdmin && (
         <Button
           onClick={handleSearch}
           disabled={isLoading || isPending}
-          className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md transition-all active:scale-95 shrink-0"
+          className="h-9 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-sm transition-all active:scale-95 shrink-0"
         >
           {isLoading || isPending ? (
             <>
@@ -170,8 +178,7 @@ export default function AdminClassSelector({
         </Button>
       )}
 
-      
-      <div className="ml-auto flex items-center gap-4">
+      <div className="ml-auto hidden sm:flex items-center gap-4">
         {isAdmin ? (
            <div className="text-[10px] text-blue-500 font-medium flex items-center gap-1">
              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />

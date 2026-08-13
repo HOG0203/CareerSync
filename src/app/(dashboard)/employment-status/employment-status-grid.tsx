@@ -451,7 +451,7 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
   }
 
   return (
-    <div className="flex flex-col h-full gap-4">
+    <div className="flex flex-col gap-4">
       {/* 클라이언트 사이드 검색창 */}
       <SearchHeader 
         onSearch={setSearchQuery} 
@@ -464,7 +464,7 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
         customMatchedCount={customMatchedCount}
       />
 
-      <div className="flex-1 overflow-x-auto overflow-y-auto bg-gray-50/50 rounded-xl border border-slate-200 shadow-sm p-2 sm:p-4">
+      <div className="w-full overflow-x-auto bg-gray-50/50 rounded-xl border border-slate-200 shadow-sm p-2 sm:p-4">
         <div className="flex gap-px bg-gray-300 border border-gray-300 min-w-max mx-auto shadow-sm">
           {classNames.map((className) => {
             const students = [...groupedData[className]].sort((a, b) => 

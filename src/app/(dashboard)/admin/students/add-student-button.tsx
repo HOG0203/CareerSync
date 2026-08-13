@@ -17,10 +17,10 @@ export function AddStudentButton({ baseYear, majors }: AddStudentButtonProps) {
     <>
       <Button 
         size="sm" 
-        className="h-9 bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-100"
+        className="h-8 sm:h-9 px-2 sm:px-3 text-[11px] sm:text-xs font-bold bg-indigo-600 hover:bg-indigo-700 shadow-xs"
         onClick={() => setIsOpen(true)}
       >
-        <Plus className="mr-2 h-4 w-4" />
+        <Plus className="mr-1 sm:mr-1.5 h-3.5 w-3.5" />
         학생 추가
       </Button>
 

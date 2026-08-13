@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Search, GraduationCap, Trash2, Loader2, Phone, ChevronRight, ChevronLeft } from 'lucide-react'
+import { Search, GraduationCap, Trash2, Loader2, Phone, ChevronRight, ChevronLeft, BookUser, Award } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -35,6 +35,7 @@ export function StandardSpreadsheetTable({
   disableNamePopover = false,
   baseYear,
   mobileInfoKeys,
+  pageType,
 }: SpreadsheetTableProps) {
   const [mounted, setMounted] = React.useState(false)
   const isMobile = useIsMobile()
@@ -121,9 +122,9 @@ export function StandardSpreadsheetTable({
   }
 
   return (
-    <div className="flex flex-col gap-3 w-full h-full overflow-hidden">
+    <div className="flex flex-col gap-2 w-full h-full overflow-hidden">
       {/* 검색 및 선택 툴바 */}
-      <div className="flex items-center justify-between p-2 bg-muted/20 rounded-md border-dashed border shrink-0">
+      <div className="flex items-center justify-between p-1.5 bg-muted/20 rounded-md border-dashed border shrink-0">
         <div className="flex items-center gap-3">
           <Search className="h-4 w-4 text-muted-foreground ml-2" />
           <Input
@@ -168,10 +169,11 @@ export function StandardSpreadsheetTable({
             <tbody>
               {(() => {
                 const totalCount = filteredData.length;
-                // 가상 스크롤 활성화: 화면에 보이는 행 + 편집 중 행만 렌더링
-                const OVERSCAN = 8; // 화면 위아래로 여분 렌더 행 수
-                const visStart = Math.max(0, Math.floor((scrollTop - HEADER_HEIGHT) / ROW_HEIGHT) - OVERSCAN);
-                const visEnd = Math.min(totalCount - 1, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + OVERSCAN);
+                // 내부 고정 스크롤 여부 자동 감지
+                const isInnerScroll = containerHeight > 0 && containerHeight < totalCount * ROW_HEIGHT;
+                const OVERSCAN = 8;
+                const visStart = isInnerScroll ? Math.max(0, Math.floor((scrollTop - HEADER_HEIGHT) / ROW_HEIGHT) - OVERSCAN) : 0;
+                const visEnd = isInnerScroll ? Math.min(totalCount - 1, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + OVERSCAN) : totalCount - 1;
                 // 편집 중인 셀이 가상 스크롤 범위 밖으로 잘리지 않도록 범위에 포함
                 const editRow = editingCell?.row ?? -1;
                 const start = editRow >= 0 && editRow < visStart ? editRow : visStart;
@@ -195,74 +197,352 @@ export function StandardSpreadsheetTable({
           </table>
         </div>
       ) : (
-        /* 모바일: 카드 목록 */
-        <div className="grid grid-cols-1 gap-3 lg:hidden p-1 overflow-y-auto">
+        /* 모바일: 페이지 유형별 특화 모바일 카드 목록 */
+        <div className="grid grid-cols-1 gap-2.5 lg:hidden p-1 overflow-y-auto">
           {filteredData.map((row) => {
             const titleCol = columns.find(c => c.key.includes('name')) || columns[1];
-            const statusCol = columns.find(c => c.key.includes('status') || c.key.includes('aspiration'));
-            // mobileInfoKeys가 지정된 경우 해당 키에 맞는 컬럼만, 없으면 자동 선택
-            const infoCols = mobileInfoKeys
-              ? mobileInfoKeys
-                  .map(k => columns.find(c => c.key === k))
-                  .filter((c): c is NonNullable<typeof c> => !!c)
-              : columns.filter(c =>
-                  c.key !== 'major' && c.key !== 'class_info' && c.key !== 'student_number' &&
-                  c.key !== titleCol?.key && c.key !== statusCol?.key &&
-                  c.type !== 'action' && c.key !== 'certificates'
-                ).slice(0, 6);
-            return (
-              <div key={row.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm active:scale-[0.98] transition-transform cursor-pointer" onClick={() => setDetailData(row)}>
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold shrink-0">
-                      {String(row[titleCol?.key || ''] || '?')[0]}
-                    </div>
-                    <div className="min-w-0">
-                      {!disableNamePopover ? (
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <StudentPopover student={row} rankingSummary={rankingMap?.[row.id]} isRankingsLoading={isRankingsLoading} userProfile={userProfile} baseYear={baseYear}>
-                            <h3 className="font-bold text-slate-900 truncate hover:text-blue-600 transition-colors cursor-pointer">{row[titleCol?.key || ''] || '이름 없음'}</h3>
-                          </StudentPopover>
+            const certs = normalizeCertificates(row?.certificates || []);
+            const studentName = row.student_name || row[titleCol?.key || ''] || '이름 없음';
+            const rawGrade = row.grade || (row.graduation_year ? `${row.graduation_year}졸업` : '');
+            const gradeText = rawGrade 
+              ? (String(rawGrade).endsWith('학년') || String(rawGrade).endsWith('졸업') 
+                  ? String(rawGrade) 
+                  : `${rawGrade}학년`) 
+              : '';
+            const classText = row.class_info ? `${row.class_info}반` : '';
+            const numberText = row.student_number ? `${row.student_number}번` : '';
+            const subInfoText = [row.major, classText, numberText].filter(Boolean).join(' • ');
+
+            // 페이지 유형 자동 판별
+            const effectivePageType = pageType || (
+              columns.some(c => c.key === 'counseling_log_action') ? 'class-management' :
+              columns.some(c => c.key === 'company' || c.key === 'latest_training_company') ? 'students' :
+              'admin-students'
+            );
+
+            // 이름 클릭 팝업(StudentPopover) 렌더링 헬퍼
+            const renderStudentName = () => {
+              if (!disableNamePopover) {
+                return (
+                  <div onClick={(e) => e.stopPropagation()} className="min-w-0 truncate">
+                    <StudentPopover student={row} rankingSummary={rankingMap?.[row.id]} isRankingsLoading={isRankingsLoading} userProfile={userProfile} baseYear={baseYear}>
+                      <h3 className="font-bold text-xs sm:text-sm text-slate-900 truncate hover:text-indigo-600 transition-colors cursor-pointer underline decoration-indigo-300 underline-offset-2">
+                        {studentName}
+                      </h3>
+                    </StudentPopover>
+                  </div>
+                );
+              }
+              return <h3 className="font-bold text-xs sm:text-sm text-slate-900 truncate">{studentName}</h3>;
+            };
+
+            // ==========================================
+            // CASE 1: 학급 관리 (/class-management) - 담임 교사 전용 진로상담 카드
+            // ==========================================
+            if (effectivePageType === 'class-management') {
+              return (
+                <div 
+                  key={row.id} 
+                  className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs active:scale-[0.99] transition-all cursor-pointer hover:border-indigo-200 flex flex-col gap-2.5" 
+                  onClick={() => setDetailData(row)}
+                >
+                  {/* 1행: 아바타 + 이름/반/번호 (좌), 전화번호 & 상담일지 버튼 (우) */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="h-8 w-8 rounded-lg bg-indigo-50 border border-indigo-100/80 flex items-center justify-center text-indigo-600 font-extrabold text-xs shrink-0">
+                        {String(studentName)[0]}
+                      </div>
+                      <div className="min-w-0 flex flex-col justify-center">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {renderStudentName()}
+                          <span className="text-[10px] font-bold text-slate-500">
+                            {classText} {numberText}
+                          </span>
                         </div>
-                      ) : (
-                        <h3 className="font-bold text-slate-900 truncate">{row[titleCol?.key || ''] || '이름 없음'}</h3>
+                        <p className="text-[10px] text-indigo-600 font-medium truncate mt-0.5">
+                          {row.major || '학과 미지정'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {row.phone_number && (
+                        <a 
+                          href={`tel:${row.phone_number}`} 
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1 bg-blue-50/70 px-1.5 py-1 rounded border border-blue-100/80"
+                        >
+                          <Phone className="h-3 w-3 text-blue-500" />
+                          <span className="hidden sm:inline">{row.phone_number}</span>
+                        </a>
                       )}
-                      <p className="text-[11px] text-slate-500 truncate">
-                        {row.major || ''} {row.class_info ? `${row.class_info}반` : ''} {row.student_number ? `${row.student_number}번` : ''}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[10px] font-bold text-indigo-700 bg-indigo-50/80 border-indigo-100 hover:bg-indigo-100 px-2 gap-1"
+                        onClick={(e) => { e.stopPropagation(); onAction?.(row.id, 'counseling_log_action'); }}
+                      >
+                        <BookUser className="h-3.5 w-3.5 text-indigo-600" />
+                        상담일지
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* 2행: 담임 상담 핵심 데이터 요약 바 (진로희망, 희망기업, 희망코스, 부모의견) */}
+                  <div className="bg-slate-50/80 rounded-lg p-2 border border-slate-200/60 grid grid-cols-2 gap-1.5 text-[11px]">
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span className="text-[10px] font-bold text-slate-400 shrink-0">진로희망:</span>
+                      <span className={cn("text-[10px] font-bold px-1.5 py-0.2 rounded border truncate", 
+                        row.career_aspiration === '취업' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                        row.career_aspiration === '진학' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' :
+                        row.career_aspiration === '제외인정자' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                        'text-slate-600 border-slate-200'
+                      )}>
+                        {row.career_aspiration || '미입력'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span className="text-[10px] font-bold text-slate-400 shrink-0">희망기업:</span>
+                      <span className="font-bold text-slate-700 truncate text-[10px]">
+                        {row.special_notes || '미설정'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span className="text-[10px] font-bold text-slate-400 shrink-0">희망코스:</span>
+                      <span className="font-bold text-indigo-700 bg-indigo-50/80 px-1 py-0.2 rounded border border-indigo-100/80 text-[10px] truncate">
+                        {row.career_course || '미설정'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span className="text-[10px] font-bold text-slate-400 shrink-0">부모의견:</span>
+                      <span className="font-bold text-slate-700 text-[10px] truncate">
+                        {row.parents_opinion || '미선택'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 3행: 자격증 목록 & 상세 보기 */}
+                  <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-slate-400">
+                    <div className="flex items-center gap-1 overflow-hidden min-w-0">
+                      <span className="text-[10px] font-bold text-slate-400 shrink-0 mr-1">자격증:</span>
+                      {certs.length > 0 ? (
+                        <>
+                          {certs.slice(0, 3).map((cert, i) => (
+                            <span key={i} className="text-[9px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200/60 truncate max-w-[100px]">
+                              {cert}
+                            </span>
+                          ))}
+                          {certs.length > 3 && (
+                            <span className="text-[9px] font-extrabold text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded border border-indigo-100/80 shrink-0">
+                              +{certs.length - 3}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-[10px] text-slate-300 font-medium italic">자격증 미입력</span>
+                      )}
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-slate-300 shrink-0 ml-1" />
+                  </div>
+                </div>
+              );
+            }
+
+            // ==========================================
+            // CASE 2: 학생 취업 현황 (/students) - 취업/현장실습 통합 현황 카드
+            // ==========================================
+            if (effectivePageType === 'students') {
+              const companyName = row.company || row.latest_training_company || '';
+              const companyLabel = row.company ? '취업처' : row.latest_training_company ? '실습처' : '';
+
+              return (
+                <div 
+                  key={row.id} 
+                  className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs active:scale-[0.99] transition-all cursor-pointer hover:border-indigo-200 flex flex-col gap-2.5" 
+                  onClick={() => setDetailData(row)}
+                >
+                  {/* 1행: 아바타 + 이름 + 학년 + 학과/반/번호 (좌), 전화번호 & 취업상태 배지 (우) */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="h-8 w-8 rounded-lg bg-indigo-50 border border-indigo-100/80 flex items-center justify-center text-indigo-600 font-extrabold text-xs shrink-0">
+                        {String(studentName)[0]}
+                      </div>
+                      <div className="min-w-0 flex flex-col justify-center">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {renderStudentName()}
+                          {gradeText && (
+                            <span className="text-[10px] font-extrabold bg-indigo-50 text-indigo-600 px-1.5 py-0.2 rounded border border-indigo-100/80 shrink-0">
+                              {gradeText}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                          {subInfoText || '-'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end shrink-0 gap-1">
+                      {row.phone_number && (
+                        <a 
+                          href={`tel:${row.phone_number}`} 
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1 bg-blue-50/70 px-1.5 py-0.5 rounded border border-blue-100/80"
+                        >
+                          <Phone className="h-3 w-3 text-blue-500" />
+                          {row.phone_number}
+                        </a>
+                      )}
+                      {row.business_type && (
+                        <Badge className={cn("text-[10px] px-1.5 py-0.5 font-bold", 
+                          row.business_type === '취업' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+                          row.business_type === '현장실습중' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                          row.business_type === '미취업' ? 'bg-rose-100 text-rose-700 border-rose-200' :
+                          'bg-slate-100 text-slate-700 border-slate-200'
+                        )}>
+                          {row.business_type}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 2행: 취업처/실습처 회사명, 기업구분, 최종진로코스 및 실습이력 버튼 */}
+                  <div className="bg-slate-50/80 rounded-lg p-2 border border-slate-200/60 flex flex-col gap-1.5 text-[11px]">
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1 min-w-0">
+                        <span className="text-[10px] font-bold text-slate-400 shrink-0">{companyLabel || '회사'}:</span>
+                        <span className="font-extrabold text-slate-900 truncate">{companyName || '미등록'}</span>
+                        {row.company_type && (
+                          <span className="text-[9px] font-bold bg-white text-indigo-700 px-1.5 py-0.2 rounded border border-indigo-100 shrink-0">
+                            {row.company_type}
+                          </span>
+                        )}
+                      </div>
+
+                      {onAction && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-1.5 gap-1 shrink-0"
+                          onClick={(e) => { e.stopPropagation(); onAction(row.id, 'field_training_action'); }}
+                        >
+                          <Award className="h-3 w-3 text-emerald-600" />
+                          실습이력
+                        </Button>
+                      )}
+                    </div>
+
+                    {row.employment_status && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] font-bold text-slate-400 shrink-0">최종진로코스:</span>
+                        <span className="font-bold text-indigo-700 bg-indigo-50/80 px-1.5 py-0.2 rounded border border-indigo-100/80 text-[10px]">
+                          {row.employment_status}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3행: 자격증 목록 & 상세 보기 */}
+                  <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-slate-400">
+                    <div className="flex items-center gap-1 overflow-hidden min-w-0">
+                      <span className="text-[10px] font-bold text-slate-400 shrink-0 mr-1">자격증:</span>
+                      {certs.length > 0 ? (
+                        <>
+                          {certs.slice(0, 3).map((cert, i) => (
+                            <span key={i} className="text-[9px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200/60 truncate max-w-[100px]">
+                              {cert}
+                            </span>
+                          ))}
+                          {certs.length > 3 && (
+                            <span className="text-[9px] font-extrabold text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded border border-indigo-100/80 shrink-0">
+                              +{certs.length - 3}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-[10px] text-slate-300 font-medium italic">자격증 미입력</span>
+                      )}
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-slate-300 shrink-0 ml-1" />
+                  </div>
+                </div>
+              );
+            }
+
+            // ==========================================
+            // CASE 3: 관리자 학생 등록/진급 (/admin/students) - 초슬림 인적사항 명부 카드
+            // ==========================================
+            return (
+              <div 
+                key={row.id} 
+                className="bg-white border border-slate-200 rounded-xl p-2.5 shadow-xs active:scale-[0.99] transition-all cursor-pointer hover:border-indigo-200 flex flex-col gap-2" 
+                onClick={() => setDetailData(row)}
+              >
+                {/* 상단: 이름 + 학년 + 학과/반/번호 (좌), 전화번호 (우) */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="h-8 w-8 rounded-lg bg-indigo-50 border border-indigo-100/80 flex items-center justify-center text-indigo-600 font-extrabold text-xs shrink-0">
+                      {String(studentName)[0]}
+                    </div>
+                    <div className="min-w-0 flex flex-col justify-center">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {renderStudentName()}
+                        {gradeText && (
+                          <span className="text-[10px] font-extrabold bg-indigo-50 text-indigo-600 px-1.5 py-0.2 rounded border border-indigo-100/80 shrink-0">
+                            {gradeText}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                        {subInfoText || '-'}
                       </p>
                     </div>
                   </div>
-                  {statusCol && <Badge className={cn("text-[10px] px-2 py-0.5 shrink-0", statusCol.variant?.(row[statusCol.key]))}>{row[statusCol.key] || '미설정'}</Badge>}
-                </div>
-                <div className="grid grid-cols-3 gap-x-2 gap-y-2.5 border-t border-slate-100 pt-2.5">
-                  {infoCols.slice(0, 6).map(col => (
-                    <div key={col.key} className="space-y-0.5 min-w-0">
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate">{col.label.replace(/\\n/g, ' ')}</p>
-                      {col.variant && row[col.key] ? (
-                        <span className={cn('inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded border truncate max-w-full', col.variant(row[col.key]))}>
-                          {row[col.key]}
-                        </span>
-                      ) : col.key === 'phone_number' && row[col.key] ? (
-                        <a href={`tel:${row[col.key]}`} onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-blue-600 hover:underline text-[11px] font-semibold truncate">
-                          <span className="truncate">{row[col.key]}</span>
-                        </a>
-                      ) : (
-                        <p className="text-[11px] font-semibold text-slate-700 truncate">{row[col.key] || '-'}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-3 flex items-center justify-between text-slate-400">
-                  <div className="flex gap-1 overflow-hidden">
-                    {normalizeCertificates(row?.certificates || []).slice(0, 2).map((cert, i) => (<span key={i} className="text-[8px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-sm whitespace-nowrap">{cert}</span>))}
-                    {normalizeCertificates(row?.certificates || []).length > 2 && (<span className="text-[8px] text-slate-400">+{normalizeCertificates(row?.certificates || []).length - 2}</span>)}
+
+                  <div className="flex flex-col items-end shrink-0 gap-1">
+                    {row.phone_number && (
+                      <a 
+                        href={`tel:${row.phone_number}`} 
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1 bg-blue-50/70 px-1.5 py-0.5 rounded border border-blue-100/80"
+                      >
+                        <Phone className="h-3 w-3 text-blue-500" />
+                        {row.phone_number}
+                      </a>
+                    )}
                   </div>
-                  <ChevronRight className="h-4 w-4" />
+                </div>
+
+                {/* 하단: 자격증 목록 & 상세 보기 */}
+                <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-slate-400">
+                  <div className="flex items-center gap-1 overflow-hidden min-w-0">
+                    <span className="text-[10px] font-bold text-slate-400 shrink-0 mr-1">자격증:</span>
+                    {certs.length > 0 ? (
+                      <>
+                        {certs.slice(0, 3).map((cert, i) => (
+                          <span key={i} className="text-[9px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200/60 truncate max-w-[110px]">
+                            {cert}
+                          </span>
+                        ))}
+                        {certs.length > 3 && (
+                          <span className="text-[9px] font-extrabold text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded border border-indigo-100/80 shrink-0">
+                            +{certs.length - 3}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-[10px] text-slate-300 font-medium italic">자격증 미입력</span>
+                    )}
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-slate-300 shrink-0 ml-1" />
                 </div>
               </div>
             );
           })}
-          {filteredData.length === 0 && <div className="text-center py-20 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200"><p className="text-sm text-slate-400">검색 결과가 없습니다.</p></div>}
+          {filteredData.length === 0 && <div className="text-center py-16 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200"><p className="text-xs text-slate-400">검색 결과가 없습니다.</p></div>}
         </div>
       )}
 

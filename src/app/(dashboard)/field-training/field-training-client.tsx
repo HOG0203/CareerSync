@@ -329,17 +329,17 @@ export function FieldTrainingClient({
       </div>
 
       {/* 2. 툴바 & 뷰 모드 전환 및 검색 필터 */}
-      <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-sm shrink-0 space-y-2.5">
+      <div className="bg-white p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border border-slate-200/90 shadow-sm shrink-0 space-y-2 sm:space-y-2.5">
         {/* 상단: 뷰 모드 토글 + 검색창 */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-2.5">
           {/* 뷰 모드 토글 (모바일 1:1 세그먼트, 데스크톱 콤팩트) */}
-          <div className="grid grid-cols-2 sm:flex bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1 w-full sm:w-auto">
+          <div className="grid grid-cols-2 sm:flex bg-slate-100 p-0.5 sm:p-1 rounded-xl border border-slate-200 gap-0.5 sm:gap-1 w-full sm:w-auto">
             <Button
               size="sm"
               variant={viewMode === 'timeline' ? 'default' : 'ghost'}
               onClick={() => setViewMode('timeline')}
               className={cn(
-                "h-8 px-3 text-xs font-extrabold rounded-lg gap-1.5 transition-all justify-center",
+                "h-8.5 sm:h-9 px-2.5 sm:px-3.5 text-xs font-extrabold rounded-lg gap-1.5 transition-all justify-center",
                 viewMode === 'timeline' ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"
               )}
             >
@@ -351,7 +351,7 @@ export function FieldTrainingClient({
               variant={viewMode === 'grid' ? 'default' : 'ghost'}
               onClick={() => setViewMode('grid')}
               className={cn(
-                "h-8 px-3 text-xs font-extrabold rounded-lg gap-1.5 transition-all justify-center",
+                "h-8.5 sm:h-9 px-2.5 sm:px-3.5 text-xs font-extrabold rounded-lg gap-1.5 transition-all justify-center",
                 viewMode === 'grid' ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"
               )}
             >
@@ -362,12 +362,12 @@ export function FieldTrainingClient({
 
           {/* 학생 & 업체 검색창 */}
           <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400" />
             <Input
               placeholder="학생 성명, 번호, 실습처 검색..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-8 h-9 text-xs sm:text-sm bg-slate-50 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:bg-white font-medium"
+              className="pl-8 sm:pl-9 pr-7 sm:pr-8 h-8.5 sm:h-9 text-[11px] sm:text-sm bg-slate-50 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 focus:bg-white font-medium"
             />
             {searchTerm && (
               <button
@@ -381,20 +381,20 @@ export function FieldTrainingClient({
           </div>
         </div>
 
-        {/* 하단: 상태 필터 칩 레일 (가로 스크롤 가능한 고시인성 칩 바) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 custom-scrollbar scrollbar-hide pt-0.5">
+        {/* 하단: 상태 필터 칩 레일 (모바일 5분할 핏, PC 콤팩트 핏) */}
+        <div className="grid grid-cols-5 sm:flex sm:items-center sm:w-auto sm:justify-start gap-1 sm:gap-2 w-full pt-0.5">
           <button
             type="button"
             onClick={() => setStatusFilter('all')}
             className={cn(
-              "h-7 px-2.5 rounded-lg text-xs font-extrabold transition-all border shrink-0 flex items-center gap-1.5",
+              "h-8 sm:h-8.5 px-1 sm:px-3 rounded-md sm:rounded-lg text-[10.5px] sm:text-xs font-extrabold transition-all border flex items-center justify-center gap-1 sm:gap-1.5 min-w-0 w-full sm:w-auto shrink-0 active:scale-95",
               statusFilter === 'all'
                 ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
                 : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
             )}
           >
-            <span>전체</span>
-            <span className={cn("text-[10.5px] px-1.5 py-0.2 rounded-full font-black", statusFilter === 'all' ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700")}>
+            <span className="truncate">전체</span>
+            <span className={cn("text-[9.5px] sm:text-[10.5px] px-1 sm:px-1.5 py-0.1 sm:py-0.2 rounded-full font-black shrink-0", statusFilter === 'all' ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700")}>
               {students.length}
             </span>
           </button>
@@ -403,14 +403,14 @@ export function FieldTrainingClient({
             type="button"
             onClick={() => setStatusFilter('ongoing')}
             className={cn(
-              "h-7 px-2.5 rounded-lg text-xs font-extrabold transition-all border shrink-0 flex items-center gap-1.5",
+              "h-8 sm:h-8.5 px-1 sm:px-3 rounded-md sm:rounded-lg text-[10.5px] sm:text-xs font-extrabold transition-all border flex items-center justify-center gap-1 sm:gap-1.5 min-w-0 w-full sm:w-auto shrink-0 active:scale-95",
               statusFilter === 'ongoing'
                 ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
                 : "bg-emerald-50/70 text-emerald-800 border-emerald-200 hover:bg-emerald-100/70"
             )}
           >
-            <span>실습중</span>
-            <span className={cn("text-[10.5px] px-1.5 py-0.2 rounded-full font-black", statusFilter === 'ongoing' ? "bg-white/20 text-white" : "bg-emerald-200/80 text-emerald-900")}>
+            <span className="truncate">실습중</span>
+            <span className={cn("text-[9.5px] sm:text-[10.5px] px-1 sm:px-1.5 py-0.1 sm:py-0.2 rounded-full font-black shrink-0", statusFilter === 'ongoing' ? "bg-white/20 text-white" : "bg-emerald-200/80 text-emerald-900")}>
               {stats.ongoingCount}
             </span>
           </button>
@@ -419,14 +419,14 @@ export function FieldTrainingClient({
             type="button"
             onClick={() => setStatusFilter('converted')}
             className={cn(
-              "h-7 px-2.5 rounded-lg text-xs font-extrabold transition-all border shrink-0 flex items-center gap-1.5",
+              "h-8 sm:h-8.5 px-1 sm:px-3 rounded-md sm:rounded-lg text-[10.5px] sm:text-xs font-extrabold transition-all border flex items-center justify-center gap-1 sm:gap-1.5 min-w-0 w-full sm:w-auto shrink-0 active:scale-95",
               statusFilter === 'converted'
                 ? "bg-purple-600 text-white border-purple-600 shadow-2xs"
                 : "bg-purple-50/70 text-purple-800 border-purple-200 hover:bg-purple-100/70"
             )}
           >
-            <span>채용전환</span>
-            <span className={cn("text-[10.5px] px-1.5 py-0.2 rounded-full font-black", statusFilter === 'converted' ? "bg-white/20 text-white" : "bg-purple-200/80 text-purple-900")}>
+            <span className="truncate">채용전환</span>
+            <span className={cn("text-[9.5px] sm:text-[10.5px] px-1 sm:px-1.5 py-0.1 sm:py-0.2 rounded-full font-black shrink-0", statusFilter === 'converted' ? "bg-white/20 text-white" : "bg-purple-200/80 text-purple-900")}>
               {stats.convertedCount}
             </span>
           </button>
@@ -435,14 +435,14 @@ export function FieldTrainingClient({
             type="button"
             onClick={() => setStatusFilter('returned')}
             className={cn(
-              "h-7 px-2.5 rounded-lg text-xs font-extrabold transition-all border shrink-0 flex items-center gap-1.5",
+              "h-8 sm:h-8.5 px-1 sm:px-3 rounded-md sm:rounded-lg text-[10.5px] sm:text-xs font-extrabold transition-all border flex items-center justify-center gap-1 sm:gap-1.5 min-w-0 w-full sm:w-auto shrink-0 active:scale-95",
               statusFilter === 'returned'
                 ? "bg-rose-600 text-white border-rose-600 shadow-2xs"
                 : "bg-rose-50/70 text-rose-800 border-rose-200 hover:bg-rose-100/70"
             )}
           >
-            <span>복교</span>
-            <span className={cn("text-[10.5px] px-1.5 py-0.2 rounded-full font-black", statusFilter === 'returned' ? "bg-white/20 text-white" : "bg-rose-200/80 text-rose-900")}>
+            <span className="truncate">복교</span>
+            <span className={cn("text-[9.5px] sm:text-[10.5px] px-1 sm:px-1.5 py-0.1 sm:py-0.2 rounded-full font-black shrink-0", statusFilter === 'returned' ? "bg-white/20 text-white" : "bg-rose-200/80 text-rose-900")}>
               {stats.returnedCount}
             </span>
           </button>
@@ -451,14 +451,14 @@ export function FieldTrainingClient({
             type="button"
             onClick={() => setStatusFilter('none')}
             className={cn(
-              "h-7 px-2.5 rounded-lg text-xs font-extrabold transition-all border shrink-0 flex items-center gap-1.5",
+              "h-8 sm:h-8.5 px-1 sm:px-3 rounded-md sm:rounded-lg text-[10.5px] sm:text-xs font-extrabold transition-all border flex items-center justify-center gap-1 sm:gap-1.5 min-w-0 w-full sm:w-auto shrink-0 active:scale-95",
               statusFilter === 'none'
                 ? "bg-slate-800 text-white border-slate-800 shadow-2xs"
                 : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200/80"
             )}
           >
-            <span>미실습</span>
-            <span className={cn("text-[10.5px] px-1.5 py-0.2 rounded-full font-black", statusFilter === 'none' ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700")}>
+            <span className="truncate">미실습</span>
+            <span className={cn("text-[9.5px] sm:text-[10.5px] px-1 sm:px-1.5 py-0.1 sm:py-0.2 rounded-full font-black shrink-0", statusFilter === 'none' ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700")}>
               {students.length - stats.participatingCount}
             </span>
           </button>
@@ -466,45 +466,41 @@ export function FieldTrainingClient({
       </div>
 
       {/* 3. 뷰 메인 렌더링 영역 */}
-      <Card className="flex-1 min-h-0 bg-white border border-slate-200/80 shadow-sm rounded-xl overflow-hidden flex flex-col">
+      <Card className="w-full bg-white border border-slate-200/80 shadow-sm rounded-xl overflow-hidden flex flex-col">
         {viewMode === 'timeline' ? (
           /* ===== [VIEW 1] 월별 그래픽 간트 타임라인 뷰 ===== */
-          <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
-            {/* 범례 안내 바 */}
-            <div className="p-2.5 px-4 bg-slate-50/90 border-b border-slate-200/80 flex items-center justify-between shrink-0 text-xs">
-              <div className="flex items-center gap-3 font-semibold text-slate-600">
-                <span className="text-[11px] font-bold text-slate-900 flex items-center gap-1">
-                  <Calendar className="h-3.5 w-3.5 text-blue-600" />
-                  실습 일정 범례:
-                </span>
-                <span className="inline-flex items-center gap-1 text-[11px]">
-                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 inline-block" />
+          <div className="w-full flex flex-col overflow-hidden relative">
+            {/* 범례 안내 바 (모바일에서 줄바꿈 없이 1줄 가로 스크롤) */}
+            <div className="p-2 sm:p-2.5 px-3 sm:px-4 bg-slate-50/90 border-b border-slate-200/80 flex items-center justify-between shrink-0 text-xs overflow-x-auto custom-scrollbar scrollbar-hide whitespace-nowrap">
+              <div className="flex items-center gap-2 sm:gap-2.5 font-semibold text-slate-600 shrink-0">
+                <span className="inline-flex items-center gap-1 text-[10.5px] sm:text-[11px] bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />
                   실습 진행중
                 </span>
-                <span className="inline-flex items-center gap-1 text-[11px]">
-                  <span className="h-2.5 w-2.5 rounded-full bg-purple-600 inline-block" />
+                <span className="inline-flex items-center gap-1 text-[10.5px] sm:text-[11px] bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0">
+                  <span className="h-2 w-2 rounded-full bg-purple-600 inline-block" />
                   채용전환
                 </span>
-                <span className="inline-flex items-center gap-1 text-[11px]">
-                  <span className="h-2.5 w-2.5 rounded-full bg-amber-500 inline-block" />
+                <span className="inline-flex items-center gap-1 text-[10.5px] sm:text-[11px] bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0">
+                  <span className="h-2 w-2 rounded-full bg-amber-500 inline-block" />
                   복교/중단
                 </span>
-                <span className="inline-flex items-center gap-1 text-[11px] text-blue-600 font-bold ml-2">
-                  <Badge className="bg-sky-100 text-sky-800 border-sky-200 text-[9px] px-1 py-0">O</Badge>
-                  지원금 신청완료
+                <span className="inline-flex items-center gap-1 text-[10.5px] sm:text-[11px] text-blue-700 font-extrabold bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200 shrink-0">
+                  <Badge className="bg-sky-500 text-white text-[8.5px] px-1 py-0 h-3.5 leading-none">O</Badge>
+                  지원금 완료
                 </span>
               </div>
-              <span className="text-[11px] text-slate-500 font-medium hidden md:inline-block">
+              <span className="text-[11px] text-slate-500 font-medium hidden md:inline-block ml-4">
                 💡 실습 기간 막대를 클릭하면 해당 학생의 실습 및 지원금 정보를 바로 수정할 수 있습니다.
               </span>
             </div>
 
-            {/* ===== [DESKTOP / TABLET TIMELINE VIEW] (md 이상 화면에서 표시) ===== */}
-            <div className="hidden md:block flex-1 overflow-auto custom-scrollbar relative">
-              <div className="w-full" style={{ minWidth: `${Math.max(900, 240 + timelineMonths.length * 105)}px` }}>
+            {/* ===== [DESKTOP / TABLET TIMELINE VIEW] (md 이상 화면에서 표시: PC 화면 100% 핏) ===== */}
+            <div className="hidden md:block w-full relative">
+              <div className="w-full min-w-0">
                 {/* 헤더 행: 좌측 고정 학생 정보 컬럼 + 가변 월별 컬럼 */}
                 <div className="sticky top-0 z-30 bg-slate-100 border-b border-slate-200 flex text-xs font-extrabold text-slate-700 shadow-sm">
-                  <div className="w-[240px] shrink-0 p-2.5 pl-4 border-r border-slate-200 bg-slate-100 flex items-center sticky left-0 z-30 shadow-xs">
+                  <div className="w-[190px] xl:w-[220px] shrink-0 p-2.5 pl-3.5 border-r border-slate-200 bg-slate-100 flex items-center sticky left-0 z-30 shadow-xs">
                     학생 기본 정보 (성명 / 학번)
                   </div>
                   <div className="flex-1 grid relative" style={{ gridTemplateColumns: `repeat(${timelineMonths.length}, minmax(0, 1fr))` }}>
@@ -542,7 +538,7 @@ export function FieldTrainingClient({
                       return (
                         <div key={s.id} className="flex hover:bg-slate-50/70 transition-colors group min-h-[52px]">
                           {/* 좌측 학생 프로필 정보 영역 (가로 스크롤 시 좌측 Sticky 고정) */}
-                          <div className="w-[240px] shrink-0 p-2.5 pl-4 border-r border-slate-200/80 flex items-center justify-between bg-white group-hover:bg-slate-50/70 sticky left-0 z-20 shadow-xs">
+                          <div className="w-[190px] xl:w-[220px] shrink-0 p-2.5 pl-3.5 border-r border-slate-200/80 flex items-center justify-between bg-white group-hover:bg-slate-50/70 sticky left-0 z-20 shadow-xs">
                             <div className="flex items-center gap-2.5 min-w-0">
                               <div className="h-8 w-8 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 font-extrabold text-xs flex items-center justify-center shrink-0">
                                 {s.student_number ? `${s.student_number}번` : (sIdx + 1)}
@@ -816,7 +812,7 @@ export function FieldTrainingClient({
           </div>
         ) : (
           /* ===== [VIEW 2] 모바일 최적화 미니 스트립 막대(Concept 1) 카드 뷰 ===== */
-          <div className="flex-1 overflow-auto p-3 sm:p-4 custom-scrollbar bg-slate-50/50">
+          <div className="w-full p-3 sm:p-4 bg-slate-50/50">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {filteredStudents.length === 0 ? (
                 <div className="col-span-full py-16 text-center text-slate-400 italic font-medium">
