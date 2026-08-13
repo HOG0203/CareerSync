@@ -1,5 +1,5 @@
 import { 
-  getAssignedStudentDetails,
+  getCachedAssignedStudentDetails,
   getCachedGraduationYears, 
   getCachedClassStructureCombinations, 
   MAJOR_SORT_ORDER, 
@@ -126,7 +126,7 @@ async function FieldTrainingPageContent({
   let studentData: any[] = [];
 
   if (isViewable) {
-    studentData = await getAssignedStudentDetails(targetMajor, targetClass, calculatedYear, settings.baseYear);
+    studentData = await getCachedAssignedStudentDetails(targetMajor, targetClass, calculatedYear, settings.baseYear);
   }
 
   return (

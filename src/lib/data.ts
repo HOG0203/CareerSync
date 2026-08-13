@@ -232,7 +232,7 @@ export async function getAssignedStudentDetails(major: string, classInfo: string
   const [studentsResult, historyResult] = await Promise.all([
     supabase
       .from('students')
-      .select('id, student_id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, labor_education_status, military_status, desired_work_area, parents_opinion, shoe_size, top_size, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks), student_counseling_logs (*)')
+      .select('id, student_id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, labor_education_status, military_status, desired_work_area, parents_opinion, shoe_size, top_size, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks)')
       .eq('major', major)
       .eq('class_info', classInfo)
       .eq('graduation_year', graduationYear)
@@ -240,7 +240,7 @@ export async function getAssignedStudentDetails(major: string, classInfo: string
     baseYear 
       ? supabase
           .from('student_academic_history')
-          .select('id, student_id, major, class_info, student_number, teacher_name, grade, students!inner(id, student_id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, labor_education_status, military_status, desired_work_area, parents_opinion, shoe_size, top_size, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks), student_counseling_logs (*))')
+          .select('id, student_id, major, class_info, student_number, teacher_name, grade, students!inner(id, student_id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, labor_education_status, military_status, desired_work_area, parents_opinion, shoe_size, top_size, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks))')
           .eq('academic_year', baseYear)
           .eq('students.graduation_year', graduationYear)
           .eq('major', major)
@@ -293,7 +293,7 @@ export async function getAssignedStudentDetails(major: string, classInfo: string
       } : {}),
       id: s.id,
       training_records: studentTrainings, 
-      counseling_logs: s.student_counseling_logs || [],
+      counseling_logs: (s as any).student_counseling_logs || [],
       has_field_training: latestTraining ? 'O' : '',
       latest_training_company: latestTraining?.company,
       start_date: latestTraining?.start_date,

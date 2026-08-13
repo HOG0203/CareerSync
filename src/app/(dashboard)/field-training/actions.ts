@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { getCurrentUserProfile } from '@/lib/data'
 
 /**
@@ -45,6 +45,7 @@ export async function updateFieldTrainingStatusAction(
     return { success: false, error: error.message }
   }
 
+  revalidateTag('students')
   revalidatePath('/field-training')
   revalidatePath('/students')
   revalidatePath('/class-management')
