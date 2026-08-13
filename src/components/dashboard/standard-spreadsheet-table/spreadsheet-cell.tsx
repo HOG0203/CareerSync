@@ -88,8 +88,8 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
       const isOtherTrigger = localValue === '기타(직접입력)';
       if (isManualInput || isOtherTrigger) {
         return (
-          <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative z-40 bg-white ring-2 ring-blue-500" style={{ width: config.width }}>
-            <div className="flex items-center w-full bg-white">
+          <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative h-8 z-40 bg-white ring-2 ring-blue-500 ring-inset overflow-hidden" style={{ minWidth: config.width, width: config.width }}>
+            <div className="flex items-center w-full h-8 bg-white">
               <Input autoFocus value={isOtherTrigger ? '' : localValue} onChange={(e) => { setLocalValue(e.target.value); setIsManualInput(true); isManualRef.current = true; }} onBlur={() => handleCommit(localValue)} onKeyDown={(e) => { if(e.key==='Enter') { e.preventDefault(); e.stopPropagation(); handleCommit(localValue); } if(e.key==='Escape') { e.preventDefault(); e.stopPropagation(); onEndEdit(); } }} className="h-8 w-full text-[11px] border-none rounded-none focus-visible:ring-0 px-1 bg-transparent font-medium" placeholder="내용 입력..." />
               <Button 
                 type="button"
@@ -112,7 +112,7 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
         )
       }
       return (
-        <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative z-40 bg-white ring-2 ring-blue-500" style={{ width: config.width }}>
+        <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative h-8 z-40 bg-white ring-2 ring-blue-500 ring-inset overflow-hidden" style={{ minWidth: config.width, width: config.width }}>
           <Select
             open={true}
             value={isInOptions ? localValue : ''}
@@ -153,7 +153,7 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
       )
     }
     if (config.type === 'date') return (
-      <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative z-40 bg-white ring-2 ring-blue-500" style={{ width: config.width }}>
+      <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative h-8 z-40 bg-white ring-2 ring-blue-500 ring-inset overflow-hidden" style={{ minWidth: config.width, width: config.width }}>
         <Popover open={true} onOpenChange={(open) => !open && onEndEdit()}>
           <PopoverTrigger asChild><div className="h-8 w-full flex items-center justify-center text-[11px] cursor-pointer font-medium">{localValue || '-'}</div></PopoverTrigger>
           <PopoverContent className="w-auto p-0 z-[200]" align="start" side="bottom" avoidCollisions={true} collisionPadding={10}>
@@ -162,9 +162,9 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
         </Popover>
       </td>
     )
-    if (config.type === 'multi-select') return <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative z-40 bg-white" />;
+    if (config.type === 'multi-select') return <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative h-8 z-40 bg-white" style={{ minWidth: config.width, width: config.width }} />;
     return (
-      <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative z-40 bg-white ring-2 ring-blue-500" style={{ width: config.width }}>
+      <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative h-8 z-40 bg-white ring-2 ring-blue-500 ring-inset overflow-hidden" style={{ minWidth: config.width, width: config.width }}>
         <Input autoFocus value={localValue} onChange={(e) => setLocalValue(e.target.value)} onBlur={() => handleCommit(localValue)} onKeyDown={(e) => { if(e.key==='Enter') { e.preventDefault(); e.stopPropagation(); handleCommit(localValue); } if(e.key==='Escape') { e.preventDefault(); e.stopPropagation(); onEndEdit(); } }} className="h-8 w-full text-[11px] border-none rounded-none focus-visible:ring-0 px-1 bg-transparent font-medium" />
       </td>
     )
@@ -176,7 +176,7 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
       data-row={rIdx}
       data-col={cIdx}
       className={cn("p-0 border-r border-b relative h-8 transition-none select-none cursor-cell text-center overflow-hidden", isSelected && "bg-blue-50/70", isFocused && "ring-2 ring-blue-500 ring-inset z-10")}
-      style={{ minWidth: config.width, width: 'auto' }}
+      style={{ minWidth: config.width, width: config.width }}
       onMouseDown={(e) => onMouseDown(e.shiftKey)} onMouseEnter={onMouseEnter} onDoubleClick={() => !config.readOnly && config.type !== 'action' && onStartEdit()}
     >
       <div className="px-2 text-[11px] w-full h-full flex items-center justify-center whitespace-nowrap">
