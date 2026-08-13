@@ -30,8 +30,13 @@ export type UnregisteredCompanyData = {
   totalCount: number;
 };
 
+// 필요한 학생 필드만 선택 (전체 컬럼 대신 화면에 사용하는 필드만)
+const STUDENT_FIELDS = 'id, student_id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, military_status';
+const EMPLOYMENT_FIELDS = 'id, is_desiring_employment, employment_status, company_type, business_type, company, remarks';
+const TRAINING_FIELDS = 'id, student_id, training_order, company, start_date, end_date, stipend_status, hiring_status, conversion_date';
+
 /**
- * 기업 목록 검색 및 조회 (취업생/실습생 카운트 및 서버 메모리 캐싱 적용)
+ * 기업 목록 검색 및 조회 (취업생/실습생 카운트 + 캐싱)
  */
 export async function getCompanies(search?: string) {
   const cleanSearch = search ? search.trim() : '';
@@ -40,33 +45,30 @@ export async function getCompanies(search?: string) {
     async () => {
       const supabase = createAdminClient();
 
-      // 시스템 기준년도 조회
-      const { data: settingsData } = await supabase
-        .from('system_settings')
-        .select('value')
-        .eq('key', 'base_year')
-        .single();
-      const baseYear = settingsData?.value ? (settingsData.value as any).year : 2026;
-
-      let query = supabase.from('companies').select('*').order('name');
+      // 시스템 기준년도 + companies + 카운트 데이터를 병렬로 조회
+      let query = supabase.from('companies')
+        .select('id, name, location, industry, company_type')
+        .order('name');
       
       if (cleanSearch) {
         query = query.ilike('name', `%${cleanSearch}%`);
       }
-      
-      const [{ data, error }, { data: empCompanies }, { data: traineeRecords }] = await Promise.all([
+
+      const [{ data: settingsData }, { data, error }, { data: empCompanies }, { data: traineeRecords }] = await Promise.all([
+        supabase.from('system_settings').select('value').eq('key', 'base_year').single(),
         query,
-        supabase
-          .from('student_employments')
-          .select('company')
-          .eq('business_type', '취업')
-          .not('company', 'is', null),
-        supabase
-          .from('field_training_records')
+        supabase.from('student_employments').select('company').eq('business_type', '취업').not('company', 'is', null),
+        supabase.from('field_training_records')
           .select('company, student_id, hiring_status, students!inner(graduation_year)')
           .in('hiring_status', ['진행중', '채용전환'])
-          .gte('students.graduation_year', baseYear + 1)
       ]);
+
+      const baseYear = settingsData?.value ? (settingsData.value as any).year : 2026;
+
+      // baseYear 필터링 (trainees는 재학생만)
+      const filteredTrainees = (traineeRecords || []).filter((t: any) =>
+        t.students?.graduation_year >= baseYear + 1
+      );
 
       const empCounts: Record<string, number> = {};
       (empCompanies || []).forEach((e: any) => {
@@ -75,7 +77,7 @@ export async function getCompanies(search?: string) {
       });
 
       const traineeCounts: Record<string, number> = {};
-      (traineeRecords || []).forEach((t: any) => {
+      filteredTrainees.forEach((t: any) => {
         const name = (t.company || '').trim();
         if (name) traineeCounts[name] = (traineeCounts[name] || 0) + 1;
       });
@@ -92,65 +94,79 @@ export async function getCompanies(search?: string) {
       return { data: companiesWithCounts, error: error?.message || null };
     },
     [`companies-v3-${cleanSearch || 'all'}`],
-    {
-      revalidate: 3600,
-      tags: ['companies']
-    }
+    { revalidate: 3600, tags: ['companies'] }
   )();
 }
 
 /**
- * 특정 기업의 상세 정보와 소속 학생 통합 조회
+ * 특정 기업의 상세 정보와 소속 학생 통합 조회 (병렬 쿼리 + 캐시 적용)
  */
 export async function getCompanyDetails(companyName: string) {
-  const supabase = createAdminClient();
-  
-  // 1. 기업 정보
-  const { data: company } = await supabase
-    .from('companies')
-    .select('*')
-    .eq('name', companyName)
-    .single();
+  return unstable_cache(
+    async () => {
+      const supabase = createAdminClient();
 
-  // 시스템 기준년도 조회 (학년 필터링용)
-  const { data: settingsData } = await supabase
-    .from('system_settings')
-    .select('value')
-    .eq('key', 'base_year')
-    .single();
-  
-  const baseYear = settingsData?.value ? (settingsData.value as any).year : 2026;
-  const currentGradYears = [baseYear + 1, baseYear + 2, baseYear + 3];
-    
-  // 2. 취업생 정보 (졸업생 포함 전체 인적사항 + 취업/실습 이력)
-  const { data: employees } = await supabase
-    .from('student_employments')
-    .select('*')
-    .eq('company', companyName)
-    .eq('business_type', '취업');
-    
-  let employeeDetails: any[] = [];
-  if (employees && employees.length > 0) {
-    const empIds = employees.map((e: any) => e.id);
-    const { data: students } = await supabase
-      .from('students')
-      .select('*')
-      .in('id', empIds);
+      // 1단계: 기업 정보 + 기준년도 + 취업생 IDs + 실습 기록을 모두 병렬로 조회
+      const [
+        { data: company },
+        { data: settingsData },
+        { data: empRecords },
+        { data: traineeRecords }
+      ] = await Promise.all([
+        supabase.from('companies').select('*').eq('name', companyName).single(),
+        supabase.from('system_settings').select('value').eq('key', 'base_year').single(),
+        supabase.from('student_employments')
+          .select(EMPLOYMENT_FIELDS)
+          .eq('company', companyName)
+          .eq('business_type', '취업'),
+        supabase.from('field_training_records')
+          .select(TRAINING_FIELDS)
+          .eq('company', companyName)
+          .in('hiring_status', ['진행중', '채용전환'])
+      ]);
 
-    if (students && students.length > 0) {
-      const validEmpIds = students.map((s: any) => s.id);
-      const { data: trainings } = await supabase
-        .from('field_training_records')
-        .select('*')
-        .in('student_id', validEmpIds);
+      const baseYear = settingsData?.value ? (settingsData.value as any).year : 2026;
 
-      employeeDetails = students.map((s: any) => {
-        const emp = employees.find((e: any) => e.id === s.id) || {};
-        const sTrainings = (trainings || []).filter((t: any) => t.student_id === s.id);
+      // 2단계: 취업생 student IDs + 실습생 student IDs를 동시에 확보 → 학생 정보를 병렬 조회
+      const empIds = (empRecords || []).map((e: any) => e.id);
+      const traineeStudentIds = Array.from(
+        new Set((traineeRecords || []).map((t: any) => t.student_id))
+      );
+
+      // 2단계 병렬: 취업생 students + 실습생 students + 취업생 훈련기록 + 실습생 employment 정보
+      const [
+        { data: empStudents },
+        { data: traineeStudents },
+        { data: empTrainings },
+        { data: traineeEmployments },
+        { data: traineeAllTrainings }
+      ] = await Promise.all([
+        empIds.length > 0
+          ? supabase.from('students').select(STUDENT_FIELDS).in('id', empIds)
+          : Promise.resolve({ data: [] as any[] }),
+        traineeStudentIds.length > 0
+          ? supabase.from('students').select(STUDENT_FIELDS)
+              .in('id', traineeStudentIds)
+              .gte('graduation_year', baseYear + 1)
+          : Promise.resolve({ data: [] as any[] }),
+        empIds.length > 0
+          ? supabase.from('field_training_records').select(TRAINING_FIELDS).in('student_id', empIds)
+          : Promise.resolve({ data: [] as any[] }),
+        traineeStudentIds.length > 0
+          ? supabase.from('student_employments').select(EMPLOYMENT_FIELDS).in('id', traineeStudentIds)
+          : Promise.resolve({ data: [] as any[] }),
+        traineeStudentIds.length > 0
+          ? supabase.from('field_training_records').select(TRAINING_FIELDS).in('student_id', traineeStudentIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
+
+      // 취업생 데이터 조합
+      const employeeDetails = (empStudents || []).map((s: any) => {
+        const emp = (empRecords || []).find((e: any) => e.id === s.id) || {};
+        const sTrainings = (empTrainings || []).filter((t: any) => t.student_id === s.id);
         const latestT = sTrainings[0];
         return {
-          ...s,
-          ...emp,
+          ...s, ...emp,
           training_records: sTrainings,
           has_field_training: latestT ? 'O' : '',
           latest_training_company: latestT?.company,
@@ -161,45 +177,16 @@ export async function getCompanyDetails(companyName: string) {
           is_returned: latestT?.hiring_status === '복교' ? 'O' : '',
         };
       });
-    }
-  }
-  
-  // 3. 실습생 정보 (졸업생 제외 재학생 전용: baseYear + 1 이상 졸업년도 + 동일 업체명)
-  const { data: trainees } = await supabase
-    .from('field_training_records')
-    .select('*')
-    .eq('company', companyName)
-    .in('hiring_status', ['진행중', '채용전환']);
-    
-  let traineeDetails: any[] = [];
-  if (trainees && trainees.length > 0) {
-    const traineeStudentIds = Array.from(new Set(trainees.map((t: any) => t.student_id)));
-    const { data: students } = await supabase
-      .from('students')
-      .select('*')
-      .in('id', traineeStudentIds)
-      .gte('graduation_year', baseYear + 1);
-      
-    if (students && students.length > 0) {
-      const validStudentIds = students.map((s: any) => s.id);
-      const { data: employments } = await supabase
-        .from('student_employments')
-        .select('*')
-        .in('id', validStudentIds);
 
-      const { data: allTrainings } = await supabase
-        .from('field_training_records')
-        .select('*')
-        .in('student_id', validStudentIds);
-
-      traineeDetails = students.map((s: any) => {
-        const emp = (employments || []).find((e: any) => e.id === s.id) || {};
-        const trainee = trainees.find((t: any) => t.student_id === s.id);
-        const sTrainings = (allTrainings || []).filter((t: any) => t.student_id === s.id);
+      // 실습생 데이터 조합
+      const validTraineeIds = new Set((traineeStudents || []).map((s: any) => s.id));
+      const traineeDetails = (traineeStudents || []).map((s: any) => {
+        const emp = (traineeEmployments || []).find((e: any) => e.id === s.id) || {};
+        const trainee = (traineeRecords || []).find((t: any) => t.student_id === s.id);
+        const sTrainings = (traineeAllTrainings || []).filter((t: any) => t.student_id === s.id);
         const latestT = sTrainings[0];
         return {
-          ...s,
-          ...emp,
+          ...s, ...emp,
           hiring_status: trainee?.hiring_status,
           training_records: sTrainings,
           has_field_training: latestT ? 'O' : '',
@@ -211,16 +198,18 @@ export async function getCompanyDetails(companyName: string) {
           is_returned: latestT?.hiring_status === '복교' ? 'O' : '',
         };
       });
-    }
-  }
-  
-  return {
-    company,
-    name: companyName,
-    employees: employeeDetails,
-    trainees: traineeDetails,
-    baseYear
-  };
+
+      return {
+        company,
+        name: companyName,
+        employees: employeeDetails,
+        trainees: traineeDetails,
+        baseYear
+      };
+    },
+    [`company-details-v1-${companyName}`],
+    { revalidate: 600, tags: ['companies', `company-${companyName}`] }
+  )();
 }
 
 /**
@@ -231,15 +220,13 @@ export async function upsertCompany(companyData: CompanyData) {
   
   const { data, error } = await supabase
     .from('companies')
-    .upsert({
-      ...companyData,
-      updated_at: new Date().toISOString()
-    })
+    .upsert({ ...companyData, updated_at: new Date().toISOString() })
     .select()
     .single();
     
   if (!error) {
     revalidateTag('companies');
+    if (companyData.name) revalidateTag(`company-${companyData.name}`);
     revalidatePath('/company-info');
   }
 
@@ -251,7 +238,6 @@ export async function upsertCompany(companyData: CompanyData) {
  */
 export async function deleteCompany(id: string) {
   const supabase = createAdminClient();
-
   const { error } = await supabase.from('companies').delete().eq('id', id);
   
   if (!error) {
@@ -305,45 +291,42 @@ export async function bulkUpsertCompanies(companiesData: CompanyData[]) {
 }
 
 /**
- * 학생 취업현황이 '취업'으로 기록된 기업 중, 기업 마스터 DB(companies)에는 등록되지 않은 미등록 기업 목록 감지
+ * 미등록 기업 목록 감지 (캐시 10분)
  */
 export async function getUnregisteredCompanies() {
-  const supabase = createAdminClient();
+  return unstable_cache(
+    async () => {
+      const supabase = createAdminClient();
 
-  // 1. 등록된 기업 명단 조회
-  const { data: registeredCompanies } = await supabase
-    .from('companies')
-    .select('name');
-  
-  const registeredNameSet = new Set((registeredCompanies || []).map((c: any) => (c.name || '').trim()).filter(Boolean));
+      // 등록 기업명 + 취업 학생 기업명을 병렬로 조회
+      const [{ data: registeredCompanies }, { data: empCompanies }] = await Promise.all([
+        supabase.from('companies').select('name'),
+        supabase.from('student_employments').select('company').eq('business_type', '취업').not('company', 'is', null)
+      ]);
 
-  // 2. 취업현황이 '취업'인 학생의 기업명만 조회 (business_type === '취업')
-  const { data: empCompanies } = await supabase
-    .from('student_employments')
-    .select('company')
-    .eq('business_type', '취업')
-    .not('company', 'is', null);
+      const registeredNameSet = new Set(
+        (registeredCompanies || []).map((c: any) => (c.name || '').trim()).filter(Boolean)
+      );
 
-  const empCounts: Record<string, number> = {};
-  (empCompanies || []).forEach((e: any) => {
-    const name = (e.company || '').trim();
-    if (name) empCounts[name] = (empCounts[name] || 0) + 1;
-  });
-
-  const unregistered: UnregisteredCompanyData[] = [];
-
-  Object.entries(empCounts).forEach(([name, count]) => {
-    if (!registeredNameSet.has(name)) {
-      unregistered.push({
-        name,
-        employeeCount: count,
-        traineeCount: 0,
-        totalCount: count
+      const empCounts: Record<string, number> = {};
+      (empCompanies || []).forEach((e: any) => {
+        const name = (e.company || '').trim();
+        if (name) empCounts[name] = (empCounts[name] || 0) + 1;
       });
-    }
-  });
 
-  unregistered.sort((a, b) => b.totalCount - a.totalCount);
+      const unregistered: UnregisteredCompanyData[] = Object.entries(empCounts)
+        .filter(([name]) => !registeredNameSet.has(name))
+        .map(([name, count]) => ({
+          name,
+          employeeCount: count,
+          traineeCount: 0,
+          totalCount: count
+        }))
+        .sort((a, b) => b.totalCount - a.totalCount);
 
-  return unregistered;
+      return unregistered;
+    },
+    ['unregistered-companies-v1'],
+    { revalidate: 600, tags: ['companies'] }
+  )();
 }

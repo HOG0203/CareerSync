@@ -107,18 +107,38 @@ export default function CompanyInfoPage() {
   };
 
   const [unregisteredCompanies, setUnregisteredCompanies] = React.useState<UnregisteredCompanyData[]>([]);
+  const [unregisteredLoaded, setUnregisteredLoaded] = React.useState(false);
   const [companyFilterType, setCompanyFilterType] = React.useState<'registered' | 'unregistered'>('registered');
+
+  // hover prefetch 캐시 (이미 prefetch한 기업은 중복 요청 방지)
+  const prefetchedRef = React.useRef<Set<string>>(new Set());
 
   const loadCompanies = async (searchVal?: string) => {
     setIsLoading(true);
-    const [{ data }, unregData] = await Promise.all([
-      getCompanies(searchVal),
-      getUnregisteredCompanies()
-    ]);
+    // 초기 로드 시 등록 기업만 조회 (미등록 기업은 탭 클릭 시 지연 로드)
+    const { data } = await getCompanies(searchVal);
     if (data) setCompanies(data);
-    if (unregData) setUnregisteredCompanies(unregData);
     setIsLoading(false);
   };
+
+  // 미등록 기업 탭 클릭 시 지연 로드
+  const handleUnregisteredTabClick = async () => {
+    setCompanyFilterType('unregistered');
+    if (!unregisteredLoaded) {
+      const data = await getUnregisteredCompanies();
+      if (data) setUnregisteredCompanies(data);
+      setUnregisteredLoaded(true);
+    }
+  };
+
+  // hover 시 상세 데이터 prefetch (캐시 워밍)
+  const handleCompanyHover = (companyName: string) => {
+    if (prefetchedRef.current.has(companyName)) return;
+    prefetchedRef.current.add(companyName);
+    // fire-and-forget: 서버 캐시에 워밍만 하면 됨
+    getCompanyDetails(companyName).catch(() => {});
+  };
+
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -331,7 +351,7 @@ export default function CompanyInfoPage() {
                 
                 <button
                   type="button"
-                  onClick={() => setCompanyFilterType('unregistered')}
+                  onClick={handleUnregisteredTabClick}
                   className={cn(
                     "flex-1 py-1.5 px-2 rounded-lg text-center transition-all flex items-center justify-center gap-1 text-[11px]",
                     companyFilterType === 'unregistered' 
@@ -385,6 +405,7 @@ export default function CompanyInfoPage() {
                     <div 
                       key={company.id} 
                       onClick={() => handleSelectCompany(company.name)}
+                      onMouseEnter={() => handleCompanyHover(company.name)}
                       className={cn(
                         "p-3 sm:p-4 cursor-pointer hover:bg-slate-50 active:bg-blue-50/50 transition-all group relative border-l-4",
                         selectedCompany?.company?.name === company.name 
