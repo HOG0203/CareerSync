@@ -21,6 +21,13 @@ export type CompanyData = {
   strengths?: string;
 };
 
+export type UnregisteredCompanyData = {
+  name: string;
+  employeeCount: number;
+  traineeCount: number;
+  totalCount: number;
+};
+
 /**
  * 기업 목록 검색 및 조회 (서버 메모리 캐싱 적용)
  */
@@ -246,4 +253,63 @@ export async function bulkUpsertCompanies(companiesData: CompanyData[]) {
   }
 
   return { count: data ? data.length : payload.length, error: error?.message };
+}
+
+/**
+ * 학생 취업/실습 기록에는 있으나 기업 마스터 DB(companies)에는 등록되지 않은 기업 목록 감지
+ */
+export async function getUnregisteredCompanies() {
+  const supabase = createAdminClient();
+
+  // 1. 등록된 기업 명단 조회
+  const { data: registeredCompanies } = await supabase
+    .from('companies')
+    .select('name');
+  
+  const registeredNameSet = new Set((registeredCompanies || []).map((c: any) => (c.name || '').trim()).filter(Boolean));
+
+  // 2. 취업생의 기업명 조회
+  const { data: empCompanies } = await supabase
+    .from('student_employments')
+    .select('company')
+    .not('company', 'is', null);
+
+  // 3. 실습생의 기업명 조회
+  const { data: trainCompanies } = await supabase
+    .from('field_training_records')
+    .select('company')
+    .not('company', 'is', null);
+
+  const empCounts: Record<string, number> = {};
+  (empCompanies || []).forEach((e: any) => {
+    const name = (e.company || '').trim();
+    if (name) empCounts[name] = (empCounts[name] || 0) + 1;
+  });
+
+  const trainCounts: Record<string, number> = {};
+  (trainCompanies || []).forEach((t: any) => {
+    const name = (t.company || '').trim();
+    if (name) trainCounts[name] = (trainCounts[name] || 0) + 1;
+  });
+
+  const allDetectedNames = Array.from(new Set([...Object.keys(empCounts), ...Object.keys(trainCounts)]));
+
+  const unregistered: UnregisteredCompanyData[] = [];
+
+  allDetectedNames.forEach(name => {
+    if (!registeredNameSet.has(name)) {
+      const employeeCount = empCounts[name] || 0;
+      const traineeCount = trainCounts[name] || 0;
+      unregistered.push({
+        name,
+        employeeCount,
+        traineeCount,
+        totalCount: employeeCount + traineeCount
+      });
+    }
+  });
+
+  unregistered.sort((a, b) => b.totalCount - a.totalCount);
+
+  return unregistered;
 }

@@ -6,7 +6,9 @@ import {
   getCompanyDetails, 
   upsertCompany, 
   deleteCompany,
-  CompanyData 
+  getUnregisteredCompanies,
+  CompanyData,
+  UnregisteredCompanyData 
 } from './actions';
 import { 
   Search, 
@@ -34,7 +36,8 @@ import {
   ArrowUpDown,
   CheckCircle2,
   ChevronRight,
-  FileSpreadsheet
+  FileSpreadsheet,
+  AlertTriangle
 } from 'lucide-react';
 import { StudentPopover } from '@/components/dashboard/student-popover';
 import { fetchYearlyRankings } from '@/app/(dashboard)/employment-status/actions';
@@ -103,10 +106,17 @@ export default function CompanyInfoPage() {
     }
   };
 
+  const [unregisteredCompanies, setUnregisteredCompanies] = React.useState<UnregisteredCompanyData[]>([]);
+  const [companyFilterType, setCompanyFilterType] = React.useState<'registered' | 'unregistered'>('registered');
+
   const loadCompanies = async (searchVal?: string) => {
     setIsLoading(true);
-    const { data } = await getCompanies(searchVal);
+    const [{ data }, unregData] = await Promise.all([
+      getCompanies(searchVal),
+      getUnregisteredCompanies()
+    ]);
     if (data) setCompanies(data);
+    if (unregData) setUnregisteredCompanies(unregData);
     setIsLoading(false);
   };
 
@@ -296,10 +306,52 @@ export default function CompanyInfoPage() {
                   <Building2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500" />
                   <span>업체 리스트</span>
                   <span className="text-[9.5px] sm:text-[10px] bg-blue-50 text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded-full font-bold">
-                    {companies.length}개 업체
+                    {companyFilterType === 'registered' ? `${companies.length}개` : `${unregisteredCompanies.length}개`}
                   </span>
                 </div>
               </div>
+
+              {/* 마스터 등록 기업 VS 학생 감지 미등록 기업 세그먼트 필터 */}
+              <div className="flex items-center gap-1 p-1 bg-slate-200/70 rounded-xl text-xs font-bold my-1">
+                <button
+                  type="button"
+                  onClick={() => setCompanyFilterType('registered')}
+                  className={cn(
+                    "flex-1 py-1.5 px-2 rounded-lg text-center transition-all flex items-center justify-center gap-1.5 text-[11px]",
+                    companyFilterType === 'registered' 
+                      ? "bg-white text-slate-900 shadow-xs font-extrabold" 
+                      : "text-slate-500 hover:text-slate-900"
+                  )}
+                >
+                  <span>등록 기업</span>
+                  <span className="bg-slate-200/80 text-slate-700 text-[9.5px] px-1.5 py-0.2 rounded-full font-bold">
+                    {companies.length}
+                  </span>
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => setCompanyFilterType('unregistered')}
+                  className={cn(
+                    "flex-1 py-1.5 px-2 rounded-lg text-center transition-all flex items-center justify-center gap-1 text-[11px]",
+                    companyFilterType === 'unregistered' 
+                      ? "bg-amber-500 text-white shadow-xs font-extrabold" 
+                      : "text-amber-800 hover:bg-amber-100/50"
+                  )}
+                >
+                  <AlertTriangle className="h-3 w-3 shrink-0" />
+                  <span>미등록</span>
+                  {unregisteredCompanies.length > 0 && (
+                    <span className={cn(
+                      "text-[9.5px] px-1.5 py-0.2 rounded-full font-bold",
+                      companyFilterType === 'unregistered' ? "bg-white/30 text-white" : "bg-amber-200 text-amber-900"
+                    )}>
+                      {unregisteredCompanies.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
               <form onSubmit={handleSearch} className="relative w-full">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                 <Input 
@@ -311,15 +363,16 @@ export default function CompanyInfoPage() {
               </form>
             </div>
 
-            <CardContent className="p-0 overflow-y-auto flex-1 min-h-0">
+            <CardContent className="p-0 overflow-y-auto flex-1 min-h-0 divide-y divide-slate-100">
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3">
                   <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
                   <p className="text-xs font-medium text-slate-400">목록을 불러오는 중...</p>
                 </div>
-              ) : companies.length > 0 ? (
-                <div className="divide-y">
-                  {companies.map((company) => (
+              ) : companyFilterType === 'registered' ? (
+                /* 등록 기업 목록 */
+                companies.length > 0 ? (
+                  companies.map((company) => (
                     <div 
                       key={company.id}
                       onClick={() => handleSelectCompany(company.name)}
@@ -353,12 +406,64 @@ export default function CompanyInfoPage() {
                         )}
                       </div>
                     </div>
-                  ))}
-                </div>
+                  ))
+                ) : (
+                  <div className="text-center py-20 text-slate-400">
+                    <p className="text-sm">등록된 기업 검색 결과가 없습니다.</p>
+                  </div>
+                )
               ) : (
-                <div className="text-center py-20 text-slate-400">
-                  <p className="text-sm">검색 결과가 없습니다.</p>
-                </div>
+                /* 미등록 기업 목록 (학생 데이터 감지) */
+                unregisteredCompanies.filter(u => !search || u.name.toLowerCase().includes(search.toLowerCase())).length > 0 ? (
+                  unregisteredCompanies
+                    .filter(u => !search || u.name.toLowerCase().includes(search.toLowerCase()))
+                    .map((item) => {
+                      const isSelected = selectedCompany?.name === item.name || selectedCompany?.company?.name === item.name;
+                      return (
+                        <div 
+                          key={item.name}
+                          onClick={() => handleSelectCompany(item.name)}
+                          className={cn(
+                            "p-2.5 sm:p-4 cursor-pointer hover:bg-amber-50/50 transition-all group relative border-l-4",
+                            isSelected 
+                              ? "bg-amber-50/90 border-amber-500 shadow-sm" 
+                              : "border-transparent"
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <p className={cn(
+                                  "font-bold text-sm truncate transition-colors",
+                                  isSelected ? "text-amber-800" : "text-slate-900 group-hover:text-amber-700"
+                                )}>
+                                  {item.name}
+                                </p>
+                                <span className="text-[9px] font-black bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded border border-amber-200 shrink-0 flex items-center gap-0.5">
+                                  <AlertTriangle className="h-2.5 w-2.5 text-amber-600" />
+                                  미등록
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
+                                <span className="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-bold border border-amber-200/60">
+                                  학생 감지 {item.totalCount}명
+                                </span>
+                                <span>(취업 {item.employeeCount} / 실습 {item.traineeCount})</span>
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <ChevronRight className="h-4 w-4 text-amber-600 shrink-0 animate-in slide-in-from-left-1 duration-200" />
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                ) : (
+                  <div className="text-center py-20 text-slate-400">
+                    <p className="text-sm font-medium">감지된 미등록 기업이 없습니다.</p>
+                    <p className="text-xs text-slate-400 mt-1">모든 학생 취업처가 마스터 DB에 정식 등록되어 있습니다. 🎉</p>
+                  </div>
+                )
               )}
             </CardContent>
           </Card>
@@ -376,100 +481,138 @@ export default function CompanyInfoPage() {
             </div>
           ) : selectedCompany ? (
             <div className="space-y-6">
-              {/* 기업 기본 정보 카드 */}
-              <Card className="border-none shadow-md overflow-hidden bg-white">
-                <div className="h-2 bg-blue-600 w-full" />
-                <CardHeader className="pb-4">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <div className="flex items-center flex-wrap gap-2 sm:gap-3">
-                        <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 shrink-0" />
-                        <CardTitle className="text-xl sm:text-2xl font-black text-slate-900 break-all">{selectedCompany.company?.name}</CardTitle>
-                        <span className="bg-blue-100 text-blue-700 text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
-                          {selectedCompany.company?.company_type || '기업형태'}
-                        </span>
+              {/* 미등록 기업인 경우 경고 알림 및 정식 등록 액션 카드를 상단에 배치 */}
+              {!selectedCompany.company ? (
+                <Card className="border-amber-200 bg-amber-50/80 shadow-sm rounded-2xl overflow-hidden">
+                  <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2.5 bg-amber-100 rounded-xl text-amber-700 shrink-0 mt-0.5 sm:mt-0">
+                        <AlertTriangle className="h-5 w-5" />
                       </div>
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 text-[11px] sm:text-sm text-slate-500 font-medium">
-                        <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500" /> {selectedCompany.company?.location || '소재지 미등록'}</span>
-                        <span className="flex items-center gap-1.5"><Briefcase className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-500" /> {selectedCompany.company?.industry || '업종 미등록'}</span>
+                      <div>
+                        <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-2 flex-wrap">
+                          <span>{selectedCompany.name}</span>
+                          <span className="text-[10px] font-black bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full border border-amber-300">
+                            미등록 기업 감지
+                          </span>
+                        </h4>
+                        <p className="text-slate-600 text-xs mt-1 leading-relaxed">
+                          학생 취업 및 현장실습 데이터에 총 <strong>{selectedCompany.employees.length + selectedCompany.trainees.length}명</strong> (취업생 {selectedCompany.employees.length}명 / 실습생 {selectedCompany.trainees.length}명)의 소속으로 기록되어 있으나, 기업 마스터 DB에는 아직 등록되지 않았습니다.
+                        </p>
                       </div>
                     </div>
+
                     {isAdmin && (
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => {
-                            setEditingCompany(selectedCompany.company);
-                            setIsEditModalOpen(true);
-                          }}
-                          className="h-8 font-bold border-blue-200 text-blue-600 hover:bg-blue-50"
-                        >
-                          <Edit2 className="h-3.5 w-3.5 mr-1" /> 정보 수정
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleDelete(selectedCompany.company?.id)}
-                          className="h-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setEditingCompany({ name: selectedCompany.name || '' });
+                          setIsEditModalOpen(true);
+                        }}
+                        className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs shrink-0 gap-1.5 h-9 w-full sm:w-auto"
+                      >
+                        <Plus className="h-4 w-4" />
+                        마스터 DB에 정식 등록하기
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                /* 기업 기본 정보 카드 (등록 기업인 경우만 표시) */
+                <Card className="border-none shadow-md overflow-hidden bg-white">
+                  <div className="h-2 bg-blue-600 w-full" />
+                  <CardHeader className="pb-4">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center flex-wrap gap-2 sm:gap-3">
+                          <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 shrink-0" />
+                          <CardTitle className="text-xl sm:text-2xl font-black text-slate-900 break-all">{selectedCompany.company?.name}</CardTitle>
+                          <span className="bg-blue-100 text-blue-700 text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
+                            {selectedCompany.company?.company_type || '기업형태'}
+                          </span>
+                        </div>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 text-[11px] sm:text-sm text-slate-500 font-medium">
+                          <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500" /> {selectedCompany.company?.location || '소재지 미등록'}</span>
+                          <span className="flex items-center gap-1.5"><Briefcase className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-500" /> {selectedCompany.company?.industry || '업종 미등록'}</span>
+                        </div>
+                      </div>
+                      {isAdmin && (
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => {
+                              setEditingCompany(selectedCompany.company);
+                              setIsEditModalOpen(true);
+                            }}
+                            className="h-8 font-bold border-blue-200 text-blue-600 hover:bg-blue-50"
+                          >
+                            <Edit2 className="h-3.5 w-3.5 mr-1" /> 정보 수정
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleDelete(selectedCompany.company?.id)}
+                            className="h-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                          <TrendingUp className="h-3 w-3" /> 채용 정보
+                        </p>
+                        <ul className="space-y-2 text-xs">
+                          <li className="flex justify-between"><span className="text-slate-500">직무</span> <span className="font-bold text-slate-700">{selectedCompany.company?.job_description || '-'}</span></li>
+                          <li className="flex justify-between"><span className="text-slate-500">급여</span> <span className="font-bold text-blue-600">{selectedCompany.company?.salary || '-'}</span></li>
+                          <li className="flex justify-between"><span className="text-slate-500">상여</span> <span className="font-bold text-indigo-600">{selectedCompany.company?.bonus || '-'}</span></li>
+                        </ul>
+                      </div>
+                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                          <Clock className="h-3 w-3" /> 근무 환경
+                        </p>
+                        <ul className="space-y-2 text-xs">
+                          <li className="flex justify-between"><span className="text-slate-500">근무시간</span> <span className="font-bold text-slate-700">{selectedCompany.company?.working_hours || '-'}</span></li>
+                          <li className="flex justify-between"><span className="text-slate-500">고용형태</span> <span className="font-bold text-slate-700">{selectedCompany.company?.employment_type || '-'}</span></li>
+                          <li className="flex justify-between flex-col gap-1">
+                            <span className="text-slate-500">복리후생</span> 
+                            <span className="font-medium text-slate-600 text-[11px] leading-tight line-clamp-2">{selectedCompany.company?.welfare || '-'}</span>
+                          </li>
+                        </ul>
+                      </div>
+                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                          <Award className="h-3 w-3" /> 자격/요구사항
+                        </p>
+                        <ul className="space-y-2 text-xs">
+                          <li className="flex justify-between"><span className="text-slate-500">대상전공</span> <span className="font-bold text-slate-700">{selectedCompany.company?.required_major || '-'}</span></li>
+                          <li className="flex justify-between flex-col gap-1">
+                            <span className="text-slate-500">필수자격증</span> 
+                            <span className="font-bold text-emerald-600 text-[11px]">{selectedCompany.company?.required_certificates || '-'}</span>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                    
+                    {selectedCompany.company?.strengths && (
+                      <div className="mt-4 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
+                        <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                          <Info className="h-3 w-3" /> 기업 특장점
+                        </p>
+                        <p className="text-xs text-slate-700 leading-relaxed font-medium">
+                          {selectedCompany.company?.strengths}
+                        </p>
                       </div>
                     )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                        <TrendingUp className="h-3 w-3" /> 채용 정보
-                      </p>
-                      <ul className="space-y-2 text-xs">
-                        <li className="flex justify-between"><span className="text-slate-500">직무</span> <span className="font-bold text-slate-700">{selectedCompany.company?.job_description || '-'}</span></li>
-                        <li className="flex justify-between"><span className="text-slate-500">급여</span> <span className="font-bold text-blue-600">{selectedCompany.company?.salary || '-'}</span></li>
-                        <li className="flex justify-between"><span className="text-slate-500">상여</span> <span className="font-bold text-indigo-600">{selectedCompany.company?.bonus || '-'}</span></li>
-                      </ul>
-                    </div>
-                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                        <Clock className="h-3 w-3" /> 근무 환경
-                      </p>
-                      <ul className="space-y-2 text-xs">
-                        <li className="flex justify-between"><span className="text-slate-500">근무시간</span> <span className="font-bold text-slate-700">{selectedCompany.company?.working_hours || '-'}</span></li>
-                        <li className="flex justify-between"><span className="text-slate-500">고용형태</span> <span className="font-bold text-slate-700">{selectedCompany.company?.employment_type || '-'}</span></li>
-                        <li className="flex justify-between flex-col gap-1">
-                          <span className="text-slate-500">복리후생</span> 
-                          <span className="font-medium text-slate-600 text-[11px] leading-tight line-clamp-2">{selectedCompany.company?.welfare || '-'}</span>
-                        </li>
-                      </ul>
-                    </div>
-                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                        <Award className="h-3 w-3" /> 자격/요구사항
-                      </p>
-                      <ul className="space-y-2 text-xs">
-                        <li className="flex justify-between"><span className="text-slate-500">대상전공</span> <span className="font-bold text-slate-700">{selectedCompany.company?.required_major || '-'}</span></li>
-                        <li className="flex justify-between flex-col gap-1">
-                          <span className="text-slate-500">필수자격증</span> 
-                          <span className="font-bold text-emerald-600 text-[11px]">{selectedCompany.company?.required_certificates || '-'}</span>
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                  
-                  {selectedCompany.company?.strengths && (
-                    <div className="mt-4 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
-                      <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                        <Info className="h-3 w-3" /> 기업 특장점
-                      </p>
-                      <p className="text-xs text-slate-700 leading-relaxed font-medium">
-                        {selectedCompany.company?.strengths}
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* 학생 현황 탭 */}
               <Tabs defaultValue="employees" className="w-full">
