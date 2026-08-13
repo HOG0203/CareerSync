@@ -36,6 +36,8 @@ import {
   ChevronRight,
   FileSpreadsheet
 } from 'lucide-react';
+import { StudentPopover } from '@/components/dashboard/student-popover';
+import { fetchYearlyRankings } from '@/app/(dashboard)/employment-status/actions';
 import { ImportCompanyModal } from './import-company-modal';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -113,14 +115,36 @@ export default function CompanyInfoPage() {
     loadCompanies(search);
   };
 
+  const [rankingMap, setRankingMap] = React.useState<Record<string, any>>({});
+  const [isRankingsLoading, setIsRankingsLoading] = React.useState(false);
+
   const handleSelectCompany = async (companyName: string) => {
     // 모바일에서는 즉시 상세 탭으로 전환하여 클릭 피드백 제공
     setMobileTab('details');
     
     setIsDetailsLoading(true);
+    setIsRankingsLoading(true);
     const details = await getCompanyDetails(companyName);
     setSelectedCompany(details);
     setIsDetailsLoading(false);
+
+    if (details && (details.employees.length > 0 || details.trainees.length > 0)) {
+      const allStudents = [...details.employees, ...details.trainees];
+      const gradYears = Array.from(new Set(allStudents.map((s: any) => s.graduation_year).filter(Boolean)));
+      
+      const baseYear = details.baseYear || 2026;
+      const rankingPromises = gradYears.map((gy: any) => fetchYearlyRankings(Number(gy), baseYear));
+      const results = await Promise.all(rankingPromises);
+      
+      const combinedMap: Record<string, any> = {};
+      results.forEach(resMap => {
+        if (resMap) {
+          Object.assign(combinedMap, resMap);
+        }
+      });
+      setRankingMap(combinedMap);
+    }
+    setIsRankingsLoading(false);
   };
 
   const handleUpsert = async () => {
@@ -476,8 +500,19 @@ export default function CompanyInfoPage() {
                           <tbody className="divide-y">
                             {getSortedData(selectedCompany.employees, employeeSort).map((s: any) => (
                               <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                                <td className="px-6 py-4 font-bold text-slate-900">{s.student_name}</td>
-                                <td className="px-4 py-4 text-slate-500">{s.graduation_year}년</td>
+                                <td className="px-6 py-4 font-bold text-slate-900">
+                                  <StudentPopover 
+                                    student={s} 
+                                    rankingSummary={rankingMap[s.id]} 
+                                    isRankingsLoading={isRankingsLoading}
+                                    baseYear={selectedCompany.baseYear || 2026}
+                                  >
+                                    <span className="hover:text-indigo-600 cursor-pointer underline decoration-indigo-300 underline-offset-2 transition-colors">
+                                      {s.student_name}
+                                    </span>
+                                  </StudentPopover>
+                                </td>
+                                <td className="px-4 py-4 text-slate-500">{s.graduation_year ? `${s.graduation_year}년` : '-'}</td>
                                 <td className="px-4 py-4 font-medium text-slate-600">{s.major}</td>
                                 <td className="px-4 py-4 text-slate-500">{s.class_info}반 {s.student_number}번</td>
                               </tr>
@@ -507,8 +542,19 @@ export default function CompanyInfoPage() {
                           <tbody className="divide-y">
                             {getSortedData(selectedCompany.trainees, traineeSort).map((s: any) => (
                               <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                                <td className="px-6 py-4 font-bold text-slate-900">{s.student_name}</td>
-                                <td className="px-4 py-4 text-slate-500">{s.graduation_year}년</td>
+                                <td className="px-6 py-4 font-bold text-slate-900">
+                                  <StudentPopover 
+                                    student={s} 
+                                    rankingSummary={rankingMap[s.id]} 
+                                    isRankingsLoading={isRankingsLoading}
+                                    baseYear={selectedCompany.baseYear || 2026}
+                                  >
+                                    <span className="hover:text-indigo-600 cursor-pointer underline decoration-indigo-300 underline-offset-2 transition-colors">
+                                      {s.student_name}
+                                    </span>
+                                  </StudentPopover>
+                                </td>
+                                <td className="px-4 py-4 text-slate-500">{s.graduation_year ? `${s.graduation_year}년` : '-'}</td>
                                 <td className="px-4 py-4 font-medium text-slate-600">{s.major}</td>
                                 <td className="px-4 py-4">
                                   <span className={cn(

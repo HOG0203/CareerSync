@@ -68,46 +68,93 @@ export async function getCompanyDetails(companyName: string) {
     .single();
   
   const baseYear = settingsData?.value ? (settingsData.value as any).year : 2026;
-  // 현재 학년도 학생들의 졸업연도 (1~3학년)
   const currentGradYears = [baseYear + 1, baseYear + 2, baseYear + 3];
     
-  // 2. 취업생 정보 (취업생은 졸업생도 포함될 수 있으므로 졸업연도 필터 제외 또는 별도 처리 가능하나, 
-  // 여기서는 기존 로직 유지 - 모든 졸업연도의 '취업' 상태 학생)
+  // 2. 취업생 정보 (전체 인적사항 + 취업/실습 이력)
   const { data: employees } = await supabase
     .from('student_employments')
-    .select('id, company, business_type')
+    .select('*')
     .eq('company', companyName)
     .eq('business_type', '취업');
     
   let employeeDetails: any[] = [];
   if (employees && employees.length > 0) {
+    const empIds = employees.map((e: any) => e.id);
     const { data: students } = await supabase
       .from('students')
-      .select('id, student_name, major, class_info, student_number, graduation_year')
-      .in('id', employees.map((e: any) => e.id));
-    employeeDetails = students || [];
+      .select('*')
+      .in('id', empIds);
+
+    const { data: trainings } = await supabase
+      .from('field_training_records')
+      .select('*')
+      .in('student_id', empIds);
+
+    employeeDetails = (students || []).map((s: any) => {
+      const emp = employees.find((e: any) => e.id === s.id) || {};
+      const sTrainings = (trainings || []).filter((t: any) => t.student_id === s.id);
+      const latestT = sTrainings[0];
+      return {
+        ...s,
+        ...emp,
+        training_records: sTrainings,
+        has_field_training: latestT ? 'O' : '',
+        latest_training_company: latestT?.company,
+        start_date: latestT?.start_date,
+        end_date: latestT?.end_date,
+        training_stipend_status: latestT?.stipend_status,
+        is_hiring_conversion: latestT?.hiring_status === '채용전환' ? latestT?.conversion_date : '',
+        is_returned: latestT?.hiring_status === '복교' ? 'O' : '',
+      };
+    });
   }
   
-  // 3. 실습생 정보 (현재 학년도 학생만 표시)
+  // 3. 실습생 정보 (현재 재학생 기준 + 전체 인적사항)
   const { data: trainees } = await supabase
     .from('field_training_records')
-    .select('student_id, company, hiring_status')
+    .select('*')
     .eq('company', companyName)
     .in('hiring_status', ['진행중', '채용전환']);
     
   let traineeDetails: any[] = [];
   if (trainees && trainees.length > 0) {
+    const traineeStudentIds = Array.from(new Set(trainees.map((t: any) => t.student_id)));
     const { data: students } = await supabase
       .from('students')
-      .select('id, student_name, major, class_info, student_number, graduation_year')
-      .in('id', trainees.map((t: any) => t.student_id))
-      .in('graduation_year', currentGradYears); // 현재 재학생(1,2,3학년)만 필터링
+      .select('*')
+      .in('id', traineeStudentIds)
+      .in('graduation_year', currentGradYears);
       
-    // students가 필터링되었으므로, 필터링된 학생들에 대해서만 trainee 정보를 조합해야 함
     if (students && students.length > 0) {
+      const validStudentIds = students.map((s: any) => s.id);
+      const { data: employments } = await supabase
+        .from('student_employments')
+        .select('*')
+        .in('id', validStudentIds);
+
+      const { data: allTrainings } = await supabase
+        .from('field_training_records')
+        .select('*')
+        .in('student_id', validStudentIds);
+
       traineeDetails = students.map((s: any) => {
+        const emp = (employments || []).find((e: any) => e.id === s.id) || {};
         const trainee = trainees.find((t: any) => t.student_id === s.id);
-        return { ...s, hiring_status: trainee?.hiring_status };
+        const sTrainings = (allTrainings || []).filter((t: any) => t.student_id === s.id);
+        const latestT = sTrainings[0];
+        return {
+          ...s,
+          ...emp,
+          hiring_status: trainee?.hiring_status,
+          training_records: sTrainings,
+          has_field_training: latestT ? 'O' : '',
+          latest_training_company: latestT?.company,
+          start_date: latestT?.start_date,
+          end_date: latestT?.end_date,
+          training_stipend_status: latestT?.stipend_status,
+          is_hiring_conversion: latestT?.hiring_status === '채용전환' ? latestT?.conversion_date : '',
+          is_returned: latestT?.hiring_status === '복교' ? 'O' : '',
+        };
       });
     }
   }
@@ -115,7 +162,8 @@ export async function getCompanyDetails(companyName: string) {
   return {
     company,
     employees: employeeDetails,
-    trainees: traineeDetails
+    trainees: traineeDetails,
+    baseYear
   };
 }
 

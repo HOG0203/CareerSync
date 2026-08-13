@@ -25,7 +25,8 @@ import {
   Loader2,
   User,
   ClipboardList,
-  MessageSquare
+  MessageSquare,
+  Phone
 } from 'lucide-react';
 import { getStudentScoresById, updateStudentField } from '@/app/students/actions';
 import { Button } from '@/components/ui/button';
@@ -135,17 +136,34 @@ export function StudentPopover({
 
   const popoverBody = (
     <div className="space-y-4">
-      <div className="flex items-center justify-between border-b-2 pb-1.5 mb-1">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="font-bold text-[15px] text-blue-900">{student.student_name}</span>
-          {student.teacher_name && (
-            <span className="text-[10px] text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 font-bold shrink-0">
-              {student.teacher_name}T
-            </span>
-          )}
+      <div className="flex items-start justify-between border-b-2 pb-2 mb-1 gap-2">
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="font-bold text-[15px] text-blue-900">{student.student_name}</span>
+            {student.teacher_name && (
+              <span className="text-[10px] text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 font-bold shrink-0">
+                {student.teacher_name}T
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium flex-wrap">
+            {(student.major || student.class_info || student.student_number) && (
+              <span>{[student.major, student.class_info ? `${student.class_info}반` : '', student.student_number ? `${student.student_number}번` : ''].filter(Boolean).join(' • ')}</span>
+            )}
+            {student.phone_number && (
+              <a 
+                href={`tel:${student.phone_number}`}
+                onClick={(e) => e.stopPropagation()}
+                className="text-blue-600 hover:underline flex items-center gap-0.5 font-bold"
+              >
+                <Phone className="h-3 w-3 text-blue-500" />
+                {student.phone_number}
+              </a>
+            )}
+          </div>
         </div>
         <span className={cn(
-          "text-[10px] px-2 py-0.5 rounded-full font-bold",
+          "text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 mt-0.5",
           isLowerGrade ? (
             student.career_aspiration === '취업' ? "bg-emerald-100 text-emerald-700" : 
             student.career_aspiration === '진학' ? "bg-rose-100 text-rose-700" : 
