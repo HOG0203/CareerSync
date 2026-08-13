@@ -169,9 +169,10 @@ export function StandardSpreadsheetTable({
             <tbody>
               {(() => {
                 const totalCount = filteredData.length;
-                // 내부 고정 스크롤 여부 자동 감지
-                const isInnerScroll = containerHeight > 0 && containerHeight < totalCount * ROW_HEIGHT;
-                const OVERSCAN = 8;
+                // 가상 스크롤 임계값 적용 (600명 이하 테이블은 전체 렌더링하여 스크롤 중 잘림 현상 방지)
+                const ENABLE_VIRTUALIZATION = totalCount > 600;
+                const isInnerScroll = ENABLE_VIRTUALIZATION && containerHeight > 0 && containerHeight < totalCount * ROW_HEIGHT;
+                const OVERSCAN = 10;
                 const visStart = isInnerScroll ? Math.max(0, Math.floor((scrollTop - HEADER_HEIGHT) / ROW_HEIGHT) - OVERSCAN) : 0;
                 const visEnd = isInnerScroll ? Math.min(totalCount - 1, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + OVERSCAN) : totalCount - 1;
                 // 편집 중인 셀이 가상 스크롤 범위 밖으로 잘리지 않도록 범위에 포함
