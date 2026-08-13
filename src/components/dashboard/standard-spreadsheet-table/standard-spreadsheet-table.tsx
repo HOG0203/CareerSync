@@ -193,10 +193,10 @@ export function StandardSpreadsheetTable({
         )}
       </div>
 
-      {/* 데스크톱: 스프레드시트 테이블 */}
+      {/* 데스크톱: 스프레드시트 테이블 (내부 전용 스크롤박스) */}
       {!isMobile ? (
         <div className="flex flex-col flex-1 min-h-0 border rounded-md shadow-inner bg-white overflow-hidden">
-          <div ref={containerRef} className="relative outline-none bg-white overflow-auto flex-1 min-h-0 custom-scrollbar focus-visible:ring-0" onScroll={handleTableScroll} onKeyDown={handleKeyDown} tabIndex={0}>
+          <div ref={containerRef} className="relative outline-none bg-white overflow-auto h-[calc(100vh-210px)] custom-scrollbar focus-visible:ring-0" onScroll={handleTableScroll} onKeyDown={handleKeyDown} tabIndex={0}>
             <table className="text-[11px] border-collapse table-auto min-w-max text-center relative border-none">
               <colgroup>
                 <col style={{ width: 32 }} />
