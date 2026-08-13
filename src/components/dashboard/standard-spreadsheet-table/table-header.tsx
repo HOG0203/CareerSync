@@ -7,20 +7,22 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 
-export const TableHeader = React.memo(({ columns, groupHeaders, filterOptions, columnFilters, onFilterChange, onSelectAll, isAllSelected }: any) => {
+export const TableHeader = React.memo(({ columns, groupHeaders, filterOptions, columnFilters, onFilterChange, onSelectAll, isAllSelected, hideCheckbox }: any) => {
   const hasGroup = !!groupHeaders;
   return (
     <thead className="text-muted-foreground select-none relative z-30">
       {groupHeaders && (
         <tr className="h-10">
-          <th className="sticky top-0 z-40 border-r border-b w-8 bg-slate-50 shadow-[0_1px_0_0_rgba(0,0,0,0.1)]"></th>
+          {!hideCheckbox && <th className="sticky top-0 z-40 border-r border-b w-8 bg-slate-50 shadow-[0_1px_0_0_rgba(0,0,0,0.1)]"></th>}
           {groupHeaders.map((h: any, i: number) => (
             <th key={i} colSpan={h.colSpan} className={cn("sticky top-0 z-40 text-center border-r border-b font-bold p-0 text-[11px] bg-slate-50 shadow-[0_1px_0_0_rgba(0,0,0,0.1)]", h.className)}>{h.label}</th>
           ))}
         </tr>
       )}
       <tr className="h-10">
-        <th className={cn("sticky z-40 border-r border-b w-8 bg-slate-50 shadow-[0_1px_0_0_rgba(0,0,0,0.1)]", hasGroup ? "top-10" : "top-0")}><div className="flex items-center justify-center h-10"><Checkbox checked={isAllSelected} onCheckedChange={onSelectAll} /></div></th>
+        {!hideCheckbox && (
+          <th className={cn("sticky z-40 border-r border-b w-8 bg-slate-50 shadow-[0_1px_0_0_rgba(0,0,0,0.1)]", hasGroup ? "top-10" : "top-0")}><div className="flex items-center justify-center h-10"><Checkbox checked={isAllSelected} onCheckedChange={onSelectAll} /></div></th>
+        )}
         {columns.map((col: any) => {
           const isFilterActive = columnFilters[col.key] !== undefined;
           return (

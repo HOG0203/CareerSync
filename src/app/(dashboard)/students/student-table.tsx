@@ -363,6 +363,7 @@ export function StudentTable({
             'latest_training_company', // 실습처(회사명)
           ]}
           pageType="students"
+          hideCheckbox={true}
         />
       </div>
 

@@ -36,6 +36,7 @@ export function StandardSpreadsheetTable({
   baseYear,
   mobileInfoKeys,
   pageType,
+  hideCheckbox = pageType === 'students',
 }: SpreadsheetTableProps) {
   const [mounted, setMounted] = React.useState(false)
   const isMobile = useIsMobile()
@@ -156,7 +157,7 @@ export function StandardSpreadsheetTable({
           <div ref={containerRef} className="relative outline-none bg-white overflow-auto h-[calc(100vh-210px)] custom-scrollbar focus-visible:ring-0" onScroll={handleTableScroll} onKeyDown={handleKeyDown} tabIndex={0}>
             <table className="text-[11px] border-collapse table-auto min-w-max text-center relative border-none">
               <colgroup>
-                <col style={{ width: 32 }} />
+                {!hideCheckbox && <col style={{ width: 32 }} />}
                 {columns.map((c, i) => <col key={i} style={{ width: c.width, minWidth: c.width }} />)}
               </colgroup>
               <TableHeader
@@ -167,6 +168,7 @@ export function StandardSpreadsheetTable({
                 onFilterChange={handleFilterChange}
                 onSelectAll={handleSelectAll}
                 isAllSelected={filteredData.length > 0 && filteredData.every(r => selectedRowIds.includes(r.id))}
+                hideCheckbox={hideCheckbox}
               />
               <tbody>
                 {(() => {
@@ -175,7 +177,7 @@ export function StandardSpreadsheetTable({
                   const sMinC = selectionStart && selectionEnd ? Math.min(selectionStart.col, selectionEnd.col) : -1;
                   const sMaxC = selectionStart && selectionEnd ? Math.max(selectionStart.col, selectionEnd.col) : -1;
                   return filteredData.map((row, i) => (
-                    <SpreadsheetRow key={row.id} rIdx={i} row={row} columns={columns} selMinR={sMinR} selMaxR={sMaxR} selMinC={sMinC} selMaxC={sMaxC} selStart={selectionStart} editCell={editingCell} onMouseDown={handleMouseDown} onMouseEnter={handleMouseEnter} onStartEdit={(r: any, c: any) => { if (!columns[c] || columns[c].readOnly || columns[c].type === 'action') return; if (columns[c].type === 'multi-select') { setEditingCell({ row: r, col: c }); setIsPickerOpen(true); } else setEditingCell({ row: r, col: c }); }} onEndEdit={() => setEditingCell(null)} onSave={handleSaveInternal} isSelectedRow={selectedRowIds.includes(row.id)} onSelectRow={(id: any, v: any) => syncSelected(v ? [...selectedRowIds, id] : selectedRowIds.filter(x => x !== id))} onAction={onAction} rankingMap={rankingMap} isRankingsLoading={isRankingsLoading} userProfile={userProfile} disableNamePopover={disableNamePopover} baseYear={baseYear} />
+                    <SpreadsheetRow key={row.id} rIdx={i} row={row} columns={columns} selMinR={sMinR} selMaxR={sMaxR} selMinC={sMinC} selMaxC={sMaxC} selStart={selectionStart} editCell={editingCell} onMouseDown={handleMouseDown} onMouseEnter={handleMouseEnter} onStartEdit={(r: any, c: any) => { if (!columns[c] || columns[c].readOnly || columns[c].type === 'action') return; if (columns[c].type === 'multi-select') { setEditingCell({ row: r, col: c }); setIsPickerOpen(true); } else setEditingCell({ row: r, col: c }); }} onEndEdit={() => setEditingCell(null)} onSave={handleSaveInternal} isSelectedRow={selectedRowIds.includes(row.id)} onSelectRow={(id: any, v: any) => syncSelected(v ? [...selectedRowIds, id] : selectedRowIds.filter(x => x !== id))} onAction={onAction} rankingMap={rankingMap} isRankingsLoading={isRankingsLoading} userProfile={userProfile} disableNamePopover={disableNamePopover} baseYear={baseYear} hideCheckbox={hideCheckbox} />
                   ));
                 })()}
               </tbody>
