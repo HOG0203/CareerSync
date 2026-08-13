@@ -181,11 +181,43 @@ export function useSpreadsheet({
   }, [columnFilters, searchTerm, filteredData.length, containerHeight, HEADER_HEIGHT])
 
   React.useEffect(() => {
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver((e) => { for (const entry of e) setContainerHeight(entry.contentRect.height); });
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
-  }, [])
+    const updateScrollPos = () => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const viewH = window.innerHeight;
+      
+      // containerRef 내부 스크롤인 경우 및 window/page 스크롤인 경우 통합 측정
+      let currentTop = container.scrollTop;
+      let visibleHeight = container.clientHeight || viewH;
+
+      if (rect.top < HEADER_HEIGHT && rect.bottom > 0) {
+        const windowScrollOffset = Math.max(0, -rect.top + HEADER_HEIGHT);
+        currentTop = Math.max(currentTop, windowScrollOffset);
+      }
+
+      setScrollTop(currentTop);
+      if (visibleHeight > 0) {
+        setContainerHeight(visibleHeight);
+      }
+    };
+
+    const container = containerRef.current;
+    window.addEventListener('scroll', updateScrollPos, { passive: true });
+    if (container) {
+      container.addEventListener('scroll', updateScrollPos, { passive: true });
+    }
+
+    updateScrollPos();
+
+    return () => {
+      window.removeEventListener('scroll', updateScrollPos);
+      if (container) {
+        container.removeEventListener('scroll', updateScrollPos);
+      }
+    };
+  }, [HEADER_HEIGHT]);
 
   React.useEffect(() => {
     const stop = () => { isSelectingRef.current = false };
