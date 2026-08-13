@@ -168,6 +168,7 @@ export async function getCompanyDetails(companyName: string) {
   
   return {
     company,
+    name: companyName,
     employees: employeeDetails,
     trainees: traineeDetails,
     baseYear

@@ -505,7 +505,8 @@ export default function CompanyInfoPage() {
                       <Button
                         size="sm"
                         onClick={() => {
-                          setEditingCompany({ name: selectedCompany.name || '' });
+                          const nameToRegister = selectedCompany.name || selectedCompany.company?.name || '';
+                          setEditingCompany({ name: nameToRegister });
                           setIsEditModalOpen(true);
                         }}
                         className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs shrink-0 gap-1.5 h-9 w-full sm:w-auto"
