@@ -77,6 +77,50 @@ export function StandardSpreadsheetTable({
     handleKeyDown,
   } = useSpreadsheet({ initialData, columns, onSave, onBulkSave, groupHeaders, externalSelectedRowIds, onSelectionChange })
 
+  const [displayLimit, setDisplayLimit] = React.useState<number>(80);
+
+  // 검색이나 필터 변경 시 표시 건수 80건으로 초기화
+  React.useEffect(() => {
+    setDisplayLimit(80);
+  }, [searchTerm, columnFilters, initialData]);
+
+  // 스크롤이 하단 부근에 도달하거나 스크롤 시 60건씩 청크 자동 확장 (0ms 로딩 + 잘림 완전 방지)
+  React.useEffect(() => {
+    const handleScroll = () => {
+      if (displayLimit >= filteredData.length) return;
+
+      const container = containerRef.current;
+      if (container) {
+        const { scrollTop, scrollHeight, clientHeight } = container;
+        if (scrollTop + clientHeight >= scrollHeight - 300) {
+          setDisplayLimit(prev => Math.min(filteredData.length, prev + 60));
+          return;
+        }
+      }
+
+      // 부모 창 스크롤 감지
+      const scrollY = window.scrollY || document.documentElement.scrollTop;
+      const windowH = window.innerHeight;
+      const docH = document.documentElement.scrollHeight;
+      if (scrollY + windowH >= docH - 400) {
+        setDisplayLimit(prev => Math.min(filteredData.length, prev + 60));
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll, { passive: true });
+    }
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (container) {
+        container.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, [displayLimit, filteredData.length, containerRef]);
+
   // 스크롤 메타데이터 동기화
   const updateScrollMeta = React.useCallback(() => {
     if (containerRef.current) {
@@ -151,50 +195,57 @@ export function StandardSpreadsheetTable({
 
       {/* 데스크톱: 스프레드시트 테이블 */}
       {!isMobile ? (
-        <div ref={containerRef} className="relative outline-none bg-white overflow-auto border rounded-md shadow-inner custom-scrollbar flex-1 min-h-0 focus-visible:ring-0" onScroll={handleTableScroll} onKeyDown={handleKeyDown} tabIndex={0}>
-          <table className="text-[11px] border-collapse table-auto min-w-max text-center relative border-none">
-            <colgroup>
-              <col style={{ width: 32 }} />
-              {columns.map((c, i) => <col key={i} style={{ width: c.width, minWidth: c.width }} />)}
-            </colgroup>
-            <TableHeader
-              columns={columns}
-              groupHeaders={groupHeaders}
-              filterOptions={filterOptions}
-              columnFilters={columnFilters}
-              onFilterChange={handleFilterChange}
-              onSelectAll={handleSelectAll}
-              isAllSelected={filteredData.length > 0 && filteredData.every(r => selectedRowIds.includes(r.id))}
-            />
-            <tbody>
-              {(() => {
-                const totalCount = filteredData.length;
-                // 40명 초과 데이터는 가상 스크롤(Virtualization)을 활성화하여 초고속 60fps 렌더링 유지
-                const isInnerScroll = totalCount > 40;
-                const OVERSCAN = 12;
-                const visStart = isInnerScroll ? Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN) : 0;
-                const visEnd = isInnerScroll ? Math.min(totalCount - 1, Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + OVERSCAN) : totalCount - 1;
-                // 편집 중인 셀이 가상 스크롤 범위 밖으로 잘리지 않도록 범위에 포함
-                const editRow = editingCell?.row ?? -1;
-                const start = editRow >= 0 && editRow < visStart ? editRow : visStart;
-                const end = editRow > visEnd ? editRow : visEnd;
-                const sMinR = selectionStart && selectionEnd ? Math.min(selectionStart.row, selectionEnd.row) : -1;
-                const sMaxR = selectionStart && selectionEnd ? Math.max(selectionStart.row, selectionEnd.row) : -1;
-                const sMinC = selectionStart && selectionEnd ? Math.min(selectionStart.col, selectionEnd.col) : -1;
-                const sMaxC = selectionStart && selectionEnd ? Math.max(selectionStart.col, selectionEnd.col) : -1;
-                const rows = [];
-                if (start > 0) rows.push(<tr key="t" style={{ height: start * ROW_HEIGHT }}><td colSpan={columns.length + 1} className="border-none"></td></tr>);
-                for (let i = start; i <= end; i++) {
-                  const row = filteredData[i]; if (!row) continue;
-                  rows.push(
-                    <SpreadsheetRow key={row.id} rIdx={i} row={row} columns={columns} selMinR={sMinR} selMaxR={sMaxR} selMinC={sMinC} selMaxC={sMaxC} selStart={selectionStart} editCell={editingCell} onMouseDown={handleMouseDown} onMouseEnter={handleMouseEnter} onStartEdit={(r: any, c: any) => { if (!columns[c] || columns[c].readOnly || columns[c].type === 'action') return; if (columns[c].type === 'multi-select') { setEditingCell({ row: r, col: c }); setIsPickerOpen(true); } else setEditingCell({ row: r, col: c }); }} onEndEdit={() => setEditingCell(null)} onSave={handleSaveInternal} isSelectedRow={selectedRowIds.includes(row.id)} onSelectRow={(id: any, v: any) => syncSelected(v ? [...selectedRowIds, id] : selectedRowIds.filter(x => x !== id))} onAction={onAction} rankingMap={rankingMap} isRankingsLoading={isRankingsLoading} userProfile={userProfile} disableNamePopover={disableNamePopover} baseYear={baseYear} />
-                  );
-                }
-                if (end < totalCount - 1) rows.push(<tr key="b" style={{ height: (totalCount - 1 - end) * ROW_HEIGHT }}><td colSpan={columns.length + 1} className="border-none"></td></tr>);
-                return rows;
-              })()}
-            </tbody>
-          </table>
+        <div className="flex flex-col flex-1 min-h-0 border rounded-md shadow-inner bg-white overflow-hidden">
+          <div ref={containerRef} className="relative outline-none bg-white overflow-auto flex-1 min-h-0 custom-scrollbar focus-visible:ring-0" onScroll={handleTableScroll} onKeyDown={handleKeyDown} tabIndex={0}>
+            <table className="text-[11px] border-collapse table-auto min-w-max text-center relative border-none">
+              <colgroup>
+                <col style={{ width: 32 }} />
+                {columns.map((c, i) => <col key={i} style={{ width: c.width, minWidth: c.width }} />)}
+              </colgroup>
+              <TableHeader
+                columns={columns}
+                groupHeaders={groupHeaders}
+                filterOptions={filterOptions}
+                columnFilters={columnFilters}
+                onFilterChange={handleFilterChange}
+                onSelectAll={handleSelectAll}
+                isAllSelected={filteredData.length > 0 && filteredData.every(r => selectedRowIds.includes(r.id))}
+              />
+              <tbody>
+                {(() => {
+                  const totalCount = filteredData.length;
+                  const end = Math.min(totalCount - 1, displayLimit - 1);
+                  const sMinR = selectionStart && selectionEnd ? Math.min(selectionStart.row, selectionEnd.row) : -1;
+                  const sMaxR = selectionStart && selectionEnd ? Math.max(selectionStart.row, selectionEnd.row) : -1;
+                  const sMinC = selectionStart && selectionEnd ? Math.min(selectionStart.col, selectionEnd.col) : -1;
+                  const sMaxC = selectionStart && selectionEnd ? Math.max(selectionStart.col, selectionEnd.col) : -1;
+                  const rows = [];
+                  for (let i = 0; i <= end; i++) {
+                    const row = filteredData[i]; if (!row) continue;
+                    rows.push(
+                      <SpreadsheetRow key={row.id} rIdx={i} row={row} columns={columns} selMinR={sMinR} selMaxR={sMaxR} selMinC={sMinC} selMaxC={sMaxC} selStart={selectionStart} editCell={editingCell} onMouseDown={handleMouseDown} onMouseEnter={handleMouseEnter} onStartEdit={(r: any, c: any) => { if (!columns[c] || columns[c].readOnly || columns[c].type === 'action') return; if (columns[c].type === 'multi-select') { setEditingCell({ row: r, col: c }); setIsPickerOpen(true); } else setEditingCell({ row: r, col: c }); }} onEndEdit={() => setEditingCell(null)} onSave={handleSaveInternal} isSelectedRow={selectedRowIds.includes(row.id)} onSelectRow={(id: any, v: any) => syncSelected(v ? [...selectedRowIds, id] : selectedRowIds.filter(x => x !== id))} onAction={onAction} rankingMap={rankingMap} isRankingsLoading={isRankingsLoading} userProfile={userProfile} disableNamePopover={disableNamePopover} baseYear={baseYear} />
+                    );
+                  }
+                  return rows;
+                })()}
+              </tbody>
+            </table>
+          </div>
+          {displayLimit < filteredData.length && (
+            <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 border-t text-xs text-slate-600 font-medium shrink-0">
+              <span>
+                현재 <strong>{Math.min(displayLimit, filteredData.length)}명</strong> / 총 <strong>{filteredData.length}명</strong> 표시 중 (스크롤 시 자동 로드)
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setDisplayLimit(filteredData.length)}
+                className="h-6 text-[11px] font-bold text-blue-600 bg-white hover:bg-blue-50 border-blue-200 px-2.5"
+              >
+                전체 {filteredData.length}명 한 번에 펼쳐보기
+              </Button>
+            </div>
+          )}
         </div>
       ) : (
         /* 모바일: 페이지 유형별 특화 모바일 카드 목록 */
