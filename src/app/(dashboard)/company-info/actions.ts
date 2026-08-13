@@ -256,7 +256,7 @@ export async function bulkUpsertCompanies(companiesData: CompanyData[]) {
 }
 
 /**
- * 학생 취업/실습 기록에는 있으나 기업 마스터 DB(companies)에는 등록되지 않은 기업 목록 감지
+ * 학생 취업현황이 '취업'으로 기록된 기업 중, 기업 마스터 DB(companies)에는 등록되지 않은 미등록 기업 목록 감지
  */
 export async function getUnregisteredCompanies() {
   const supabase = createAdminClient();
@@ -268,16 +268,11 @@ export async function getUnregisteredCompanies() {
   
   const registeredNameSet = new Set((registeredCompanies || []).map((c: any) => (c.name || '').trim()).filter(Boolean));
 
-  // 2. 취업생의 기업명 조회
+  // 2. 취업현황이 '취업'인 학생의 기업명만 조회 (business_type === '취업')
   const { data: empCompanies } = await supabase
     .from('student_employments')
     .select('company')
-    .not('company', 'is', null);
-
-  // 3. 실습생의 기업명 조회
-  const { data: trainCompanies } = await supabase
-    .from('field_training_records')
-    .select('company')
+    .eq('business_type', '취업')
     .not('company', 'is', null);
 
   const empCounts: Record<string, number> = {};
@@ -286,25 +281,15 @@ export async function getUnregisteredCompanies() {
     if (name) empCounts[name] = (empCounts[name] || 0) + 1;
   });
 
-  const trainCounts: Record<string, number> = {};
-  (trainCompanies || []).forEach((t: any) => {
-    const name = (t.company || '').trim();
-    if (name) trainCounts[name] = (trainCounts[name] || 0) + 1;
-  });
-
-  const allDetectedNames = Array.from(new Set([...Object.keys(empCounts), ...Object.keys(trainCounts)]));
-
   const unregistered: UnregisteredCompanyData[] = [];
 
-  allDetectedNames.forEach(name => {
+  Object.entries(empCounts).forEach(([name, count]) => {
     if (!registeredNameSet.has(name)) {
-      const employeeCount = empCounts[name] || 0;
-      const traineeCount = trainCounts[name] || 0;
       unregistered.push({
         name,
-        employeeCount,
-        traineeCount,
-        totalCount: employeeCount + traineeCount
+        employeeCount: count,
+        traineeCount: 0,
+        totalCount: count
       });
     }
   });

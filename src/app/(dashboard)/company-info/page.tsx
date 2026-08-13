@@ -446,9 +446,8 @@ export default function CompanyInfoPage() {
                               </div>
                               <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
                                 <span className="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-bold border border-amber-200/60">
-                                  학생 감지 {item.totalCount}명
+                                  취업생 감지 {item.totalCount}명
                                 </span>
-                                <span>(취업 {item.employeeCount} / 실습 {item.traineeCount})</span>
                               </div>
                             </div>
                             {isSelected && (
@@ -460,7 +459,7 @@ export default function CompanyInfoPage() {
                     })
                 ) : (
                   <div className="text-center py-20 text-slate-400">
-                    <p className="text-sm font-medium">감지된 미등록 기업이 없습니다.</p>
+                    <p className="text-sm font-medium">감지된 미등록 취업 기업이 없습니다.</p>
                     <p className="text-xs text-slate-400 mt-1">모든 학생 취업처가 마스터 DB에 정식 등록되어 있습니다. 🎉</p>
                   </div>
                 )
@@ -497,7 +496,7 @@ export default function CompanyInfoPage() {
                           </span>
                         </h4>
                         <p className="text-slate-600 text-xs mt-1 leading-relaxed">
-                          학생 취업 및 현장실습 데이터에 총 <strong>{selectedCompany.employees.length + selectedCompany.trainees.length}명</strong> (취업생 {selectedCompany.employees.length}명 / 실습생 {selectedCompany.trainees.length}명)의 소속으로 기록되어 있으나, 기업 마스터 DB에는 아직 등록되지 않았습니다.
+                          학생 취업 현황에 취업으로 등록된 <strong>'{selectedCompany.name}'</strong> (취업생 {selectedCompany.employees.length}명) 기업이나, 아직 기업 마스터 DB에는 등록되지 않았습니다.
                         </p>
                       </div>
                     </div>
