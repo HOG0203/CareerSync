@@ -299,7 +299,7 @@ export default function CompanyInfoPage() {
           "lg:col-span-4 flex flex-col gap-3 min-h-0",
           mobileTab !== 'list' && "hidden lg:flex"
         )}>
-          <Card className="flex-1 overflow-hidden flex flex-col">
+          <Card className="flex-1 overflow-hidden flex flex-col border-none shadow-md h-[calc(100vh-210px)] bg-white rounded-2xl">
             <div className="p-2.5 sm:p-4 border-b space-y-2 bg-slate-50/50">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-xs sm:text-sm font-bold flex items-center gap-1.5 text-slate-800">
@@ -363,7 +363,7 @@ export default function CompanyInfoPage() {
               </form>
             </div>
 
-            <CardContent className="p-0 overflow-y-auto flex-1 min-h-0 divide-y divide-slate-100">
+            <CardContent className="p-0 overflow-y-auto flex-1 min-h-0 custom-scrollbar divide-y divide-slate-100">
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3">
                   <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
@@ -468,9 +468,9 @@ export default function CompanyInfoPage() {
           </Card>
         </div>
 
-        {/* 오른쪽: 상세 정보 및 학생 현황 */}
+        {/* 오른쪽: 상세 정보 및 학생 현황 (Sticky 고정 스크롤 적용) */}
         <div className={cn(
-          "lg:col-span-8 flex flex-col gap-6 overflow-y-auto pr-1",
+          "lg:col-span-8 flex flex-col gap-6 overflow-y-auto lg:sticky lg:top-4 self-start h-[calc(100vh-210px)] custom-scrollbar pr-1",
           mobileTab !== 'details' && "hidden lg:flex"
         )}>
           {isDetailsLoading ? (
