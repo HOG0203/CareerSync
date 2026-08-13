@@ -181,20 +181,44 @@ export function useSpreadsheet({
   }, [columnFilters, searchTerm, filteredData.length, containerHeight, HEADER_HEIGHT])
 
   React.useEffect(() => {
+    const getScrollParent = (node: HTMLElement | null): HTMLElement | Window => {
+      if (!node) return window;
+      let p = node.parentElement;
+      while (p && p !== document.body) {
+        const style = window.getComputedStyle(p);
+        const overflowY = style.overflowY;
+        if (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') {
+          return p;
+        }
+        p = p.parentElement;
+      }
+      return window;
+    };
+
     const updateScrollPos = () => {
       const container = containerRef.current;
       if (!container) return;
 
-      const rect = container.getBoundingClientRect();
-      const viewH = window.innerHeight;
-      
-      // containerRef 내부 스크롤인 경우 및 window/page 스크롤인 경우 통합 측정
+      const scrollParent = getScrollParent(container);
       let currentTop = container.scrollTop;
-      let visibleHeight = container.clientHeight || viewH;
+      let visibleHeight = container.clientHeight;
 
-      if (rect.top < HEADER_HEIGHT && rect.bottom > 0) {
-        const windowScrollOffset = Math.max(0, -rect.top + HEADER_HEIGHT);
-        currentTop = Math.max(currentTop, windowScrollOffset);
+      if (scrollParent === window) {
+        const rect = container.getBoundingClientRect();
+        currentTop = Math.max(0, -rect.top + HEADER_HEIGHT);
+        visibleHeight = window.innerHeight;
+      } else {
+        const parentEl = scrollParent as HTMLElement;
+        const parentRect = parentEl.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+
+        if (container.scrollTop > 0) {
+          currentTop = container.scrollTop;
+        } else {
+          const relativeTop = parentRect.top - containerRect.top + HEADER_HEIGHT;
+          currentTop = Math.max(0, relativeTop);
+        }
+        visibleHeight = parentEl.clientHeight || window.innerHeight;
       }
 
       setScrollTop(currentTop);
@@ -204,9 +228,14 @@ export function useSpreadsheet({
     };
 
     const container = containerRef.current;
+    const scrollParent = getScrollParent(container);
+
     window.addEventListener('scroll', updateScrollPos, { passive: true });
     if (container) {
       container.addEventListener('scroll', updateScrollPos, { passive: true });
+    }
+    if (scrollParent && scrollParent !== window) {
+      (scrollParent as HTMLElement).addEventListener('scroll', updateScrollPos, { passive: true });
     }
 
     updateScrollPos();
@@ -215,6 +244,9 @@ export function useSpreadsheet({
       window.removeEventListener('scroll', updateScrollPos);
       if (container) {
         container.removeEventListener('scroll', updateScrollPos);
+      }
+      if (scrollParent && scrollParent !== window) {
+        (scrollParent as HTMLElement).removeEventListener('scroll', updateScrollPos);
       }
     };
   }, [HEADER_HEIGHT]);
