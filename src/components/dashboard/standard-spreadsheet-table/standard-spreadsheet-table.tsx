@@ -231,21 +231,6 @@ export function StandardSpreadsheetTable({
               </tbody>
             </table>
           </div>
-          {displayLimit < filteredData.length && (
-            <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 border-t text-xs text-slate-600 font-medium shrink-0">
-              <span>
-                현재 <strong>{Math.min(displayLimit, filteredData.length)}명</strong> / 총 <strong>{filteredData.length}명</strong> 표시 중 (스크롤 시 자동 로드)
-              </span>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setDisplayLimit(filteredData.length)}
-                className="h-6 text-[11px] font-bold text-blue-600 bg-white hover:bg-blue-50 border-blue-200 px-2.5"
-              >
-                전체 {filteredData.length}명 한 번에 펼쳐보기
-              </Button>
-            </div>
-          )}
         </div>
       ) : (
         /* 모바일: 페이지 유형별 특화 모바일 카드 목록 */
