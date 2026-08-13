@@ -105,6 +105,12 @@ const getLowerGradeAspirationVariant = (aspiration?: string) => {
   return 'bg-white text-black border-gray-200';
 };
 
+const CAREER_COURSE_OPTIONS = [
+  '청솔반', '취업맞춤반', '중견기업반', '반도체아카데미반', '혁신인재반',
+  '부사관반', '일학습병행', '계약학과', '도제반', '아우스빌둥',
+  '일반취업', '기술사관', '군특성화', '운동부', '진학', '입대', '기타'
+];
+
 interface SearchHeaderProps {
   onSearch: (query: string) => void;
   currentSearchQuery: string;
@@ -114,6 +120,13 @@ interface SearchHeaderProps {
   onOpenCustomModal: () => void;
   onClearCustomRule: () => void;
   customMatchedCount?: number;
+  // 2학년 전용 코스 필터
+  wishCourseFilter?: string;
+  currentCourseFilter?: string;
+  onWishCourseFilter?: (val: string) => void;
+  onCurrentCourseFilter?: (val: string) => void;
+  wishFilterCount?: number;
+  currentFilterCount?: number;
 }
 
 function SearchHeader({ 
@@ -124,7 +137,13 @@ function SearchHeader({
   customRule,
   onOpenCustomModal,
   onClearCustomRule,
-  customMatchedCount
+  customMatchedCount,
+  wishCourseFilter,
+  currentCourseFilter,
+  onWishCourseFilter,
+  onCurrentCourseFilter,
+  wishFilterCount,
+  currentFilterCount
 }: SearchHeaderProps) {
   const [mounted, setMounted] = React.useState(false);
   const [localValue, setLocalValue] = React.useState('');
@@ -164,7 +183,7 @@ function SearchHeader({
           <Search className="h-5 w-5 text-slate-400 group-focus-within:text-blue-500 shrink-0" />
           <Input 
             type="text"
-            placeholder={isLowerGrade ? "이름, 자격증, 희망진로코스 검색..." : "이름, 자격증, 기업, 진로코스 검색..."}
+            placeholder={isLowerGrade ? "이름, 자격증, 희망/현재 진로코스 검색..." : "이름, 자격증, 기업, 진로코스 검색..."}
             value={localValue}
             onChange={(e) => setLocalValue(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -187,6 +206,73 @@ function SearchHeader({
           검색
         </button>
       </div>
+
+      {/* 2학년 전용 진로코스 필터 드롭다운 */}
+      {isLowerGrade && onWishCourseFilter && onCurrentCourseFilter && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* 희망진로코스 필터 */}
+          <div className="relative">
+            <Select value={wishCourseFilter || 'all'} onValueChange={(v) => onWishCourseFilter(v === 'all' ? '' : v)}>
+              <SelectTrigger className={cn(
+                "h-11 text-xs font-bold border-2 rounded-lg shadow-sm transition-all w-[148px] px-3",
+                wishCourseFilter
+                  ? "bg-blue-600 text-white border-blue-700 shadow-blue-100"
+                  : "bg-white text-blue-700 border-blue-200 hover:bg-blue-50"
+              )}>
+                <SelectValue placeholder="희망코스 전체" />
+              </SelectTrigger>
+              <SelectContent className="z-[200]">
+                <SelectItem value="all" className="text-xs font-medium">희망코스 전체</SelectItem>
+                {CAREER_COURSE_OPTIONS.map(opt => (
+                  <SelectItem key={opt} value={opt} className="text-xs font-medium">{opt}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {wishCourseFilter && (
+              <span className="absolute -top-1.5 -right-1.5 bg-blue-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none z-10">
+                {wishFilterCount ?? 0}명
+              </span>
+            )}
+          </div>
+
+          {/* 현재진로코스 필터 */}
+          <div className="relative">
+            <Select value={currentCourseFilter || 'all'} onValueChange={(v) => onCurrentCourseFilter(v === 'all' ? '' : v)}>
+              <SelectTrigger className={cn(
+                "h-11 text-xs font-bold border-2 rounded-lg shadow-sm transition-all w-[148px] px-3",
+                currentCourseFilter
+                  ? "bg-emerald-600 text-white border-emerald-700 shadow-emerald-100"
+                  : "bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+              )}>
+                <SelectValue placeholder="현재코스 전체" />
+              </SelectTrigger>
+              <SelectContent className="z-[200]">
+                <SelectItem value="all" className="text-xs font-medium">현재코스 전체</SelectItem>
+                {CAREER_COURSE_OPTIONS.map(opt => (
+                  <SelectItem key={opt} value={opt} className="text-xs font-medium">{opt}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {currentCourseFilter && (
+              <span className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none z-10">
+                {currentFilterCount ?? 0}명
+              </span>
+            )}
+          </div>
+
+          {/* 필터 초기화 버튼 */}
+          {(wishCourseFilter || currentCourseFilter) && (
+            <button
+              onClick={() => { onWishCourseFilter(''); onCurrentCourseFilter(''); }}
+              className="h-11 px-3 rounded-lg text-xs font-bold border-2 border-slate-200 bg-white text-slate-500 hover:bg-slate-50 flex items-center gap-1 transition-all"
+              title="필터 초기화"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              초기화
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 커스텀 검색 버튼 */}
       <button
@@ -234,6 +320,9 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
   const [isLoading, setIsLoading] = React.useState(false);
   const [rankingMap, setRankingMap] = React.useState<Record<string, any>>({});
   const [isRankingsLoading, setIsRankingsLoading] = React.useState(false);
+  // 2학년 전용 진로코스 필터
+  const [wishCourseFilter, setWishCourseFilter] = React.useState('');
+  const [currentCourseFilter, setCurrentCourseFilter] = React.useState('');
 
   React.useEffect(() => {
     const handleLoading = () => setIsLoading(true);
@@ -421,6 +510,7 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
             student.student_name,
             student.career_aspiration,
             student.career_course,
+            student.employment_status,
             student.special_notes,
             student.major,
             student.class_info,
@@ -440,6 +530,17 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
       return fieldsToSearch.some(field => field?.toLowerCase().includes(query));
     }).length;
   }, [allData, searchQuery, isLowerGrade]);
+
+  // 2학년 진로코스 필터 매칭 수
+  const wishFilterCount = React.useMemo(() => {
+    if (!wishCourseFilter) return 0;
+    return allData.filter(s => (s.career_course || '').trim() === wishCourseFilter).length;
+  }, [allData, wishCourseFilter]);
+
+  const currentFilterCount = React.useMemo(() => {
+    if (!currentCourseFilter) return 0;
+    return allData.filter(s => (s.employment_status || '').trim() === currentCourseFilter).length;
+  }, [allData, currentCourseFilter]);
 
 
   if (isLoading) {
@@ -462,6 +563,12 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
         onOpenCustomModal={() => setIsCustomModalOpen(true)}
         onClearCustomRule={() => setCustomRule(null)}
         customMatchedCount={customMatchedCount}
+        wishCourseFilter={wishCourseFilter}
+        currentCourseFilter={currentCourseFilter}
+        onWishCourseFilter={setWishCourseFilter}
+        onCurrentCourseFilter={setCurrentCourseFilter}
+        wishFilterCount={wishFilterCount}
+        currentFilterCount={currentFilterCount}
       />
 
       <div className="w-full overflow-x-auto bg-gray-50/50 rounded-xl border border-slate-200 shadow-sm p-2 sm:p-4">
@@ -535,6 +642,8 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
                         customRule={customRule}
                         baseYear={baseYear}
                         isLowerGrade={isLowerGrade}
+                        wishCourseFilter={wishCourseFilter}
+                        currentCourseFilter={currentCourseFilter}
                       />
                     );
                   })}

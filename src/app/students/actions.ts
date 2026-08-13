@@ -196,6 +196,15 @@ export async function uploadStudentsCSV(csvData: string) {
 
 export async function updateStudentField(id: string, field: string, value: any) {
   const supabase = await createClient(); const settings = await getSystemSettings()
+
+  // employment_status(현재진로코스) 변경은 관리자만 가능
+  if (field === 'employment_status') {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: '로그인이 필요합니다.' };
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    if (profile?.role !== 'admin') return { success: false, error: '현재진로코스는 관리자만 변경할 수 있습니다.' };
+  }
+
   let finalValue = value;
   if (field === 'graduation_year') finalValue = value ? parseInt(value) : null;
   else if (value === '' || value === 'CLEARED' || (Array.isArray(value) && value.length === 0)) finalValue = null;

@@ -19,6 +19,8 @@ export type CompanyData = {
   required_certificates?: string;
   etc?: string;
   strengths?: string;
+  employeeCount?: number;
+  traineeCount?: number;
 };
 
 export type UnregisteredCompanyData = {
@@ -29,7 +31,7 @@ export type UnregisteredCompanyData = {
 };
 
 /**
- * 기업 목록 검색 및 조회 (서버 메모리 캐싱 적용)
+ * 기업 목록 검색 및 조회 (취업생/실습생 카운트 및 서버 메모리 캐싱 적용)
  */
 export async function getCompanies(search?: string) {
   const cleanSearch = search ? search.trim() : '';
@@ -37,16 +39,59 @@ export async function getCompanies(search?: string) {
   return unstable_cache(
     async () => {
       const supabase = createAdminClient();
+
+      // 시스템 기준년도 조회
+      const { data: settingsData } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'base_year')
+        .single();
+      const baseYear = settingsData?.value ? (settingsData.value as any).year : 2026;
+
       let query = supabase.from('companies').select('*').order('name');
       
       if (cleanSearch) {
         query = query.ilike('name', `%${cleanSearch}%`);
       }
       
-      const { data, error } = await query;
-      return { data: data || [], error: error?.message || null };
+      const [{ data, error }, { data: empCompanies }, { data: traineeRecords }] = await Promise.all([
+        query,
+        supabase
+          .from('student_employments')
+          .select('company')
+          .eq('business_type', '취업')
+          .not('company', 'is', null),
+        supabase
+          .from('field_training_records')
+          .select('company, student_id, hiring_status, students!inner(graduation_year)')
+          .in('hiring_status', ['진행중', '채용전환'])
+          .gte('students.graduation_year', baseYear + 1)
+      ]);
+
+      const empCounts: Record<string, number> = {};
+      (empCompanies || []).forEach((e: any) => {
+        const name = (e.company || '').trim();
+        if (name) empCounts[name] = (empCounts[name] || 0) + 1;
+      });
+
+      const traineeCounts: Record<string, number> = {};
+      (traineeRecords || []).forEach((t: any) => {
+        const name = (t.company || '').trim();
+        if (name) traineeCounts[name] = (traineeCounts[name] || 0) + 1;
+      });
+
+      const companiesWithCounts = (data || []).map((c: any) => {
+        const trimmedName = (c.name || '').trim();
+        return {
+          ...c,
+          employeeCount: empCounts[trimmedName] || 0,
+          traineeCount: traineeCounts[trimmedName] || 0,
+        };
+      });
+
+      return { data: companiesWithCounts, error: error?.message || null };
     },
-    [`companies-search-${cleanSearch || 'all'}`],
+    [`companies-v3-${cleanSearch || 'all'}`],
     {
       revalidate: 3600,
       tags: ['companies']
@@ -77,7 +122,7 @@ export async function getCompanyDetails(companyName: string) {
   const baseYear = settingsData?.value ? (settingsData.value as any).year : 2026;
   const currentGradYears = [baseYear + 1, baseYear + 2, baseYear + 3];
     
-  // 2. 취업생 정보 (전체 인적사항 + 취업/실습 이력)
+  // 2. 취업생 정보 (졸업생 포함 전체 인적사항 + 취업/실습 이력)
   const { data: employees } = await supabase
     .from('student_employments')
     .select('*')
@@ -92,31 +137,34 @@ export async function getCompanyDetails(companyName: string) {
       .select('*')
       .in('id', empIds);
 
-    const { data: trainings } = await supabase
-      .from('field_training_records')
-      .select('*')
-      .in('student_id', empIds);
+    if (students && students.length > 0) {
+      const validEmpIds = students.map((s: any) => s.id);
+      const { data: trainings } = await supabase
+        .from('field_training_records')
+        .select('*')
+        .in('student_id', validEmpIds);
 
-    employeeDetails = (students || []).map((s: any) => {
-      const emp = employees.find((e: any) => e.id === s.id) || {};
-      const sTrainings = (trainings || []).filter((t: any) => t.student_id === s.id);
-      const latestT = sTrainings[0];
-      return {
-        ...s,
-        ...emp,
-        training_records: sTrainings,
-        has_field_training: latestT ? 'O' : '',
-        latest_training_company: latestT?.company,
-        start_date: latestT?.start_date,
-        end_date: latestT?.end_date,
-        training_stipend_status: latestT?.stipend_status,
-        is_hiring_conversion: latestT?.hiring_status === '채용전환' ? latestT?.conversion_date : '',
-        is_returned: latestT?.hiring_status === '복교' ? 'O' : '',
-      };
-    });
+      employeeDetails = students.map((s: any) => {
+        const emp = employees.find((e: any) => e.id === s.id) || {};
+        const sTrainings = (trainings || []).filter((t: any) => t.student_id === s.id);
+        const latestT = sTrainings[0];
+        return {
+          ...s,
+          ...emp,
+          training_records: sTrainings,
+          has_field_training: latestT ? 'O' : '',
+          latest_training_company: latestT?.company,
+          start_date: latestT?.start_date,
+          end_date: latestT?.end_date,
+          training_stipend_status: latestT?.stipend_status,
+          is_hiring_conversion: latestT?.hiring_status === '채용전환' ? latestT?.conversion_date : '',
+          is_returned: latestT?.hiring_status === '복교' ? 'O' : '',
+        };
+      });
+    }
   }
   
-  // 3. 실습생 정보 (현재 재학생 기준 + 전체 인적사항)
+  // 3. 실습생 정보 (졸업생 제외 재학생 전용: baseYear + 1 이상 졸업년도 + 동일 업체명)
   const { data: trainees } = await supabase
     .from('field_training_records')
     .select('*')
@@ -130,7 +178,7 @@ export async function getCompanyDetails(companyName: string) {
       .from('students')
       .select('*')
       .in('id', traineeStudentIds)
-      .in('graduation_year', currentGradYears);
+      .gte('graduation_year', baseYear + 1);
       
     if (students && students.length > 0) {
       const validStudentIds = students.map((s: any) => s.id);

@@ -26,7 +26,8 @@ import {
   User,
   ClipboardList,
   MessageSquare,
-  Phone
+  Phone,
+  ChevronDown
 } from 'lucide-react';
 import { getStudentScoresById, updateStudentField } from '@/app/students/actions';
 import { Button } from '@/components/ui/button';
@@ -71,6 +72,32 @@ export function StudentPopover({
   const resolvedBaseYear = baseYear || 2026;
   const studentGrade = student.graduation_year ? (4 - (student.graduation_year - resolvedBaseYear)) : 3;
   const isLowerGrade = propIsLowerGrade !== undefined ? propIsLowerGrade : (studentGrade === 1 || studentGrade === 2);
+
+  const [currentEmploymentStatus, setCurrentEmploymentStatus] = React.useState(student.employment_status || '');
+  const [isStatusSaving, setIsStatusSaving] = React.useState(false);
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    setCurrentEmploymentStatus(student.employment_status || '');
+  }, [student.employment_status]);
+
+  // 팝오버가 닫힐 때 커스텀 드롭다운도 함께 닫기
+  React.useEffect(() => {
+    if (!open) setIsStatusDropdownOpen(false);
+  }, [open]);
+
+  const handleStatusChange = async (val: string) => {
+    setCurrentEmploymentStatus(val);
+    setIsStatusSaving(true);
+    try {
+      await updateStudentField(student.id, 'employment_status', val);
+      student.employment_status = val;
+    } catch (err) {
+      console.error('Failed to update employment_status:', err);
+    } finally {
+      setIsStatusSaving(false);
+    }
+  };
 
   const getDesireColor = (student: StudentEmploymentData) => {
     const isDesiring = student.is_desiring_employment;
@@ -207,11 +234,62 @@ export function StudentPopover({
                   <span className="font-black text-blue-600 text-right">{student.special_notes || '미설정'}</span>
                 </p>
               </div>
-              <div className="pt-1 border-t border-slate-200 mt-1">
-                <p className="text-[9px] text-slate-400 font-bold uppercase mb-0.5">희망진로코스</p>
-                <p className="font-black text-blue-600 text-[17px] leading-tight truncate">
-                  {student.career_course || '미설정'}
-                </p>
+              <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-slate-200 mt-1">
+                <div>
+                  <p className="text-[9px] text-slate-400 font-bold uppercase mb-0.5">희망진로코스</p>
+                  <p className="font-black text-blue-600 text-xs sm:text-sm leading-tight truncate">
+                    {student.career_course || '미설정'}
+                  </p>
+                </div>
+                <div className="relative">
+                  <p className="text-[9px] text-emerald-600 font-bold uppercase mb-0.5 flex items-center justify-between">
+                    <span>현재진로코스</span>
+                    {isStatusSaving && <Loader2 className="h-2.5 w-2.5 animate-spin text-emerald-600" />}
+                  </p>
+                  {userProfile?.role === 'admin' ? (
+                    <>
+                      {/* 관리자 전용 편집 드롭다운 */}
+                      <button
+                        type="button"
+                        disabled={isStatusSaving}
+                        onClick={(e) => { e.stopPropagation(); setIsStatusDropdownOpen(v => !v); }}
+                        className="w-full flex items-center justify-between text-xs font-extrabold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md py-1 px-2 hover:bg-emerald-100 transition-colors cursor-pointer"
+                      >
+                        <span className="truncate">{currentEmploymentStatus || '(미선택)'}</span>
+                        <ChevronDown className={cn('h-3 w-3 ml-1 shrink-0 text-emerald-500 transition-transform', isStatusDropdownOpen && 'rotate-180')} />
+                      </button>
+                      {isStatusDropdownOpen && (
+                        <div
+                          data-career-dropdown
+                          className="absolute left-0 right-0 top-full mt-1 z-[200] bg-white border border-emerald-200 rounded-lg shadow-xl max-h-48 overflow-y-auto"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {['(미선택)', '청솔반', '취업맞춤반', '중견기업반', '반도체아카데미반', '혁신인재반', '부사관반', '일학습병행', '계약학과', '도제반', '아우스빌둥', '일반취업', '기술사관', '군특성화', '운동부', '진학', '입대', '기타'].map((opt) => {
+                            const val = opt === '(미선택)' ? '' : opt;
+                            return (
+                              <button
+                                key={opt}
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleStatusChange(val); setIsStatusDropdownOpen(false); }}
+                                className={cn(
+                                  'w-full text-left text-xs px-3 py-1.5 hover:bg-emerald-50 transition-colors font-medium',
+                                  currentEmploymentStatus === val ? 'bg-emerald-100 text-emerald-800 font-black' : 'text-slate-700'
+                                )}
+                              >
+                                {opt}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    /* 일반 교사: 읽기 전용 */
+                    <p className="font-black text-emerald-700 text-xs sm:text-sm leading-tight truncate">
+                      {currentEmploymentStatus || '미설정'}
+                    </p>
+                  )}
+                </div>
               </div>
             </>
           ) : (
@@ -445,22 +523,20 @@ export function StudentPopover({
           </Dialog>
         </>
       ) : (
-        <Popover open={open} onOpenChange={setOpen} modal={false}>
+        <Popover open={open} onOpenChange={(v) => {
+          setOpen(v);
+          if (!v) setIsStatusDropdownOpen(false);
+        }}>
           <PopoverTrigger asChild>
             {children}
           </PopoverTrigger>
           <PopoverContent 
             side={resolvedSide} 
             align={resolvedAlign}
-            className="p-4 w-[300px] text-xs shadow-xl border-2 z-[100] max-h-[80vh] overflow-y-auto bg-white cursor-pointer"
+            className="p-4 w-[300px] text-xs shadow-xl border-2 z-[100] max-h-[80vh] overflow-y-auto bg-white"
             sideOffset={5}
             collisionPadding={16}
             avoidCollisions={true}
-            onClick={(e) => {
-              const target = e.target as HTMLElement;
-              if (target.closest('button') || target.closest('a')) return;
-              setOpen(false);
-            }}
           >
             {popoverBody}
           </PopoverContent>
