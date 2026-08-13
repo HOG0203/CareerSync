@@ -77,49 +77,6 @@ export function StandardSpreadsheetTable({
     handleKeyDown,
   } = useSpreadsheet({ initialData, columns, onSave, onBulkSave, groupHeaders, externalSelectedRowIds, onSelectionChange })
 
-  const [displayLimit, setDisplayLimit] = React.useState<number>(80);
-
-  // 검색이나 필터 변경 시 표시 건수 80건으로 초기화
-  React.useEffect(() => {
-    setDisplayLimit(80);
-  }, [searchTerm, columnFilters, initialData]);
-
-  // 스크롤이 하단 부근에 도달하거나 스크롤 시 60건씩 청크 자동 확장 (0ms 로딩 + 잘림 완전 방지)
-  React.useEffect(() => {
-    const handleScroll = () => {
-      if (displayLimit >= filteredData.length) return;
-
-      const container = containerRef.current;
-      if (container) {
-        const { scrollTop, scrollHeight, clientHeight } = container;
-        if (scrollTop + clientHeight >= scrollHeight - 300) {
-          setDisplayLimit(prev => Math.min(filteredData.length, prev + 60));
-          return;
-        }
-      }
-
-      // 부모 창 스크롤 감지
-      const scrollY = window.scrollY || document.documentElement.scrollTop;
-      const windowH = window.innerHeight;
-      const docH = document.documentElement.scrollHeight;
-      if (scrollY + windowH >= docH - 400) {
-        setDisplayLimit(prev => Math.min(filteredData.length, prev + 60));
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    const container = containerRef.current;
-    if (container) {
-      container.addEventListener('scroll', handleScroll, { passive: true });
-    }
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      if (container) {
-        container.removeEventListener('scroll', handleScroll);
-      }
-    };
-  }, [displayLimit, filteredData.length, containerRef]);
 
   // 스크롤 메타데이터 동기화
   const updateScrollMeta = React.useCallback(() => {
@@ -213,20 +170,13 @@ export function StandardSpreadsheetTable({
               />
               <tbody>
                 {(() => {
-                  const totalCount = filteredData.length;
-                  const end = Math.min(totalCount - 1, displayLimit - 1);
                   const sMinR = selectionStart && selectionEnd ? Math.min(selectionStart.row, selectionEnd.row) : -1;
                   const sMaxR = selectionStart && selectionEnd ? Math.max(selectionStart.row, selectionEnd.row) : -1;
                   const sMinC = selectionStart && selectionEnd ? Math.min(selectionStart.col, selectionEnd.col) : -1;
                   const sMaxC = selectionStart && selectionEnd ? Math.max(selectionStart.col, selectionEnd.col) : -1;
-                  const rows = [];
-                  for (let i = 0; i <= end; i++) {
-                    const row = filteredData[i]; if (!row) continue;
-                    rows.push(
-                      <SpreadsheetRow key={row.id} rIdx={i} row={row} columns={columns} selMinR={sMinR} selMaxR={sMaxR} selMinC={sMinC} selMaxC={sMaxC} selStart={selectionStart} editCell={editingCell} onMouseDown={handleMouseDown} onMouseEnter={handleMouseEnter} onStartEdit={(r: any, c: any) => { if (!columns[c] || columns[c].readOnly || columns[c].type === 'action') return; if (columns[c].type === 'multi-select') { setEditingCell({ row: r, col: c }); setIsPickerOpen(true); } else setEditingCell({ row: r, col: c }); }} onEndEdit={() => setEditingCell(null)} onSave={handleSaveInternal} isSelectedRow={selectedRowIds.includes(row.id)} onSelectRow={(id: any, v: any) => syncSelected(v ? [...selectedRowIds, id] : selectedRowIds.filter(x => x !== id))} onAction={onAction} rankingMap={rankingMap} isRankingsLoading={isRankingsLoading} userProfile={userProfile} disableNamePopover={disableNamePopover} baseYear={baseYear} />
-                    );
-                  }
-                  return rows;
+                  return filteredData.map((row, i) => (
+                    <SpreadsheetRow key={row.id} rIdx={i} row={row} columns={columns} selMinR={sMinR} selMaxR={sMaxR} selMinC={sMinC} selMaxC={sMaxC} selStart={selectionStart} editCell={editingCell} onMouseDown={handleMouseDown} onMouseEnter={handleMouseEnter} onStartEdit={(r: any, c: any) => { if (!columns[c] || columns[c].readOnly || columns[c].type === 'action') return; if (columns[c].type === 'multi-select') { setEditingCell({ row: r, col: c }); setIsPickerOpen(true); } else setEditingCell({ row: r, col: c }); }} onEndEdit={() => setEditingCell(null)} onSave={handleSaveInternal} isSelectedRow={selectedRowIds.includes(row.id)} onSelectRow={(id: any, v: any) => syncSelected(v ? [...selectedRowIds, id] : selectedRowIds.filter(x => x !== id))} onAction={onAction} rankingMap={rankingMap} isRankingsLoading={isRankingsLoading} userProfile={userProfile} disableNamePopover={disableNamePopover} baseYear={baseYear} />
+                  ));
                 })()}
               </tbody>
             </table>

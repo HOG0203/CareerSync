@@ -19,26 +19,28 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
   const selectRef = React.useRef<HTMLSelectElement>(null)
 
   const resolvedOptions = React.useMemo(() => {
+    if (!isEditing) return undefined;
     if (typeof config.options === 'function') return config.options(rowData);
     return config.options;
-  }, [config.options, rowData]);
+  }, [isEditing, config.options, rowData]);
 
   React.useEffect(() => {
-    if (isEditing) {
-      setLocalValue(value || '')
-      const isInOptions = resolvedOptions?.some((o: any) => o.value === value);
-      const isManual = !!value && !isInOptions && value !== '기타(직접입력)';
-      setIsManualInput(isManual);
-      isManualRef.current = isManual;
-    } else {
-      setIsManualInput(false)
-      isManualRef.current = false
+    if (!isEditing) {
+      setIsManualInput(false);
+      isManualRef.current = false;
+      return;
     }
-  }, [value, isEditing, resolvedOptions])
+    setLocalValue(value || '');
+    const isInOptions = resolvedOptions?.some((o: any) => o.value === value);
+    const isManual = !!value && !isInOptions && value !== '기타(직접입력)';
+    setIsManualInput(isManual);
+    isManualRef.current = isManual;
+  }, [value, isEditing, resolvedOptions]);
 
   // 더블클릭/수정 모드 진입 즉시 0ms 드롭다운 메뉴 팝업 자동 개방 (showPicker)
   React.useEffect(() => {
-    if (isEditing && config.type === 'select' && !isManualInput) {
+    if (!isEditing) return;
+    if (config.type === 'select' && !isManualInput) {
       if (selectRef.current) {
         try {
           if (typeof selectRef.current.showPicker === 'function') {
@@ -54,7 +56,8 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
   }, [isEditing, config.type, isManualInput]);
 
   React.useEffect(() => {
-    if (isEditing && config.type === 'multi-select') {
+    if (!isEditing) return;
+    if (config.type === 'multi-select') {
       const timer = setTimeout(() => onSave(id, field, 'OPEN_PICKER'), 0);
       return () => clearTimeout(timer);
     }
