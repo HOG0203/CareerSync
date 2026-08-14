@@ -181,75 +181,32 @@ export function useSpreadsheet({
   }, [columnFilters, searchTerm, filteredData.length, containerHeight, HEADER_HEIGHT])
 
   React.useEffect(() => {
-    const getScrollParent = (node: HTMLElement | null): HTMLElement | Window => {
-      if (!node) return window;
-      let p = node.parentElement;
-      while (p && p !== document.body) {
-        const style = window.getComputedStyle(p);
-        const overflowY = style.overflowY;
-        if (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') {
-          return p;
-        }
-        p = p.parentElement;
-      }
-      return window;
-    };
-
     const updateScrollPos = () => {
       const container = containerRef.current;
       if (!container) return;
 
-      const scrollParent = getScrollParent(container);
-      let currentTop = container.scrollTop;
-      let visibleHeight = container.clientHeight;
-
-      if (scrollParent === window) {
-        const rect = container.getBoundingClientRect();
-        currentTop = Math.max(0, -rect.top + HEADER_HEIGHT);
-        visibleHeight = window.innerHeight;
-      } else {
-        const parentEl = scrollParent as HTMLElement;
-        const parentRect = parentEl.getBoundingClientRect();
-        const containerRect = container.getBoundingClientRect();
-
-        if (container.scrollTop > 0) {
-          currentTop = container.scrollTop;
-        } else {
-          const relativeTop = parentRect.top - containerRect.top + HEADER_HEIGHT;
-          currentTop = Math.max(0, relativeTop);
-        }
-        visibleHeight = parentEl.clientHeight || window.innerHeight;
-      }
-
-      setScrollTop(currentTop);
-      if (visibleHeight > 0) {
-        setContainerHeight(visibleHeight);
+      setScrollTop(container.scrollTop);
+      if (container.clientHeight > 0) {
+        setContainerHeight(container.clientHeight);
       }
     };
 
     const container = containerRef.current;
-    const scrollParent = getScrollParent(container);
-
-    window.addEventListener('scroll', updateScrollPos, { passive: true });
     if (container) {
       container.addEventListener('scroll', updateScrollPos, { passive: true });
-    }
-    if (scrollParent && scrollParent !== window) {
-      (scrollParent as HTMLElement).addEventListener('scroll', updateScrollPos, { passive: true });
+      updateScrollPos();
     }
 
-    updateScrollPos();
+    const handleResize = () => updateScrollPos();
+    window.addEventListener('resize', handleResize, { passive: true });
 
     return () => {
-      window.removeEventListener('scroll', updateScrollPos);
       if (container) {
         container.removeEventListener('scroll', updateScrollPos);
       }
-      if (scrollParent && scrollParent !== window) {
-        (scrollParent as HTMLElement).removeEventListener('scroll', updateScrollPos);
-      }
+      window.removeEventListener('resize', handleResize);
     };
-  }, [HEADER_HEIGHT]);
+  }, []);
 
   React.useEffect(() => {
     const stop = () => { isSelectingRef.current = false };
