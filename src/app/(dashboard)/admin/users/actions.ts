@@ -193,7 +193,12 @@ export async function resetUserPassword(userId: string) {
     return { error: '권한이 없습니다.' }
   }
 
-  // Supabase Auth Admin API를 사용하여 비밀번호 강제 업데이트
+  const { data: targetProfile } = await supabaseAdmin
+    .from('profiles')
+    .select('username, full_name')
+    .eq('id', userId)
+    .maybeSingle()
+
   const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
     password: '123123'
   })
@@ -202,6 +207,17 @@ export async function resetUserPassword(userId: string) {
     console.error('Error resetting password:', authError)
     return { error: `비밀번호 초기화 실패: ${authError.message}` }
   }
+
+  const targetLabel = targetProfile
+    ? `${targetProfile.full_name || targetProfile.username} (${targetProfile.username})`
+    : `계정 (ID: ${userId})`;
+
+  const { logAuditAction } = await import('@/lib/audit-logger');
+  await logAuditAction({
+    action_type: 'PASSWORD_RESET',
+    target_name: targetLabel,
+    details: { userId }
+  });
 
   return { success: true }
 }
@@ -212,6 +228,12 @@ export async function updateUserRole(userId: string, newRole: string) {
     return { error: '권한이 없습니다.' }
   }
 
+  const { data: targetProfile } = await supabaseAdmin
+    .from('profiles')
+    .select('username, full_name, role')
+    .eq('id', userId)
+    .maybeSingle()
+
   const { error } = await supabaseAdmin
     .from('profiles')
     .update({ role: newRole as any })
@@ -220,6 +242,17 @@ export async function updateUserRole(userId: string, newRole: string) {
   if (error) {
     return { error: error.message }
   }
+
+  const targetLabel = targetProfile
+    ? `${targetProfile.full_name || targetProfile.username} (${targetProfile.username})`
+    : `계정 (ID: ${userId})`;
+
+  const { logAuditAction } = await import('@/lib/audit-logger');
+  await logAuditAction({
+    action_type: 'USER_ROLE_UPDATE',
+    target_name: targetLabel,
+    details: { userId, oldRole: targetProfile?.role, newRole }
+  });
 
   revalidateTag('profiles')
   revalidateTag('teachers')
@@ -269,11 +302,29 @@ export async function deleteUser(userId: string) {
     return { error: '권한이 없습니다.' }
   }
 
+  // 삭제 대상 프로필 정보 먼저 조회
+  const { data: targetProfile } = await supabaseAdmin
+    .from('profiles')
+    .select('username, full_name, role')
+    .eq('id', userId)
+    .maybeSingle()
+
+  const targetLabel = targetProfile
+    ? `${targetProfile.full_name || targetProfile.username} (${targetProfile.username})`
+    : `계정 (ID: ${userId})`;
+
   const { error } = await supabaseAdmin.auth.admin.deleteUser(userId)
 
   if (error) {
     return { error: error.message }
   }
+
+  const { logAuditAction } = await import('@/lib/audit-logger');
+  await logAuditAction({
+    action_type: 'USER_DELETE',
+    target_name: targetLabel,
+    details: { userId, username: targetProfile?.username, role: targetProfile?.role }
+  });
 
   revalidateTag('profiles')
   revalidateTag('teachers')

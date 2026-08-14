@@ -52,6 +52,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useRouter } from 'next/navigation';
 
 interface UserTableProps {
   initialProfiles: any[];
@@ -61,8 +62,14 @@ interface UserTableProps {
 }
 
 export function UserTable({ initialProfiles, graduationYears, fullClassMapping, baseYear }: UserTableProps) {
+  const router = useRouter();
   const isMobile = useIsMobile();
   const [profiles, setProfiles] = React.useState(initialProfiles);
+
+  // 서버 컴포넌트에서 전달된 initialProfiles 갱신 시 로컬 상태 동기화
+  React.useEffect(() => {
+    setProfiles(initialProfiles);
+  }, [initialProfiles]);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [roleFilter, setRoleFilter] = React.useState<'all' | 'admin' | 'teacher'>('all');
   const [isAssignOpen, setIsAssignOpen] = React.useState(false);
@@ -135,6 +142,7 @@ export function UserTable({ initialProfiles, graduationYears, fullClassMapping, 
     if (result.success) {
       setProfiles(prev => prev.map(p => p.id === userId ? { ...p, role: newRole } : p));
       toast({ title: '역할 변경 완료' });
+      router.refresh();
     } else {
       toast({ variant: 'destructive', title: '변경 실패', description: result.error });
     }
@@ -164,6 +172,7 @@ export function UserTable({ initialProfiles, graduationYears, fullClassMapping, 
       } : p));
       toast({ title: '담당 학반 설정 완료' });
       setIsAssignOpen(false);
+      router.refresh();
     } else {
       toast({ variant: 'destructive', title: '설정 실패', description: result.error });
     }
@@ -190,6 +199,7 @@ export function UserTable({ initialProfiles, graduationYears, fullClassMapping, 
       } : p));
       toast({ title: '담당 학반 배정 해제 완료' });
       setIsAssignOpen(false);
+      router.refresh();
     } else {
       toast({ variant: 'destructive', title: '해제 실패', description: result.error });
     }
@@ -200,6 +210,7 @@ export function UserTable({ initialProfiles, graduationYears, fullClassMapping, 
     if (result.success) {
       setProfiles(prev => prev.filter(p => p.id !== userId));
       toast({ title: '계정 삭제 완료' });
+      router.refresh();
     } else {
       toast({ variant: 'destructive', title: '삭제 실패', description: result.error });
     }

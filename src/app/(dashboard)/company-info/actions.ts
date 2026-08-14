@@ -228,6 +228,17 @@ export async function upsertCompany(companyData: CompanyData) {
     revalidateTag('companies');
     if (companyData.name) revalidateTag(`company-${companyData.name}`);
     revalidatePath('/company-info');
+
+    const { logAuditAction } = await import('@/lib/audit-logger');
+    await logAuditAction({
+      action_type: 'COMPANY_UPSERT',
+      target_name: companyData.name,
+      details: {
+        company_type: companyData.company_type || '',
+        location: companyData.location || '',
+        industry: companyData.industry || '',
+      }
+    });
   }
 
   return { data, error };
@@ -238,11 +249,22 @@ export async function upsertCompany(companyData: CompanyData) {
  */
 export async function deleteCompany(id: string) {
   const supabase = createAdminClient();
+
+  const { data: targetCompany } = await supabase.from('companies').select('name').eq('id', id).maybeSingle();
+  const companyName = targetCompany?.name || `기업 (ID: ${id})`;
+
   const { error } = await supabase.from('companies').delete().eq('id', id);
   
   if (!error) {
     revalidateTag('companies');
     revalidatePath('/company-info');
+
+    const { logAuditAction } = await import('@/lib/audit-logger');
+    await logAuditAction({
+      action_type: 'COMPANY_DELETE',
+      target_name: companyName,
+      details: { id, name: companyName }
+    });
   }
 
   return { error };
@@ -285,6 +307,13 @@ export async function bulkUpsertCompanies(companiesData: CompanyData[]) {
   if (!error) {
     revalidateTag('companies');
     revalidatePath('/company-info');
+
+    const { logAuditAction } = await import('@/lib/audit-logger');
+    await logAuditAction({
+      action_type: 'COMPANY_UPSERT',
+      target_name: `업체 ${payload.length}개 일괄 등록/수정`,
+      details: { count: payload.length, sampleNames: payload.slice(0, 5).map(c => c.name) }
+    });
   }
 
   return { count: data ? data.length : payload.length, error: error?.message };

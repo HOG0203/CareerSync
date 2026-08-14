@@ -16,8 +16,10 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { bulkCreateUsers } from './actions';
 import * as XLSX from 'xlsx';
+import { useRouter } from 'next/navigation';
 
 export function ImportUserButton() {
+  const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
   const [isPending, setIsPending] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
@@ -85,6 +87,7 @@ export function ImportUserButton() {
           
           setIsOpen(false);
           setSelectedFile(null);
+          router.refresh();
         }
       } catch (error) {
         console.error('Excel parse error:', error);

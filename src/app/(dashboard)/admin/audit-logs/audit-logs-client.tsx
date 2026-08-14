@@ -28,6 +28,7 @@ const ACTION_TYPE_CONFIG: Record<string, { label: string; color: string }> = {
   STUDENT_BULK_UPDATE: { label: '학생 일괄 수정', color: 'bg-teal-50 text-teal-700 border-teal-200' },
   USER_CREATE: { label: '계정 생성', color: 'bg-blue-50 text-blue-700 border-blue-200' },
   USER_ROLE_UPDATE: { label: '권한 변경', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+  USER_DELETE: { label: '계정 삭제', color: 'bg-rose-100 text-rose-800 border-rose-300 font-bold' },
   HOMEROOM_ASSIGN: { label: '담임교사 배정', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
   PASSWORD_RESET: { label: '비밀번호 초기화', color: 'bg-rose-50 text-rose-700 border-rose-200' },
   COMPANY_UPSERT: { label: '기업정보 등록/수정', color: 'bg-amber-50 text-amber-700 border-amber-200' },

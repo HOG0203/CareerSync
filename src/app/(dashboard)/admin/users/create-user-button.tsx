@@ -24,8 +24,10 @@ import { Plus, UserPlus, Loader2, ShieldCheck, Shield } from 'lucide-react';
 import { createUser } from './actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 export function CreateUserButton() {
+  const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
   const [isPending, setIsPending] = React.useState(false);
   const { toast } = useToast();
@@ -41,6 +43,7 @@ export function CreateUserButton() {
     if (result.success) {
       toast({ title: '계정 생성 성공', description: '새로운 사용자가 성공적으로 등록되었습니다.' });
       setIsOpen(false);
+      router.refresh();
     } else {
       toast({ variant: 'destructive', title: '생성 실패', description: result.error });
     }
