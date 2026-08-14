@@ -274,65 +274,60 @@ export function useSpreadsheet({
     return offsets;
   }, [columns]);
 
-  // 초고속 가로/세로 자동 스크롤 함수 (실제 DOM offsetTop 측정으로 100% 정확한 시야 유지)
+  // 초고속 가로/세로 자동 스크롤 함수 (Virtual Scroll 환경에서도 100% 정확한 시야 유지)
   const scrollToCell = React.useCallback((row: number, col: number) => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || row < 0 || col < 0) return;
     const container = containerRef.current;
 
-    // 1. 세로 스크롤 (실제 DOM 렌더링 높이 측정 기반)
-    const trs = container.querySelectorAll('tbody tr');
-    const targetTr = trs[row] as HTMLElement;
+    // 1. 세로 스크롤 (Virtual Scroll 호환 수학적 고정 위치 계산)
+    const headerEl = container.querySelector('thead') as HTMLElement;
+    const headerHeight = headerEl ? headerEl.offsetHeight : HEADER_HEIGHT;
 
-    if (targetTr) {
-      const headerEl = container.querySelector('thead') as HTMLElement;
-      const headerHeight = headerEl ? headerEl.offsetHeight : HEADER_HEIGHT;
-      const cellTop = targetTr.offsetTop;
-      const cellHeight = targetTr.offsetHeight || ROW_HEIGHT;
-      const cellBottom = cellTop + cellHeight;
+    const cellTop = headerHeight + row * ROW_HEIGHT;
+    const cellHeight = ROW_HEIGHT;
+    const cellBottom = cellTop + cellHeight;
 
-      const curY = container.scrollTop;
-      const ch = container.clientHeight;
-      const visibleTop = curY + headerHeight;
-      const visibleBottom = curY + ch;
+    const curY = container.scrollTop;
+    const ch = container.clientHeight;
+    const visibleTop = curY + headerHeight;
+    const visibleBottom = curY + ch;
 
-      // 셀 하단이 컨테이너 화면 바닥 밖으로 넘어가서 안 보이는 경우 -> 바닥에 맞춰 최소 스크롤
-      if (cellBottom > visibleBottom) {
-        container.scrollTop = cellBottom - ch;
-      }
-      // 셀 상단이 sticky 헤더 뒤로 들어가서 안 보이는 경우 -> 헤더 바로 밑(0px)으로 최소 스크롤
-      else if (cellTop < visibleTop) {
-        container.scrollTop = Math.max(0, cellTop - headerHeight);
-      }
-      // (이미 시야 영역 내에 100% 잘 보이는 경우 -> scrollTop 전혀 변경 없음)
+    // 셀 하단이 화면 바닥 밖으로 넘어가면 바닥에 맞춰 스크롤
+    if (cellBottom > visibleBottom) {
+      container.scrollTop = cellBottom - ch;
+    }
+    // 셀 상단이 sticky 헤더 뒤로 넘어가면 헤더 바로 밑으로 스크롤
+    else if (cellTop < visibleTop) {
+      container.scrollTop = Math.max(0, cellTop - headerHeight);
     }
 
-    // 2. 가로 스크롤 (실제 DOM offsetLeft & offsetWidth 측정 기반)
+    // 2. 가로 스크롤 (실제 DOM offsetLeft & offsetWidth 동적 계산)
     const ths = container.querySelectorAll('thead tr:last-child th');
-    const targetTh = ths[col + 1] as HTMLElement;
+    if (ths.length > 0) {
+      const hasCheckboxTh = ths.length > columns.length;
+      const thIndex = hasCheckboxTh ? col + 1 : col;
+      const targetTh = ths[thIndex] as HTMLElement;
 
-    if (targetTh) {
-      const firstTh = ths[0] as HTMLElement;
-      const stickyLeft = firstTh ? firstTh.offsetWidth : 32;
-      const cellLeft = targetTh.offsetLeft;
-      const cellWidth = targetTh.offsetWidth;
-      const cellRight = cellLeft + cellWidth;
+      if (targetTh) {
+        const firstTh = ths[0] as HTMLElement;
+        const stickyLeft = (hasCheckboxTh && firstTh) ? firstTh.offsetWidth : 0;
+        const cellLeft = targetTh.offsetLeft;
+        const cellWidth = targetTh.offsetWidth;
+        const cellRight = cellLeft + cellWidth;
 
-      const curX = container.scrollLeft;
-      const cw = container.clientWidth;
-      const visibleLeft = curX + stickyLeft;
-      const visibleRight = curX + cw;
+        const curX = container.scrollLeft;
+        const cw = container.clientWidth;
+        const visibleLeft = curX + stickyLeft;
+        const visibleRight = curX + cw;
 
-      // 셀 오른쪽 끝이 화면 우측 경계 밖으로 넘어가서 안 보이는 경우 -> 우측 경계선에 딱 맞춰 스크롤
-      if (cellRight > visibleRight) {
-        container.scrollLeft = cellRight - cw;
+        if (cellRight > visibleRight) {
+          container.scrollLeft = cellRight - cw;
+        } else if (cellLeft < visibleLeft) {
+          container.scrollLeft = Math.max(0, cellLeft - stickyLeft);
+        }
       }
-      // 셀 왼쪽 끝이 왼쪽 고정 컬럼 뒤로 들어가서 안 보이는 경우 -> 고정 컬럼 바로 오른쪽(0px)으로 스크롤
-      else if (cellLeft < visibleLeft) {
-        container.scrollLeft = Math.max(0, cellLeft - stickyLeft);
-      }
-      // (이미 가로 시야 영역 내에 100% 잘 보이는 경우 -> scrollLeft 전혀 변경 없음)
     }
-  }, [ROW_HEIGHT]);
+  }, [ROW_HEIGHT, columns]);
 
   const rafRef = React.useRef<number | null>(null);
   const requestScrollToCell = React.useCallback((row: number, col: number) => {
