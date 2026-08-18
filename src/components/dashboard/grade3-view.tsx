@@ -4,13 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Briefcase, GraduationCap, Building2 } from 'lucide-react';
 import CompanyTypeChart from './company-type-chart';
 import MajorEmploymentChart from './major-employment-chart';
-import ClassFieldTrainingChart from './class-field-training-chart';
-import MajorFieldTrainingChart from './major-field-training-chart';
 import CertificateStatusChart from './certificate-status-chart';
 import CareerAspirationChart from './career-aspiration-chart';
 import CareerCourseChart from './career-course-chart';
 import SpecificCourseChart from './specific-course-chart';
 import { StudentEmploymentData } from '@/lib/types';
+import { DraggableChartGrid } from './draggable-chart-grid';
+
+import { saveDashboardChartLayout } from '@/app/(dashboard)/admin/settings/actions';
 
 interface Grade3ViewProps {
   filteredData: StudentEmploymentData[];
@@ -21,7 +22,11 @@ interface Grade3ViewProps {
   trainingStudents: number;
   majorCompanyStudents: number;
   grade: number;
+  isAdmin?: boolean;
+  initialOrder?: string[];
 }
+
+const DEFAULT_KEYS = ['aspiration', 'course', 'specific', 'employment', 'company', 'certificate'];
 
 export default function Grade3View({
   filteredData,
@@ -31,8 +36,33 @@ export default function Grade3View({
   excludingStudents,
   trainingStudents,
   majorCompanyStudents,
-  grade
+  grade,
+  isAdmin = false,
+  initialOrder,
 }: Grade3ViewProps) {
+  const renderChart = (key: string) => {
+    switch (key) {
+      case 'aspiration':
+        return <CareerAspirationChart data={filteredData} grade={grade} selectedMajor={selectedMajor} />;
+      case 'course':
+        return <CareerCourseChart data={filteredData} grade={grade} selectedMajor={selectedMajor} />;
+      case 'specific':
+        return <SpecificCourseChart data={filteredData} selectedMajor={selectedMajor} grade={grade} />;
+      case 'employment':
+        return <MajorEmploymentChart data={filteredData} selectedMajor={selectedMajor} />;
+      case 'company':
+        return <CompanyTypeChart data={filteredData} selectedMajor={selectedMajor} />;
+      case 'certificate':
+        return <CertificateStatusChart data={filteredData} selectedMajor={selectedMajor} />;
+      default:
+        return null;
+    }
+  };
+
+  const handleSaveOrder = async (newOrder: string[]) => {
+    await saveDashboardChartLayout('grade3Order', newOrder);
+  };
+
   return (
     <div className="flex flex-col gap-4 lg:gap-6 animate-in fade-in duration-500">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -81,15 +111,14 @@ export default function Grade3View({
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 min-w-0 overflow-hidden">
-         <CareerAspirationChart data={filteredData} grade={grade} selectedMajor={selectedMajor} />
-         <CareerCourseChart data={filteredData} grade={grade} selectedMajor={selectedMajor} />
-         <SpecificCourseChart data={filteredData} selectedMajor={selectedMajor} grade={grade} />
-
-         <MajorEmploymentChart data={filteredData} selectedMajor={selectedMajor} />
-         <CompanyTypeChart data={filteredData} selectedMajor={selectedMajor} />
-         <CertificateStatusChart data={filteredData} selectedMajor={selectedMajor} />
-      </div>
+      <DraggableChartGrid
+        storageKey="dashboard_chart_order_grade3"
+        defaultKeys={DEFAULT_KEYS}
+        initialOrder={initialOrder}
+        isAdmin={isAdmin}
+        onSaveOrder={handleSaveOrder}
+        renderChart={renderChart}
+      />
     </div>
   );
 }

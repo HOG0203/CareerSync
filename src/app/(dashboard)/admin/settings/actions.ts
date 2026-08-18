@@ -232,3 +232,72 @@ export async function updateMasterCertificates(certificates: MasterCertificate[]
     return { error: error.message }
   }
 }
+
+export interface DashboardChartLayout {
+  grade3Order?: string[];
+  lowerGradeOrder?: string[];
+}
+
+/**
+ * 대시보드 차트 배치 순서 조회 (서버 캐싱)
+ */
+export async function getDashboardChartLayout(): Promise<DashboardChartLayout> {
+  return unstable_cache(
+    async () => {
+      const supabase = createAdminClient();
+      try {
+        const { data, error } = await supabase
+          .from('system_settings')
+          .select('value')
+          .eq('key', 'dashboard_chart_layout')
+          .single();
+
+        if (error) throw error;
+        return (data.value as DashboardChartLayout) || {};
+      } catch (error) {
+        return {};
+      }
+    },
+    ['dashboard-chart-layout'],
+    { revalidate: 3600, tags: ['settings', 'dashboard-layout'] }
+  )();
+}
+
+/**
+ * 대시보드 차트 배치 순서 저장 (관리자 전용)
+ */
+export async function saveDashboardChartLayout(key: 'grade3Order' | 'lowerGradeOrder', newOrder: string[]) {
+  const supabase = createAdminClient();
+
+  try {
+    const { data: existingData } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'dashboard_chart_layout')
+      .maybeSingle();
+
+    const currentLayout: DashboardChartLayout = existingData?.value ? (existingData.value as any) : {};
+    const updatedLayout: DashboardChartLayout = {
+      ...currentLayout,
+      [key]: newOrder
+    };
+
+    const { error } = await supabase
+      .from('system_settings')
+      .upsert({
+        key: 'dashboard_chart_layout',
+        value: updatedLayout,
+        updated_at: new Date().toISOString()
+      });
+
+    if (error) throw error;
+
+    revalidateTag('settings');
+    revalidateTag('dashboard-layout');
+    revalidatePath('/dashboard');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error saving dashboard chart layout:', error);
+    return { error: error.message };
+  }
+}

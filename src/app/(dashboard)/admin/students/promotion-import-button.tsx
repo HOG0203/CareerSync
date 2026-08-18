@@ -12,6 +12,7 @@ import {
   DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import { bulkPromoteFromExcel } from '@/app/students/actions'
 
@@ -21,6 +22,7 @@ interface PromotionImportButtonProps {
 }
 
 export function PromotionImportButton({ currentData, baseYear }: PromotionImportButtonProps) {
+  const router = useRouter()
   const [isOpen, setIsOpen] = React.useState(false)
   const [isPending, setIsPending] = React.useState(false)
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null)
@@ -54,6 +56,7 @@ export function PromotionImportButton({ currentData, baseYear }: PromotionImport
         }
         setSelectedFile(null)
         setIsOpen(false)
+        router.refresh()
       } catch (err: any) {
         toast({ variant: "destructive", title: '업로드 실패', description: err.message })
       } finally {

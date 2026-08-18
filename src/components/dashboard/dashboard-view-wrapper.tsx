@@ -6,6 +6,8 @@ import LowerGradeView from './lower-grade-view';
 import { DashboardLoadingSkeleton } from './loading-skeleton';
 import { StudentEmploymentData } from '@/lib/types';
 
+import { DashboardChartLayout } from '@/app/(dashboard)/admin/settings/actions';
+
 interface DashboardViewWrapperProps {
   filteredData: StudentEmploymentData[];
   selectedMajor: string;
@@ -15,6 +17,8 @@ interface DashboardViewWrapperProps {
   trainingStudents: number;
   majorCompanyStudents: number;
   grade: number;
+  isAdmin?: boolean;
+  chartLayout?: DashboardChartLayout;
 }
 
 export default function DashboardViewWrapper({
@@ -26,6 +30,8 @@ export default function DashboardViewWrapper({
   trainingStudents,
   majorCompanyStudents,
   grade,
+  isAdmin = false,
+  chartLayout = {},
 }: DashboardViewWrapperProps) {
   const [isLoading, setIsLoading] = React.useState(false);
 
@@ -56,6 +62,8 @@ export default function DashboardViewWrapper({
         trainingStudents={trainingStudents}
         majorCompanyStudents={majorCompanyStudents}
         grade={grade}
+        isAdmin={isAdmin}
+        initialOrder={chartLayout.grade3Order}
       />
     );
   }
@@ -65,6 +73,8 @@ export default function DashboardViewWrapper({
       filteredData={filteredData}
       selectedMajor={selectedMajor}
       grade={grade}
+      isAdmin={isAdmin}
+      initialOrder={chartLayout.lowerGradeOrder}
     />
   );
 }

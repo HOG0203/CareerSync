@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { UserPlus, Save, Loader2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { createStudent } from '@/app/students/actions'
 import { useToast } from '@/hooks/use-toast'
 
@@ -31,6 +32,7 @@ interface AddStudentModalProps {
 }
 
 export function AddStudentModal({ isOpen, onClose, baseYear, majors }: AddStudentModalProps) {
+  const router = useRouter()
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const { toast } = useToast()
 
@@ -69,6 +71,7 @@ export function AddStudentModal({ isOpen, onClose, baseYear, majors }: AddStuden
 
     if (result.success) {
       toast({ title: '학생 등록 완료', description: `${formData.student_name} 학생이 성공적으로 등록되었습니다.` })
+      router.refresh()
       onClose()
     } else {
       toast({ variant: 'destructive', title: '등록 실패', description: result.error })

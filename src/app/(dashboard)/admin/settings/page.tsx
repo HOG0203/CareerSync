@@ -497,9 +497,9 @@ export default function AdminSettingsPage() {
         </Card>
       </div>
 
-      {/* 모바일 전용 아코디언 모드 레이아웃 (lg 미만) - 색상 통일 적용 */}
+      {/* 모바일 전용 아코디언 모드 레이아웃 (lg 미만) - 기본 닫힘 적용 */}
       <div className="lg:hidden flex flex-col space-y-3">
-        <Accordion type="multiple" defaultValue={["year-settings", "cert-settings", "certify-settings"]} className="space-y-3">
+        <Accordion type="multiple" defaultValue={[]} className="space-y-3">
           {/* 1. 학사학년도 아코디언 */}
           <AccordionItem value="year-settings" className="border border-slate-200/80 bg-white rounded-2xl shadow-sm overflow-hidden px-0">
             <AccordionTrigger className="px-4 py-3.5 hover:no-underline bg-slate-50/80 font-bold text-sm text-slate-800">

@@ -8,17 +8,26 @@ import SpecificCourseChart from './specific-course-chart';
 import MilitaryStatusChart from './military-status-chart';
 import CertificateStatusChart from './certificate-status-chart';
 import { StudentEmploymentData } from '@/lib/types';
+import { DraggableChartGrid } from './draggable-chart-grid';
+
+import { saveDashboardChartLayout } from '@/app/(dashboard)/admin/settings/actions';
 
 interface LowerGradeViewProps {
   filteredData: StudentEmploymentData[];
   selectedMajor: string;
   grade: number;
+  isAdmin?: boolean;
+  initialOrder?: string[];
 }
+
+const DEFAULT_KEYS = ['aspiration', 'course', 'specific', 'military', 'certificate'];
 
 export default function LowerGradeView({
   filteredData,
   selectedMajor,
-  grade
+  grade,
+  isAdmin = false,
+  initialOrder,
 }: LowerGradeViewProps) {
   // 요약 통계 계산
   const totalStudents = filteredData.length;
@@ -38,6 +47,27 @@ export default function LowerGradeView({
   ).length;
 
   const certificateHolders = filteredData.filter(s => (s.certificates?.length || 0) > 0).length;
+
+  const renderChart = (key: string) => {
+    switch (key) {
+      case 'aspiration':
+        return <CareerAspirationChart data={filteredData} grade={grade} selectedMajor={selectedMajor} />;
+      case 'course':
+        return <CareerCourseChart data={filteredData} grade={grade} selectedMajor={selectedMajor} />;
+      case 'specific':
+        return <SpecificCourseChart data={filteredData} selectedMajor={selectedMajor} grade={grade} />;
+      case 'military':
+        return <MilitaryStatusChart data={filteredData} selectedMajor={selectedMajor} />;
+      case 'certificate':
+        return <CertificateStatusChart data={filteredData} selectedMajor={selectedMajor} />;
+      default:
+        return null;
+    }
+  };
+
+  const handleSaveOrder = async (newOrder: string[]) => {
+    await saveDashboardChartLayout('lowerGradeOrder', newOrder);
+  };
 
   return (
     <div className="flex flex-col gap-4 lg:gap-6 animate-in fade-in duration-500">
@@ -87,18 +117,14 @@ export default function LowerGradeView({
         </Card>
       </div>
 
-      {/* 차트 섹션 - selectedMajor 전달 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 min-w-0 overflow-hidden">
-         <CareerAspirationChart data={filteredData} grade={grade} selectedMajor={selectedMajor} />
-         <CareerCourseChart data={filteredData} grade={grade} selectedMajor={selectedMajor} />
-         <SpecificCourseChart data={filteredData} selectedMajor={selectedMajor} grade={grade} />
-
-         <MilitaryStatusChart data={filteredData} selectedMajor={selectedMajor} />
-         <CertificateStatusChart 
-           data={filteredData} 
-           selectedMajor={selectedMajor} 
-         />
-      </div>
+      <DraggableChartGrid
+        storageKey="dashboard_chart_order_lower"
+        defaultKeys={DEFAULT_KEYS}
+        initialOrder={initialOrder}
+        isAdmin={isAdmin}
+        onSaveOrder={handleSaveOrder}
+        renderChart={renderChart}
+      />
     </div>
   );
 }

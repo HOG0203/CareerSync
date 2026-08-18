@@ -57,9 +57,11 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
 export default function CompanyInfoPage() {
+  const router = useRouter();
   const [companies, setCompanies] = React.useState<CompanyData[]>([]);
   const [selectedCompany, setSelectedCompany] = React.useState<any>(null);
   const [search, setSearch] = React.useState('');
@@ -71,8 +73,8 @@ export default function CompanyInfoPage() {
   // 모바일 탭 상태
   const [mobileTab, setMobileTab] = React.useState<'list' | 'details'>('list');
 
-  // 정렬 상태
-  const [employeeSort, setEmployeeSort] = React.useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'student_name', direction: 'asc' });
+  // 정렬 상태 (취업생 현황: 기본 졸업연도 내림차순)
+  const [employeeSort, setEmployeeSort] = React.useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'graduation_year', direction: 'desc' });
   const [traineeSort, setTraineeSort] = React.useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'student_name', direction: 'asc' });
 
   // 편집 및 일괄등록 모달 상태
@@ -119,6 +121,20 @@ export default function CompanyInfoPage() {
     const { data } = await getCompanies(searchVal);
     if (data) setCompanies(data);
     setIsLoading(false);
+  };
+
+  // 등록/수정/삭제/가져오기 시 등록/미등록 기업 전체 실시간 최신화
+  const refreshAllCompanies = async (searchVal?: string) => {
+    setIsLoading(true);
+    const [{ data: regData }, unregData] = await Promise.all([
+      getCompanies(searchVal),
+      getUnregisteredCompanies()
+    ]);
+    if (regData) setCompanies(regData);
+    if (unregData) setUnregisteredCompanies(unregData);
+    setUnregisteredLoaded(true);
+    setIsLoading(false);
+    router.refresh();
   };
 
   // 미등록 기업 탭 클릭 시 지연 로드
@@ -184,15 +200,16 @@ export default function CompanyInfoPage() {
     }
     
     setIsSubmitting(true);
+    const targetName = editingCompany.name;
     const { error } = await upsertCompany(editingCompany);
     if (error) {
       toast({ variant: 'destructive', title: '저장 실패', description: '기업 정보를 저장하는 중 오류가 발생했습니다.' });
     } else {
       toast({ title: '저장 완료', description: '기업 정보가 성공적으로 업데이트되었습니다.' });
       setIsEditModalOpen(false);
-      loadCompanies(search);
-      if (selectedCompany?.company?.name === editingCompany.name) {
-        handleSelectCompany(editingCompany.name);
+      await refreshAllCompanies(search);
+      if (selectedCompany?.name === targetName || selectedCompany?.company?.name === targetName) {
+        handleSelectCompany(targetName);
       }
     }
     setIsSubmitting(false);
@@ -207,7 +224,7 @@ export default function CompanyInfoPage() {
     } else {
       toast({ title: '삭제 완료' });
       setSelectedCompany(null);
-      loadCompanies(search);
+      await refreshAllCompanies(search);
     }
   };
 
@@ -706,9 +723,9 @@ export default function CompanyInfoPage() {
                   <Card className="border-none shadow-xs">
                     <CardContent className="p-0 overflow-hidden rounded-xl">
                       {selectedCompany.employees.length > 0 ? (
-                        <div className="overflow-x-auto custom-scrollbar">
-                          <table className="w-full text-xs sm:text-sm text-left min-w-[500px]">
-                            <thead className="bg-slate-50 text-slate-500 text-[10px] sm:text-[11px] font-black uppercase border-b">
+                        <div className="w-full overflow-x-auto">
+                          <table className="w-full text-xs sm:text-sm text-left">
+                            <thead className="bg-slate-100/80 text-slate-600 text-[11px] sm:text-xs font-bold border-b border-slate-200">
                               <tr>
                                 <SortHeader label="이름" sortKey="student_name" currentSort={employeeSort} onSort={(key: string) => handleSort('employee', key)} />
                                 <SortHeader label="졸업연도" sortKey="graduation_year" currentSort={employeeSort} onSort={(key: string) => handleSort('employee', key)} />
@@ -716,10 +733,10 @@ export default function CompanyInfoPage() {
                                 <SortHeader label="반/번호" sortKey="student_number" currentSort={employeeSort} onSort={(key: string) => handleSort('employee', key)} />
                               </tr>
                             </thead>
-                            <tbody className="divide-y">
+                            <tbody className="divide-y divide-slate-100">
                               {getSortedData(selectedCompany.employees, employeeSort).map((s: any) => (
-                                <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                                  <td className="px-4 sm:px-6 py-3 sm:py-4 font-bold text-slate-900">
+                                <tr key={s.id} className="hover:bg-slate-50/90 transition-colors">
+                                  <td className="px-2.5 sm:px-4 py-3 font-bold text-slate-900 whitespace-nowrap">
                                     <StudentPopover 
                                       student={s} 
                                       rankingSummary={rankingMap[s.id]} 
@@ -731,9 +748,17 @@ export default function CompanyInfoPage() {
                                       </span>
                                     </StudentPopover>
                                   </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-slate-500">{s.graduation_year ? `${s.graduation_year}년` : '-'}</td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 font-medium text-slate-600">{s.major}</td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-slate-500">{s.class_info}반 {s.student_number}번</td>
+                                  <td className="px-2 sm:px-4 py-3 font-semibold text-blue-700 whitespace-nowrap">
+                                    <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200/60 text-[11px] sm:text-xs">
+                                      {s.graduation_year ? `${s.graduation_year}년` : '-'}
+                                    </span>
+                                  </td>
+                                  <td className="px-2 sm:px-4 py-3 font-semibold text-slate-800 text-xs sm:text-sm">
+                                    {s.major}
+                                  </td>
+                                  <td className="px-2 sm:px-4 py-3 font-medium text-slate-600 text-xs whitespace-nowrap">
+                                    {s.class_info}반 {s.student_number}번
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>
@@ -750,20 +775,20 @@ export default function CompanyInfoPage() {
                   <Card className="border-none shadow-xs">
                     <CardContent className="p-0 overflow-hidden rounded-xl">
                       {selectedCompany.trainees.length > 0 ? (
-                        <div className="overflow-x-auto custom-scrollbar">
-                          <table className="w-full text-xs sm:text-sm text-left min-w-[500px]">
-                            <thead className="bg-slate-50 text-slate-500 text-[10px] sm:text-[11px] font-black uppercase border-b">
+                        <div className="w-full overflow-x-auto">
+                          <table className="w-full text-xs sm:text-sm text-left">
+                            <thead className="bg-slate-100/80 text-slate-600 text-[11px] sm:text-xs font-bold border-b border-slate-200">
                               <tr>
                                 <SortHeader label="이름" sortKey="student_name" currentSort={traineeSort} onSort={(key: string) => handleSort('trainee', key)} />
-                                <SortHeader label="졸업연도" sortKey="graduation_year" currentSort={traineeSort} onSort={(key: string) => handleSort('trainee', key)} />
                                 <SortHeader label="학과" sortKey="major" currentSort={traineeSort} onSort={(key: string) => handleSort('trainee', key)} />
+                                <SortHeader label="반/번호" sortKey="student_number" currentSort={traineeSort} onSort={(key: string) => handleSort('trainee', key)} />
                                 <SortHeader label="상태" sortKey="hiring_status" currentSort={traineeSort} onSort={(key: string) => handleSort('trainee', key)} />
                               </tr>
                             </thead>
-                            <tbody className="divide-y">
+                            <tbody className="divide-y divide-slate-100">
                               {getSortedData(selectedCompany.trainees, traineeSort).map((s: any) => (
-                                <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                                  <td className="px-4 sm:px-6 py-3 sm:py-4 font-bold text-slate-900">
+                                <tr key={s.id} className="hover:bg-slate-50/90 transition-colors">
+                                  <td className="px-2.5 sm:px-4 py-3 font-bold text-slate-900 whitespace-nowrap">
                                     <StudentPopover 
                                       student={s} 
                                       rankingSummary={rankingMap[s.id]} 
@@ -775,12 +800,16 @@ export default function CompanyInfoPage() {
                                       </span>
                                     </StudentPopover>
                                   </td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 text-slate-500">{s.graduation_year ? `${s.graduation_year}년` : '-'}</td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4 font-medium text-slate-600">{s.major}</td>
-                                  <td className="px-3 sm:px-4 py-3 sm:py-4">
+                                  <td className="px-2 sm:px-4 py-3 font-semibold text-slate-800 text-xs sm:text-sm">
+                                    {s.major}
+                                  </td>
+                                  <td className="px-2 sm:px-4 py-3 font-medium text-slate-600 text-xs whitespace-nowrap">
+                                    {s.class_info}반 {s.student_number}번
+                                  </td>
+                                  <td className="px-2 sm:px-4 py-3 whitespace-nowrap">
                                     <span className={cn(
-                                      "px-2 py-0.5 rounded-full text-[10px] font-black",
-                                      s.hiring_status === '채용전환' ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700"
+                                      "px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black shadow-2xs",
+                                      s.hiring_status === '채용전환' ? "bg-blue-100 text-blue-700 border border-blue-200" : "bg-emerald-100 text-emerald-700 border border-emerald-200"
                                     )}>
                                       {s.hiring_status}
                                     </span>
@@ -1030,12 +1059,11 @@ export default function CompanyInfoPage() {
       <ImportCompanyModal 
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
-        onSuccess={() => {
-          loadCompanies(search);
+        onSuccess={async () => {
+          await refreshAllCompanies(search);
           if (selectedCompany) {
-            getCompanyDetails(selectedCompany.name).then(res => {
-              if (res.company) setSelectedCompany(res.company);
-            });
+            const compName = selectedCompany.name || selectedCompany.company?.name;
+            if (compName) handleSelectCompany(compName);
           }
         }}
       />

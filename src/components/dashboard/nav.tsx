@@ -218,7 +218,7 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
             <Collapsible
               key={group.title}
               asChild
-              defaultOpen={isAnyItemActive || group.title === '시스템 관리'}
+              defaultOpen={isAnyItemActive}
               className="group/collapsible"
             >
               <SidebarGroup className="p-0">

@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions'
 
@@ -73,6 +73,7 @@ export async function updatePersonalDetail(id: string, field: string, value: any
     if (student) await syncAcademicHistory(id, student)
   }
 
+  revalidateTag('students')
   revalidatePath('/class-management')
   revalidatePath('/employment-status')
   revalidatePath('/students')
@@ -101,6 +102,7 @@ export async function bulkUpdatePersonalDetails(updates: { id: string, field: st
     if (student) await syncAcademicHistory(sid, student)
   }
 
+  revalidateTag('students')
   revalidatePath('/class-management')
   revalidatePath('/employment-status')
   revalidatePath('/students')

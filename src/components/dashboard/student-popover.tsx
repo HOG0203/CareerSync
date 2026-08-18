@@ -29,6 +29,7 @@ import {
   Phone,
   ChevronDown
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { getStudentScoresById, updateStudentField } from '@/app/students/actions';
 import { Button } from '@/components/ui/button';
 import { CounselingModal } from '@/app/(dashboard)/class-management/counseling-modal';
@@ -58,6 +59,7 @@ export function StudentPopover({
   baseYear,
   isLowerGrade: propIsLowerGrade
 }: StudentPopoverProps) {
+  const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const isMobile = useIsMobile();
   const resolvedSide = side || (isMobile ? 'bottom' : 'right');
@@ -92,6 +94,7 @@ export function StudentPopover({
     try {
       await updateStudentField(student.id, 'employment_status', val);
       student.employment_status = val;
+      router.refresh();
     } catch (err) {
       console.error('Failed to update employment_status:', err);
     } finally {

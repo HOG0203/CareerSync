@@ -241,6 +241,7 @@ export async function updateStudentField(id: string, field: string, value: any) 
     }
   });
 
+  revalidateTag('students');
   revalidatePath('/students'); 
   revalidatePath('/admin/students'); 
   revalidatePath('/class-management');
@@ -266,6 +267,7 @@ export async function bulkUpdateStudentData(updates: { id: string, field: string
     details: { count: updates.length }
   });
 
+  revalidateTag('students');
   revalidatePath('/students'); 
   revalidatePath('/admin/students'); 
   revalidatePath('/class-management');

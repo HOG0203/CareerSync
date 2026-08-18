@@ -96,7 +96,7 @@ async function EmploymentStatusPageContent({
             </div>
           ) : (
             <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar scrollbar-hide py-1 text-[10px] font-semibold whitespace-nowrap w-full sm:w-auto justify-start sm:justify-end">
-              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-blue-600 rounded-full shrink-0"></div> 대/공기업</div>
+              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-rose-600 rounded-full shrink-0"></div> 대/공기업</div>
               <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-indigo-700 rounded-full shrink-0"></div> 공무원/부사관</div>
               <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-purple-600 rounded-full shrink-0"></div> 중견기업</div>
               <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-cyan-500 rounded-full shrink-0"></div> 강소기업</div>

@@ -12,10 +12,12 @@ import {
   DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import { uploadStudentsCSV } from '@/app/students/actions'
 
 export function ImportButton() {
+  const router = useRouter()
   const [mounted, setMounted] = React.useState(false)
   const [isOpen, setIsOpen] = React.useState(false)
   const [isPending, setIsPending] = React.useState(false)
@@ -53,6 +55,7 @@ export function ImportButton() {
         toast({ title: '업로드 성공', description: `${result.count}명의 학생 데이터가 반영되었습니다.` })
         setSelectedFile(null)
         setIsOpen(false)
+        router.refresh()
       }
     }
 

@@ -80,7 +80,8 @@ const getCompanyTypeVariant = (type?: string, businessType?: string, careerAspir
   if (businessType === '취업') {
     switch (type) {
       case '대기업':
-      case '공기업': return 'bg-blue-600 text-white border-blue-700';
+      case '공기업':
+      case '대/공기업': return 'bg-rose-600 text-white border-rose-700 font-bold';
       case '공무원':
       case '부사관': return 'bg-indigo-700 text-white border-indigo-800';
       case '중견기업': return 'bg-purple-600 text-white border-purple-700';

@@ -7,7 +7,7 @@ import {
 import { LayoutDashboard } from 'lucide-react';
 import DashboardFilters from '@/components/dashboard/dashboard-filters';
 import DashboardViewWrapper from '@/components/dashboard/dashboard-view-wrapper';
-import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
+import { getSystemSettings, getDashboardChartLayout } from '@/app/(dashboard)/admin/settings/actions';
 import { redirect } from 'next/navigation';
 import React from 'react';
 
@@ -21,11 +21,14 @@ export default async function DashboardPage({
   const params = await searchParams;
 
   // 1. 기반 설정 및 사용자 프로필 패칭
-  const [graduationYears, settings, profile] = await Promise.all([
+  const [graduationYears, settings, profile, chartLayout] = await Promise.all([
     getGraduationYears(),
     getSystemSettings(),
-    getCurrentUserProfile()
+    getCurrentUserProfile(),
+    getDashboardChartLayout()
   ]);
+
+  const isAdmin = profile?.role === 'admin';
 
   // 지능형 초기 학년 및 학사학년도 설정 (In-Memory Default Fallback - 2중 HTTP 딜레이 제거)
   const defaultGrade = profile?.assigned_grade || 3;
@@ -148,6 +151,8 @@ export default async function DashboardPage({
         trainingStudents={trainingStudents}
         majorCompanyStudents={majorCompanyStudents}
         grade={grade}
+        isAdmin={isAdmin}
+        chartLayout={chartLayout}
       />
     </div>
   );
