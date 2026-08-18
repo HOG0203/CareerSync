@@ -299,7 +299,13 @@ export async function updateAssignedClass(userId: string, data: { year: number |
 export async function deleteUser(userId: string) {
   const isAdmin = await checkIsAdmin()
   if (!isAdmin) {
-    return { error: '권한이 없습니다.' }
+    return { error: '관리자 권한이 필요합니다.' }
+  }
+
+  const supabase = await createClient()
+  const { data: { user: currentUser } } = await supabase.auth.getUser()
+  if (currentUser && currentUser.id === userId) {
+    return { error: '현재 로그인 중인 본인 계정은 삭제할 수 없습니다.' }
   }
 
   // 삭제 대상 프로필 정보 먼저 조회
@@ -313,10 +319,20 @@ export async function deleteUser(userId: string) {
     ? `${targetProfile.full_name || targetProfile.username} (${targetProfile.username})`
     : `계정 (ID: ${userId})`;
 
-  const { error } = await supabaseAdmin.auth.admin.deleteUser(userId)
+  // 1. public.profiles 테이블에서 먼저 삭제
+  const { error: profileErr } = await supabaseAdmin
+    .from('profiles')
+    .delete()
+    .eq('id', userId)
 
-  if (error) {
-    return { error: error.message }
+  if (profileErr) {
+    return { error: `프로필 삭제 실패: ${profileErr.message}` }
+  }
+
+  // 2. Supabase Auth 유저 삭제 (Auth에 유저가 없더라도 무시하고 정상 처리)
+  const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(userId)
+  if (authErr && !authErr.message?.toLowerCase().includes('not found')) {
+    console.warn('Auth user delete notice:', authErr.message)
   }
 
   const { logAuditAction } = await import('@/lib/audit-logger');
