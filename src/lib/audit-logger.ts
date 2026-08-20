@@ -94,6 +94,38 @@ export async function logAuditAction(params: {
 }
 
 /**
+ * 페이지 조회(방문) 로그 기록 Server Action (로그인 이력 페이지 자체는 제외)
+ */
+export async function recordPageViewAction(path: string, pageName: string) {
+  try {
+    // 로그인 이력 관리 페이지 자체 조회는 기록에서 제외
+    if (path.includes('/admin/login-history')) {
+      return { success: true };
+    }
+
+    const userProfile = await getCurrentUserProfile();
+    if (!userProfile) return { success: false };
+
+    const actorName = userProfile.full_name || userProfile.username || '사용자';
+
+    return await logAuditAction({
+      actor_name: actorName,
+      action_type: 'PAGE_VIEW',
+      target_name: `[${pageName}] 페이지 조회`,
+      details: {
+        path,
+        page_name: pageName,
+        role: userProfile.role,
+        viewed_at: new Date().toISOString()
+      }
+    });
+  } catch (err) {
+    console.error('Failed to record page view:', err);
+    return { success: false };
+  }
+}
+
+/**
  * [캐싱] Audit Log 전체 목록 서버 메모리 캐싱 조회
  */
 export async function getCachedAuditLogs() {

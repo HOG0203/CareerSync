@@ -9,6 +9,7 @@ import Header from '@/components/dashboard/header';
 import { createClient } from '@/lib/supabase/server';
 import { MobileTopBar } from '@/components/dashboard/mobile-top-bar';
 import { MobileBottomTab } from '@/components/dashboard/mobile-bottom-tab';
+import { PageViewTracker } from '@/components/dashboard/page-view-tracker';
 import { redirect } from 'next/navigation';
 import { getCurrentUserProfile } from '@/lib/data';
 
@@ -28,6 +29,7 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
 
   return (
     <SidebarProvider>
+      <PageViewTracker />
       <div className="h-screen w-full flex bg-background overflow-hidden">
         {/* Desktop Sidebar */}
         <div className="hidden lg:block">

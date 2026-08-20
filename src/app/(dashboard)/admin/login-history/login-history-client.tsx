@@ -45,9 +45,10 @@ interface LoginHistoryClientProps {
   logs: AuditLogEntry[];
 }
 
-const ACTION_TYPE_CONFIG: Record<string, { label: string; color: string }> = {
+const ACTION_TYPE_CONFIG: Record<string, { label: string; color: string; isView?: boolean }> = {
   USER_LOGIN: { label: '시스템 로그인', color: 'bg-blue-50 text-blue-700 border-blue-200' },
   USER_LOGOUT: { label: '시스템 로그아웃', color: 'bg-slate-50 text-slate-700 border-slate-200' },
+  PAGE_VIEW: { label: '페이지 조회', color: 'bg-sky-50 text-sky-700 border-sky-200', isView: true },
   STUDENT_UPDATE: { label: '학생정보 수정', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   STUDENT_BULK_UPDATE: { label: '학생 일괄 수정', color: 'bg-teal-50 text-teal-700 border-teal-200' },
   USER_CREATE: { label: '계정 생성', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
@@ -68,12 +69,14 @@ interface LoginSessionItem {
   role?: string;
   details?: any;
   actions: AuditLogEntry[];
+  workCount: number;
+  viewCount: number;
 }
 
 export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
   const [selectedUser, setSelectedUser] = React.useState<string>('all');
   const [dateFilter, setDateFilter] = React.useState<'all' | 'today' | '7days' | '30days'>('all');
-  const [onlyWithActions, setOnlyWithActions] = React.useState<boolean>(false);
+  const [activityFilter, setActivityFilter] = React.useState<'all' | 'work_only' | 'view_only'>('all');
   const [search, setSearch] = React.useState<string>('');
   const [expandedSessionIds, setExpandedSessionIds] = React.useState<Record<string, boolean>>({});
   const [detailModalLog, setDetailModalLog] = React.useState<AuditLogEntry | null>(null);
@@ -89,11 +92,12 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
     return Array.from(userSet).sort((a, b) => a.localeCompare(b, 'ko'));
   }, [logs]);
 
-  // 2. 로그인 세션 및 실제 변경 작업 이력 맵핑 구성
+  // 2. 로그인 세션 및 활동 이력 맵핑 구성
   const { loginSessions, stats } = React.useMemo(() => {
     const loginLogs = logs.filter(l => l.action_type === 'USER_LOGIN');
-    // PAGE_VIEW 및 단순 로그아웃 제외하고 실제 데이터 변경 작업만 필터링
-    const workLogs = logs.filter(l => l.action_type !== 'USER_LOGIN' && l.action_type !== 'USER_LOGOUT' && (l.action_type as string) !== 'PAGE_VIEW');
+    const activityLogs = logs.filter(l => l.action_type !== 'USER_LOGIN' && l.action_type !== 'USER_LOGOUT');
+    const workLogs = logs.filter(l => l.action_type !== 'USER_LOGIN' && l.action_type !== 'USER_LOGOUT' && l.action_type !== 'PAGE_VIEW');
+    const viewLogs = logs.filter(l => l.action_type === 'PAGE_VIEW');
 
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -106,17 +110,19 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
       const olderLoginSameUser = loginLogs.slice(idx + 1).find(l => l.actor_name === loginLog.actor_name);
       const olderLoginTime = olderLoginSameUser ? new Date(olderLoginSameUser.created_at).getTime() : 0;
       
-      // 이번 로그인 세션 중 수행된 실제 변경 작업 매핑 (동일 사용자 & 이번 로그인 시각 ~ 다음 로그인 시각 전, 최대 12시간 범위)
-      const sessionActions = workLogs.filter(wl => {
-        if (wl.actor_name !== loginLog.actor_name) return false;
-        const workTime = new Date(wl.created_at).getTime();
-        const isAfterLogin = workTime >= loginTime - 60000; // 1분 오차 허용
-        const isBeforeOlder = olderLoginTime ? workTime > olderLoginTime : true;
-        const isWithin12Hours = workTime <= loginTime + (12 * 60 * 60 * 1000);
+      // 이번 로그인 세션 중 수행된 모든 활동 매핑
+      const sessionActions = activityLogs.filter(al => {
+        if (al.actor_name !== loginLog.actor_name) return false;
+        const actTime = new Date(al.created_at).getTime();
+        const isAfterLogin = actTime >= loginTime - 60000; // 1분 오차 허용
+        const isBeforeOlder = olderLoginTime ? actTime > olderLoginTime : true;
+        const isWithin12Hours = actTime <= loginTime + (12 * 60 * 60 * 1000);
         return isAfterLogin && isBeforeOlder && isWithin12Hours;
       });
 
       const role = typeof loginLog.details === 'object' ? loginLog.details?.role : undefined;
+      const workCount = sessionActions.filter(a => a.action_type !== 'PAGE_VIEW').length;
+      const viewCount = sessionActions.filter(a => a.action_type === 'PAGE_VIEW').length;
 
       return {
         id: loginLog.id,
@@ -124,36 +130,41 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
         loginTime: loginLog.created_at,
         role: role === 'admin' ? '관리자' : role === 'teacher' ? '교사' : role || '사용자',
         details: loginLog.details,
-        actions: sessionActions
+        actions: sessionActions,
+        workCount,
+        viewCount
       };
     });
 
-    // 2. 로그인 로깅 기능 추가 전의 과거 작업 로그들을 날짜별로 그룹화하여 세션 목록에 추가
-    const assignedWorkLogIds = new Set<string>();
-    sessions.forEach(s => s.actions.forEach(a => assignedWorkLogIds.add(a.id)));
+    // 2. 과거 활동 로그 (로그인 로깅 이전) 날짜별 그룹화
+    const assignedLogIds = new Set<string>();
+    sessions.forEach(s => s.actions.forEach(a => assignedLogIds.add(a.id)));
 
-    const unassignedWorkLogs = workLogs.filter(w => !assignedWorkLogIds.has(w.id));
-    if (unassignedWorkLogs.length > 0) {
-      // 사용자 및 날짜(YYYY-MM-DD)별로 그룹화
+    const unassignedLogs = activityLogs.filter(w => !assignedLogIds.has(w.id));
+    if (unassignedLogs.length > 0) {
       const dateUserMap: Record<string, AuditLogEntry[]> = {};
-      unassignedWorkLogs.forEach(wl => {
-        const dStr = wl.created_at.slice(0, 10);
-        const u = wl.actor_name || '관리자';
+      unassignedLogs.forEach(al => {
+        const dStr = al.created_at.slice(0, 10);
+        const u = al.actor_name || '관리자';
         const key = `${dStr}_${u}`;
         if (!dateUserMap[key]) dateUserMap[key] = [];
-        dateUserMap[key].push(wl);
+        dateUserMap[key].push(al);
       });
 
       Object.entries(dateUserMap).forEach(([key, uLogs]) => {
         const [dStr, user] = key.split('_');
         const latestLog = uLogs[0];
+        const wCount = uLogs.filter(a => a.action_type !== 'PAGE_VIEW').length;
+        const vCount = uLogs.filter(a => a.action_type === 'PAGE_VIEW').length;
         sessions.push({
           id: `history_${key}`,
           actorName: user,
           loginTime: latestLog.created_at,
           role: '과거 활동 기록',
-          details: { message: `${dStr} 시스템 작업 기록 (로그인 로깅 이전)` },
-          actions: uLogs
+          details: { message: `${dStr} 시스템 활동 기록` },
+          actions: uLogs,
+          workCount: wCount,
+          viewCount: vCount
         });
       });
     }
@@ -161,18 +172,21 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
     // 최신순 정렬
     sessions.sort((a, b) => new Date(b.loginTime).getTime() - new Date(a.loginTime).getTime());
 
-    // KPI 통계 계산 (실제 타임스탬프 기준)
+    // KPI 통계 계산
     const todayLogins = loginLogs.filter(l => new Date(l.created_at).getTime() >= todayStart);
     const todayWorkLogs = workLogs.filter(w => new Date(w.created_at).getTime() >= todayStart);
-    const todayActiveUsers = new Set([...todayLogins.map(l => l.actor_name), ...todayWorkLogs.map(w => w.actor_name)]).size;
+    const todayViewLogs = viewLogs.filter(v => new Date(v.created_at).getTime() >= todayStart);
+    const todayActiveUsers = new Set([...todayLogins.map(l => l.actor_name), ...todayWorkLogs.map(w => w.actor_name), ...todayViewLogs.map(v => v.actor_name)]).size;
 
     return {
       loginSessions: sessions,
       stats: {
         todayLoginsCount: todayLogins.length,
         todayActiveUsers,
-        totalWorkCount: workLogs.length,
+        todayViewCount: todayViewLogs.length,
+        totalViewCount: viewLogs.length,
         todayWorkCount: todayWorkLogs.length,
+        totalWorkCount: workLogs.length,
         recentActor: sessions[0]?.actorName || '없음'
       }
     };
@@ -203,9 +217,11 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
       }
     }
 
-    // 작업 이력 있는 로그인만 보기
-    if (onlyWithActions) {
-      list = list.filter(s => s.actions.length > 0);
+    // 활동 유형 필터 (전체 / 변경 작업만 / 조회만)
+    if (activityFilter === 'work_only') {
+      list = list.filter(s => s.workCount > 0);
+    } else if (activityFilter === 'view_only') {
+      list = list.filter(s => s.viewCount > 0);
     }
 
     // 검색어 필터
@@ -223,7 +239,7 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
     }
 
     return list;
-  }, [loginSessions, selectedUser, dateFilter, onlyWithActions, search]);
+  }, [loginSessions, selectedUser, dateFilter, activityFilter, search]);
 
   const toggleSessionExpand = (id: string) => {
     setExpandedSessionIds(prev => ({ ...prev, [id]: !prev[id] }));
@@ -303,7 +319,23 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
 
         <Card className="bg-white border-slate-200/80 shadow-sm rounded-xl p-4 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500">수행된 변경 작업</span>
+            <span className="text-xs font-bold text-slate-500">오늘 페이지 조회</span>
+            <div className="h-8 w-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center">
+              <Eye className="h-4.5 w-4.5" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl font-extrabold text-sky-600">{stats.todayViewCount}</span>
+              <span className="text-xs font-semibold text-slate-500">회 (오늘)</span>
+              <span className="text-[11px] text-slate-400 ml-1">/ 누적 {stats.totalViewCount}회</span>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="bg-white border-slate-200/80 shadow-sm rounded-xl p-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500">오늘 변경 작업</span>
             <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <Activity className="h-4.5 w-4.5" />
             </div>
@@ -316,18 +348,6 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
             </div>
           </div>
         </Card>
-
-        <Card className="bg-white border-slate-200/80 shadow-sm rounded-xl p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500">최근 접속 사용자</span>
-            <div className="h-8 w-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
-              <User className="h-4.5 w-4.5" />
-            </div>
-          </div>
-          <div className="mt-3 truncate">
-            <span className="text-lg font-bold text-slate-900 truncate block">{stats.recentActor}</span>
-          </div>
-        </Card>
       </div>
 
       {/* 2. 검색 및 다중 필터 툴바 */}
@@ -338,7 +358,7 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
             <div className="relative w-full sm:w-64 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input
-                placeholder="사용자명, 아이디, 작업 내용 검색..."
+                placeholder="사용자명, 아이디, 페이지명, 작업 내용 검색..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 h-9 text-xs bg-slate-50/50 border-slate-200 focus:bg-white rounded-lg"
@@ -410,22 +430,47 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
               </Button>
             </div>
 
-            {/* 작업 이력 있는 로그인만 토글 */}
-            <Button
-              type="button"
-              variant={onlyWithActions ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setOnlyWithActions(!onlyWithActions)}
-              className={cn(
-                "h-8 text-xs font-bold rounded-lg border gap-1.5 transition-all",
-                onlyWithActions 
-                  ? "bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600 shadow-xs" 
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-              )}
-            >
-              <Activity className="h-3.5 w-3.5" />
-              <span>작업 수행 이력만 ({loginSessions.filter(s => s.actions.length > 0).length}건)</span>
-            </Button>
+            {/* 활동 유형 3단 필터 (전체 / 변경작업만 / 페이지만) */}
+            <div className="flex items-center bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/60">
+              <Button
+                type="button"
+                variant={activityFilter === 'all' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setActivityFilter('all')}
+                className={cn(
+                  "h-7 px-2.5 text-[11px] font-bold rounded-md transition-all",
+                  activityFilter === 'all' ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                )}
+              >
+                전체 활동
+              </Button>
+              <Button
+                type="button"
+                variant={activityFilter === 'work_only' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setActivityFilter('work_only')}
+                className={cn(
+                  "h-7 px-2.5 text-[11px] font-bold rounded-md transition-all",
+                  activityFilter === 'work_only' ? "bg-emerald-600 text-white shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                )}
+              >
+                <Activity className="h-3 w-3 mr-1" />
+                변경 작업만
+              </Button>
+              <Button
+                type="button"
+                variant={activityFilter === 'view_only' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setActivityFilter('view_only')}
+                className={cn(
+                  "h-7 px-2.5 text-[11px] font-bold rounded-md transition-all",
+                  activityFilter === 'view_only' ? "bg-sky-600 text-white shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                )}
+              >
+                <Eye className="h-3 w-3 mr-1" />
+                페이지 조회만
+              </Button>
+            </div>
           </div>
 
           {/* 모두 펼치기 / 접기 */}
@@ -479,6 +524,12 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
             const isExpanded = !!expandedSessionIds[session.id];
             const hasActions = session.actions.length > 0;
 
+            const displayedActions = session.actions.filter(a => {
+              if (activityFilter === 'work_only') return a.action_type !== 'PAGE_VIEW';
+              if (activityFilter === 'view_only') return a.action_type === 'PAGE_VIEW';
+              return true;
+            });
+
             return (
               <Card 
                 key={session.id}
@@ -495,7 +546,7 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
                   <div className="flex items-center gap-3.5">
                     <div className={cn(
                       "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 border",
-                      hasActions 
+                      session.workCount > 0
                         ? "bg-indigo-50 text-indigo-600 border-indigo-100 shadow-2xs" 
                         : "bg-blue-50 text-blue-600 border-blue-100"
                     )}>
@@ -526,18 +577,27 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
                   </div>
 
                   {/* 세션 내 작업 현황 배지 & 토글 버튼 */}
-                  <div className="flex items-center gap-3 justify-between sm:justify-end shrink-0 pl-13 sm:pl-0">
-                    {hasActions ? (
-                      <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 text-xs font-bold px-2.5 py-1 flex items-center gap-1.5">
-                        <Activity className="h-3.5 w-3.5" />
-                        <span>수행 작업 {session.actions.length}건</span>
-                      </Badge>
-                    ) : (
-                      <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-slate-300" />
-                        단순 조회/활동 없음
-                      </span>
-                    )}
+                  <div className="flex items-center gap-2.5 justify-between sm:justify-end shrink-0 pl-13 sm:pl-0">
+                    <div className="flex items-center gap-1.5">
+                      {session.viewCount > 0 && (
+                        <Badge className="bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 text-[11px] font-bold px-2 py-0.5 flex items-center gap-1">
+                          <Eye className="h-3 w-3" />
+                          <span>조회 {session.viewCount}회</span>
+                        </Badge>
+                      )}
+                      {session.workCount > 0 && (
+                        <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 text-[11px] font-bold px-2 py-0.5 flex items-center gap-1">
+                          <Activity className="h-3 w-3" />
+                          <span>작업 {session.workCount}건</span>
+                        </Badge>
+                      )}
+                      {session.viewCount === 0 && session.workCount === 0 && (
+                        <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-slate-300" />
+                          활동 없음
+                        </span>
+                      )}
+                    </div>
 
                     <div className="h-8 w-8 rounded-lg bg-slate-100/80 text-slate-500 flex items-center justify-center hover:bg-slate-200/80 transition-colors shrink-0">
                       {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -545,49 +605,61 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
                   </div>
                 </div>
 
-                {/* 세션 상세: 로그인 중 수행한 작업 타임라인 */}
+                {/* 세션 상세: 로그인 중 수행한 활동 타임라인 */}
                 {isExpanded && (
                   <div className="p-4 sm:p-5 bg-slate-50/70 border-t border-slate-100 flex flex-col gap-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                         <Layers className="h-4 w-4 text-indigo-600" />
-                        로그인 세션 동안 수행된 작업 상세 ({session.actions.length}건)
+                        로그인 세션 활동 타임라인 ({displayedActions.length}건)
                       </span>
-                      {hasActions && (
+                      {displayedActions.length > 0 && (
                         <span className="text-[11px] font-medium text-slate-500">
-                          항목을 클릭하면 상세 변경 내역을 확인할 수 있습니다.
+                          항목을 클릭하면 상세 내역을 확인할 수 있습니다.
                         </span>
                       )}
                     </div>
 
-                    {!hasActions ? (
+                    {displayedActions.length === 0 ? (
                       <div className="bg-white rounded-xl p-6 text-center border border-slate-200/60">
                         <p className="text-xs text-slate-500 font-medium">
-                          해당 로그인 세션 동안 등록, 수정, 삭제 등의 변경 작업이 발생하지 않았습니다. (조회만 수행)
+                          선택한 활동 필터에 해당하는 이력이 없습니다.
                         </p>
                       </div>
                     ) : (
                       <div className="flex flex-col gap-2 relative before:absolute before:left-3.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-indigo-100">
-                        {session.actions.map((action, aIdx) => {
+                        {displayedActions.map((action, aIdx) => {
                           const actionConfig = ACTION_TYPE_CONFIG[action.action_type] || { 
                             label: action.action_type, 
                             color: 'bg-slate-100 text-slate-700 border-slate-200' 
                           };
 
+                          const isPageView = action.action_type === 'PAGE_VIEW';
+
                           return (
                             <div 
                               key={action.id || aIdx}
                               onClick={() => setDetailModalLog(action)}
-                              className="relative pl-8 flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-white hover:bg-indigo-50/40 border border-slate-200/80 rounded-xl transition-all cursor-pointer shadow-2xs hover:border-indigo-200 group"
+                              className={cn(
+                                "relative pl-8 flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-white hover:bg-indigo-50/40 border rounded-xl transition-all cursor-pointer shadow-2xs group",
+                                isPageView ? "border-slate-200/60" : "border-slate-200/90 hover:border-indigo-200"
+                              )}
                             >
                               {/* 타임라인 점 */}
-                              <div className="absolute left-2.5 top-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full bg-indigo-500 ring-4 ring-white" />
+                              <div className={cn(
+                                "absolute left-2.5 top-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full ring-4 ring-white",
+                                isPageView ? "bg-sky-400" : "bg-emerald-500"
+                              )} />
 
                               <div className="flex items-center gap-2.5 flex-wrap flex-1">
                                 <Badge variant="outline" className={cn("text-[11px] font-bold px-2 py-0.5 border shrink-0", actionConfig.color)}>
+                                  {isPageView && <Eye className="h-3 w-3 mr-1 inline" />}
                                   {actionConfig.label}
                                 </Badge>
-                                <span className="font-bold text-xs sm:text-sm text-slate-800 group-hover:text-indigo-600 transition-colors">
+                                <span className={cn(
+                                  "text-xs sm:text-sm group-hover:text-indigo-600 transition-colors",
+                                  isPageView ? "font-medium text-slate-700" : "font-bold text-slate-900"
+                                )}>
                                   {action.target_name}
                                 </span>
                               </div>
