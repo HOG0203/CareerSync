@@ -54,7 +54,32 @@ export async function login(formData: FormData) {
     return { error: '아이디 또는 비밀번호가 잘못되었습니다.' }
   }
 
-  // 3. 리다이렉트 (무거운 전체 레이아웃 revalidatePath 생략으로 즉각 0.4초 이동)
+  // 3. 로그인 성공 시 Audit Log (USER_LOGIN) 기록
+  try {
+    const { data: userProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('id, username, full_name, role, assigned_grade, assigned_class')
+      .eq('username', username)
+      .maybeSingle()
+
+    const { logAuditAction } = await import('@/lib/audit-logger')
+    await logAuditAction({
+      actor_name: userProfile?.full_name ? `${userProfile.full_name}(${username})` : username,
+      action_type: 'USER_LOGIN',
+      target_name: `시스템 로그인 접속`,
+      details: {
+        username,
+        role: userProfile?.role || 'user',
+        assigned_grade: userProfile?.assigned_grade,
+        assigned_class: userProfile?.assigned_class,
+        login_at: new Date().toISOString()
+      }
+    })
+  } catch (logErr) {
+    console.error('Failed to log login action:', logErr)
+  }
+
+  // 4. 리다이렉트 (무거운 전체 레이아웃 revalidatePath 생략으로 즉각 0.4초 이동)
   redirect('/dashboard')
 }
 
@@ -115,8 +140,12 @@ export async function signup(formData: FormData) {
   return { success: true }
 }
 
+import { revalidatePath } from 'next/cache'
+
 export async function logout() {
   const supabase = await createClient()
   await supabase.auth.signOut()
-  redirect('/')
+  revalidatePath('/', 'layout')
+  return { success: true }
 }
+

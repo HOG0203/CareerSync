@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { logout } from '@/app/login/actions';
+import { handleClientLogout } from '@/lib/auth-helpers';
 import ProfileSettingsModal from './profile-settings-modal';
 
 export function MobileTopBar({ isAdmin = false, userProfile }: { isAdmin?: boolean, userProfile?: any }) {
@@ -23,7 +23,7 @@ export function MobileTopBar({ isAdmin = false, userProfile }: { isAdmin?: boole
   }, []);
 
   const handleLogout = async () => {
-    await logout();
+    await handleClientLogout();
   };
 
   // 이름의 마지막 두 글자 추출 로직

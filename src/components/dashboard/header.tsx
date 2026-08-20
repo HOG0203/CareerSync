@@ -24,7 +24,7 @@ import Link from 'next/link';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import Nav from './nav';
 import { usePathname } from 'next/navigation';
-import { logout } from '@/app/login/actions';
+import { handleClientLogout } from '@/lib/auth-helpers';
 import ProfileSettingsModal from './profile-settings-modal';
 
 function toTitleCase(str: string) {
@@ -47,6 +47,7 @@ const ROUTE_MAP: Record<string, { group: string; label: string }> = {
   '/labor-education': { group: '학사 및 지도', label: '노동인권교육' },
   '/admin/students': { group: '학사 및 지도', label: '학생 등록/진급' },
   '/admin/users': { group: '시스템 관리', label: '사용자 관리' },
+  '/admin/login-history': { group: '시스템 관리', label: '로그인 및 활동 이력' },
   '/admin/audit-logs': { group: '시스템 관리', label: '작업 이력 관리' },
   '/admin/settings': { group: '시스템 관리', label: '시스템 설정' },
   '/admin/certification': { group: '옥저인재인증제', label: '인증현황' },
@@ -81,7 +82,7 @@ export default function Header({ userProfile }: { userProfile?: any }) {
   const displayName = getDisplayInitials(userProfile?.full_name);
 
   const handleLogout = async () => {
-    await logout();
+    await handleClientLogout();
   };
 
   if (!mounted) {

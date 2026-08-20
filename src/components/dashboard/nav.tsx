@@ -38,10 +38,11 @@ import {
   CalendarCheck,
   Award,
   Loader2,
-  History
+  History,
+  KeyRound
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { logout } from '@/app/login/actions';
+import { handleClientLogout } from '@/lib/auth-helpers';
 import {
   Collapsible,
   CollapsibleContent,
@@ -66,7 +67,7 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
   }, [pathname, searchParams]);
 
   const handleLogout = async () => {
-    await logout();
+    await handleClientLogout();
   };
 
   const closeMobile = () => {
@@ -118,6 +119,7 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
         icon: Settings,
         items: [
           { href: '/admin/users', label: '사용자 관리', icon: UserCog },
+          { href: '/admin/login-history', label: '로그인 및 활동 이력', icon: KeyRound },
           { href: '/admin/audit-logs', label: '작업 이력 관리', icon: History },
           { href: '/admin/settings', label: '시스템 설정', icon: ShieldCheck },
         ]

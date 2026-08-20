@@ -1,0 +1,667 @@
+'use client';
+
+import * as React from 'react';
+import { AuditLogEntry } from '@/lib/audit-logger';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  KeyRound,
+  Users,
+  Activity,
+  Calendar,
+  Search,
+  CheckCircle2,
+  Clock,
+  User,
+  Shield,
+  Layers,
+  Eye,
+  FileText,
+  Filter,
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface LoginHistoryClientProps {
+  logs: AuditLogEntry[];
+}
+
+const ACTION_TYPE_CONFIG: Record<string, { label: string; color: string }> = {
+  USER_LOGIN: { label: '시스템 로그인', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  USER_LOGOUT: { label: '시스템 로그아웃', color: 'bg-slate-50 text-slate-700 border-slate-200' },
+  STUDENT_UPDATE: { label: '학생정보 수정', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  STUDENT_BULK_UPDATE: { label: '학생 일괄 수정', color: 'bg-teal-50 text-teal-700 border-teal-200' },
+  USER_CREATE: { label: '계정 생성', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  USER_ROLE_UPDATE: { label: '권한 변경', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+  USER_DELETE: { label: '계정 삭제', color: 'bg-rose-100 text-rose-800 border-rose-300 font-bold' },
+  HOMEROOM_ASSIGN: { label: '담임교사 배정', color: 'bg-sky-50 text-sky-700 border-sky-200' },
+  PASSWORD_RESET: { label: '비밀번호 초기화', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+  COMPANY_UPSERT: { label: '기업정보 등록/수정', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+  COMPANY_DELETE: { label: '기업 정보 삭제', color: 'bg-red-50 text-red-700 border-red-200' },
+  SYSTEM_SETTING_UPDATE: { label: '시스템 설정 변경', color: 'bg-orange-50 text-orange-700 border-orange-200' },
+  BASE_YEAR_SNAPSHOT: { label: '학적 백업 스냅샷', color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+};
+
+interface LoginSessionItem {
+  id: string;
+  actorName: string;
+  loginTime: string;
+  role?: string;
+  details?: any;
+  actions: AuditLogEntry[];
+}
+
+export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
+  const [selectedUser, setSelectedUser] = React.useState<string>('all');
+  const [dateFilter, setDateFilter] = React.useState<'all' | 'today' | '7days' | '30days'>('all');
+  const [onlyWithActions, setOnlyWithActions] = React.useState<boolean>(false);
+  const [search, setSearch] = React.useState<string>('');
+  const [expandedSessionIds, setExpandedSessionIds] = React.useState<Record<string, boolean>>({});
+  const [detailModalLog, setDetailModalLog] = React.useState<AuditLogEntry | null>(null);
+
+  // 1. 전체 고유 사용자 목록 추출
+  const uniqueUsers = React.useMemo(() => {
+    const userSet = new Set<string>();
+    logs.forEach(l => {
+      if (l.actor_name && l.actor_name !== '시스템 관리자') {
+        userSet.add(l.actor_name);
+      }
+    });
+    return Array.from(userSet).sort((a, b) => a.localeCompare(b, 'ko'));
+  }, [logs]);
+
+  // 2. 로그인 세션 및 실제 변경 작업 이력 맵핑 구성
+  const { loginSessions, stats } = React.useMemo(() => {
+    const loginLogs = logs.filter(l => l.action_type === 'USER_LOGIN');
+    // PAGE_VIEW 및 단순 로그아웃 제외하고 실제 데이터 변경 작업만 필터링
+    const workLogs = logs.filter(l => l.action_type !== 'USER_LOGIN' && l.action_type !== 'USER_LOGOUT' && (l.action_type as string) !== 'PAGE_VIEW');
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+    // 1. 실제 로그인 로그 기반 세션 목록
+    const sessions: LoginSessionItem[] = loginLogs.map((loginLog, idx) => {
+      const loginTime = new Date(loginLog.created_at).getTime();
+      
+      // 동일 사용자의 이전(더 과거) 로그인 시각 찾기 (logs는 최신순 정렬)
+      const olderLoginSameUser = loginLogs.slice(idx + 1).find(l => l.actor_name === loginLog.actor_name);
+      const olderLoginTime = olderLoginSameUser ? new Date(olderLoginSameUser.created_at).getTime() : 0;
+      
+      // 이번 로그인 세션 중 수행된 실제 변경 작업 매핑 (동일 사용자 & 이번 로그인 시각 ~ 다음 로그인 시각 전, 최대 12시간 범위)
+      const sessionActions = workLogs.filter(wl => {
+        if (wl.actor_name !== loginLog.actor_name) return false;
+        const workTime = new Date(wl.created_at).getTime();
+        const isAfterLogin = workTime >= loginTime - 60000; // 1분 오차 허용
+        const isBeforeOlder = olderLoginTime ? workTime > olderLoginTime : true;
+        const isWithin12Hours = workTime <= loginTime + (12 * 60 * 60 * 1000);
+        return isAfterLogin && isBeforeOlder && isWithin12Hours;
+      });
+
+      const role = typeof loginLog.details === 'object' ? loginLog.details?.role : undefined;
+
+      return {
+        id: loginLog.id,
+        actorName: loginLog.actor_name,
+        loginTime: loginLog.created_at,
+        role: role === 'admin' ? '관리자' : role === 'teacher' ? '교사' : role || '사용자',
+        details: loginLog.details,
+        actions: sessionActions
+      };
+    });
+
+    // 2. 로그인 로깅 기능 추가 전의 과거 작업 로그들을 날짜별로 그룹화하여 세션 목록에 추가
+    const assignedWorkLogIds = new Set<string>();
+    sessions.forEach(s => s.actions.forEach(a => assignedWorkLogIds.add(a.id)));
+
+    const unassignedWorkLogs = workLogs.filter(w => !assignedWorkLogIds.has(w.id));
+    if (unassignedWorkLogs.length > 0) {
+      // 사용자 및 날짜(YYYY-MM-DD)별로 그룹화
+      const dateUserMap: Record<string, AuditLogEntry[]> = {};
+      unassignedWorkLogs.forEach(wl => {
+        const dStr = wl.created_at.slice(0, 10);
+        const u = wl.actor_name || '관리자';
+        const key = `${dStr}_${u}`;
+        if (!dateUserMap[key]) dateUserMap[key] = [];
+        dateUserMap[key].push(wl);
+      });
+
+      Object.entries(dateUserMap).forEach(([key, uLogs]) => {
+        const [dStr, user] = key.split('_');
+        const latestLog = uLogs[0];
+        sessions.push({
+          id: `history_${key}`,
+          actorName: user,
+          loginTime: latestLog.created_at,
+          role: '과거 활동 기록',
+          details: { message: `${dStr} 시스템 작업 기록 (로그인 로깅 이전)` },
+          actions: uLogs
+        });
+      });
+    }
+
+    // 최신순 정렬
+    sessions.sort((a, b) => new Date(b.loginTime).getTime() - new Date(a.loginTime).getTime());
+
+    // KPI 통계 계산 (실제 타임스탬프 기준)
+    const todayLogins = loginLogs.filter(l => new Date(l.created_at).getTime() >= todayStart);
+    const todayWorkLogs = workLogs.filter(w => new Date(w.created_at).getTime() >= todayStart);
+    const todayActiveUsers = new Set([...todayLogins.map(l => l.actor_name), ...todayWorkLogs.map(w => w.actor_name)]).size;
+
+    return {
+      loginSessions: sessions,
+      stats: {
+        todayLoginsCount: todayLogins.length,
+        todayActiveUsers,
+        totalWorkCount: workLogs.length,
+        todayWorkCount: todayWorkLogs.length,
+        recentActor: sessions[0]?.actorName || '없음'
+      }
+    };
+  }, [logs]);
+
+  // 3. 필터링 로직
+  const filteredSessions = React.useMemo(() => {
+    let list = loginSessions;
+
+    // 사용자 필터
+    if (selectedUser !== 'all') {
+      list = list.filter(s => s.actorName === selectedUser);
+    }
+
+    // 날짜 필터
+    if (dateFilter !== 'all') {
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      
+      if (dateFilter === 'today') {
+        list = list.filter(s => new Date(s.loginTime).getTime() >= todayStart);
+      } else if (dateFilter === '7days') {
+        const sevenDaysAgo = todayStart - (7 * 24 * 60 * 60 * 1000);
+        list = list.filter(s => new Date(s.loginTime).getTime() >= sevenDaysAgo);
+      } else if (dateFilter === '30days') {
+        const thirtyDaysAgo = todayStart - (30 * 24 * 60 * 60 * 1000);
+        list = list.filter(s => new Date(s.loginTime).getTime() >= thirtyDaysAgo);
+      }
+    }
+
+    // 작업 이력 있는 로그인만 보기
+    if (onlyWithActions) {
+      list = list.filter(s => s.actions.length > 0);
+    }
+
+    // 검색어 필터
+    if (search.trim() !== '') {
+      const q = search.toLowerCase().trim();
+      list = list.filter(s => 
+        s.actorName.toLowerCase().includes(q) ||
+        JSON.stringify(s.details || '').toLowerCase().includes(q) ||
+        s.actions.some(a => 
+          a.target_name.toLowerCase().includes(q) ||
+          (ACTION_TYPE_CONFIG[a.action_type]?.label || '').toLowerCase().includes(q) ||
+          JSON.stringify(a.details || '').toLowerCase().includes(q)
+        )
+      );
+    }
+
+    return list;
+  }, [loginSessions, selectedUser, dateFilter, onlyWithActions, search]);
+
+  const toggleSessionExpand = (id: string) => {
+    setExpandedSessionIds(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const expandAll = () => {
+    const allExp: Record<string, boolean> = {};
+    filteredSessions.forEach(s => { allExp[s.id] = true; });
+    setExpandedSessionIds(allExp);
+  };
+
+  const collapseAll = () => {
+    setExpandedSessionIds({});
+  };
+
+  const formatDate = (isoString: string) => {
+    try {
+      const d = new Date(isoString);
+      return d.toLocaleString('ko-KR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+    } catch {
+      return isoString;
+    }
+  };
+
+  const formatRelativeTime = (isoString: string) => {
+    try {
+      const diffMs = Date.now() - new Date(isoString).getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      if (diffMins < 1) return '방금 전';
+      if (diffMins < 60) return `${diffMins}분 전`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours}시간 전`;
+      const diffDays = Math.floor(diffHours / 24);
+      return `${diffDays}일 전`;
+    } catch {
+      return '';
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-5 w-full">
+      {/* 1. 상단 KPI 요약 카드 */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="bg-white border-slate-200/80 shadow-sm rounded-xl p-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500">오늘 총 로그인</span>
+            <div className="h-8 w-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+              <KeyRound className="h-4.5 w-4.5" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl font-extrabold text-slate-900">{stats.todayLoginsCount}</span>
+            <span className="text-xs font-semibold text-slate-500 ml-1.5">회 접속</span>
+          </div>
+        </Card>
+
+        <Card className="bg-white border-slate-200/80 shadow-sm rounded-xl p-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500">오늘 접속 사용자</span>
+            <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <Users className="h-4.5 w-4.5" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl font-extrabold text-indigo-600">{stats.todayActiveUsers}</span>
+            <span className="text-xs font-semibold text-slate-500 ml-1.5">명 활동</span>
+          </div>
+        </Card>
+
+        <Card className="bg-white border-slate-200/80 shadow-sm rounded-xl p-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500">수행된 변경 작업</span>
+            <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <Activity className="h-4.5 w-4.5" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl font-extrabold text-emerald-600">{stats.todayWorkCount}</span>
+              <span className="text-xs font-semibold text-slate-500">건 (오늘)</span>
+              <span className="text-[11px] text-slate-400 ml-1">/ 누적 {stats.totalWorkCount}건</span>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="bg-white border-slate-200/80 shadow-sm rounded-xl p-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500">최근 접속 사용자</span>
+            <div className="h-8 w-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+              <User className="h-4.5 w-4.5" />
+            </div>
+          </div>
+          <div className="mt-3 truncate">
+            <span className="text-lg font-bold text-slate-900 truncate block">{stats.recentActor}</span>
+          </div>
+        </Card>
+      </div>
+
+      {/* 2. 검색 및 다중 필터 툴바 */}
+      <Card className="border border-slate-200/80 bg-white shadow-sm rounded-2xl overflow-hidden p-4 sm:p-5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-2.5 flex-1">
+            {/* 검색창 */}
+            <div className="relative w-full sm:w-64 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="사용자명, 아이디, 작업 내용 검색..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 h-9 text-xs bg-slate-50/50 border-slate-200 focus:bg-white rounded-lg"
+              />
+            </div>
+
+            {/* 사용자 선택 필터 */}
+            <Select value={selectedUser} onValueChange={setSelectedUser}>
+              <SelectTrigger className="h-9 text-xs w-[140px] bg-slate-50/50 border-slate-200 rounded-lg font-medium">
+                <SelectValue placeholder="사용자 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs font-semibold">전체 사용자 ({uniqueUsers.length}명)</SelectItem>
+                {uniqueUsers.map(u => (
+                  <SelectItem key={u} value={u} className="text-xs">{u}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* 기간 필터 */}
+            <div className="flex items-center bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/60">
+              <Button
+                type="button"
+                variant={dateFilter === 'all' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setDateFilter('all')}
+                className={cn(
+                  "h-7 px-2.5 text-[11px] font-bold rounded-md transition-all",
+                  dateFilter === 'all' ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                )}
+              >
+                전체
+              </Button>
+              <Button
+                type="button"
+                variant={dateFilter === 'today' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setDateFilter('today')}
+                className={cn(
+                  "h-7 px-2.5 text-[11px] font-bold rounded-md transition-all",
+                  dateFilter === 'today' ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                )}
+              >
+                오늘
+              </Button>
+              <Button
+                type="button"
+                variant={dateFilter === '7days' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setDateFilter('7days')}
+                className={cn(
+                  "h-7 px-2.5 text-[11px] font-bold rounded-md transition-all",
+                  dateFilter === '7days' ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                )}
+              >
+                최근 7일
+              </Button>
+              <Button
+                type="button"
+                variant={dateFilter === '30days' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setDateFilter('30days')}
+                className={cn(
+                  "h-7 px-2.5 text-[11px] font-bold rounded-md transition-all",
+                  dateFilter === '30days' ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                )}
+              >
+                30일
+              </Button>
+            </div>
+
+            {/* 작업 이력 있는 로그인만 토글 */}
+            <Button
+              type="button"
+              variant={onlyWithActions ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setOnlyWithActions(!onlyWithActions)}
+              className={cn(
+                "h-8 text-xs font-bold rounded-lg border gap-1.5 transition-all",
+                onlyWithActions 
+                  ? "bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600 shadow-xs" 
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+              )}
+            >
+              <Activity className="h-3.5 w-3.5" />
+              <span>작업 수행 이력만 ({loginSessions.filter(s => s.actions.length > 0).length}건)</span>
+            </Button>
+          </div>
+
+          {/* 모두 펼치기 / 접기 */}
+          <div className="flex items-center gap-1.5 shrink-0 self-end md:self-auto">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={expandAll}
+              className="h-8 px-2.5 text-xs text-slate-600 hover:text-slate-900"
+            >
+              <ChevronDown className="h-3.5 w-3.5 mr-1" />
+              전체 펼치기
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={collapseAll}
+              className="h-8 px-2.5 text-xs text-slate-600 hover:text-slate-900"
+            >
+              <ChevronUp className="h-3.5 w-3.5 mr-1" />
+              전체 접기
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      {/* 3. 로그인 및 작업 세션 타임라인 리스트 */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs font-bold text-slate-500">
+            총 <span className="text-blue-600 font-extrabold">{filteredSessions.length}</span>개의 로그인 세션 조회됨
+          </span>
+        </div>
+
+        {filteredSessions.length === 0 ? (
+          <Card className="bg-white border-slate-200/80 rounded-2xl p-12 text-center shadow-xs">
+            <div className="flex flex-col items-center justify-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
+                <KeyRound className="h-6 w-6" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-bold text-slate-800">조회된 로그인 이력이 없습니다.</p>
+                <p className="text-xs text-slate-400">선택한 필터 조건 또는 검색어를 다시 확인해주세요.</p>
+              </div>
+            </div>
+          </Card>
+        ) : (
+          filteredSessions.map((session) => {
+            const isExpanded = !!expandedSessionIds[session.id];
+            const hasActions = session.actions.length > 0;
+
+            return (
+              <Card 
+                key={session.id}
+                className={cn(
+                  "border bg-white rounded-2xl shadow-xs transition-all overflow-hidden",
+                  hasActions ? "border-slate-200/90" : "border-slate-200/60 opacity-95"
+                )}
+              >
+                {/* 세션 헤더 */}
+                <div 
+                  onClick={() => toggleSessionExpand(session.id)}
+                  className="p-4 sm:p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-slate-50/70 transition-colors"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className={cn(
+                      "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 border",
+                      hasActions 
+                        ? "bg-indigo-50 text-indigo-600 border-indigo-100 shadow-2xs" 
+                        : "bg-blue-50 text-blue-600 border-blue-100"
+                    )}>
+                      <KeyRound className="h-5 w-5" />
+                    </div>
+
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-sm text-slate-900">{session.actorName}</span>
+                        {session.role && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-slate-100 text-slate-700 font-semibold border-slate-200">
+                            {session.role}
+                          </Badge>
+                        )}
+                        <span className="text-[11px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
+                          로그인 접속
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3.5 w-3.5 text-slate-400" />
+                          {formatDate(session.loginTime)}
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="text-slate-500 font-semibold">{formatRelativeTime(session.loginTime)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 세션 내 작업 현황 배지 & 토글 버튼 */}
+                  <div className="flex items-center gap-3 justify-between sm:justify-end shrink-0 pl-13 sm:pl-0">
+                    {hasActions ? (
+                      <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 text-xs font-bold px-2.5 py-1 flex items-center gap-1.5">
+                        <Activity className="h-3.5 w-3.5" />
+                        <span>수행 작업 {session.actions.length}건</span>
+                      </Badge>
+                    ) : (
+                      <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-slate-300" />
+                        단순 조회/활동 없음
+                      </span>
+                    )}
+
+                    <div className="h-8 w-8 rounded-lg bg-slate-100/80 text-slate-500 flex items-center justify-center hover:bg-slate-200/80 transition-colors shrink-0">
+                      {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 세션 상세: 로그인 중 수행한 작업 타임라인 */}
+                {isExpanded && (
+                  <div className="p-4 sm:p-5 bg-slate-50/70 border-t border-slate-100 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                        <Layers className="h-4 w-4 text-indigo-600" />
+                        로그인 세션 동안 수행된 작업 상세 ({session.actions.length}건)
+                      </span>
+                      {hasActions && (
+                        <span className="text-[11px] font-medium text-slate-500">
+                          항목을 클릭하면 상세 변경 내역을 확인할 수 있습니다.
+                        </span>
+                      )}
+                    </div>
+
+                    {!hasActions ? (
+                      <div className="bg-white rounded-xl p-6 text-center border border-slate-200/60">
+                        <p className="text-xs text-slate-500 font-medium">
+                          해당 로그인 세션 동안 등록, 수정, 삭제 등의 변경 작업이 발생하지 않았습니다. (조회만 수행)
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2 relative before:absolute before:left-3.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-indigo-100">
+                        {session.actions.map((action, aIdx) => {
+                          const actionConfig = ACTION_TYPE_CONFIG[action.action_type] || { 
+                            label: action.action_type, 
+                            color: 'bg-slate-100 text-slate-700 border-slate-200' 
+                          };
+
+                          return (
+                            <div 
+                              key={action.id || aIdx}
+                              onClick={() => setDetailModalLog(action)}
+                              className="relative pl-8 flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-white hover:bg-indigo-50/40 border border-slate-200/80 rounded-xl transition-all cursor-pointer shadow-2xs hover:border-indigo-200 group"
+                            >
+                              {/* 타임라인 점 */}
+                              <div className="absolute left-2.5 top-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full bg-indigo-500 ring-4 ring-white" />
+
+                              <div className="flex items-center gap-2.5 flex-wrap flex-1">
+                                <Badge variant="outline" className={cn("text-[11px] font-bold px-2 py-0.5 border shrink-0", actionConfig.color)}>
+                                  {actionConfig.label}
+                                </Badge>
+                                <span className="font-bold text-xs sm:text-sm text-slate-800 group-hover:text-indigo-600 transition-colors">
+                                  {action.target_name}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto text-xs text-slate-500 font-medium">
+                                <span>{formatDate(action.created_at)}</span>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-7 px-2 text-xs font-bold text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 rounded-md"
+                                >
+                                  <Eye className="h-3.5 w-3.5 mr-1" />
+                                  상세보기
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Card>
+            );
+          })
+        )}
+      </div>
+
+      {/* 4. 작업 상세 다이얼로그 모달 */}
+      <Dialog open={!!detailModalLog} onOpenChange={(open) => !open && setDetailModalLog(null)}>
+        <DialogContent className="max-w-xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl">
+          <DialogHeader className="p-5 sm:p-6 bg-slate-900 text-white">
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-xl bg-white/10 text-white flex items-center justify-center">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-bold text-white">작업 상세 이력</DialogTitle>
+                <DialogDescription className="text-xs text-slate-400 mt-0.5">
+                  수행된 작업의 변경 전/후 상세 정보를 확인합니다.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          {detailModalLog && (
+            <div className="p-5 sm:p-6 flex flex-col gap-4 bg-white max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+                <div>
+                  <span className="font-semibold text-slate-500 block mb-0.5">작업 수행자</span>
+                  <span className="font-bold text-slate-900">{detailModalLog.actor_name}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-500 block mb-0.5">작업 일시</span>
+                  <span className="font-bold text-slate-900">{formatDate(detailModalLog.created_at)}</span>
+                </div>
+                <div className="col-span-2 pt-2 border-t border-slate-200/60">
+                  <span className="font-semibold text-slate-500 block mb-0.5">작업 대상 및 내용</span>
+                  <span className="font-extrabold text-indigo-700 text-sm">{detailModalLog.target_name}</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-bold text-slate-700">상세 변경 데이터 (JSON Payload):</span>
+                <pre className="p-4 bg-slate-900 text-slate-100 text-xs rounded-xl overflow-x-auto font-mono max-h-[250px] custom-scrollbar leading-relaxed">
+                  {typeof detailModalLog.details === 'object' 
+                    ? JSON.stringify(detailModalLog.details, null, 2) 
+                    : String(detailModalLog.details || '내용 없음')}
+                </pre>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
