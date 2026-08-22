@@ -81,12 +81,19 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
   const [expandedSessionIds, setExpandedSessionIds] = React.useState<Record<string, boolean>>({});
   const [detailModalLog, setDetailModalLog] = React.useState<AuditLogEntry | null>(null);
 
+  // 사용자명 정규화 (예: '이호중(이호중)' -> '이호중')
+  const normalizeActorName = (name?: string) => {
+    if (!name) return '';
+    return name.replace(/\([^)]*\)/g, '').trim();
+  };
+
   // 1. 전체 고유 사용자 목록 추출
   const uniqueUsers = React.useMemo(() => {
     const userSet = new Set<string>();
     logs.forEach(l => {
-      if (l.actor_name && l.actor_name !== '시스템 관리자') {
-        userSet.add(l.actor_name);
+      const name = normalizeActorName(l.actor_name);
+      if (name && name !== '시스템 관리자') {
+        userSet.add(name);
       }
     });
     return Array.from(userSet).sort((a, b) => a.localeCompare(b, 'ko'));
@@ -102,22 +109,33 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
-    // 1. 실제 로그인 로그 기반 세션 목록
+    // 1. 실제 로그인 로그 기반 세션 목록 (loginLogs는 최신순 정렬)
     const sessions: LoginSessionItem[] = loginLogs.map((loginLog, idx) => {
       const loginTime = new Date(loginLog.created_at).getTime();
+      const actorNorm = normalizeActorName(loginLog.actor_name);
       
-      // 동일 사용자의 이전(더 과거) 로그인 시각 찾기 (logs는 최신순 정렬)
-      const olderLoginSameUser = loginLogs.slice(idx + 1).find(l => l.actor_name === loginLog.actor_name);
-      const olderLoginTime = olderLoginSameUser ? new Date(olderLoginSameUser.created_at).getTime() : 0;
+      // 동일 사용자의 직후(더 최신) 로그인 시각 찾기 (idx 이전 요소들 중 가장 가까운 최신 로그인)
+      const newerLoginSameUser = loginLogs
+        .slice(0, idx)
+        .reverse()
+        .find(l => normalizeActorName(l.actor_name) === actorNorm);
+      const newerLoginTime = newerLoginSameUser 
+        ? new Date(newerLoginSameUser.created_at).getTime() 
+        : Infinity;
       
       // 이번 로그인 세션 중 수행된 모든 활동 매핑
+      // 조건:
+      // 1) 동일 사용자
+      // 2) 로그인 시각 직전(오차 30초) 이후에 발생
+      // 3) 다음 로그인 시각 발생 직전까지만 포함
+      // 4) 단일 세션 최대 24시간 범위 제한
       const sessionActions = activityLogs.filter(al => {
-        if (al.actor_name !== loginLog.actor_name) return false;
+        if (normalizeActorName(al.actor_name) !== actorNorm) return false;
         const actTime = new Date(al.created_at).getTime();
-        const isAfterLogin = actTime >= loginTime - 60000; // 1분 오차 허용
-        const isBeforeOlder = olderLoginTime ? actTime > olderLoginTime : true;
-        const isWithin12Hours = actTime <= loginTime + (12 * 60 * 60 * 1000);
-        return isAfterLogin && isBeforeOlder && isWithin12Hours;
+        const isAfterThisLogin = actTime >= loginTime - 30000;
+        const isBeforeNextLogin = actTime < newerLoginTime;
+        const isWithin24Hours = actTime <= loginTime + (24 * 60 * 60 * 1000);
+        return isAfterThisLogin && isBeforeNextLogin && isWithin24Hours;
       });
 
       const role = typeof loginLog.details === 'object' ? loginLog.details?.role : undefined;
@@ -126,7 +144,7 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
 
       return {
         id: loginLog.id,
-        actorName: loginLog.actor_name,
+        actorName: actorNorm || loginLog.actor_name,
         loginTime: loginLog.created_at,
         role: role === 'admin' ? '관리자' : role === 'teacher' ? '교사' : role || '사용자',
         details: loginLog.details,
@@ -136,16 +154,16 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
       };
     });
 
-    // 2. 과거 활동 로그 (로그인 로깅 이전) 날짜별 그룹화
+    // 2. 과거 활동 로그 (로그인 로깅 기능 도입 이전의 오래된 로그들) 날짜별 그룹화
     const assignedLogIds = new Set<string>();
-    sessions.forEach(s => s.actions.forEach(a => assignedLogIds.add(a.id)));
+    sessions.forEach(s => s.actions.forEach(a => a.id && assignedLogIds.add(a.id)));
 
     const unassignedLogs = activityLogs.filter(w => !assignedLogIds.has(w.id));
     if (unassignedLogs.length > 0) {
       const dateUserMap: Record<string, AuditLogEntry[]> = {};
       unassignedLogs.forEach(al => {
         const dStr = al.created_at.slice(0, 10);
-        const u = al.actor_name || '관리자';
+        const u = normalizeActorName(al.actor_name) || '관리자';
         const key = `${dStr}_${u}`;
         if (!dateUserMap[key]) dateUserMap[key] = [];
         dateUserMap[key].push(al);
@@ -153,15 +171,16 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
 
       Object.entries(dateUserMap).forEach(([key, uLogs]) => {
         const [dStr, user] = key.split('_');
-        const latestLog = uLogs[0];
+        // 과거 활동의 경우 해당 날짜의 최초 발생 시각을 기준으로 타임스탬프 설정 (최신 로그인 위로 튀지 않도록)
+        const earliestLog = uLogs[uLogs.length - 1] || uLogs[0];
         const wCount = uLogs.filter(a => a.action_type !== 'PAGE_VIEW').length;
         const vCount = uLogs.filter(a => a.action_type === 'PAGE_VIEW').length;
         sessions.push({
           id: `history_${key}`,
           actorName: user,
-          loginTime: latestLog.created_at,
+          loginTime: earliestLog.created_at,
           role: '과거 활동 기록',
-          details: { message: `${dStr} 시스템 활동 기록` },
+          details: { message: `${dStr} 시스템 활동 기록 (로그인 로깅 이전)` },
           actions: uLogs,
           workCount: wCount,
           viewCount: vCount
@@ -176,7 +195,11 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
     const todayLogins = loginLogs.filter(l => new Date(l.created_at).getTime() >= todayStart);
     const todayWorkLogs = workLogs.filter(w => new Date(w.created_at).getTime() >= todayStart);
     const todayViewLogs = viewLogs.filter(v => new Date(v.created_at).getTime() >= todayStart);
-    const todayActiveUsers = new Set([...todayLogins.map(l => l.actor_name), ...todayWorkLogs.map(w => w.actor_name), ...todayViewLogs.map(v => v.actor_name)]).size;
+    const todayActiveUsers = new Set([
+      ...todayLogins.map(l => normalizeActorName(l.actor_name)),
+      ...todayWorkLogs.map(w => normalizeActorName(w.actor_name)),
+      ...todayViewLogs.map(v => normalizeActorName(v.actor_name))
+    ].filter(Boolean)).size;
 
     return {
       loginSessions: sessions,

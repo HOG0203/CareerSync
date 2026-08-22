@@ -64,11 +64,12 @@ export async function login(formData: FormData) {
 
     const { logAuditAction } = await import('@/lib/audit-logger')
     await logAuditAction({
-      actor_name: userProfile?.full_name ? `${userProfile.full_name}(${username})` : username,
+      actor_name: userProfile?.full_name || username,
       action_type: 'USER_LOGIN',
       target_name: `시스템 로그인 접속`,
       details: {
         username,
+        full_name: userProfile?.full_name,
         role: userProfile?.role || 'user',
         assigned_grade: userProfile?.assigned_grade,
         assigned_class: userProfile?.assigned_class,
