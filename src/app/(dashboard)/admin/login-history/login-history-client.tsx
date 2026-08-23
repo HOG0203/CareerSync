@@ -87,6 +87,23 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
     return name.replace(/\([^)]*\)/g, '').trim();
   };
 
+  // 작업 대상 명칭 한글화 헬퍼 (과거 로그 호환)
+  const formatTargetName = (targetName?: string) => {
+    if (!targetName) return '';
+    return targetName
+      .replace(/\[admin\/certification\/import\]/g, '[인증제 엑셀 일괄 등록]')
+      .replace(/admin\/certification\/import/g, '인증제 엑셀 일괄 등록')
+      .replace(/\[admin\/certification\/grades\]/g, '[인증제 성적현황]')
+      .replace(/\[admin\/certification\/attendance\]/g, '[인증제 출결현황]')
+      .replace(/\[admin\/certification\/certificates\]/g, '[인증제 자격증현황]')
+      .replace(/\[admin\/certification\]/g, '[인증제 종합 평가]')
+      .replace(/\[admin\/login-history\]/g, '[로그인 및 활동 이력]')
+      .replace(/\[admin\/audit-logs\]/g, '[작업 이력 관리]')
+      .replace(/\[admin\/settings\]/g, '[시스템 설정]')
+      .replace(/\[admin\/users\]/g, '[사용자 관리]')
+      .replace(/\[admin\/students\]/g, '[학생 등록/진급]');
+  };
+
   // 1. 전체 고유 사용자 목록 추출
   const uniqueUsers = React.useMemo(() => {
     const userSet = new Set<string>();
@@ -254,6 +271,7 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
         s.actorName.toLowerCase().includes(q) ||
         JSON.stringify(s.details || '').toLowerCase().includes(q) ||
         s.actions.some(a => 
+          formatTargetName(a.target_name).toLowerCase().includes(q) ||
           a.target_name.toLowerCase().includes(q) ||
           (ACTION_TYPE_CONFIG[a.action_type]?.label || '').toLowerCase().includes(q) ||
           JSON.stringify(a.details || '').toLowerCase().includes(q)
@@ -683,7 +701,7 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
                                   "text-xs sm:text-sm group-hover:text-indigo-600 transition-colors",
                                   isPageView ? "font-medium text-slate-700" : "font-bold text-slate-900"
                                 )}>
-                                  {action.target_name}
+                                  {formatTargetName(action.target_name)}
                                 </span>
                               </div>
 
@@ -741,7 +759,7 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
                 </div>
                 <div className="col-span-2 pt-2 border-t border-slate-200/60">
                   <span className="font-semibold text-slate-500 block mb-0.5">작업 대상 및 내용</span>
-                  <span className="font-extrabold text-indigo-700 text-sm">{detailModalLog.target_name}</span>
+                  <span className="font-extrabold text-indigo-700 text-sm">{formatTargetName(detailModalLog.target_name)}</span>
                 </div>
               </div>
 

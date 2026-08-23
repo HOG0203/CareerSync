@@ -39,7 +39,9 @@ import {
   Award,
   Loader2,
   History,
-  KeyRound
+  KeyRound,
+  FileCheck,
+  UploadCloud
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { handleClientLogout } from '@/lib/auth-helpers';
@@ -108,9 +110,11 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
       title: "옥저인재인증제",
       icon: CheckCircle2,
       items: [
+        { href: '/admin/certification', label: '종합 인증평가', icon: Award },
+        { href: '/admin/certification/import', label: '엑셀 일괄 등록', icon: UploadCloud },
         { href: '/admin/certification/grades', label: '성적현황', icon: GraduationCap },
         { href: '/admin/certification/attendance', label: '출결현황', icon: CalendarCheck },
-        { href: '/admin/certification/certificates', label: '자격증현황', icon: Award },
+        { href: '/admin/certification/certificates', label: '자격증현황', icon: FileCheck },
       ]
     },
     ...(isAdmin ? [

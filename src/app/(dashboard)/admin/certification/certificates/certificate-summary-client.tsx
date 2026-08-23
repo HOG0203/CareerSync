@@ -25,6 +25,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { StudentCertificateSummary, updateStudentCertificates } from './actions';
 import { CertificateImportModal } from './certificate-import-modal';
+import { CertificatePicker } from '@/components/dashboard/standard-spreadsheet-table/certificate-picker';
 
 import { CertificationDataSkeleton } from '@/components/dashboard/loading-skeleton';
 
@@ -32,12 +33,14 @@ export function CertificateSummaryClient({
   initialSummaries, 
   currentGrade,
   isAdmin = false,
-  userProfile
+  userProfile,
+  masterCertificates = []
 }: { 
   initialSummaries: StudentCertificateSummary[], 
   currentGrade: number,
   isAdmin?: boolean,
-  userProfile?: any
+  userProfile?: any,
+  masterCertificates?: any[]
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -57,7 +60,6 @@ export function CertificateSummaryClient({
   });
 
   const [editingStudent, setEditingStudent] = React.useState<StudentCertificateSummary | null>(null);
-  const [certsInput, setCertsInput] = React.useState('');
   const [isSaving, setIsSaving] = React.useState(false);
   const [currentPage, setCurrentPage] = React.useState(1);
   const PAGE_SIZE = 50;
@@ -147,22 +149,15 @@ export function CertificateSummaryClient({
   // 편집 시작
   const startEdit = (student: StudentCertificateSummary) => {
     setEditingStudent(student);
-    setCertsInput(student.certificates.join(', '));
   };
 
   // 편집 저장
-  const saveCertificates = async () => {
+  const saveCertificates = async (newCerts: string[]) => {
     if (!editingStudent) return;
     setIsSaving(true);
-    
-    // 쉼표/세미콜론으로 분할하고 앞뒤 공백 제거
-    const certsArray = certsInput
-      .split(/[,;]/)
-      .map(c => c.trim())
-      .filter(Boolean);
 
     try {
-      const res = await updateStudentCertificates(editingStudent.id, certsArray);
+      const res = await updateStudentCertificates(editingStudent.id, newCerts);
       if (res.success) {
         toast({
           title: "자격증 수정 완료",
@@ -494,69 +489,17 @@ export function CertificateSummaryClient({
         </>
       )}
 
-      {/* 자격증 직접 수정 다이얼로그 */}
-
-      <Dialog open={!!editingStudent} onOpenChange={(open) => !open && setEditingStudent(null)}>
-        <DialogContent className="max-w-md w-[95vw] sm:w-full bg-white p-0 rounded-2xl shadow-2xl overflow-hidden border-none">
-          <DialogHeader className="p-4 sm:p-5 bg-white border-b border-slate-100 shrink-0">
-            <div className="flex items-center gap-3 sm:gap-4 mr-6">
-              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-amber-50 flex items-center justify-center shrink-0 border border-amber-100">
-                <Award className="h-5 w-5 sm:h-6 sm:w-6 text-amber-600" />
-              </div>
-              <div className="flex flex-col text-left min-w-0">
-                <DialogTitle className="text-lg sm:text-2xl font-extrabold flex items-center gap-2 text-slate-900 truncate">
-                  {editingStudent?.name}
-                  <span className="text-xs bg-amber-500 text-white px-2.5 py-0.5 rounded-full font-bold shrink-0">
-                    {editingStudent?.number}번
-                  </span>
-                </DialogTitle>
-                <DialogDescription className="text-slate-500 text-xs sm:text-sm font-bold uppercase tracking-wide mt-1 truncate">
-                  {editingStudent?.major} • {editingStudent?.classInfo}반 자격증 수정
-                </DialogDescription>
-              </div>
-            </div>
-          </DialogHeader>
-          <div className="p-4 sm:p-6 pt-3 space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">자격증 목록 (쉼표 또는 세미콜론 구분)</label>
-              <Input 
-                value={certsInput} 
-                onChange={(e) => setCertsInput(e.target.value)} 
-                placeholder="예: 전기기능사, 승강기기능사, 정보기술자격(ITQ)"
-                className="w-full text-xs sm:text-sm font-medium border-slate-200 focus-visible:ring-indigo-500"
-              />
-              <p className="text-[10px] text-slate-400 leading-normal">
-                각 자격증 명칭은 쉼표(,)나 세미콜론(;)으로 구분하여 입력해주세요. 비워두면 모든 자격증이 제거됩니다.
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2 sm:gap-0 flex-row justify-end">
-            <Button 
-              variant="outline" 
-              disabled={isSaving}
-              onClick={() => setEditingStudent(null)}
-              className="font-bold text-xs h-8 sm:h-9"
-            >
-              취소
-            </Button>
-            <Button 
-              onClick={saveCertificates}
-              disabled={isSaving}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-8 sm:h-9 gap-1.5"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  저장 중...
-                </>
-              ) : (
-                "저장하기"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* 자격증 마스터 검색/선택 모달 (수기 입력 지양) */}
+      <CertificatePicker
+        isOpen={!!editingStudent}
+        onClose={() => !isSaving && setEditingStudent(null)}
+        initialValues={editingStudent?.certificates || []}
+        masterCerts={masterCertificates}
+        title={editingStudent ? `${editingStudent.name} (${editingStudent.number}번) 자격증 수정` : "자격증 선택 및 등록"}
+        description={editingStudent ? `${editingStudent.major} • ${editingStudent.classInfo}반` : "취득한 자격증을 검색하고 등급을 선택하세요."}
+        onSave={saveCertificates}
+        isSaving={isSaving}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import * as React from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
@@ -17,7 +17,8 @@ const PAGE_NAME_MAP: Record<string, string> = {
   '/admin/users': '사용자 관리',
   '/admin/audit-logs': '작업 이력 관리',
   '/admin/settings': '시스템 설정',
-  '/admin/certification': '옥저인재인증제 현황',
+  '/admin/certification': '인증제 종합 평가',
+  '/admin/certification/import': '인증제 엑셀 일괄 등록',
   '/admin/certification/grades': '인증제 성적현황',
   '/admin/certification/attendance': '인증제 출결현황',
   '/admin/certification/certificates': '인증제 자격증현황',

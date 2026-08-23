@@ -37,6 +37,23 @@ const ACTION_TYPE_CONFIG: Record<string, { label: string; color: string }> = {
   BASE_YEAR_SNAPSHOT: { label: '학적 백업 스냅샷', color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
 };
 
+// 작업 대상 명칭 한글화 헬퍼 (과거 로그 호환)
+export function formatTargetName(targetName?: string): string {
+  if (!targetName) return '';
+  return targetName
+    .replace(/\[admin\/certification\/import\]/g, '[인증제 엑셀 일괄 등록]')
+    .replace(/admin\/certification\/import/g, '인증제 엑셀 일괄 등록')
+    .replace(/\[admin\/certification\/grades\]/g, '[인증제 성적현황]')
+    .replace(/\[admin\/certification\/attendance\]/g, '[인증제 출결현황]')
+    .replace(/\[admin\/certification\/certificates\]/g, '[인증제 자격증현황]')
+    .replace(/\[admin\/certification\]/g, '[인증제 종합 평가]')
+    .replace(/\[admin\/login-history\]/g, '[로그인 및 활동 이력]')
+    .replace(/\[admin\/audit-logs\]/g, '[작업 이력 관리]')
+    .replace(/\[admin\/settings\]/g, '[시스템 설정]')
+    .replace(/\[admin\/users\]/g, '[사용자 관리]')
+    .replace(/\[admin\/students\]/g, '[학생 등록/진급]');
+}
+
 export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsClientProps) {
   const [search, setSearch] = React.useState(currentSearch);
   const [activeType, setActiveType] = React.useState(currentType);
@@ -63,6 +80,7 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
       const q = search.toLowerCase().trim();
       list = list.filter(l =>
         (l.actor_name || '').toLowerCase().includes(q) ||
+        formatTargetName(l.target_name || '').toLowerCase().includes(q) ||
         (l.target_name || '').toLowerCase().includes(q) ||
         JSON.stringify(l.details || '').toLowerCase().includes(q)
       );
@@ -218,7 +236,7 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
                             </span>
                           </td>
                           <td className="p-3 font-bold text-slate-800">
-                            <div>{log.target_name}</div>
+                            <div>{formatTargetName(log.target_name)}</div>
                             {log.details && typeof log.details === 'object' && (log.details.old_value !== undefined || log.details.new_value !== undefined) && (
                               <div className="flex items-center gap-1 mt-1 text-[10.5px]">
                                 <span className="bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded font-mono border border-rose-200 max-w-[130px] truncate">
@@ -284,7 +302,7 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
                       <div className="flex items-center justify-between gap-2 text-xs border-t border-slate-100/80 pt-1.5">
                         <div className="font-semibold text-slate-800 min-w-0 truncate">
                           <span className="text-[10px] text-slate-400 font-bold mr-1">대상:</span>
-                          <span className="text-slate-900 font-bold text-[11px]">{log.target_name}</span>
+                          <span className="text-slate-900 font-bold text-[11px]">{formatTargetName(log.target_name)}</span>
                         </div>
 
                         {hasValues && detailsObj ? (
@@ -343,7 +361,7 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400 font-medium">작업 대상:</span>
-                  <span className="font-bold text-emerald-700">{selectedLog.target_name}</span>
+                  <span className="font-bold text-emerald-700">{formatTargetName(selectedLog.target_name)}</span>
                 </div>
               </div>
 

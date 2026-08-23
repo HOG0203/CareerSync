@@ -13,9 +13,11 @@ export default function CertificationLayout({
 
   // 현재 경로에 맞는 소제목 결정
   const getSubTitle = () => {
+    if (pathname.includes('/import')) return '엑셀 일괄 등록';
     if (pathname.includes('/attendance')) return '출결현황';
-    if (pathname.includes('/certificates')) return '자격증 현황';
-    return '성적현황'; // 기본값 (grades 등)
+    if (pathname.includes('/certificates')) return '자격증현황';
+    if (pathname.includes('/grades')) return '성적현황';
+    return '종합 인증 평가';
   };
 
   return (
