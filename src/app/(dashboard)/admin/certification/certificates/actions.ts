@@ -29,8 +29,9 @@ export async function getCertificateSummaries(gradeNum: number) {
 
   const { data: students, error } = await supabase
     .from('students')
-    .select('id, student_id, student_name, student_number, major, class_info, certificates')
+    .select('id, student_name, student_number, major, class_info, certificates')
     .eq('graduation_year', targetGradYear)
+
     .order('major', { ascending: true })
     .order('class_info', { ascending: true })
     .order('student_number', { ascending: true });

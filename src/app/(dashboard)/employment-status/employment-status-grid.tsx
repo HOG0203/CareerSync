@@ -24,7 +24,14 @@ interface EmploymentStatusGridProps {
   baseYear?: number;
   grade?: number;
   graduationYear: string;
+  hideSearchHeader?: boolean;
+  externalSearchQuery?: string;
+  externalCustomRule?: CustomRule | null;
 }
+
+export { type CustomRule } from './custom-combination-modal';
+
+
 
 const MAJOR_MAP: Record<string, string> = {
   '자동화기계과': '기계',
@@ -314,13 +321,30 @@ function SearchHeader({
   );
 }
 
-export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [], baseYear, grade = 3, graduationYear }: EmploymentStatusGridProps) {
-  const [searchQuery, setSearchQuery] = React.useState('');
-  const [customRule, setCustomRule] = React.useState<CustomRule | null>(null);
+export function EmploymentStatusGrid({ 
+  allData, 
+  userProfile, 
+  teacherProfiles = [], 
+  baseYear, 
+  grade = 3, 
+  graduationYear, 
+  hideSearchHeader = false,
+  externalSearchQuery,
+  externalCustomRule,
+}: EmploymentStatusGridProps) {
+  const [internalSearchQuery, setInternalSearchQuery] = React.useState('');
+  const [internalCustomRule, setInternalCustomRule] = React.useState<CustomRule | null>(null);
+
+  const searchQuery = externalSearchQuery !== undefined ? externalSearchQuery : internalSearchQuery;
+  const setSearchQuery = setInternalSearchQuery;
+  const customRule = externalCustomRule !== undefined ? externalCustomRule : internalCustomRule;
+  const setCustomRule = setInternalCustomRule;
+
   const [isCustomModalOpen, setIsCustomModalOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [rankingMap, setRankingMap] = React.useState<Record<string, any>>({});
   const [isRankingsLoading, setIsRankingsLoading] = React.useState(false);
+
   // 2학년 전용 진로코스 필터
   const [wishCourseFilter, setWishCourseFilter] = React.useState('');
   const [currentCourseFilter, setCurrentCourseFilter] = React.useState('');
@@ -554,23 +578,26 @@ export function EmploymentStatusGrid({ allData, userProfile, teacherProfiles = [
 
   return (
     <div className="flex flex-col gap-4">
-      {/* 클라이언트 사이드 검색창 */}
-      <SearchHeader 
-        onSearch={setSearchQuery} 
-        currentSearchQuery={searchQuery} 
-        isLowerGrade={isLowerGrade} 
-        matchedCount={matchedCount} 
-        customRule={customRule}
-        onOpenCustomModal={() => setIsCustomModalOpen(true)}
-        onClearCustomRule={() => setCustomRule(null)}
-        customMatchedCount={customMatchedCount}
-        wishCourseFilter={wishCourseFilter}
-        currentCourseFilter={currentCourseFilter}
-        onWishCourseFilter={setWishCourseFilter}
-        onCurrentCourseFilter={setCurrentCourseFilter}
-        wishFilterCount={wishFilterCount}
-        currentFilterCount={currentFilterCount}
-      />
+      {/* 클라이언트 사이드 검색창 (hideSearchHeader가 아닐 때만 표시) */}
+      {!hideSearchHeader && (
+        <SearchHeader 
+          onSearch={setSearchQuery} 
+          currentSearchQuery={searchQuery} 
+          isLowerGrade={isLowerGrade} 
+          matchedCount={matchedCount} 
+          customRule={customRule}
+          onOpenCustomModal={() => setIsCustomModalOpen(true)}
+          onClearCustomRule={() => setCustomRule(null)}
+          customMatchedCount={customMatchedCount}
+          wishCourseFilter={wishCourseFilter}
+          currentCourseFilter={currentCourseFilter}
+          onWishCourseFilter={setWishCourseFilter}
+          onCurrentCourseFilter={setCurrentCourseFilter}
+          wishFilterCount={wishFilterCount}
+          currentFilterCount={currentFilterCount}
+        />
+      )}
+
 
       <div className="w-full overflow-x-auto bg-gray-50/50 rounded-xl border border-slate-200 shadow-sm p-2 sm:p-4">
         <div className="flex gap-px bg-gray-300 border border-gray-300 min-w-max mx-auto shadow-sm">

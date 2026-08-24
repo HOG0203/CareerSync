@@ -271,15 +271,18 @@ export function StudentTable({
   masterCertificates = [],
   rankingMap = {},
   userProfile = null,
-  baseYear
+  baseYear,
+  onFilteredDataChange
 }: { 
   initialData: any[], 
   isAdmin?: boolean,
   masterCertificates?: MasterCertificate[],
   rankingMap?: Record<string, any>,
   userProfile?: any,
-  baseYear?: number
+  baseYear?: number,
+  onFilteredDataChange?: (data: any[]) => void
 }) {
+
   const [selectedStudent, setSelectedStudent] = React.useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = React.useState(false)
 
@@ -364,7 +367,11 @@ export function StudentTable({
           ]}
           pageType="students"
           hideCheckbox={true}
+          hideSearch={true}
+          onFilteredDataChange={onFilteredDataChange}
         />
+
+
       </div>
 
       <FieldTrainingModal 

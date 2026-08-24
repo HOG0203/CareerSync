@@ -31,9 +31,10 @@ export type UnregisteredCompanyData = {
 };
 
 // 필요한 학생 필드만 선택 (전체 컬럼 대신 화면에 사용하는 필드만)
-const STUDENT_FIELDS = 'id, student_id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, military_status';
+const STUDENT_FIELDS = 'id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, military_status';
 const EMPLOYMENT_FIELDS = 'id, is_desiring_employment, employment_status, company_type, business_type, company, remarks';
 const TRAINING_FIELDS = 'id, student_id, training_order, company, start_date, end_date, stipend_status, hiring_status, conversion_date';
+
 
 /**
  * 기업 목록 검색 및 조회 (취업생/실습생 카운트 + 캐싱)

@@ -7,13 +7,20 @@ import { MasterCertificate } from '@/app/(dashboard)/admin/settings/actions'
 import { CounselingModal } from './counseling-modal'
 import { fetchYearlyRankings } from '../employment-status/actions'
 
+import { Users, Briefcase, GraduationCap, Award, BookOpen } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+
 interface ClassTableProps {
   initialData: any[];
   masterCertificates: MasterCertificate[];
   userProfile?: any;
   baseYear?: number;
   graduationYear: number;
+  targetMajor?: string;
+  displayClass?: string;
+  selectedGrade?: number;
 }
+
 
 // 학년별 진로희망 옵션 생성 함수
 const GET_CAREER_OPTIONS = (grade: number) => {
@@ -89,13 +96,33 @@ export function ClassTable({
   masterCertificates,
   userProfile = null,
   baseYear,
-  graduationYear
+  graduationYear,
+  targetMajor = '',
+  displayClass = '',
+  selectedGrade = 3,
 }: ClassTableProps) {
   const [selectedStudent, setSelectedStudent] = React.useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = React.useState(false)
   
   const [rankingMap, setRankingMap] = React.useState<Record<string, any>>({})
   const [isRankingsLoading, setIsRankingsLoading] = React.useState(false)
+
+  // 학반 요약 통계 계산
+  const stats = React.useMemo(() => {
+    const total = initialData.length;
+    const employCount = initialData.filter(s => s.career_aspiration === '취업').length;
+    const academicCount = initialData.filter(s => s.career_aspiration === '진학').length;
+    const certCount = initialData.filter(s => {
+      if (Array.isArray(s.certificates) && s.certificates.length > 0) return true;
+      if (typeof s.certificates === 'string' && s.certificates.trim()) return true;
+      return false;
+    }).length;
+
+    const employRate = total > 0 ? Math.round((employCount / total) * 100) : 0;
+    const academicRate = total > 0 ? Math.round((academicCount / total) * 100) : 0;
+
+    return { total, employCount, employRate, academicCount, academicRate, certCount };
+  }, [initialData]);
 
   React.useEffect(() => {
     if (!graduationYear) return
@@ -110,6 +137,7 @@ export function ClassTable({
         setIsRankingsLoading(false)
       })
   }, [graduationYear, baseYear])
+
 
   // 현재 데이터로부터 학년 판별
   const currentGrade = React.useMemo(() => {
@@ -283,22 +311,103 @@ export function ClassTable({
   }, [initialData]);
 
   return (
-    <div className="w-full h-full flex flex-col min-h-0 flex-1 overflow-hidden">
-      <StandardSpreadsheetTable 
-        data={initialData}
-        columns={columns}
-        groupHeaders={groupHeaders}
-        onSave={handleSave}
-        onBulkSave={handleBulkSave}
-        onAction={handleAction}
-        searchPlaceholder="학반 학생 검색..."
-        masterCertificates={masterCertificates}
-        rankingMap={rankingMap}
-        isRankingsLoading={isRankingsLoading}
-        userProfile={userProfile}
-        baseYear={baseYear}
-        pageType="class-management"
-      />
+    <div className="w-full flex flex-col gap-4 min-h-0 flex-1">
+      {/* 요약 통계 카드 4종 */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <Card className="border-slate-200/80 shadow-2xs">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500">학반 학생수</p>
+              <p className="text-2xl font-black text-slate-900 mt-1">{stats.total}명</p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600">
+              <Users className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-200/80 shadow-2xs">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500">취업 희망</p>
+              <div className="flex items-baseline gap-1.5 mt-1">
+                <span className="text-2xl font-black text-blue-600">{stats.employCount}명</span>
+                <span className="text-xs font-bold text-slate-400">({stats.employRate}%)</span>
+              </div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600">
+              <Briefcase className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-200/80 shadow-2xs">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500">진학 희망</p>
+              <div className="flex items-baseline gap-1.5 mt-1">
+                <span className="text-2xl font-black text-emerald-600">{stats.academicCount}명</span>
+                <span className="text-xs font-bold text-slate-400">({stats.academicRate}%)</span>
+              </div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600">
+              <GraduationCap className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-200/80 shadow-2xs">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500">자격증 취득 학생</p>
+              <div className="flex items-baseline gap-1.5 mt-1">
+                <span className="text-2xl font-black text-amber-600">{stats.certCount}명</span>
+                <span className="text-xs font-bold text-slate-400">({stats.total > 0 ? Math.round((stats.certCount / stats.total) * 100) : 0}%)</span>
+              </div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600">
+              <Award className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 스프레드시트 메인 테이블 카드 */}
+      <Card className="flex-1 min-h-0 shadow-sm border border-slate-200/80 bg-white rounded-2xl overflow-hidden flex flex-col mb-0">
+        <CardHeader className="py-3.5 px-5 border-b border-slate-200/80 bg-slate-50/50 flex flex-row items-center justify-between shrink-0">
+          <div>
+            <CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-blue-600" />
+              <span>{targetMajor ? `${targetMajor} ${displayClass}반` : '학반'} 세부 진로지도 및 상세 데이터</span>
+            </CardTitle>
+            <CardDescription className="text-xs text-slate-500 mt-0.5">
+              셀을 클릭하여 진로희망, 희망기업유형, 세부코스를 즉시 수정하거나 엑셀 데이터를 붙여넣을 수 있습니다.
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-bold border border-blue-100/80 shadow-2xs">
+              총 {initialData.length}명
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0 flex-1 min-h-0 flex flex-col overflow-hidden">
+          <StandardSpreadsheetTable 
+            data={initialData}
+            columns={columns}
+            groupHeaders={groupHeaders}
+            onSave={handleSave}
+            onBulkSave={handleBulkSave}
+            onAction={handleAction}
+            searchPlaceholder="학반 학생 검색 (이름, 번호, 진로희망...)"
+            masterCertificates={masterCertificates}
+            rankingMap={rankingMap}
+            isRankingsLoading={isRankingsLoading}
+            userProfile={userProfile}
+            baseYear={baseYear}
+            pageType="class-management"
+          />
+        </CardContent>
+      </Card>
 
       <CounselingModal 
         isOpen={isModalOpen}
@@ -308,3 +417,4 @@ export function ClassTable({
     </div>
   )
 }
+

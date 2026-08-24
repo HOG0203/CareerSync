@@ -16,18 +16,29 @@ import { logAuditAction } from '@/lib/audit-logger';
 const EVAL_SETTINGS_KEY = 'certification_evaluations_store';
 
 /**
- * 평가 데이터 저장소 (Map: studentId -> CertificationEvaluationData) 조회
+ * 평가 데이터 저장소 (Map: studentId -> CertificationEvaluationData) 조회 (캐싱 적용)
  */
-export async function getEvaluationsStore(): Promise<Record<string, CertificationEvaluationData>> {
-  const supabase = createAdminClient();
-  const { data } = await supabase
-    .from('system_settings')
-    .select('value')
-    .eq('key', EVAL_SETTINGS_KEY)
-    .single();
+export const getEvaluationsStore = unstable_cache(
+  async (): Promise<Record<string, CertificationEvaluationData>> => {
+    try {
+      const supabase = createAdminClient();
+      const { data } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', EVAL_SETTINGS_KEY)
+        .maybeSingle();
 
-  return (data?.value as Record<string, CertificationEvaluationData>) || {};
-}
+      return (data?.value as Record<string, CertificationEvaluationData>) || {};
+    } catch (e) {
+      console.error('Error in getEvaluationsStore:', e);
+      return {};
+    }
+  },
+  ['certification-evaluations-store-cache'],
+  { revalidate: 3600, tags: ['cert-eval'] }
+);
+
+
 
 /**
  * 특정 학년의 전교생 옥저인재인증제 종합 평가 목록 조회 (계산 완료된 데이터셋)
@@ -42,8 +53,9 @@ export async function getCertificationSummaryList(gradeNum: number): Promise<Ful
   const [studentsRes, attendanceRes, evalStore] = await Promise.all([
     supabase
       .from('students')
-      .select('id, student_id, student_name, student_number, major, class_info, graduation_year, certificates, career_course')
+      .select('id, student_name, student_number, major, class_info, graduation_year, certificates, career_course')
       .eq('graduation_year', targetGradYear)
+
       .order('major', { ascending: true })
       .order('class_info', { ascending: true })
       .order('student_number', { ascending: true }),
@@ -98,6 +110,45 @@ export async function getCachedCertificationSummaryList(gradeNum: number) {
     }
   )();
 }
+
+/**
+ * 개별 학생 단건 옥저인증제 종합 평가 산출
+ */
+export async function getStudentSingleEvaluation(studentId: string): Promise<FullStudentEvaluation | null> {
+  const supabase = createAdminClient();
+  const settings = await getSystemSettings();
+  const baseYear = settings.baseYear;
+
+  const [studentRes, attendanceRes, evalStore] = await Promise.all([
+    supabase
+      .from('students')
+      .select('id, student_name, student_number, major, class_info, graduation_year, certificates, career_course, phone_number')
+      .eq('id', studentId)
+
+      .maybeSingle(),
+    supabase
+      .from('student_attendance')
+      .select('student_id, grade, absent_unexcused, late_unexcused, early_unexcused, out_unexcused')
+      .eq('student_id', studentId),
+    getEvaluationsStore()
+  ]);
+
+  if (studentRes.error || !studentRes.data) {
+    return null;
+  }
+
+  const student = studentRes.data;
+  const attendanceRecords = attendanceRes.data || [];
+  const evalData = evalStore[studentId] || { student_id: studentId };
+
+  return calculateStudentFullEvaluation({
+    student,
+    attendanceRecords,
+    evalData,
+    baseYear
+  });
+}
+
 
 /**
  * 개별 학생 인증 데이터 저장 / 수동 보정 (RBAC 적용: 관리자 또는 해당 학반 담임만 가능)

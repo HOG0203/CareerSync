@@ -76,50 +76,78 @@ async function syncAcademicHistory(supabase: any, studentUuid: string, info: any
     }, { onConflict: 'student_id, grade' })
 }
 
-async function getNextStudentId(supabase: any, graduationYear: number): Promise<string> {
-  const yearPrefix = graduationYear.toString().slice(-2);
-  const { data } = await supabase.from('students').select('student_id').ilike('student_id', `${yearPrefix}%`).order('student_id', { ascending: false }).limit(1);
-  let nextSequence = 1;
-  if (data && data.length > 0) {
-    const lastId = data[0].student_id;
-    const lastSequence = parseInt(lastId.slice(2));
-    if (!isNaN(lastSequence)) nextSequence = lastSequence + 1;
-  }
-  return `${yearPrefix}${nextSequence.toString().padStart(3, '0')}`;
-}
+import { parseCSVText } from '@/lib/student-utils';
+
 
 export async function bulkPromoteFromExcel(csvData: string) {
   const supabase = await createClient()
-  const rows = csvData.split(/\r?\n/).filter(row => row.trim() !== '')
-  const dataRows = rows.slice(1)
+  const parsedRows = parseCSVText(csvData);
+  if (parsedRows.length <= 1) return { success: false, count: 0, errors: ['데이터 행이 없습니다.'] };
+  
+  const dataRows = parsedRows.slice(1);
   const settings = await getSystemSettings()
 
   let successCount = 0;
   let errors = [];
 
-  for (const row of dataRows) {
-    const values = row.split(',').map(v => {
-      const trimmed = v.trim().replace(/^"|"$/g, '')
-      return trimmed === '' ? null : trimmed 
-    })
-    
-    // 엑셀 서식: [0]학번, [1]성명, [2]기존학과, [3]기존반, [4]기존번호, [5]신규학과, [6]신규반, [7]신규번호
-    const student_id = values[0];
-    const next_major = values[5];
-    const next_class = values[6];
-    const next_number = values[7];
+  for (const values of dataRows) {
+    let student_id: string | null = null;
+    let student_name: string | null = null;
+    let prev_major: string | null = null;
+    let prev_class: string | null = null;
+    let prev_number: string | null = null;
+    let next_major: string | null = null;
+    let next_class: string | null = null;
+    let next_number: string | null = null;
 
-    if (!student_id || !next_major || !next_class || !next_number) continue;
+    if (values.length >= 8) {
+      // 8컬럼 서식: [0]학번, [1]성명, [2]기존학과, [3]기존반, [4]기존번호, [5]신규학과, [6]신규반, [7]신규번호
+      student_id = values[0];
+      student_name = values[1];
+      prev_major = values[2];
+      prev_class = values[3];
+      prev_number = values[4];
+      next_major = values[5];
+      next_class = values[6];
+      next_number = values[7];
+    } else {
+      // 7컬럼 최신 서식: [0]성명, [1]기존학과, [2]기존반, [3]기존번호, [4]신규학과, [5]신규반, [6]신규번호
+      student_name = values[0];
+      prev_major = values[1];
+      prev_class = values[2];
+      prev_number = values[3];
+      next_major = values[4];
+      next_class = values[5];
+      next_number = values[6];
+    }
+
+    if (!next_major || !next_class || !next_number) continue;
 
     // 학생 조회
-    const { data: student } = await supabase
-      .from('students')
-      .select('id, graduation_year')
-      .eq('student_id', student_id)
-      .single();
+    let student: any = null;
+
+    if (student_id) {
+      const { data } = await supabase
+        .from('students')
+        .select('id, graduation_year')
+        .eq('student_id', student_id)
+        .maybeSingle();
+      student = data;
+    }
+
+    if (!student && prev_major && prev_class && prev_number) {
+      const { data } = await supabase
+        .from('students')
+        .select('id, graduation_year')
+        .eq('major', prev_major)
+        .eq('class_info', prev_class)
+        .eq('student_number', prev_number)
+        .maybeSingle();
+      student = data;
+    }
 
     if (!student) {
-      errors.push(`${student_id} 학생을 찾을 수 없습니다.`);
+      errors.push(`${student_name || student_id || '해당'} 학생을 찾을 수 없습니다.`);
       continue;
     }
 
@@ -143,56 +171,237 @@ export async function bulkPromoteFromExcel(csvData: string) {
         graduation_year: student.graduation_year
       }, settings.baseYear);
     } else {
-      errors.push(`${student_id} 업데이트 실패: ${updateError.message}`);
+      errors.push(`${student_name || student.id} 업데이트 실패: ${updateError.message}`);
     }
   }
 
-  revalidatePath('/class-management')
-  revalidatePath('/employment-status')
-  revalidatePath('/students')
-  revalidatePath('/admin/students')
-  revalidatePath('/dashboard')
+  revalidateTag('students');
+  revalidatePath('/class-management');
+  revalidatePath('/admin/students');
   
   return { success: true, count: successCount, errors: errors.length > 0 ? errors : null }
 }
 
+
+/**
+ * [취업·실습 종합 서식] 29개 컬럼 엑셀 CSV 업로드 (학번 불필요, 자동 매칭/채번)
+ */
 export async function uploadStudentsCSV(csvData: string) {
   const supabase = await createClient()
-  const rows = csvData.split(/\r?\n/).filter(row => row.trim() !== '')
-  const dataRows = rows.slice(1)
-  const settings = await getSystemSettings()
+  const parsedRows = parseCSVText(csvData);
+  if (parsedRows.length <= 1) return { success: false, count: 0, error: '데이터 행이 없습니다.' };
 
-  for (const row of dataRows) {
-    const values = row.split(',').map(v => {
-      const trimmed = v.trim().replace(/^"|"$/g, '')
-      return trimmed === '' ? null : trimmed 
-    })
-    const graduation_year = values[1] ? parseInt(values[1]) : null
+  const dataRows = parsedRows.slice(1);
+  const settings = await getSystemSettings()
+  let successCount = 0;
+
+  for (const values of dataRows) {
+    const graduation_year = values[0] ? parseInt(values[0]) : null
     if (!graduation_year) continue
-    const student_id = values[0] || await getNextStudentId(supabase, graduation_year)
-    const { data: student, error: sError } = await supabase.from('students').upsert({
-      student_id, graduation_year, major: values[2], class_info: values[3], student_number: values[4], student_name: values[5],
-      phone_number: values[6],
-      career_aspiration: values[7], special_notes: values[8], career_course: values[9],
-      certificates: values[15] ? values[15].split(';').map(c => c.trim()) : [],
-      military_status: values[16], shoe_size: values[17], top_size: values[18], personal_remarks: values[29]
-    }, { onConflict: 'student_id' }).select('id, graduation_year, major, class_info, student_number').single()
-    if (sError || !student) continue;
-    await supabase.from('student_employments').upsert({ id: student.id, is_desiring_employment: values[10] || '예', business_type: values[11] || '아니오', employment_status: values[12], company_type: values[13], company: values[14], remarks: values[28] }, { onConflict: 'id' })
-    const startDate = normalizeDate(values[21]);
-    const endDate = normalizeDate(values[22]);
-    if (startDate || endDate) {
-      await supabase.from('field_training_records').upsert({
-        student_id: student.id, training_order: 1, company: values[20] || values[14] || '미지정', start_date: startDate, end_date: endDate, stipend_status: values[23] || 'X',
-        hiring_status: values[24] === 'O' || values[24] === '예' || values[24] === '채용전환' ? '채용전환' : (values[26] === 'O' || values[26] === '예' || values[26] === '복교' ? '복교' : '진행중'),
-        conversion_date: normalizeDate(values[25]), return_reason: values[27]
-      }, { onConflict: 'student_id, training_order' })
+
+    const major = values[1] || null;
+    const class_info = values[2] || null;
+    const student_number = values[3] || null;
+    const student_name = values[4] || null;
+
+    // 기존 학생 조회 (졸업연도 + 학과 + 반 + 번호 기반 매칭)
+    let matchedStudentId: string | null = null;
+
+    if (major && class_info && student_number) {
+      const { data: existing } = await supabase
+        .from('students')
+        .select('id')
+        .eq('graduation_year', graduation_year)
+        .eq('major', major)
+        .eq('class_info', class_info)
+        .eq('student_number', student_number)
+        .maybeSingle();
+
+      if (existing) {
+        matchedStudentId = existing.id;
+      }
     }
-    await syncAcademicHistory(supabase, student.id, student, settings.baseYear)
+
+    const certificates = values[20] ? values[20].split(';').map(c => c.trim()).filter(Boolean) : [];
+
+    const studentPayload: any = {
+      graduation_year,
+      major,
+      class_info,
+      student_number,
+      student_name,
+      phone_number: values[5] || null,
+      career_aspiration: values[6] || null,
+      special_notes: values[7] || null,
+      career_course: values[8] || null,
+      military_status: values[9] || null,
+      desired_work_area: values[10] || null,
+      parents_opinion: values[11] || null,
+      shoe_size: values[12] || null,
+      top_size: values[13] || null,
+      personal_remarks: values[14] || null,
+      certificates,
+      updated_at: new Date().toISOString()
+    };
+
+    let student: any = null;
+
+    if (matchedStudentId) {
+      const { data: updated, error: uError } = await supabase
+        .from('students')
+        .update(studentPayload)
+        .eq('id', matchedStudentId)
+        .select('id, graduation_year, major, class_info, student_number')
+        .single();
+      if (!uError && updated) student = updated;
+    } else {
+      const { data: inserted, error: iError } = await supabase
+        .from('students')
+        .insert([studentPayload])
+        .select('id, graduation_year, major, class_info, student_number')
+        .single();
+      if (!iError && inserted) student = inserted;
+    }
+
+    if (!student) continue;
+
+
+    // 취업 정보 업서트
+    await supabase.from('student_employments').upsert({
+      id: student.id,
+      is_desiring_employment: values[15] || '예',
+      employment_status: values[16] || null, // 최종진로코스
+      business_type: values[17] || '아니오',  // 취업현황
+      company_type: values[18] || null,
+      company: values[19] || null,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'id' });
+
+    // 실습 정보 업서트
+    const trainingCompany = values[21];
+    const startDate = normalizeDate(values[22]);
+    const endDate = normalizeDate(values[23]);
+    if (trainingCompany || startDate || endDate) {
+      const isConversion = values[25] === 'O' || values[25] === '예' || values[25] === '채용전환';
+      const isReturned = values[27] === 'O' || values[27] === '예' || values[27] === '복교';
+
+      await supabase.from('field_training_records').upsert({
+        student_id: student.id,
+        training_order: 1,
+        company: trainingCompany || values[19] || '미지정',
+        start_date: startDate,
+        end_date: endDate,
+        stipend_status: values[24] || 'X',
+        hiring_status: isConversion ? '채용전환' : (isReturned ? '복교' : '진행중'),
+        conversion_date: normalizeDate(values[26]),
+        return_reason: values[28] || null,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'student_id, training_order' });
+    }
+
+    await syncAcademicHistory(supabase, student.id, student, settings.baseYear);
+    successCount++;
   }
-  revalidatePath('/students'); revalidatePath('/admin/students');
-  return { success: true, count: dataRows.length }
+
+  revalidateTag('students');
+  revalidateTag('student-accounts');
+  revalidatePath('/students');
+  revalidatePath('/admin/students');
+  return { success: true, count: successCount }
 }
+
+/**
+ * [학생 기본 명부 서식] 6개 간편 컬럼 엑셀 CSV 업로드 (admin/students 전용, 학번 불필요)
+ */
+export async function uploadBasicStudentsCSV(csvData: string) {
+  const supabase = await createClient()
+  const parsedRows = parseCSVText(csvData);
+  if (parsedRows.length <= 1) return { success: false, count: 0, error: '데이터 행이 없습니다.' };
+
+  const dataRows = parsedRows.slice(1);
+  const settings = await getSystemSettings()
+  let successCount = 0;
+
+  for (const values of dataRows) {
+    const graduation_year = values[0] ? parseInt(values[0]) : null
+    if (!graduation_year) continue
+
+    const major = values[1] || null;
+    const class_info = values[2] || null;
+    const student_number = values[3] || null;
+    const student_name = values[4] || null;
+    const phone_number = values[5] || null;
+
+    // 기존 학생 매칭
+    let matchedStudentId: string | null = null;
+
+    if (major && class_info && student_number) {
+      const { data: existing } = await supabase
+        .from('students')
+        .select('id')
+        .eq('graduation_year', graduation_year)
+        .eq('major', major)
+        .eq('class_info', class_info)
+        .eq('student_number', student_number)
+        .maybeSingle();
+
+      if (existing) {
+        matchedStudentId = existing.id;
+      }
+    }
+
+    const studentPayload: any = {
+      graduation_year,
+      major,
+      class_info,
+      student_number,
+      student_name,
+      phone_number,
+      updated_at: new Date().toISOString()
+    };
+
+    let student: any = null;
+
+    if (matchedStudentId) {
+      const { data: updated, error: uError } = await supabase
+        .from('students')
+        .update(studentPayload)
+        .eq('id', matchedStudentId)
+        .select('id, graduation_year, major, class_info, student_number')
+        .single();
+      if (!uError && updated) student = updated;
+    } else {
+      const { data: inserted, error: iError } = await supabase
+        .from('students')
+        .insert([studentPayload])
+        .select('id, graduation_year, major, class_info, student_number')
+        .single();
+      if (!iError && inserted) student = inserted;
+    }
+
+    if (!student) continue;
+
+
+    // 기본 취업 테이블 레코드 보장
+    await supabase.from('student_employments').upsert({
+      id: student.id,
+      is_desiring_employment: '예',
+      business_type: '미취업',
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'id' });
+
+    await syncAcademicHistory(supabase, student.id, student, settings.baseYear);
+    successCount++;
+  }
+
+  revalidateTag('students');
+  revalidateTag('student-accounts');
+  revalidatePath('/admin/students');
+  revalidatePath('/students');
+  return { success: true, count: successCount };
+}
+
+
 
 export async function updateStudentField(id: string, field: string, value: any) {
   const supabase = await createClient(); const settings = await getSystemSettings()
@@ -228,30 +437,71 @@ export async function updateStudentField(id: string, field: string, value: any) 
     if (student) await syncAcademicHistory(supabase, id, student, settings.baseYear);
   }
 
-  const { logAuditAction } = await import('@/lib/audit-logger');
-  await logAuditAction({
-    action_type: 'STUDENT_UPDATE',
-    target_name: `${studentLabel} - [${field}]`,
-    details: { 
-      student_id: id, 
-      student_name: studentInfo?.student_name,
-      field, 
-      old_value: oldValue ?? '(빈값)', 
-      new_value: finalValue ?? '(빈값)' 
+  // 휴대폰 번호 변경 시 커스텀 비밀번호 미설정 학생의 비밀번호 자동 동기화
+  if (field === 'phone_number') {
+    const { syncStudentPhonePassword } = await import('@/lib/student-accounts');
+    await syncStudentPhonePassword(id, finalValue);
+  }
+
+  // 감사 로그 비동기 백그라운드 처리 (대기 시간 0초)
+  void (async () => {
+    try {
+      const { logAuditAction } = await import('@/lib/audit-logger');
+      await logAuditAction({
+        action_type: 'STUDENT_UPDATE',
+        target_name: `${studentLabel} - [${field}]`,
+        details: { 
+          student_id: id, 
+          student_name: studentInfo?.student_name,
+          field, 
+          old_value: oldValue ?? '(빈값)', 
+          new_value: finalValue ?? '(빈값)' 
+        }
+      });
+    } catch (logErr) {
+      console.error('Failed to log student update action:', logErr);
     }
-  });
+  })();
 
   revalidateTag('students');
-  revalidatePath('/students'); 
-  revalidatePath('/admin/students'); 
-  revalidatePath('/class-management');
-  revalidatePath('/employment-status');
-  revalidatePath('/labor-education');
-  revalidatePath('/dashboard');
+  revalidateTag('student-accounts');
   return { success: true }
 }
 
+/**
+ * 노동인권교육 이수 상태 전용 초고속 변경 액션 (0.1초 미만 응답)
+ */
+export async function updateLaborEducationStatus(id: string, status: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('students')
+    .update({ 
+      labor_education_status: status, 
+      updated_at: new Date().toISOString() 
+    })
+    .eq('id', id);
+
+  if (error) return { success: false, error: error.message };
+
+  // 비동기 감사로그
+  void (async () => {
+    try {
+      const { logAuditAction } = await import('@/lib/audit-logger');
+      await logAuditAction({
+        action_type: 'STUDENT_UPDATE',
+        target_name: `노동인권교육 [${status}] 변경`,
+        details: { student_id: id, field: 'labor_education_status', new_value: status }
+      });
+    } catch (e) {}
+  })();
+
+  revalidateTag('students');
+  return { success: true };
+}
+
+
 export async function bulkUpdateStudentData(updates: { id: string, field: string, value: any }[]) {
+
   const supabase = await createClient(); const settings = await getSystemSettings()
   for (const update of updates) {
     let fv = update.value;
@@ -278,11 +528,22 @@ export async function bulkUpdateStudentData(updates: { id: string, field: string
 }
 
 export async function createStudent(data: { graduation_year: number, major: string, class_info: string, student_number: string, student_name: string }) {
-  const supabase = await createClient(); const settings = await getSystemSettings(); const student_id = await getNextStudentId(supabase, data.graduation_year)
-  const { data: newStudent, error } = await supabase.from('students').insert([{ ...data, student_id }]).select().single()
-  if (error || !newStudent) return { error: error?.message }
-  await supabase.from('student_employments').insert([{ id: newStudent.id }])
-  await syncAcademicHistory(supabase, newStudent.id, newStudent, settings.baseYear)
+  const supabase = await createClient(); 
+  const settings = await getSystemSettings();
+  
+  const { data: newStudent, error } = await supabase
+    .from('students')
+    .insert([data])
+    .select('id, graduation_year, major, class_info, student_number')
+    .single();
+
+  if (error || !newStudent) return { error: error?.message || '학생 등록에 실패했습니다.' };
+
+  await supabase.from('student_employments').insert([{ id: newStudent.id, is_desiring_employment: '예', business_type: '미취업' }]);
+  await syncAcademicHistory(supabase, newStudent.id, newStudent, settings.baseYear);
+  
+  revalidateTag('students');
+  revalidateTag('student-accounts');
   revalidatePath('/admin/students'); 
   revalidatePath('/students'); 
   revalidatePath('/class-management');
@@ -291,6 +552,7 @@ export async function createStudent(data: { graduation_year: number, major: stri
   revalidatePath('/dashboard');
   return { success: true }
 }
+
 
 export async function deleteStudents(ids: string[]) {
   const supabase = await createClient()

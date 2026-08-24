@@ -1,9 +1,11 @@
 import { Metadata } from 'next';
-import { getCachedFilteredStudentData, getCachedGraduationYears, getCachedTeacherProfiles, StudentEmploymentData, getCurrentUserProfile } from '@/lib/data';
-import EmploymentStatusFilters from './employment-status-filters';
+import { getCachedFilteredStudentData, getCachedGraduationYears, getCachedTeacherProfiles, getCurrentUserProfile } from '@/lib/data';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { Grid3X3 } from 'lucide-react';
-import { EmploymentStatusGrid } from './employment-status-grid';
+import { EmploymentStatusHubClient } from './employment-status-hub-client';
+import React from 'react';
+
+export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({
   searchParams,
@@ -18,11 +20,6 @@ export async function generateMetadata({
     description: grade === 1 || grade === 2 ? '반별/학생별 진로 희망 현황 그리드뷰' : '반별/학생별 취업 현황 그리드뷰',
   };
 }
-
-import { GridLoadingSkeleton } from '@/components/dashboard/loading-skeleton';
-import React from 'react';
-
-export const dynamic = 'force-dynamic';
 
 export default async function EmploymentStatusPage({
   searchParams,
@@ -40,85 +37,62 @@ async function EmploymentStatusPageContent({
 }) {
   const params = searchParams;
 
-  const [graduationYears, settings, userProfile, teacherProfiles] = await Promise.all([
+  // 1. 학사학년도(AY)와 학년(Grade) 기반 졸업연도 사전 계산
+  const ay = params.ay ? parseInt(params.ay) : 2026;
+  const grade = params.grade ? parseInt(params.grade) : 3;
+  const defaultGradYear = (ay + (4 - grade)).toString();
+  const selectedYear = params.grade 
+    ? (ay + (4 - grade)).toString() 
+    : (params.year || defaultGradYear);
+
+  // 2. 기반 설정, 졸업연도, 프로필, 교사 정보, 학생 데이터를 완전한 1회 병렬(Promise.all)로 동시 패칭
+  const [graduationYears, settings, userProfile, teacherProfiles, allData] = await Promise.all([
     getCachedGraduationYears(),
     getSystemSettings(),
     getCurrentUserProfile(),
-    getCachedTeacherProfiles()
+    getCachedTeacherProfiles(),
+    getCachedFilteredStudentData(selectedYear, ay)
   ]);
 
-  // 담임 교사인 경우 해당 학년과 현재 학사학년도를 기본값으로 설정
-  const defaultAY = settings.baseYear;
-  let defaultGrade = 3;
-  if (userProfile?.role === 'teacher' && userProfile.assigned_grade) {
-    defaultGrade = userProfile.assigned_grade;
-  }
-
-  const ay = params.ay ? parseInt(params.ay) : defaultAY;
-  const grade = params.grade ? parseInt(params.grade) : defaultGrade;
-  const calculatedGradYear = (ay + (4 - grade)).toString();
-  const selectedYear = params.year || calculatedGradYear;
-
-  const allData = await getCachedFilteredStudentData(selectedYear, ay);
-
-
-  const displayAY = ay;
+  // 학사학년도 목록 산출
+  const academicYears = Array.from(
+    new Set([settings.baseYear, ...graduationYears.map(gy => gy - 1)])
+  ).sort((a, b) => b - a);
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-6">
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between shrink-0 gap-4 px-1">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
-            <Grid3X3 className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
+    <div className="flex flex-col gap-4 sm:gap-5">
+      {/* 상단 타이틀 */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between shrink-0 px-1 gap-2.5">
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 flex items-center gap-2.5 whitespace-nowrap">
+            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-100 shrink-0">
+              <Grid3X3 className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
+            </div>
             {grade === 1 || grade === 2 ? '진로상세현황' : '취업상세현황'}
+            <span className="text-[11px] bg-blue-600 text-white px-2.5 py-0.5 rounded-full font-black whitespace-nowrap">
+              {ay}학년도 {grade}학년
+            </span>
           </h2>
-          <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed">
-            <span className="text-blue-600 font-bold">{displayAY}학년도 {grade}학년</span> {grade === 1 || grade === 2 ? '진로 희망 현황' : '취업 및 현장실습 현황'}
+          <p className="text-slate-500 text-xs font-medium">
+            {grade === 1 || grade === 2 
+              ? '1·2학년 학생별 진로 희망 및 진로코스 바둑판식 시각화 현황' 
+              : '3학년 졸업예정자 학급별·학생별 취업 및 현장실습 바둑판식 시각화 현황'}
           </p>
-        </div>
-        
-        <div className="flex flex-col items-start sm:items-end gap-3 sm:gap-2">
-          <div className="shrink-0 scale-90 sm:scale-100 origin-left sm:origin-right">
-            <EmploymentStatusFilters 
-              graduationYears={graduationYears} 
-              defaultYear={calculatedGradYear}
-              baseYear={settings.baseYear}
-              initialAY={ay.toString()}
-              initialGrade={grade.toString()}
-            />
-          </div>
-          
-          {grade === 1 || grade === 2 ? (
-            <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar scrollbar-hide py-1 text-[10px] font-semibold whitespace-nowrap w-full sm:w-auto justify-start sm:justify-end">
-              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-emerald-500 rounded-full shrink-0"></div> 취업</div>
-              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-rose-500 rounded-full shrink-0"></div> 진학</div>
-              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-slate-400 rounded-full shrink-0"></div> 제외인정자</div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar scrollbar-hide py-1 text-[10px] font-semibold whitespace-nowrap w-full sm:w-auto justify-start sm:justify-end">
-              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-rose-600 rounded-full shrink-0"></div> 대/공기업</div>
-              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-indigo-700 rounded-full shrink-0"></div> 공무원/부사관</div>
-              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-purple-600 rounded-full shrink-0"></div> 중견기업</div>
-              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-cyan-500 rounded-full shrink-0"></div> 강소기업</div>
-              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-orange-500 rounded-full shrink-0"></div> 연계교육</div>
-              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-emerald-500 rounded-full shrink-0"></div> 기타</div>
-              <div className="flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-amber-500 rounded-full shrink-0"></div> 채용진행중</div>
-              <div className="flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-blue-500 rounded-full shrink-0"></div> 현장실습중</div>
-              <div className="flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 shadow-2xs shrink-0"><div className="w-2 h-2 bg-emerald-600 rounded-full shrink-0"></div> 도제OJT</div>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* 클라이언트 컴포넌트인 그리드 렌더링 (석차 정보는 백그라운드 fetch 처리) */}
-      <EmploymentStatusGrid 
-        allData={allData}
+      {/* 모던 클라이언트 허브 (통계 카드 4종 + 통합 필터 & 검색창 + 학급별 바둑판 그리드) */}
+      <EmploymentStatusHubClient
+        initialData={allData}
         userProfile={userProfile}
         teacherProfiles={teacherProfiles}
         baseYear={settings.baseYear}
+        currentAY={ay}
         grade={grade}
-        graduationYear={selectedYear}
+        selectedYear={selectedYear}
+        academicYears={academicYears}
       />
     </div>
   );
 }
+

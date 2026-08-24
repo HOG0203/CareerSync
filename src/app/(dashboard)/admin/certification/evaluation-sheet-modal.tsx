@@ -254,6 +254,10 @@ export function EvaluationSheetModal({
           type="button"
           onClick={(e) => {
             e.stopPropagation();
+            // PC 화면(sm 이상, 640px 이상)에서는 클릭 시 모달 팝업을 띄우지 않음 (호버 툴팁만 제공)
+            if (typeof window !== 'undefined' && window.innerWidth >= 640) {
+              return;
+            }
             setActiveEvidence({
               title,
               sourceLabel,
@@ -263,12 +267,13 @@ export function EvaluationSheetModal({
               structuredItems,
             });
           }}
-          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200/80 text-[10px] font-bold transition-all ml-1.5 print:hidden cursor-pointer shadow-2xs group shrink-0"
+          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200/80 text-[10px] font-bold transition-all ml-1.5 print:hidden cursor-pointer sm:cursor-default shadow-2xs group shrink-0"
         >
           <Info className="h-3 w-3 text-indigo-600 group-hover:text-white" />
           <span className="font-extrabold text-[9px]">산출근거</span>
         </button>
       </TooltipTrigger>
+
       <TooltipContent 
         side="top" 
         align="center" 

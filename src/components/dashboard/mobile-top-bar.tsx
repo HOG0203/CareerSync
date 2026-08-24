@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Logo } from '@/components/logo';
-import { Bell, Menu, LogOut, Settings, Sparkles } from 'lucide-react';
+import { Bell, Menu, LogOut, Settings, Sparkles, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { handleClientLogout } from '@/lib/auth-helpers';
 import ProfileSettingsModal from './profile-settings-modal';
+import { ChangePasswordDialog } from '@/app/(dashboard)/student/certification/change-password-dialog';
 
 export function MobileTopBar({ isAdmin = false, userProfile }: { isAdmin?: boolean, userProfile?: any }) {
   const [mounted, setMounted] = React.useState(false);
@@ -78,7 +79,9 @@ export function MobileTopBar({ isAdmin = false, userProfile }: { isAdmin?: boole
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-slate-800 truncate leading-none">{userProfile?.full_name || '로그인 사용자'}</p>
-                  <p className="text-[10px] text-slate-500 truncate mt-1">{isAdmin ? '시스템 관리자' : '교직원 계정'}</p>
+                  <p className="text-[10px] text-slate-500 truncate mt-1">
+                    {userProfile?.role === 'student' ? '학생 계정' : (isAdmin ? '시스템 관리자' : '교직원 계정')}
+                  </p>
                 </div>
               </div>
             </div>
@@ -93,8 +96,17 @@ export function MobileTopBar({ isAdmin = false, userProfile }: { isAdmin?: boole
               }}
               className="rounded-xl py-2.5 px-3 focus:bg-indigo-50 focus:text-indigo-700 transition-colors cursor-pointer"
             >
-              <Settings className="mr-3 h-4 w-4" />
-              <span className="font-semibold text-sm">프로필 설정</span>
+              {userProfile?.role === 'student' ? (
+                <>
+                  <KeyRound className="mr-3 h-4 w-4 text-blue-600" />
+                  <span className="font-semibold text-sm text-slate-800">비밀번호 변경</span>
+                </>
+              ) : (
+                <>
+                  <Settings className="mr-3 h-4 w-4" />
+                  <span className="font-semibold text-sm">프로필 설정</span>
+                </>
+              )}
             </DropdownMenuItem>
 
             <DropdownMenuSeparator className="mx-1" />
@@ -110,10 +122,18 @@ export function MobileTopBar({ isAdmin = false, userProfile }: { isAdmin?: boole
         </DropdownMenu>
       </div>
 
-      <ProfileSettingsModal 
-        open={profileModalOpen} 
-        onOpenChange={setProfileModalOpen} 
-      />
+      {userProfile?.role === 'student' ? (
+        <ChangePasswordDialog 
+          open={profileModalOpen} 
+          onOpenChange={setProfileModalOpen} 
+        />
+      ) : (
+        <ProfileSettingsModal 
+          open={profileModalOpen} 
+          onOpenChange={setProfileModalOpen} 
+        />
+      )}
     </header>
   );
 }
+

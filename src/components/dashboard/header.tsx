@@ -19,13 +19,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { Menu, Search, LogOut, Settings } from 'lucide-react';
+import { Menu, Search, LogOut, Settings, KeyRound } from 'lucide-react';
 import Link from 'next/link';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import Nav from './nav';
 import { usePathname } from 'next/navigation';
 import { handleClientLogout } from '@/lib/auth-helpers';
 import ProfileSettingsModal from './profile-settings-modal';
+import { ChangePasswordDialog } from '@/app/(dashboard)/student/certification/change-password-dialog';
 
 function toTitleCase(str: string) {
   return str.replace(
@@ -55,7 +56,12 @@ const ROUTE_MAP: Record<string, { group: string; label: string }> = {
   '/admin/certification/grades': { group: '옥저인재인증제', label: '성적현황' },
   '/admin/certification/attendance': { group: '옥저인재인증제', label: '출결현황' },
   '/admin/certification/certificates': { group: '옥저인재인증제', label: '자격증현황' },
+  '/student/certification': { group: '옥저인재인증제', label: '종합평가표' },
+  '/student-accounts': { group: '학사 및 지도', label: '학생 계정 및 로그인 관리' },
 };
+
+
+
 
 export default function Header({ userProfile }: { userProfile?: any }) {
   const [mounted, setMounted] = React.useState(false);
@@ -169,8 +175,17 @@ export default function Header({ userProfile }: { userProfile?: any }) {
               }} 
               className="cursor-pointer py-3 px-4 focus:bg-indigo-50 focus:text-indigo-700 transition-colors"
             >
-              <Settings className="mr-3 h-4 w-4" />
-              <span className="font-semibold">프로필 설정</span>
+              {userProfile?.role === 'student' ? (
+                <>
+                  <KeyRound className="mr-3 h-4 w-4 text-blue-600" />
+                  <span className="font-semibold text-slate-800">비밀번호 변경</span>
+                </>
+              ) : (
+                <>
+                  <Settings className="mr-3 h-4 w-4" />
+                  <span className="font-semibold">프로필 설정</span>
+                </>
+              )}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem 
@@ -184,10 +199,18 @@ export default function Header({ userProfile }: { userProfile?: any }) {
         </DropdownMenu>
       </div>
 
-      <ProfileSettingsModal 
-        open={profileModalOpen} 
-        onOpenChange={setProfileModalOpen} 
-      />
+      {userProfile?.role === 'student' ? (
+        <ChangePasswordDialog 
+          open={profileModalOpen} 
+          onOpenChange={setProfileModalOpen} 
+        />
+      ) : (
+        <ProfileSettingsModal 
+          open={profileModalOpen} 
+          onOpenChange={setProfileModalOpen} 
+        />
+      )}
     </header>
+
   );
 }

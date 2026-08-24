@@ -74,10 +74,10 @@ export function ManualStudentMatchingDialog({
       const majorMatch = (st.major || '').toLowerCase().includes(q);
       const classMatch = String(st.class_info || '').includes(q);
       const numMatch = String(st.student_number || '').includes(q);
-      const idMatch = (st.student_id || '').toLowerCase().includes(q);
 
-      return nameMatch || majorMatch || classMatch || numMatch || idMatch;
+      return nameMatch || majorMatch || classMatch || numMatch;
     });
+
   }, [activeStudents, target, query, selectedGrade, baseYear]);
 
   // 현재 지정된 학생 객체
@@ -260,12 +260,8 @@ export function ManualStudentMatchingDialog({
                               {st.major} {st.class_info}반 {st.student_number}번
                             </span>
                           </div>
-                          {st.student_id && (
-                            <div className="text-[10px] text-slate-400">
-                              학번(ID): {st.student_id}
-                            </div>
-                          )}
                         </div>
+
 
                         <Button
                           type="button"

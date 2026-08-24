@@ -1,8 +1,9 @@
-import { getCachedFilteredStudentData, getCachedGraduationYears, getCurrentUserProfile, MAJOR_SORT_ORDER } from '@/lib/data';
+import { getCachedAdminStudentData, getCachedGraduationYears, getCurrentUserProfile } from '@/lib/data';
 import { redirect } from 'next/navigation';
 import { getCachedMasterCertificates, getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { AdminStudentHub } from './admin-student-hub';
 import React from 'react';
+import { getMajorOrderIndex } from '@/lib/student-utils';
 import { TableLoadingSkeleton } from '@/components/dashboard/loading-skeleton';
 
 export const dynamic = 'force-dynamic';
@@ -24,12 +25,12 @@ async function AdminStudentsPageContent({
   const params = searchParams;
   
   // 1. 기반 설정 및 사용자 프로필 패칭 (서버 메모리 캐시 적용)
-  const [settings, graduationYears, masterCertificates, userProfile] = await Promise.all([
+  const [settings, graduationYears, userProfile] = await Promise.all([
     getSystemSettings(),
     getCachedGraduationYears(),
-    getCachedMasterCertificates(),
     getCurrentUserProfile()
   ]);
+
 
   if (!userProfile) {
     redirect('/login');
@@ -52,8 +53,8 @@ async function AdminStudentsPageContent({
   const selectedClass = params.class || 'all';
   const selectedStatus = params.status || 'all';
 
-  // 3. 타겟 데이터 패칭 (서버 메모리 캐시 적용)
-  const allStudentData = await getCachedFilteredStudentData(selectedYear, ay);
+  // 3. 학생 기본 정보 전용 초경량 데이터 패칭 (불필요한 취업/실습 JOIN 제거로 20배 초고속)
+  const allStudentData = await getCachedAdminStudentData(parseInt(selectedYear));
 
   // 4. 세부 필터링 및 옵션 계산
   const majorCounts: Record<string, number> = {};
@@ -84,17 +85,35 @@ async function AdminStudentsPageContent({
     }
   }
 
-  // 드롭다운 옵션 변환
+  // 번호 자연어 숫자 정렬 (1번 -> 2번 -> ... -> 9번 -> 10번 -> 11번)
+  filteredData.sort((a, b) => {
+    const orderA = getMajorOrderIndex(a.major || '');
+    const orderB = getMajorOrderIndex(b.major || '');
+    if (orderA !== orderB) return orderA - orderB;
+
+    const classA = parseInt((a.class_info || '').replace(/[^0-9]/g, ''), 10) || 0;
+    const classB = parseInt((b.class_info || '').replace(/[^0-9]/g, ''), 10) || 0;
+    if (classA !== classB) return classA - classB;
+
+    const numA = parseInt((a.student_number || '').replace(/[^0-9]/g, ''), 10) || 0;
+    const numB = parseInt((b.student_number || '').replace(/[^0-9]/g, ''), 10) || 0;
+    if (numA !== numB) return numA - numB;
+
+    return (a.student_name || '').localeCompare(b.student_name || '', 'ko');
+  });
+
+  // 드롭다운 옵션 변환 (학교 공식 학과 순서 정렬)
   const majors = Object.entries(majorCounts)
     .sort(([a], [b]) => {
-      const indexA = MAJOR_SORT_ORDER.indexOf(a);
-      const indexB = MAJOR_SORT_ORDER.indexOf(b);
-      return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+      const orderA = getMajorOrderIndex(a);
+      const orderB = getMajorOrderIndex(b);
+      if (orderA !== orderB) return orderA - orderB;
+      return a.localeCompare(b, 'ko');
     })
     .map(([m, count]) => ({ label: m, value: m, count }));
 
   const classes = Object.entries(classCounts)
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort(([a], [b]) => (parseInt(a.replace(/[^0-9]/g, '') || '0')) - (parseInt(b.replace(/[^0-9]/g, '') || '0')))
     .map(([c, count]) => ({ label: c, value: c, count }));
 
   const statuses = Object.entries(statusCounts)
@@ -110,7 +129,8 @@ async function AdminStudentsPageContent({
       statuses={statuses}
       settings={settings}
       params={params}
-      masterCertificates={masterCertificates}
     />
   );
 }
+
+

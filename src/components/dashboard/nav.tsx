@@ -84,9 +84,23 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
 
   const userGrade = userProfile?.assigned_grade;
   const isLowerGradeTeacher = userProfile?.role === 'teacher' && (userGrade === 1 || userGrade === 2);
+  const isStudent = userProfile?.role === 'student';
 
-  // 그룹 정의
-  const groups = [
+  // 학생인 경우 전용 메뉴 그룹
+  const studentGroups = [
+    {
+      title: "옥저인재인증제",
+      icon: Award,
+      items: [
+        { href: '/student/certification', label: '종합평가표', icon: Award },
+      ]
+    }
+  ];
+
+
+
+  // 교직원/관리자 그룹 정의
+  const staffGroups = [
     {
       title: "취업진로관리",
       icon: Briefcase,
@@ -102,6 +116,7 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
       icon: GraduationCap,
       items: [
         { href: '/class-management', label: '학반 관리', icon: BookUser },
+        { href: '/student-accounts', label: '학생 계정/로그인 관리', icon: UserCog },
         ...(!isLowerGradeTeacher ? [{ href: '/labor-education', label: '노동인권교육', icon: ShieldAlert }] : []),
         ...(isAdmin ? [{ href: '/admin/students', label: '학생 등록/진급', icon: UserPlus }] : []),
       ]
@@ -131,6 +146,8 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
     ] : [])
   ];
 
+  const groups = isStudent ? studentGroups : staffGroups;
+
   if (!mounted) {
     return (
       <>
@@ -146,39 +163,40 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
     );
   }
 
-
-
   return (
     <>
       <SidebarHeader>
         <Logo />
       </SidebarHeader>
       <SidebarContent className="p-2 gap-4">
-        {/* 대시보드 - 최상단 단일 메뉴 */}
-        <SidebarMenu>
-          <SidebarMenuItem>
-            {(() => {
-              const isDashNav = navigatingHref === '/dashboard';
-              const isDashActive = isDashNav || (navigatingHref === null && pathname === '/dashboard');
-              return (
-                <SidebarMenuButton 
-                  asChild 
-                  isActive={isDashActive}
-                  className={cn(
-                    "h-10 px-3",
-                    isDashActive ? "bg-blue-50 text-blue-600 hover:bg-blue-50 hover:text-blue-600" : ""
-                  )}
-                >
-                  <Link href="/dashboard" onClick={() => handleNavClick('/dashboard')}>
-                    <LayoutDashboard className={cn("mr-2 h-4 w-4 flex-shrink-0", isDashActive ? "text-blue-600" : "")} />
-                    <span className="font-bold flex-1">대시보드</span>
-                    {isDashNav && <div className="ml-auto h-3.5 w-3.5 rounded-full border-2 border-blue-600 border-t-transparent animate-spin shrink-0" />}
-                  </Link>
-                </SidebarMenuButton>
-              );
-            })()}
-          </SidebarMenuItem>
-        </SidebarMenu>
+        {/* 대시보드 - 최상단 단일 메뉴 (학생이 아닌 경우만 표시) */}
+        {!isStudent && (
+          <SidebarMenu>
+            <SidebarMenuItem>
+              {(() => {
+                const isDashNav = navigatingHref === '/dashboard';
+                const isDashActive = isDashNav || (navigatingHref === null && pathname === '/dashboard');
+                return (
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={isDashActive}
+                    className={cn(
+                      "h-10 px-3",
+                      isDashActive ? "bg-blue-50 text-blue-600 hover:bg-blue-50 hover:text-blue-600" : ""
+                    )}
+                  >
+                    <Link href="/dashboard" onClick={() => handleNavClick('/dashboard')}>
+                      <LayoutDashboard className={cn("mr-2 h-4 w-4 flex-shrink-0", isDashActive ? "text-blue-600" : "")} />
+                      <span className="font-bold flex-1">대시보드</span>
+                      {isDashNav && <div className="ml-auto h-3.5 w-3.5 rounded-full border-2 border-blue-600 border-t-transparent animate-spin shrink-0" />}
+                    </Link>
+                  </SidebarMenuButton>
+                );
+              })()}
+            </SidebarMenuItem>
+          </SidebarMenu>
+        )}
+
 
         {/* 카테고리별 그룹 */}
         {groups.map((group) => {

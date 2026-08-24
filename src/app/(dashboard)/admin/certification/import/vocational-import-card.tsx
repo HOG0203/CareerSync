@@ -100,14 +100,9 @@ export function VocationalImportCard({
   const [selectedMajor, setSelectedMajor] = React.useState<string>('all');
   const [filterStatus, setFilterStatus] = React.useState<'all' | 'ambiguous' | 'matched' | 'empty'>('all');
 
-  React.useEffect(() => {
-    getAllStudentsForMatching().then(res => {
-      setDbStudents(res || []);
-    });
-  }, []);
-
-  // 파일 선택 및 파싱 처리
+  // 파일 선택 및 파싱 처리 (파일을 올렸을 때만 학생 매칭 데이터 온디맨드 로드)
   const handleFileChange = async (selectedFiles: FileList | null) => {
+
     if (!selectedFiles || selectedFiles.length === 0) return;
 
     setIsParsing(true);

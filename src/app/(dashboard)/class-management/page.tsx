@@ -1,4 +1,4 @@
-import { getCachedAssignedStudentDetails, getCachedGraduationYears, getCachedFilteredStudentData, getCachedClassStructureCombinations, MAJOR_SORT_ORDER, getCurrentUserProfile } from '@/lib/data';
+import { getCachedAssignedStudentDetails, getCachedGraduationYears, getCachedFilteredStudentData, getCachedClassStructureCombinations, getCurrentUserProfile } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -7,11 +7,13 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { ClassTable } from './class-table';
-import { ShieldAlert, Users } from 'lucide-react';
+import { ShieldAlert, BookUser, Users } from 'lucide-react';
 import AdminClassSelector from './admin-class-selector';
 import { getCachedMasterCertificates, getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
+import { getMajorOrderIndex } from '@/lib/student-utils';
 import { Suspense } from 'react';
 import { TableLoadingSkeleton } from '@/components/dashboard/loading-skeleton';
+
 
 export const dynamic = 'force-dynamic';
 
@@ -78,16 +80,18 @@ async function ClassManagementPageContent({
       const sortedMajors: Record<string, string[]> = {};
       
       const sortedMajorNames = Object.keys(majorsObj).sort((a, b) => {
-        const indexA = MAJOR_SORT_ORDER.indexOf(a);
-        const indexB = MAJOR_SORT_ORDER.indexOf(b);
-        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+        const orderA = getMajorOrderIndex(a);
+        const orderB = getMajorOrderIndex(b);
+        if (orderA !== orderB) return orderA - orderB;
+        return a.localeCompare(b, 'ko');
       });
 
       sortedMajorNames.forEach((majorName) => {
-        sortedMajors[majorName] = majorsObj[majorName].sort((a, b) => a.localeCompare(b, 'ko', { numeric: true }));
+        sortedMajors[majorName] = (majorsObj[majorName] || []).sort((a, b) => parseInt(a || '0') - parseInt(b || '0'));
       });
       classStructure[g] = sortedMajors;
     });
+
   }
 
   // 3. 학년 옵션 계산 (졸업연도 목록 기반 역산)
@@ -124,22 +128,23 @@ async function ClassManagementPageContent({
   }
 
   const availableMajors = Array.from(availableMajorsSet).sort((a, b) => {
-    const indexA = MAJOR_SORT_ORDER.indexOf(a);
-    const indexB = MAJOR_SORT_ORDER.indexOf(b);
-    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+    const orderA = getMajorOrderIndex(a);
+    const orderB = getMajorOrderIndex(b);
+    if (orderA !== orderB) return orderA - orderB;
+    return a.localeCompare(b, 'ko');
   });
 
   const targetMajor = isAdmin 
     ? (params.major && availableMajors.includes(params.major) ? params.major : (availableMajors[0] || null))
     : (userProfile?.assigned_major || null);
 
-  // 선택된 학년 + 학과에 맞는 반들 추출
+  // 선택된 학년 + 학과에 맞는 반들 추출 (숫자 자연어 정렬)
   for (const s of allBaseData) {
     if (s.major === targetMajor) {
       if (s.class_info) availableClassesSet.add(s.class_info);
     }
   }
-  const availableClasses = Array.from(availableClassesSet).sort();
+  const availableClasses = Array.from(availableClassesSet).sort((a, b) => parseInt(a || '0') - parseInt(b || '0'));
 
   const targetClass = isAdmin 
     ? (params.class && availableClasses.includes(params.class) ? params.class : (availableClasses[0] || null))
@@ -150,26 +155,34 @@ async function ClassManagementPageContent({
   let studentData: any[] = [];
 
   if (isViewable) {
-    studentData = await getCachedAssignedStudentDetails(targetMajor!, targetClass!, calculatedYear);
+    const rawData = await getCachedAssignedStudentDetails(targetMajor!, targetClass!, calculatedYear);
+    // 학생 번호 자연어 숫자 정렬 (1번 -> 2번 -> ... -> 9번 -> 10번 -> 11번)
+    studentData = [...(rawData || [])].sort((a, b) => {
+      const numA = parseInt((a.student_number || '').replace(/[^0-9]/g, ''), 10) || 0;
+      const numB = parseInt((b.student_number || '').replace(/[^0-9]/g, ''), 10) || 0;
+      if (numA !== numB) return numA - numB;
+      return (a.student_name || '').localeCompare(b.student_name || '', 'ko');
+    });
   }
 
   const displayClass = targetClass && !targetClass.includes('-') ? `${selectedGrade}-${targetClass}` : targetClass;
 
   return (
-    <div className="flex flex-col h-full gap-3 sm:gap-4 overflow-hidden">
-      <div className="flex items-center justify-between shrink-0 px-1">
-        <div className="flex flex-col gap-1 min-w-0">
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2 whitespace-nowrap">
-            <Users className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600 shrink-0" />
+    <div className="flex flex-col h-full gap-5">
+      {/* 상단 타이틀 헤더 */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 px-1">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+            <BookUser className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
             학반 관리
           </h2>
-          <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed whitespace-nowrap overflow-hidden text-ellipsis">
-            {isAdmin ? '관리자 권한으로 전교생 학반 세부 사항을 관리합니다.' : '담당 학반 학생들의 세부 사항을 관리 및 수정합니다.'}
+          <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed">
+            {isAdmin ? '관리자 권한으로 전교생 학반의 진로희망 및 세부 코스를 조회·수정합니다.' : '담당 학반 학생들의 진로희망, 희망기업, 세부코스 및 연락처를 관리합니다.'}
           </p>
         </div>
       </div>
 
-      {/* 관리자에게만 셀렉터 노출, 선생님은 정보 표시만 */}
+      {/* 학반 선택기 (드롭다운 필터 바) */}
       <div className="shrink-0">
         <AdminClassSelector 
           availableGrades={availableGrades}
@@ -182,35 +195,21 @@ async function ClassManagementPageContent({
       </div>
 
       {isViewable ? (
-        <Card className="flex-1 min-h-0 shadow-sm border bg-white rounded-xl overflow-hidden flex flex-col mb-0">
-          <CardHeader className="py-3 px-4 border-b bg-white/50 flex flex-row items-center justify-between shrink-0">
-            <div>
-              <CardTitle className="text-base font-bold text-gray-900">
-                {targetMajor} {displayClass}반 학생별 상세 데이터
-              </CardTitle>
-              <CardDescription className="text-[11px] text-gray-500">
-                {settings.baseYear}학년도 {selectedGrade}학년 학생들의 개인 세부 사항을 관리합니다.
-              </CardDescription>
-            </div>
-            <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-bold border border-blue-100">
-              총 {studentData.length}명
-            </div>
-          </CardHeader>
-          <CardContent className="p-0 flex-1 min-h-0 flex flex-col overflow-hidden">
-            <ClassTable 
-              initialData={studentData} 
-              masterCertificates={masterCertificates} 
-              userProfile={userProfile}
-              baseYear={settings.baseYear}
-              graduationYear={calculatedYear}
-            />
-          </CardContent>
-        </Card>
+        <ClassTable 
+          initialData={studentData} 
+          masterCertificates={masterCertificates} 
+          userProfile={userProfile}
+          baseYear={settings.baseYear}
+          graduationYear={calculatedYear}
+          targetMajor={targetMajor || ''}
+          displayClass={displayClass || ''}
+          selectedGrade={selectedGrade}
+        />
       ) : (
-        <div className="flex flex-col items-center justify-center py-20 bg-muted/20 rounded-xl border border-dashed border-muted-foreground/30">
+        <div className="flex flex-col items-center justify-center py-20 bg-muted/20 rounded-2xl border border-dashed border-muted-foreground/30">
           <ShieldAlert className="h-12 w-12 text-muted-foreground/50 mb-4" />
-          <h3 className="text-lg font-medium text-muted-foreground">담당 학반 미지정</h3>
-          <p className="text-sm text-muted-foreground mt-1 text-center px-6 text-balance">
+          <h3 className="text-lg font-bold text-slate-700">담당 학반 미지정</h3>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1.5 text-center px-6 leading-relaxed max-w-md">
             교직원 계정의 경우 사용자 관리 페이지에서 담당 학반 정보가 설정되어야 이용 가능합니다.<br/>
             담당 정보가 설정되었음에도 이 화면이 보인다면 관리자에게 문의하세요.
           </p>
@@ -219,3 +218,4 @@ async function ClassManagementPageContent({
     </div>
   );
 }
+

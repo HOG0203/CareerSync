@@ -65,7 +65,7 @@ export function EmploymentImportCard({
   const { toast } = useToast();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const [isLoading, setIsLoading] = React.useState(true);
+  const [isLoading, setIsLoading] = React.useState(false);
   const [isParsing, setIsParsing] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
@@ -87,44 +87,33 @@ export function EmploymentImportCard({
   const [selectedMajor, setSelectedMajor] = React.useState('all');
   const [activeCategoryTab, setActiveCategoryTab] = React.useState<'all' | 'club' | 'edu' | 'course' | 'contest' | 'field'>('all');
 
-  // 1. 2026학년도 1·2·3학년 전체 재학생 & 기존 저장소 로드
-  const loadInitialData = React.useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const supabase = createClient();
-      // 3학년 (baseYear + 1 졸업), 2학년 (baseYear + 2 졸업), 1학년 (baseYear + 3 졸업)
-      const gradYears = [baseYear + 1, baseYear + 2, baseYear + 3];
-      
-      const [studentsRes, storeRes] = await Promise.all([
-        supabase
-          .from('students')
-          .select('id, student_id, student_name, student_number, major, class_info, graduation_year')
-          .in('graduation_year', gradYears)
-          .range(0, 4999)
-          .order('graduation_year', { ascending: true })
-          .order('class_info', { ascending: true })
-          .order('student_number', { ascending: true }),
-        getEvaluationsStore()
-      ]);
+  // 파일 업로드 시점에만 필요한 학생 매칭 데이터 온디맨드 로드 (초기 렌더링 쿼리 0회)
+  const ensureMatchingData = React.useCallback(async (force = false) => {
+    if (!force && activeStudents.length > 0) return { students: activeStudents, store: existingStore };
+    
+    const supabase = createClient();
+    const gradYears = [baseYear + 1, baseYear + 2, baseYear + 3];
+    
+    const [studentsRes, storeRes] = await Promise.all([
+      supabase
+        .from('students')
+        .select('id, student_name, student_number, major, class_info, graduation_year')
+        .in('graduation_year', gradYears)
 
-      if (studentsRes.error) throw studentsRes.error;
-      setActiveStudents(studentsRes.data || []);
-      setExistingStore(storeRes || {});
-    } catch (err: any) {
-      console.error(err);
-      toast({
-        title: '데이터 로드 실패',
-        description: err.message || '재학생 목록을 불러오는 중 오류가 발생했습니다.',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [baseYear, toast]);
+        .range(0, 4999)
+        .order('graduation_year', { ascending: true })
+        .order('class_info', { ascending: true })
+        .order('student_number', { ascending: true }),
+      getEvaluationsStore()
+    ]);
 
-  React.useEffect(() => {
-    loadInitialData();
-  }, [loadInitialData]);
+    const stdList = studentsRes.data || [];
+    const store = storeRes || {};
+    setActiveStudents(stdList);
+    setExistingStore(store);
+    return { students: stdList, store };
+  }, [activeStudents, existingStore, baseYear]);
+
 
   // 2. 엑셀 파일 파싱 핸들러
   const handleFileChange = async (incomingFiles: FileList | null) => {
@@ -132,6 +121,8 @@ export function EmploymentImportCard({
 
     setIsParsing(true);
     try {
+      await ensureMatchingData();
+
       const fileArr = Array.from(incomingFiles);
       const allNewRecords: RawEmploymentRecord[] = [];
 
@@ -140,6 +131,7 @@ export function EmploymentImportCard({
         const records = parseEmploymentWorkbook(buffer, file.name);
         allNewRecords.push(...records);
       }
+
 
       setFiles(prev => [...prev, ...fileArr]);
       setRawRecords(prev => [...prev, ...allNewRecords]);
@@ -351,8 +343,9 @@ export function EmploymentImportCard({
       });
 
       // 기존 스토어 갱신
-      await loadInitialData();
+      await ensureMatchingData(true);
       if (onImportSuccess) onImportSuccess();
+
     } catch (err: any) {
       console.error(err);
       toast({

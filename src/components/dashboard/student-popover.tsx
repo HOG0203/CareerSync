@@ -250,45 +250,26 @@ export function StudentPopover({
                     {isStatusSaving && <Loader2 className="h-2.5 w-2.5 animate-spin text-emerald-600" />}
                   </p>
                   {userProfile?.role === 'admin' ? (
-                    <>
-                      {/* 관리자 전용 편집 드롭다운 */}
-                      <button
-                        type="button"
+                    <div className="relative mt-0.5">
+                      <select
                         disabled={isStatusSaving}
-                        onClick={(e) => { e.stopPropagation(); setIsStatusDropdownOpen(v => !v); }}
-                        className="w-full flex items-center justify-between text-xs font-extrabold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md py-1 px-2 hover:bg-emerald-100 transition-colors cursor-pointer"
+                        value={currentEmploymentStatus || ''}
+                        onChange={(e) => handleStatusChange(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-md py-1 pl-2 pr-6 hover:border-slate-300 transition-colors cursor-pointer appearance-none outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
                       >
-                        <span className="truncate">{currentEmploymentStatus || '(미선택)'}</span>
-                        <ChevronDown className={cn('h-3 w-3 ml-1 shrink-0 text-emerald-500 transition-transform', isStatusDropdownOpen && 'rotate-180')} />
-                      </button>
-                      {isStatusDropdownOpen && (
-                        <div
-                          data-career-dropdown
-                          className="absolute left-0 right-0 top-full mt-1 z-[200] bg-white border border-emerald-200 rounded-lg shadow-xl max-h-48 overflow-y-auto"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {['(미선택)', '청솔반', '취업맞춤반', '중견기업반', '반도체아카데미반', '혁신인재반', '부사관반', '일학습병행', '계약학과', '도제반', '아우스빌둥', '일반취업', '기술사관', '군특성화', '운동부', '진학', '입대', '기타'].map((opt) => {
-                            const val = opt === '(미선택)' ? '' : opt;
-                            return (
-                              <button
-                                key={opt}
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); handleStatusChange(val); setIsStatusDropdownOpen(false); }}
-                                className={cn(
-                                  'w-full text-left text-xs px-3 py-1.5 hover:bg-emerald-50 transition-colors font-medium',
-                                  currentEmploymentStatus === val ? 'bg-emerald-100 text-emerald-800 font-black' : 'text-slate-700'
-                                )}
-                              >
-                                {opt}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </>
+                        <option value="">(미선택)</option>
+                        {['청솔반', '취업맞춤반', '중견기업반', '반도체아카데미반', '혁신인재반', '부사관반', '일학습병행', '계약학과', '도제반', '아우스빌둥', '일반취업', '기술사관', '군특성화', '운동부', '진학', '입대', '기타'].map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="h-3 w-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
                   ) : (
                     /* 일반 교사: 읽기 전용 */
-                    <p className="font-black text-emerald-700 text-xs sm:text-sm leading-tight truncate">
+                    <p className="font-black text-slate-800 text-xs sm:text-sm leading-tight truncate">
                       {currentEmploymentStatus || '미설정'}
                     </p>
                   )}
@@ -297,12 +278,33 @@ export function StudentPopover({
             </>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-x-3 text-[10px]">
-                <p className="flex justify-between">
-                  <span className="text-slate-400">진로코스</span> 
-                  <span className="font-bold text-slate-700 text-right">{student.employment_status || '미정'}</span>
-                </p>
-                <p className="flex justify-between">
+              <div className="grid grid-cols-2 gap-x-3 text-[10px] items-center">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400 shrink-0">진로코스</span> 
+                  {userProfile?.role === 'admin' ? (
+                    <div className="relative inline-block w-[100px] text-right">
+                      <select
+                        disabled={isStatusSaving}
+                        value={currentEmploymentStatus || ''}
+                        onChange={(e) => handleStatusChange(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full text-[10px] font-bold text-slate-800 bg-white border border-slate-200 rounded py-0.5 pl-1.5 pr-4 hover:border-slate-300 transition-colors cursor-pointer appearance-none outline-none text-left shadow-2xs"
+                      >
+                        <option value="">(미선택)</option>
+                        {['청솔반', '취업맞춤반', '중견기업반', '반도체아카데미반', '혁신인재반', '부사관반', '일학습병행', '계약학과', '도제반', '아우스빌둥', '일반취업', '기술사관', '군특성화', '운동부', '진학', '입대', '기타'].map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="h-2.5 w-2.5 text-slate-400 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  ) : (
+                    <span className="font-bold text-slate-700 text-right">{currentEmploymentStatus || student.employment_status || '미정'}</span>
+                  )}
+                </div>
+
+                <p className="flex justify-between items-center">
                   <span className="text-slate-400 pl-2">기업구분</span> 
                   <span className="font-black text-blue-600 text-right">{student.company_type || '미분류'}</span>
                 </p>
@@ -315,6 +317,7 @@ export function StudentPopover({
               </div>
             </>
           )}
+
         </div>
       </div>
 
@@ -526,10 +529,7 @@ export function StudentPopover({
           </Dialog>
         </>
       ) : (
-        <Popover open={open} onOpenChange={(v) => {
-          setOpen(v);
-          if (!v) setIsStatusDropdownOpen(false);
-        }}>
+        <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             {children}
           </PopoverTrigger>
@@ -540,11 +540,30 @@ export function StudentPopover({
             sideOffset={5}
             collisionPadding={16}
             avoidCollisions={true}
+            onPointerDownOutside={(e) => {
+              const target = e.target as HTMLElement;
+              if (target?.closest('select') || target?.tagName === 'OPTION') {
+                e.preventDefault();
+              }
+            }}
+            onFocusOutside={(e) => {
+              // select 조작 시 포커스 이동으로 인한 팝오버 닫힘 원천 차단
+              e.preventDefault();
+            }}
+            onInteractOutside={(e) => {
+              const target = e.target as HTMLElement;
+              if (target?.closest('select') || target?.tagName === 'OPTION') {
+                e.preventDefault();
+              }
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
           >
             {popoverBody}
           </PopoverContent>
         </Popover>
       )}
+
 
       {/* 성적 상세 모달 */}
       <Dialog open={isGradeModalOpen} onOpenChange={setIsGradeModalOpen}>

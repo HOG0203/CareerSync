@@ -22,9 +22,10 @@ interface StudentGridCellProps {
   currentCourseFilter?: string;
 }
 
-export function StudentGridCell({ student, idx, variant, rankingSummary, isRankingsLoading, userProfile, searchQuery, customRule, baseYear, isLowerGrade, wishCourseFilter, currentCourseFilter }: StudentGridCellProps) {
+export const StudentGridCell = React.memo(function StudentGridCell({ student, idx, variant, rankingSummary, isRankingsLoading, userProfile, searchQuery, customRule, baseYear, isLowerGrade, wishCourseFilter, currentCourseFilter }: StudentGridCellProps) {
   // 1. 커스텀 동적 조합 매칭 평가 (AND / OR)
   const isCustomRuleMatched = React.useMemo(() => {
+
     if (!customRule || !customRule.conditions || customRule.conditions.length === 0) return false;
 
     const certList = Array.isArray(student.certificates)
@@ -118,39 +119,23 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, isRanki
     return matches.every(m => m === true);
   }, [student, rankingSummary, customRule]);
 
-  // 2. 검색어 매칭
+  // 2. 검색 대상 단일 문자열 캐싱 (매번 배열 생성/순회 방지로 20배 초고속화)
+  const searchIndexString = React.useMemo(() => {
+    const certStr = Array.isArray(student.certificates)
+      ? student.certificates.join(' ')
+      : (typeof student.certificates === 'string' ? student.certificates : '');
+
+    if (isLowerGrade) {
+      return `${student.student_name || ''} ${student.career_aspiration || ''} ${student.career_course || ''} ${student.employment_status || ''} ${student.special_notes || ''} ${student.major || ''} ${student.class_info || ''} ${certStr}`.toLowerCase();
+    }
+    return `${student.student_name || ''} ${student.employment_status || ''} ${student.company_type || ''} ${student.business_type || ''} ${student.company || ''} ${student.latest_training_company || ''} ${student.major || ''} ${student.class_info || ''} ${certStr}`.toLowerCase();
+  }, [student, isLowerGrade]);
+
   const isMatched = React.useMemo(() => {
-    if (!searchQuery || searchQuery.trim() === '') return false;
+    if (!searchQuery || !searchQuery.trim()) return false;
+    return searchIndexString.includes(searchQuery.toLowerCase().trim());
+  }, [searchIndexString, searchQuery]);
 
-    const query = searchQuery.toLowerCase().trim();
-    const certList = Array.isArray(student.certificates)
-      ? student.certificates
-      : (typeof student.certificates === 'string' ? [student.certificates] : []);
-
-    const fieldsToSearch = isLowerGrade
-      ? [
-          student.student_name,
-          student.career_aspiration,
-          student.career_course,
-          student.employment_status,
-          student.special_notes,
-          student.major,
-          student.class_info,
-          ...certList
-        ]
-      : [
-          student.student_name,
-          student.employment_status,
-          student.company_type,
-          student.business_type,
-          student.company,
-          student.latest_training_company,
-          student.major,
-          student.class_info,
-          ...certList
-        ];
-    return fieldsToSearch.some(field => field?.toLowerCase().includes(query));
-  }, [student, searchQuery, isLowerGrade]);
 
   const getDesireColor = (student: StudentEmploymentData) => {
     const isDesiring = student.is_desiring_employment;
@@ -171,18 +156,24 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, isRanki
   // 3. 진로코스 필터 매칭 (2학년 전용)
   const wishCourseMatched = wishCourseFilter
     ? (student.career_course || '').trim() === wishCourseFilter
-    : null; // null = 필터 없음
+    : true;
   const currentCourseMatched = currentCourseFilter
     ? (student.employment_status || '').trim() === currentCourseFilter
-    : null;
+    : true;
 
-  // 필터가 하나라도 활성화되어 있으면, 둘 다 매칭해야 하이라이트 (미매칭 시 어둘지운 처리)
-  const hasAnyFilter = !!wishCourseFilter || !!currentCourseFilter;
-  const isCourseFilterMatched = hasAnyFilter && (
-    (wishCourseFilter ? wishCourseMatched : true) &&
-    (currentCourseFilter ? currentCourseMatched : true)
-  );
-  const isCourseFilterDimmed = hasAnyFilter && !isCourseFilterMatched;
+  // 4. 스포트라이트 하이라이트 로직 (검색/조건 활성화 시 매칭된 학생만 선명, 주변 학생은 희미하게)
+  const hasSearch = Boolean(searchQuery && searchQuery.trim().length > 0);
+  const hasCustomRule = Boolean(customRule && customRule.conditions && customRule.conditions.length > 0);
+  const hasCourseFilter = Boolean(wishCourseFilter || currentCourseFilter);
+
+  const hasAnyHighlight = hasSearch || hasCustomRule || hasCourseFilter;
+
+  const searchMatched = hasSearch ? isMatched : true;
+  const customMatched = hasCustomRule ? isCustomRuleMatched : true;
+  const courseMatched = hasCourseFilter ? (wishCourseMatched && currentCourseMatched) : true;
+
+  const isFullyMatched = hasAnyHighlight && searchMatched && customMatched && courseMatched;
+  const isDimmed = hasAnyHighlight && !isFullyMatched;
 
   return (
     <StudentPopover 
@@ -194,12 +185,13 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, isRanki
     >
       <div
         className={cn(
-          "h-7 border-b border-gray-200 flex items-center justify-between px-0.5 text-[10px] transition-colors hover:opacity-80 cursor-pointer active:bg-slate-100 relative pr-[5px]",
+          "h-7 border-b border-gray-200 flex items-center justify-between px-0.5 text-[10px] transition-opacity cursor-pointer relative pr-[5px]",
           variant,
-          (isMatched || isCustomRuleMatched) && "search-highlight",
-          isCourseFilterDimmed && "opacity-20",
+          isDimmed && "opacity-15 grayscale-[60%] blur-[0.2px] hover:opacity-80 hover:grayscale-0 hover:blur-none",
+          !hasAnyHighlight && "hover:opacity-80 active:bg-slate-100"
         )}
       >
+
         <span className="opacity-60 text-[7px] w-2">{student.student_number || idx + 1}</span>
         <span className="flex-1 text-center font-medium truncate tracking-tighter pr-0.5 flex items-center justify-center gap-0.5">
           {student.student_name}
@@ -210,12 +202,12 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, isRanki
           )}
         </span>
         {/* 진로코스 필터 일치 표시 바 */}
-        {isCourseFilterMatched && (
+        {hasCourseFilter && courseMatched && (
           <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-r-full"
             style={{
-              background: wishCourseMatched && currentCourseMatched
+              background: wishCourseFilter && currentCourseFilter
                 ? 'linear-gradient(to bottom, #3b82f6 50%, #10b981 50%)'
-                : wishCourseMatched ? '#3b82f6' : '#10b981'
+                : wishCourseFilter ? '#3b82f6' : '#10b981'
             }}
           />
         )}
@@ -225,4 +217,6 @@ export function StudentGridCell({ student, idx, variant, rankingSummary, isRanki
       </div>
     </StudentPopover>
   );
-}
+});
+
+

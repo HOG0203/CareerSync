@@ -1,7 +1,8 @@
 export type StudentEmploymentData = {
   id: string;
-  student_id: string;
+  student_id?: string;
   student_name: string;
+
   phone_number?: string;
   graduation_year?: number;
   major?: string;

@@ -61,7 +61,7 @@ export function ArtsContestImportCard({
 }: ArtsContestImportCardProps) {
   const { toast } = useToast();
 
-  const [isLoading, setIsLoading] = React.useState(true);
+  const [isLoading, setIsLoading] = React.useState(false);
   const [isParsing, setIsParsing] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
@@ -82,43 +82,33 @@ export function ArtsContestImportCard({
   const [gradeFilter, setGradeFilter] = React.useState<'all' | '3' | '2' | '1'>('all');
   const [majorFilter, setMajorFilter] = React.useState<string>('all');
 
-  // 1. 재학생 및 기존 평가 데이터 로드
-  const loadInitialData = React.useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const supabase = createClient();
-      const gradYears = [baseYear + 1, baseYear + 2, baseYear + 3];
+  // 파일 업로드 시점에만 필요한 학생 매칭 데이터 온디맨드 로드 (초기 렌더링 쿼리 0회)
+  const ensureMatchingData = React.useCallback(async (force = false) => {
+    if (!force && activeStudents.length > 0) return { students: activeStudents, store: existingStore };
 
-      const [studentsRes, storeRes] = await Promise.all([
-        supabase
-          .from('students')
-          .select('id, student_id, student_name, student_number, major, class_info, graduation_year')
-          .in('graduation_year', gradYears)
-          .range(0, 4999)
-          .order('graduation_year', { ascending: true })
-          .order('class_info', { ascending: true })
-          .order('student_number', { ascending: true }),
-        getEvaluationsStore(),
-      ]);
+    const supabase = createClient();
+    const gradYears = [baseYear + 1, baseYear + 2, baseYear + 3];
 
-      if (studentsRes.error) throw studentsRes.error;
-      setActiveStudents(studentsRes.data || []);
-      setExistingStore(storeRes || {});
-    } catch (err: any) {
-      console.error(err);
-      toast({
-        title: '데이터 로드 실패',
-        description: err.message || '재학생 목록을 불러오는 중 오류가 발생했습니다.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [baseYear, toast]);
+    const [studentsRes, storeRes] = await Promise.all([
+      supabase
+        .from('students')
+        .select('id, student_name, student_number, major, class_info, graduation_year')
+        .in('graduation_year', gradYears)
 
-  React.useEffect(() => {
-    loadInitialData();
-  }, [loadInitialData]);
+        .range(0, 4999)
+        .order('graduation_year', { ascending: true })
+        .order('class_info', { ascending: true })
+        .order('student_number', { ascending: true }),
+      getEvaluationsStore(),
+    ]);
+
+    const stdList = studentsRes.data || [];
+    const store = storeRes || {};
+    setActiveStudents(stdList);
+    setExistingStore(store);
+    return { students: stdList, store };
+  }, [activeStudents, existingStore, baseYear]);
+
 
   // 2. 파일 업로드 및 파싱 핸들러
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -148,8 +138,11 @@ export function ArtsContestImportCard({
   const processFiles = async (newFiles: File[]) => {
     setIsParsing(true);
     try {
+      await ensureMatchingData();
+
       const mergedFiles = [...files, ...newFiles];
       setFiles(mergedFiles);
+
 
       let allParsedRecords: RawArtsContestRecord[] = [...rawRecords];
 
@@ -334,8 +327,9 @@ export function ArtsContestImportCard({
           title: 'DB 일괄 저장 완료',
           description: `총 ${res.updatedCount}명의 예체능 및 교내외 대회 실적이 데이터베이스에 안전하게 영구 저장되었습니다.`,
         });
-        await loadInitialData();
+        await ensureMatchingData(true);
         if (onImportSuccess) onImportSuccess();
+
       } else {
         toast({
           title: '저장 실패',
@@ -931,10 +925,11 @@ export function ArtsContestImportCard({
         categoryTitle="예체능 & 교내외 대회실적"
         isAdmin={isAdmin}
         onSuccess={async () => {
-          await loadInitialData();
+          await ensureMatchingData(true);
           if (onImportSuccess) onImportSuccess();
         }}
       />
     </div>
   );
 }
+

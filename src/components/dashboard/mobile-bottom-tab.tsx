@@ -26,9 +26,14 @@ export function MobileBottomTab({ isAdmin = false, role, userGrade }: { isAdmin?
   }, [pathname]);
 
   const isLowerGradeTeacher = role === 'teacher' && (userGrade === 1 || userGrade === 2);
+  const isStudent = role === 'student';
 
-  // 담임 선생님(teacher)과 관리자(admin)의 하단 탭 구성을 다르게 설정
-  const tabs = isLowerGradeTeacher
+  // 학생(student), 담임 선생님(teacher)과 관리자(admin)의 하단 탭 구성을 다르게 설정
+  const tabs = isStudent
+    ? [
+        { href: '/student/certification', label: '내 평가표', icon: BookUser },
+      ]
+    : isLowerGradeTeacher
     ? [
         { href: '/dashboard', label: '홈', icon: LayoutDashboard },
         { href: '/employment-status', label: '현황', icon: Grid3X3 },
@@ -48,6 +53,7 @@ export function MobileBottomTab({ isAdmin = false, role, userGrade }: { isAdmin?
         { href: '/company-info', label: '업체정보', icon: Factory },
         { href: '/students', label: '취업데이터', icon: ClipboardList },
       ];
+
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around h-16 bg-white border-t border-slate-100 pb-safe shadow-[0_-4px_12px_rgba(0,0,0,0.05)] lg:hidden px-2">

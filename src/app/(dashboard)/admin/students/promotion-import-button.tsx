@@ -37,42 +37,44 @@ export function PromotionImportButton({ currentData, baseYear }: PromotionImport
     if (!selectedFile) return
 
     setIsPending(true)
-    const reader = new FileReader()
-    
-    reader.onload = async (event) => {
-      const content = event.target?.result as string
+    try {
+      const buffer = await selectedFile.arrayBuffer();
+      let content = '';
       try {
-        const result: any = await bulkPromoteFromExcel(content)
-        
-        if (result.error || result.errors) {
-          console.error('업로드 중 일부 오류:', result.errors)
-          toast({ 
-            variant: "destructive", 
-            title: '업로드 완료 (일부 실패)', 
-            description: `${result.count}명 성공. ${result.errors?.length || 0}건 실패.` 
-          })
-        } else {
-          toast({ title: '일괄 진급 완료', description: `${result.count}명의 학생 정보가 성공적으로 갱신되었습니다.` })
-        }
-        setSelectedFile(null)
-        setIsOpen(false)
-        router.refresh()
-      } catch (err: any) {
-        toast({ variant: "destructive", title: '업로드 실패', description: err.message })
-      } finally {
-        setIsPending(false)
+        const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
+        content = utf8Decoder.decode(buffer);
+      } catch (e) {
+        const euckrDecoder = new TextDecoder('euc-kr');
+        content = euckrDecoder.decode(buffer);
       }
-    }
 
-    reader.readAsText(selectedFile, 'EUC-KR')
+      const result: any = await bulkPromoteFromExcel(content)
+      
+      if (result.error || result.errors) {
+        toast({ 
+          variant: "destructive", 
+          title: '업로드 완료 (일부 실패)', 
+          description: `${result.count}명 성공. ${result.errors?.length || 0}건 실패.` 
+        })
+      } else {
+        toast({ title: '일괄 진급 완료', description: `${result.count}명의 학생 정보가 성공적으로 갱신되었습니다.` })
+      }
+      setSelectedFile(null)
+      setIsOpen(false)
+      router.refresh()
+    } catch (err: any) {
+      toast({ variant: "destructive", title: '업로드 실패', description: err.message })
+    } finally {
+      setIsPending(false)
+    }
   }
 
+
   const downloadTemplate = () => {
-    const headers = ["학번(고유ID)", "성명", "기존 학과", "기존 반", "기존 번호", "진급 후 학과", "진급 후 반", "진급 후 번호"];
+    const headers = ["성명", "기존 학과", "기존 반", "기존 번호", "진급 후 학과", "진급 후 반", "진급 후 번호"];
     
     // 현재 필터링된 데이터만 내보내기
     const rows = currentData.map(s => [
-      s.student_id || '',
       s.student_name || '',
       s.major || '',
       s.class_info || '',
@@ -94,6 +96,7 @@ export function PromotionImportButton({ currentData, baseYear }: PromotionImport
     link.download = `${baseYear}학년도_진급처리_양식.csv`
     link.click()
   }
+
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

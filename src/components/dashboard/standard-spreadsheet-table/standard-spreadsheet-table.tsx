@@ -1,7 +1,8 @@
 'use client'
 
 import * as React from 'react'
-import { Search, GraduationCap, Trash2, Loader2, Phone, ChevronRight, ChevronLeft, BookUser, Award } from 'lucide-react'
+import { Search, GraduationCap, Trash2, Loader2, Phone, ChevronRight, ChevronLeft, BookUser, Award, Filter, X } from 'lucide-react'
+
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -37,7 +38,11 @@ export function StandardSpreadsheetTable({
   mobileInfoKeys,
   pageType,
   hideCheckbox = pageType === 'students',
+  hideSearch = false,
+  onFilteredDataChange,
 }: SpreadsheetTableProps) {
+
+
   const [mounted, setMounted] = React.useState(false)
   const isMobile = useIsMobile()
 
@@ -115,6 +120,13 @@ export function StandardSpreadsheetTable({
     }
   }
 
+  React.useEffect(() => {
+    onFilteredDataChange?.(filteredData);
+  }, [filteredData, onFilteredDataChange]);
+
+  const isColumnFilterActive = Object.values(columnFilters).some(v => Array.isArray(v) && v.length > 0);
+
+
   if (!mounted) {
     return (
       <div className="flex h-[400px] w-full items-center justify-center bg-slate-50/50 rounded-2xl animate-pulse">
@@ -125,31 +137,46 @@ export function StandardSpreadsheetTable({
 
   return (
     <div className="flex flex-col gap-2 w-full h-full overflow-hidden">
-      {/* 검색 및 선택 툴바 */}
-      <div className="flex items-center justify-between p-1.5 bg-muted/20 rounded-md border-dashed border shrink-0">
-        <div className="flex items-center gap-3">
-          <Search className="h-4 w-4 text-muted-foreground ml-2" />
-          <Input
-            placeholder={searchPlaceholder}
-            className="h-8 border-none bg-transparent shadow-none focus-visible:ring-0 text-xs w-[250px]"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          {(searchTerm || Object.values(columnFilters).some(v => v.length > 0)) && (
-            <Badge variant="secondary" className="h-6 bg-blue-50 text-blue-600 border-blue-100 font-bold px-2 animate-in fade-in zoom-in-95 duration-200">
-              검색 결과: {filteredData.length}명
-            </Badge>
+      {/* 선택 툴바 또는 시트 필터 초기화 버튼 (필요할 때만 슬림하게 노출) */}
+      {(!hideSearch || selectedRowIds.length > 0 || isColumnFilterActive) && (
+        <div className="flex items-center justify-between p-1.5 bg-slate-50/80 rounded-xl border border-slate-200/80 shrink-0">
+          <div className="flex items-center gap-2">
+            {!hideSearch && (
+              <div className="flex items-center gap-2">
+                <Search className="h-4 w-4 text-muted-foreground ml-2" />
+                <Input
+                  placeholder={searchPlaceholder}
+                  className="h-8 border-none bg-transparent shadow-none focus-visible:ring-0 text-xs w-[250px]"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            )}
+            {isColumnFilterActive && (
+              <div className="flex items-center gap-1.5 pl-1">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => handleFilterChange('ALL', 'RESET')}
+                  className="h-6 px-2 text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg"
+                >
+                  <X className="h-3 w-3 mr-1" /> 시트 열 필터 초기화
+                </Button>
+              </div>
+            )}
+          </div>
+          {selectedRowIds.length > 0 && (
+            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-2">
+              <span className="text-xs font-bold text-blue-700 mr-2">{selectedRowIds.length}명 선택됨</span>
+              {onPromote && <Button size="sm" className="h-8 bg-indigo-600 hover:bg-indigo-700 shadow-md" onClick={async () => { const r = await onPromote(selectedRowIds); if (r.success) syncSelected([]); }}><GraduationCap className="h-3.5 w-3.5 mr-1.5" />진급 설정</Button>}
+              {onDelete && <Button size="sm" variant="destructive" className="h-8 shadow-md" onClick={async () => { if (confirm('정말 삭제하시겠습니까?')) { const r = await onDelete(selectedRowIds); if (r.success) syncSelected([]); } }}><Trash2 className="h-3.5 w-3.5 mr-1.5" />삭제</Button>}
+              <Button size="sm" variant="outline" className="h-8 rounded-lg" onClick={() => syncSelected([])}>선택 취소</Button>
+            </div>
           )}
         </div>
-        {selectedRowIds.length > 0 && (
-          <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-2">
-            <span className="text-xs font-bold text-blue-700 mr-2">{selectedRowIds.length}명 선택됨</span>
-            {onPromote && <Button size="sm" className="h-8 bg-indigo-600 hover:bg-indigo-700 shadow-md" onClick={async () => { const r = await onPromote(selectedRowIds); if (r.success) syncSelected([]); }}><GraduationCap className="h-3.5 w-3.5 mr-1.5" />진급 설정</Button>}
-            {onDelete && <Button size="sm" variant="destructive" className="h-8 shadow-md" onClick={async () => { if (confirm('정말 삭제하시겠습니까?')) { const r = await onDelete(selectedRowIds); if (r.success) syncSelected([]); } }}><Trash2 className="h-3.5 w-3.5 mr-1.5" />삭제</Button>}
-            <Button size="sm" variant="outline" className="h-8" onClick={() => syncSelected([])}>선택 취소</Button>
-          </div>
-        )}
-      </div>
+      )}
+
+
 
       {/* 데스크톱: 스프레드시트 테이블 (내부 전용 스크롤박스) */}
       {!isMobile ? (

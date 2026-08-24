@@ -109,51 +109,206 @@ function DashboardSkeleton() {
   );
 }
 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MAJOR_SORT_ORDER } from '@/lib/types';
+import { studentLogin } from '@/app/login/actions';
+import { GraduationCap, UserCheck, AlertCircle, Info, ShieldAlert } from 'lucide-react';
+
 export default function LoginPage() {
-  const [state, formAction, isPending] = useActionState(async (prevState: any, formData: FormData) => {
+  const [activeTab, setActiveTab] = React.useState<'staff' | 'student'>('staff');
+
+  // 교직원 로그인 State
+  const [staffState, staffFormAction, isStaffPending] = useActionState(async (prevState: any, formData: FormData) => {
     const result = await login(formData);
     return result || initialState;
   }, initialState);
 
-  if (isPending) {
+  // 학생 로그인 State
+  const [studentState, studentFormAction, isStudentPending] = useActionState(async (prevState: any, formData: FormData) => {
+    const result = await studentLogin(formData);
+    return result || initialState;
+  }, initialState);
+
+  const [selectedGrade, setSelectedGrade] = React.useState<string>('1');
+  const [selectedMajor, setSelectedMajor] = React.useState<string>(MAJOR_SORT_ORDER[0] || '자동화기계과');
+
+  if (isStaffPending || isStudentPending) {
     return <DashboardSkeleton />;
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-          <div className="mb-4 flex justify-center">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50/70 p-4">
+      <Card className="w-full max-w-md shadow-lg border-slate-200/80">
+        <CardHeader className="text-center pb-3">
+          <div className="mb-3 flex justify-center">
             <Logo />
           </div>
-          <CardTitle className="text-2xl">다시 오신 것을 환영합니다</CardTitle>
-          <CardDescription>
-            대시보드에 액세스하려면 자격 증명을 입력하세요.
+          <CardTitle className="text-2xl font-bold tracking-tight text-slate-900">CareerSync 로그인</CardTitle>
+          <CardDescription className="text-xs text-slate-500">
+            시스템에 접속할 사용자 유형을 선택해 주세요.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form action={formAction} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="username">아이디</Label>
-              <Input
-                id="username"
-                name="username"
-                type="text"
-                placeholder="아이디를 입력하세요"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">비밀번호</Label>
-              <Input id="password" name="password" type="password" required />
-            </div>
-            {state?.error && (
-              <p className="text-sm text-destructive">{state.error}</p>
-            )}
-            <Button type="submit" className="w-full" disabled={isPending}>
-              {isPending ? '로그인 중...' : '로그인'}
-            </Button>
-          </form>
+
+        <CardContent className="space-y-4">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'staff' | 'student')} className="w-full">
+            <TabsList className="grid grid-cols-2 w-full mb-4 bg-slate-100 p-1">
+              <TabsTrigger value="staff" className="flex items-center gap-1.5 font-medium text-xs sm:text-sm">
+                <UserCheck className="h-4 w-4" />
+                교직원 로그인
+              </TabsTrigger>
+              <TabsTrigger value="student" className="flex items-center gap-1.5 font-medium text-xs sm:text-sm">
+                <GraduationCap className="h-4 w-4" />
+                학생 로그인
+              </TabsTrigger>
+            </TabsList>
+
+            {/* 1. 교직원 로그인 */}
+            <TabsContent value="staff">
+              <form action={staffFormAction} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="username" className="text-xs font-semibold text-slate-700">교직원 아이디</Label>
+                  <Input
+                    id="username"
+                    name="username"
+                    type="text"
+                    placeholder="아이디를 입력하세요"
+                    required
+                    className="h-10"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-xs font-semibold text-slate-700">비밀번호</Label>
+                  <Input id="password" name="password" type="password" required className="h-10" />
+                </div>
+                {staffState?.error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 text-xs text-red-700">
+                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span>{staffState.error}</span>
+                  </div>
+                )}
+                <Button type="submit" className="w-full h-10 font-semibold" disabled={isStaffPending}>
+                  {isStaffPending ? '로그인 중...' : '교직원 로그인'}
+                </Button>
+              </form>
+            </TabsContent>
+
+            {/* 2. 학생 로그인 */}
+            <TabsContent value="student">
+              <form action={studentFormAction} className="space-y-3.5">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-700">학년</Label>
+                    <input type="hidden" name="grade" value={selectedGrade} />
+                    <Select value={selectedGrade} onValueChange={setSelectedGrade}>
+                      <SelectTrigger className="h-9 text-xs">
+                        <SelectValue placeholder="학년 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">1학년</SelectItem>
+                        <SelectItem value="2">2학년</SelectItem>
+                        <SelectItem value="3">3학년</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-700">학과</Label>
+                    <input type="hidden" name="major" value={selectedMajor} />
+                    <Select value={selectedMajor} onValueChange={setSelectedMajor}>
+                      <SelectTrigger className="h-9 text-xs">
+                        <SelectValue placeholder="학과 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MAJOR_SORT_ORDER.map((m) => (
+                          <SelectItem key={m} value={m} className="text-xs">
+                            {m}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="classInfo" className="text-xs font-semibold text-slate-700">반</Label>
+                    <Input
+                      id="classInfo"
+                      name="classInfo"
+                      type="text"
+                      placeholder="예: 1"
+                      required
+                      className="h-9 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="studentNumber" className="text-xs font-semibold text-slate-700">번호</Label>
+                    <Input
+                      id="studentNumber"
+                      name="studentNumber"
+                      type="text"
+                      placeholder="예: 15"
+                      required
+                      className="h-9 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="studentName" className="text-xs font-semibold text-slate-700">이름</Label>
+                  <Input
+                    id="studentName"
+                    name="studentName"
+                    type="text"
+                    placeholder="학생 이름을 입력하세요"
+                    required
+                    className="h-9 text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="student-password" className="text-xs font-semibold text-slate-700">비밀번호</Label>
+                    <span className="text-[11px] text-blue-600 font-medium">초기: 휴대폰 뒷 4자리</span>
+                  </div>
+                  <Input
+                    id="student-password"
+                    name="password"
+                    type="password"
+                    placeholder="비밀번호 입력"
+                    required
+                    className="h-9 text-xs"
+                  />
+                </div>
+
+                {studentState?.error && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2 text-xs text-amber-900">
+                    <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                    <div className="flex-1 leading-relaxed">
+                      {studentState.error}
+                    </div>
+                  </div>
+                )}
+
+                <div className="p-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-[11px] text-slate-600 space-y-1">
+                  <p className="flex items-center gap-1 font-medium text-slate-700">
+                    <Info className="h-3.5 w-3.5 text-blue-500" />
+                    학생 로그인 안내
+                  </p>
+                  <ul className="list-disc pl-4 space-y-0.5 text-slate-500">
+                    <li>학교에 등록된 휴대폰 번호가 있어야 로그인할 수 있습니다.</li>
+                    <li>연락처가 미등록된 경우 <strong>담임선생님께 연락처 등록을 요청</strong>해 주세요.</li>
+                    <li>로그인 후 상단에서 비밀번호를 자유롭게 변경할 수 있습니다.</li>
+                  </ul>
+                </div>
+
+                <Button type="submit" className="w-full h-10 font-semibold bg-blue-600 hover:bg-blue-700 text-white" disabled={isStudentPending}>
+                  {isStudentPending ? '학생 정보 확인 및 로그인 중...' : '학생 옥저인증평가 확인하기'}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>

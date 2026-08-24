@@ -30,6 +30,11 @@ export default async function DashboardPage({
 
   const isAdmin = profile?.role === 'admin';
 
+  if (profile?.role === 'student') {
+    redirect('/student/certification');
+  }
+
+
   // 지능형 초기 학년 및 학사학년도 설정 (In-Memory Default Fallback - 2중 HTTP 딜레이 제거)
   const defaultGrade = profile?.assigned_grade || 3;
   const grade = params.grade ? parseInt(params.grade) : defaultGrade;

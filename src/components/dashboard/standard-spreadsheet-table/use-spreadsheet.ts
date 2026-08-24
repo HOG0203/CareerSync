@@ -137,12 +137,17 @@ export function useSpreadsheet({
   }, [initialData, columns, columnFilters, searchTerm])
 
   const handleFilterChange = React.useCallback((key: string, value: string) => {
+    if (key === 'ALL' && value === 'RESET') {
+      setColumnFilters({});
+      return;
+    }
     setColumnFilters(prev => {
       const currentOpts = filterOptions[key] || [];
       const isFilterActive = prev[key] !== undefined;
       if (value === 'RESET' || value === 'SELECT_ALL') {
         const next = { ...prev }; delete next[key]; return next;
       }
+
       if (value === 'CLEAR_ALL') return { ...prev, [key]: [] };
       let nextSelected: string[];
       if (!isFilterActive) {
