@@ -30,7 +30,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { getStudentScoresById, updateStudentField } from '@/app/students/actions';
+import { getStudentScoresById, getStudentRankSummary, updateStudentField } from '@/app/students/actions';
 import { Button } from '@/components/ui/button';
 import { CounselingModal } from '@/app/(dashboard)/class-management/counseling-modal';
 
@@ -71,6 +71,12 @@ export function StudentPopover({
   const [detailedScores, setDetailedScores] = React.useState<any[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
 
+  const [internalRankSummary, setInternalRankSummary] = React.useState<any>(null);
+  const [isInternalRankLoading, setIsInternalRankLoading] = React.useState(false);
+
+  const effectiveRankSummary = (rankingSummary !== undefined && rankingSummary !== null) ? rankingSummary : internalRankSummary;
+  const effectiveRankLoading = isRankingsLoading || (isInternalRankLoading && !effectiveRankSummary);
+
   const resolvedBaseYear = baseYear || 2026;
   const studentGrade = student.graduation_year ? (4 - (student.graduation_year - resolvedBaseYear)) : 3;
   const isLowerGrade = propIsLowerGrade !== undefined ? propIsLowerGrade : (studentGrade === 1 || studentGrade === 2);
@@ -82,6 +88,21 @@ export function StudentPopover({
   React.useEffect(() => {
     setCurrentEmploymentStatus(student.employment_status || '');
   }, [student.employment_status]);
+
+  // 팝오버가 열렸을 때 rankingSummary가 없으면 단건 석차 요약을 비동기로 자동 조회
+  React.useEffect(() => {
+    if ((open || isGradeModalOpen || isAttendanceModalOpen) && (!rankingSummary || !rankingSummary.subjectCount) && student.id && student.graduation_year) {
+      setIsInternalRankLoading(true);
+      getStudentRankSummary(student.id, student.graduation_year)
+        .then(res => {
+          if (res) setInternalRankSummary(res);
+          setIsInternalRankLoading(false);
+        })
+        .catch(() => {
+          setIsInternalRankLoading(false);
+        });
+    }
+  }, [open, isGradeModalOpen, isAttendanceModalOpen, rankingSummary, student.id, student.graduation_year]);
 
   // 팝오버가 닫힐 때 커스텀 드롭다운도 함께 닫기
   React.useEffect(() => {
@@ -160,9 +181,9 @@ export function StudentPopover({
   }, [detailedScores]);
 
   const attendanceByGrade = React.useMemo(() => {
-    if (!rankingSummary?.attnRecords) return null;
-    return (rankingSummary.attnRecords as any[]).sort((a, b) => a.grade - b.grade);
-  }, [rankingSummary]);
+    if (!effectiveRankSummary?.attnRecords) return null;
+    return (effectiveRankSummary.attnRecords as any[]).sort((a, b) => a.grade - b.grade);
+  }, [effectiveRankSummary]);
 
   const popoverBody = (
     <div className="space-y-4">
@@ -366,26 +387,26 @@ export function StudentPopover({
           </Button>
         </div>
 
-        {isRankingsLoading ? (
+        {effectiveRankLoading ? (
           <div className="space-y-2 bg-slate-50 p-2 rounded-lg border border-slate-100 animate-pulse">
             <div className="h-3 bg-slate-200 rounded w-3/4 mb-1"></div>
             <div className="h-3 bg-slate-200 rounded w-1/2"></div>
           </div>
-        ) : rankingSummary && rankingSummary.subjectCount > 0 ? (
+        ) : effectiveRankSummary && effectiveRankSummary.subjectCount > 0 ? (
           <div className="space-y-1 bg-slate-50 p-2 rounded-lg border border-slate-100">
             <div className="grid grid-cols-2 gap-x-3 text-[10px]">
               <p className="flex justify-between">
                 <span className="text-slate-400">전교 석차</span>
                 <span className="font-black text-indigo-700 text-right">
-                  {rankingSummary.totalRank}
-                  <span className="text-[8px] text-indigo-400 font-medium ml-0.5">/ {rankingSummary.schoolTotal}</span>
+                  {effectiveRankSummary.totalRank}
+                  <span className="text-[8px] text-indigo-400 font-medium ml-0.5">/ {effectiveRankSummary.schoolTotal}</span>
                 </span>
               </p>
               <p className="flex justify-between">
                 <span className="text-slate-400 pl-2">반 석차</span>
                 <span className="font-black text-amber-700 text-right">
-                  {rankingSummary.classRank}
-                  <span className="text-[8px] text-amber-500 font-medium ml-0.5">/ {rankingSummary.classTotal}</span>
+                  {effectiveRankSummary.classRank}
+                  <span className="text-[8px] text-amber-500 font-medium ml-0.5">/ {effectiveRankSummary.classTotal}</span>
                 </span>
               </p>
             </div>
@@ -393,10 +414,10 @@ export function StudentPopover({
             <div className="pt-1 border-t border-slate-200 mt-1">
               <p className="text-[9px] text-slate-400 font-bold mb-1.5 flex justify-between uppercase tracking-tighter">
                 <span>성취도별 과목 수 (A-E)</span>
-                <span>총 {rankingSummary.subjectCount}개 과목</span>
+                <span>총 {effectiveRankSummary.subjectCount}개 과목</span>
               </p>
               <div className="flex flex-wrap gap-1">
-                {Object.entries(rankingSummary.gradeCounts || {}).map(([grade, count]) => (
+                {Object.entries(effectiveRankSummary.gradeCounts || {}).map(([grade, count]) => (
                   <div key={grade} className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-slate-200 min-w-[36px] justify-center">
                     <span className={cn(
                       "text-[9px] font-black",
@@ -431,11 +452,11 @@ export function StudentPopover({
             상세보기 <ExternalLink className="h-2.5 w-2.5" />
           </Button>
         </div>
-        {isRankingsLoading ? (
+        {effectiveRankLoading ? (
           <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 animate-pulse">
             <div className="h-6 bg-slate-200 rounded w-full"></div>
           </div>
-        ) : rankingSummary?.attendance ? (
+        ) : effectiveRankSummary?.attendance ? (
           <div className="bg-slate-50 p-1 rounded-lg border border-slate-100 overflow-hidden">
             <table className="w-full text-[9px] border-collapse">
               <thead>
@@ -447,17 +468,17 @@ export function StudentPopover({
               <tbody className="font-bold text-center">
                 <tr className="border-b border-slate-100">
                   <td className="py-1 text-left text-rose-600 font-black">미인정</td>
-                  <td className={cn(rankingSummary.attendance.unexcused.absent > 0 && "text-rose-600 font-black")}>{rankingSummary.attendance.unexcused.absent}</td>
-                  <td className={cn(rankingSummary.attendance.unexcused.late > 0 && "text-rose-500")}>{rankingSummary.attendance.unexcused.late}</td>
-                  <td className={cn(rankingSummary.attendance.unexcused.early > 0 && "text-rose-500")}>{rankingSummary.attendance.unexcused.early}</td>
-                  <td className={cn(rankingSummary.attendance.unexcused.out > 0 && "text-rose-500")}>{rankingSummary.attendance.unexcused.out}</td>
+                  <td className={cn(effectiveRankSummary.attendance.unexcused.absent > 0 && "text-rose-600 font-black")}>{effectiveRankSummary.attendance.unexcused.absent}</td>
+                  <td className={cn(effectiveRankSummary.attendance.unexcused.late > 0 && "text-rose-500")}>{effectiveRankSummary.attendance.unexcused.late}</td>
+                  <td className={cn(effectiveRankSummary.attendance.unexcused.early > 0 && "text-rose-500")}>{effectiveRankSummary.attendance.unexcused.early}</td>
+                  <td className={cn(effectiveRankSummary.attendance.unexcused.out > 0 && "text-rose-500")}>{effectiveRankSummary.attendance.unexcused.out}</td>
                 </tr>
                 <tr>
                   <td className="py-1 text-left text-blue-600 font-black">질병</td>
-                  <td className="text-slate-600">{rankingSummary.attendance.disease.absent}</td>
-                  <td className="text-slate-600">{rankingSummary.attendance.disease.late}</td>
-                  <td className="text-slate-600">{rankingSummary.attendance.disease.early}</td>
-                  <td className="text-slate-600">{rankingSummary.attendance.disease.out}</td>
+                  <td className="text-slate-600">{effectiveRankSummary.attendance.disease.absent}</td>
+                  <td className="text-slate-600">{effectiveRankSummary.attendance.disease.late}</td>
+                  <td className="text-slate-600">{effectiveRankSummary.attendance.disease.early}</td>
+                  <td className="text-slate-600">{effectiveRankSummary.attendance.disease.out}</td>
                 </tr>
               </tbody>
             </table>
@@ -589,7 +610,7 @@ export function StudentPopover({
               <div className="text-right shrink-0">
                 <p className="text-[9px] sm:text-[10px] text-slate-400 font-black uppercase tracking-tighter mb-0.5 sm:mb-1">전교 석차</p>
                 <p className="text-lg sm:text-2xl font-black text-indigo-600">
-                  {rankingSummary?.totalRank ? `${rankingSummary.totalRank}위` : '-'}
+                  {effectiveRankSummary?.totalRank ? `${effectiveRankSummary.totalRank}위` : '-'}
                 </p>
               </div>
             </div>
@@ -683,7 +704,7 @@ export function StudentPopover({
               <div className="text-right shrink-0">
                 <p className="text-[9px] sm:text-[10px] text-slate-400 font-black uppercase tracking-tighter mb-0.5 sm:mb-1">미인정 결석</p>
                 <p className="text-lg sm:text-2xl font-black text-rose-600">
-                  {rankingSummary?.attendance?.unexcused?.absent ? `${rankingSummary.attendance.unexcused.absent}회` : '0회'}
+                  {effectiveRankSummary?.attendance?.unexcused?.absent ? `${effectiveRankSummary.attendance.unexcused.absent}회` : '0회'}
                 </p>
               </div>
             </div>

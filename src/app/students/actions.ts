@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath, revalidateTag } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions'
 
 const normalizeDate = (dateStr: string | null | undefined): string | null => {
@@ -621,7 +621,7 @@ export async function deleteFieldTrainingRecord(id: string) {
  * [복구] 특정 학생의 모든 성적 데이터를 가져옵니다.
  */
 export async function getStudentScoresById(studentId: string) {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('student_scores')
     .select('*')
@@ -641,8 +641,6 @@ export async function getStudentScoresById(studentId: string) {
  * [복구] 특정 학생의 석차 요약 정보를 계산합니다.
  */
 export async function getStudentRankSummary(studentId: string, graduationYear: number) {
-  const supabase = await createClient();
-  
   // 1. 해당 졸업연도 전체 요약 정보 활용 (lib/data.ts 함수 호출)
   const { getYearlyRankingsSummary } = await import('@/lib/data');
   const rankings = await getYearlyRankingsSummary(graduationYear);

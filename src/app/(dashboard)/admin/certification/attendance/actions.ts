@@ -1,11 +1,9 @@
-'use server';
+﻿'use server';
 
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
 
 export interface ParsedAttendanceData {
-
-
   studentId?: string;
   studentName: string;
   studentNumber: string;
@@ -146,6 +144,7 @@ export async function uploadStudentAttendance(
   const affectedGrades = Array.from(new Set(data.map(d => d.currentGrade).filter(Boolean)));
   affectedGrades.forEach(g => {
     revalidateTag(`cert-attendance-grade-${g}`);
+    clearAttendanceCache(g);
   });
   revalidateTag('cert-attendance');
   revalidatePath('/admin/certification/attendance');
@@ -190,34 +189,46 @@ export async function getAllAttendanceRecords(academicYear: number, currentGrade
   const supabase = createAdminClient();
   const targetGraduationYear = academicYear + (4 - currentGrade);
 
-  const { data: students } = await supabase
-    .from('students')
-    .select('id')
-    .eq('graduation_year', targetGraduationYear);
+  // 1. [1-Shot 초고속 병렬화] 학생 명부와 3개년 출결 레코드를 단 1번에 완전 동시 병렬 패칭
+  const [studentsRes, attendanceRes] = await Promise.all([
+    supabase
+      .from('students')
+      .select('id, student_name, student_number, major, class_info, graduation_year')
+      .eq('graduation_year', targetGraduationYear)
+      .order('major', { ascending: true })
+      .order('class_info', { ascending: true })
+      .order('student_number', { ascending: true }),
+    supabase
+      .from('student_attendance')
+      .select('*, students!inner(graduation_year)')
+      .eq('students.graduation_year', targetGraduationYear)
+      .order('grade', { ascending: true })
+      .range(0, 5000)
+  ]);
 
+  const students = studentsRes.data;
   if (!students || students.length === 0) return [];
 
-  const studentIds = students.map(s => s.id);
+  // 학생 맵 생성
+  const studentMap: Record<string, any> = {};
+  students.forEach(s => {
+    studentMap[s.id] = {
+      student_name: s.student_name,
+      student_number: s.student_number,
+      major: s.major,
+      class_info: s.class_info,
+      graduation_year: s.graduation_year
+    };
+  });
 
-  const { data, error } = await supabase
-    .from('student_attendance')
-    .select(`
-      *,
-      students (
-        student_name,
-        student_number,
-        major,
-        class_info,
-        graduation_year
-      )
-    `)
-    .in('student_id', studentIds)
-    .order('grade', { ascending: true });
+  // 출결 데이터에 학생 정보 바인딩
+  const combinedData = (attendanceRes.data || []).map(r => ({
+    ...r,
+    students: studentMap[r.student_id] || null
+  }));
 
-  if (error || !data) return [];
-  
-  attendanceMemoryCache[cacheKey] = { data, timestamp: now };
-  return data;
+  attendanceMemoryCache[cacheKey] = { data: combinedData, timestamp: now };
+  return combinedData;
 }
 
 /**

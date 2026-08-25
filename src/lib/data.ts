@@ -615,40 +615,72 @@ export async function getYearlyRankingsSummary(graduationYear: number, baseYear:
 
   const supabase = createAdminClient();
 
-  // 1. [최적화] 학생 정보 조회
-  const { data: students, error: sErr } = await supabase
-    .from('students')
-    .select('id, student_name, student_number, major, class_info, graduation_year')
-    .eq('graduation_year', graduationYear);
-
-  if (sErr || !students || students.length === 0) return {};
-  const studentIds = students.map(s => s.id);
-
-  // 2. [최적화] 해당 학생들의 성적 목록 및 출결 직접 쿼리 (무거운 JOIN 제거)
-  const [scoresResult, attendanceResult, weights] = await Promise.all([
+  // 1. [초고속 1단계] 학생 목록, 가중치 병렬 조회
+  const [studentsResult, weights] = await Promise.all([
     supabase
-      .from('student_scores')
-      .select('student_id, credits, achievement')
-      .in('student_id', studentIds)
-      .range(0, 10000),
-    supabase
-      .from('student_attendance')
-      .select('student_id, grade, semester, school_days, remarks, absent_unexcused, late_unexcused, early_unexcused, out_unexcused, absent_disease, late_disease, early_disease, out_disease, absent_other, late_other, early_other, out_other')
-      .in('student_id', studentIds),
+      .from('students')
+      .select('id, student_name, student_number, major, class_info, graduation_year')
+      .eq('graduation_year', graduationYear)
+      .order('major', { ascending: true })
+      .order('class_info', { ascending: true })
+      .order('student_number', { ascending: true }),
     getAchievementScores()
   ]);
 
+  if (studentsResult.error || !studentsResult.data || studentsResult.data.length === 0) return {};
+  const students = studentsResult.data;
+  const studentIds = students.map(s => s.id);
 
-  const allScores = scoresResult.data || [];
+  // 2. [초고속 2단계] 50명 단위 청크로 분할하여 무거운 JOIN 없이 B-Tree 인덱스로 초고속 병렬 쿼리
+  const CHUNK_SIZE = 50;
+  const chunks: string[][] = [];
+  for (let i = 0; i < studentIds.length; i += CHUNK_SIZE) {
+    chunks.push(studentIds.slice(i, i + CHUNK_SIZE));
+  }
+
+  const scorePromises = chunks.map(chunk =>
+    supabase
+      .from('student_scores')
+      .select('student_id, credits, achievement')
+      .in('student_id', chunk)
+      .range(0, 5000)
+  );
+
+  const attendancePromises = chunks.map(chunk =>
+    supabase
+      .from('student_attendance')
+      .select('student_id, grade, semester, school_days, remarks, absent_unexcused, late_unexcused, early_unexcused, out_unexcused, absent_disease, late_disease, early_disease, out_disease, absent_other, late_other, early_other, out_other')
+      .in('student_id', chunk)
+      .range(0, 5000)
+  );
+
+  const [scoreResults, attendanceResults] = await Promise.all([
+    Promise.all(scorePromises),
+    Promise.all(attendancePromises)
+  ]);
+
+  const allScores: any[] = [];
+  scoreResults.forEach(res => {
+    if (res.data && res.data.length > 0) {
+      allScores.push(...res.data);
+    }
+  });
+
+  const allAttendance: any[] = [];
+  attendanceResults.forEach(res => {
+    if (res.data && res.data.length > 0) {
+      allAttendance.push(...res.data);
+    }
+  });
+
   const maxWeight = Math.max(...Object.values(weights), 0);
+
 
 
   // 3. 학생별 통계 집계 초기화
   const stats: Record<string, any> = {};
   students.forEach(s => {
-    // [학년 계산 공식 수정] 4 - (졸업연도 - 학사학년도)
     const currentGrade = 4 - (s.graduation_year - baseYear);
-
     stats[s.id] = { 
       id: s.id, name: s.student_name, number: s.student_number, 
       major: s.major, classInfo: s.class_info, currentGrade,
@@ -672,11 +704,11 @@ export async function getYearlyRankingsSummary(graduationYear: number, baseYear:
   });
 
   // 5. 출결 데이터 집계
-  (attendanceResult.data || []).forEach(record => {
+  allAttendance.forEach(record => {
     const s = stats[record.student_id];
     if (!s) return;
+
     
-    // 개별 레코드 저장 (상세 모달용)
     if (!s.attnRecords) s.attnRecords = [];
     s.attnRecords.push(record);
 
@@ -718,45 +750,42 @@ export async function getYearlyRankingsSummary(graduationYear: number, baseYear:
       classRank: sameClass.findIndex(s => s.id === student.id) + 1,
       classTotal: sameClass.length,
       attendance: student.attendance || null,
-      attnRecords: student.attnRecords || [] // 상세 기록 리스트 추가
+      attnRecords: student.attnRecords || []
     };
   });
 
+  yearlyRankingsMemoryCache[cacheKey] = { data: resultMap, timestamp: now };
   return resultMap;
 }
 
-const getAchievementScoresCached = unstable_cache(
-  async (): Promise<Record<string, number>> => {
-    const supabase = createAdminClient()
-    try {
-      const { data, error } = await supabase.from('system_settings').select('value').eq('key', 'achievement_scores').single();
-      if (error) throw error
-      return data.value as Record<string, number>
-    } catch (error) {
-      return { "A": 5, "B": 4, "C": 3, "D": 2, "E": 1 }
-    }
-  },
-  ['achievement-scores'],
-  { revalidate: 3600, tags: ['settings'] }
-);
+let cachedAchievementScores: { data: Record<string, number>; timestamp: number } | null = null;
 
 export async function getAchievementScores(): Promise<Record<string, number>> {
-  return getAchievementScoresCached();
+  const now = Date.now();
+  if (cachedAchievementScores && (now - cachedAchievementScores.timestamp < 5 * 60 * 1000)) {
+    return cachedAchievementScores.data;
+  }
+  const supabase = createAdminClient();
+  try {
+    const { data, error } = await supabase.from('system_settings').select('value').eq('key', 'achievement_scores').single();
+    if (error || !data?.value) {
+      return { "A": 5, "B": 4, "C": 3, "D": 2, "E": 1 };
+    }
+    const val = data.value as Record<string, number>;
+    cachedAchievementScores = { data: val, timestamp: now };
+    return val;
+  } catch (error) {
+    return { "A": 5, "B": 4, "C": 3, "D": 2, "E": 1 };
+  }
 }
 
 /**
- * [캐싱] 특정 졸업연도 학생들의 석차 및 성취도 사전 계산 결과를 학년별 동적 태그로 서버 메모리에 캐싱합니다.
+ * [캐싱] 특정 졸업연도 학생들의 석차 및 성취도 사전 계산 결과 조회
  */
 export async function getCachedYearlyRankingsSummary(graduationYear: number, baseYear: number = 2026) {
-  return unstable_cache(
-    async () => getYearlyRankingsSummary(graduationYear, baseYear),
-    [`yearly-rankings-summary-${graduationYear}-${baseYear}`],
-    {
-      revalidate: 86400,
-      tags: [`cert-grades-${graduationYear}`, 'cert-grades']
-    }
-  )();
+  return getYearlyRankingsSummary(graduationYear, baseYear);
 }
+
 
 /**
  * [캐싱] 전교 학과 및 반 구조 조합 목록 캐싱 (students 태그 적용)

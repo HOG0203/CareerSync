@@ -15,36 +15,46 @@ import { logAuditAction } from '@/lib/audit-logger';
 
 const EVAL_SETTINGS_KEY = 'certification_evaluations_store';
 
+// 평가 데이터 저장소 인메모리 캐시 (0ms 응답용, 5분 TTL)
+let evalStoreMemoryCache: { data: Record<string, CertificationEvaluationData>; timestamp: number } | null = null;
+const EVAL_STORE_CACHE_TTL_MS = 5 * 60 * 1000;
+
+export async function clearEvaluationsStoreCache() {
+  evalStoreMemoryCache = null;
+}
+
 /**
- * 평가 데이터 저장소 (Map: studentId -> CertificationEvaluationData) 조회 (캐싱 적용)
+ * 평가 데이터 저장소 (Map: studentId -> CertificationEvaluationData) 조회 (초고속 인메모리 캐싱)
  */
-export const getEvaluationsStore = unstable_cache(
-  async (): Promise<Record<string, CertificationEvaluationData>> => {
-    try {
-      const supabase = createAdminClient();
-      const { data } = await supabase
-        .from('system_settings')
-        .select('value')
-        .eq('key', EVAL_SETTINGS_KEY)
-        .maybeSingle();
+export async function getEvaluationsStore(): Promise<Record<string, CertificationEvaluationData>> {
+  const now = Date.now();
+  if (evalStoreMemoryCache && (now - evalStoreMemoryCache.timestamp < EVAL_STORE_CACHE_TTL_MS)) {
+    return evalStoreMemoryCache.data;
+  }
 
-      return (data?.value as Record<string, CertificationEvaluationData>) || {};
-    } catch (e) {
-      console.error('Error in getEvaluationsStore:', e);
-      return {};
-    }
-  },
-  ['certification-evaluations-store-cache'],
-  { revalidate: 3600, tags: ['cert-eval'] }
-);
+  try {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', EVAL_SETTINGS_KEY)
+      .maybeSingle();
 
-
+    const store = (data?.value as Record<string, CertificationEvaluationData>) || {};
+    evalStoreMemoryCache = { data: store, timestamp: now };
+    return store;
+  } catch (e) {
+    console.error('Error in getEvaluationsStore:', e);
+    return {};
+  }
+}
 
 // 옥저인재인증제 종합평가 서버 인메모리 캐시 (0ms 초고속 응답용, 5분 TTL)
 const certSummaryMemoryCache: Record<number, { data: FullStudentEvaluation[]; timestamp: number }> = {};
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5분
 
 export async function clearCertificationSummaryCache(gradeNum?: number) {
+  evalStoreMemoryCache = null;
   if (gradeNum) {
     delete certSummaryMemoryCache[gradeNum];
   } else {
@@ -52,11 +62,10 @@ export async function clearCertificationSummaryCache(gradeNum?: number) {
   }
 }
 
-
 /**
- * 특정 학년의 전교생 옥저인재인증제 종합 평가 목록 조회 (초고속 인메모리 + 경량 쿼리 최적화)
+ * 특정 학년의 전교생 옥저인재인증제 종합 평가 목록 조회 (1-Shot 완전 동시 병렬 쿼리 + 초고속 인메모리)
  */
-export async function getCertificationSummaryList(gradeNum: number): Promise<FullStudentEvaluation[]> {
+export async function getCertificationSummaryList(gradeNum: number, preloadedBaseYear?: number): Promise<FullStudentEvaluation[]> {
   const now = Date.now();
   const cached = certSummaryMemoryCache[gradeNum];
   if (cached && (now - cached.timestamp < CACHE_TTL_MS)) {
@@ -64,12 +73,11 @@ export async function getCertificationSummaryList(gradeNum: number): Promise<Ful
   }
 
   const supabase = createAdminClient();
-  const settings = await getSystemSettings();
-  const baseYear = settings.baseYear;
+  const baseYear = preloadedBaseYear || (await getSystemSettings()).baseYear;
   const targetGradYear = baseYear + (4 - gradeNum);
 
-  // 1. 학생 목록 및 평가 저장소를 1회 병렬 패칭
-  const [studentsRes, evalStore] = await Promise.all([
+  // 1. [1-Shot 동시 병렬화] 학생 목록, 3개년 출결, 평가 스토어를 단 1번에 동시 병렬 패칭
+  const [studentsRes, attendanceRes, evalStore] = await Promise.all([
     supabase
       .from('students')
       .select('id, student_name, student_number, major, class_info, graduation_year, certificates, career_course')
@@ -77,6 +85,11 @@ export async function getCertificationSummaryList(gradeNum: number): Promise<Ful
       .order('major', { ascending: true })
       .order('class_info', { ascending: true })
       .order('student_number', { ascending: true }),
+    supabase
+      .from('student_attendance')
+      .select('student_id, grade, absent_unexcused, late_unexcused, early_unexcused, out_unexcused, students!inner(graduation_year)')
+      .eq('students.graduation_year', targetGradYear)
+      .range(0, 5000),
     getEvaluationsStore()
   ]);
 
@@ -85,22 +98,14 @@ export async function getCertificationSummaryList(gradeNum: number): Promise<Ful
     return [];
   }
 
-  const studentIds = students.map(s => s.id);
-
-  // 2. 출결 데이터를 학생 ID 목록으로 직접 초고속 쿼리 (무거운 DB Inner Join 제거)
-  const { data: attendanceData } = await supabase
-    .from('student_attendance')
-    .select('student_id, grade, absent_unexcused, late_unexcused, early_unexcused, out_unexcused')
-    .in('student_id', studentIds);
-
   // 출결 데이터를 student_id 별로 그룹화
   const attendanceMap: Record<string, any[]> = {};
-  (attendanceData || []).forEach(r => {
+  (attendanceRes.data || []).forEach(r => {
     if (!attendanceMap[r.student_id]) attendanceMap[r.student_id] = [];
     attendanceMap[r.student_id].push(r);
   });
 
-  // 3. 각 학생별 100점 만점 종합 평가 산출
+  // 2. 각 학생별 100점 만점 종합 평가 산출
   const results: FullStudentEvaluation[] = students.map(s => {
     const studentEvalData = evalStore[s.id] || { student_id: s.id };
 
@@ -121,9 +126,10 @@ export async function getCertificationSummaryList(gradeNum: number): Promise<Ful
 /**
  * [캐싱] 학년별 옥저인재인증제 종합 평가 목록 캐시 조회
  */
-export async function getCachedCertificationSummaryList(gradeNum: number) {
-  return getCertificationSummaryList(gradeNum);
+export async function getCachedCertificationSummaryList(gradeNum: number, preloadedBaseYear?: number) {
+  return getCertificationSummaryList(gradeNum, preloadedBaseYear);
 }
+
 
 /**
  * [캐싱] 학년별 직기초 성적 및 석차 요약 목록 조회
@@ -642,6 +648,13 @@ export async function batchImportVocationalAction(studentsList: VocationalImport
     const mVal = (row.math && row.math > 0) ? row.math : 5;
     const pVal = (row.problem && row.problem > 0) ? row.problem : 5;
 
+    // 국/영/수/문제 등급이 있거나 등급합이 있으면 응시 완료로 안전하게 인정
+    const hasScoreInput = (row.korean && row.korean > 0) || (row.english && row.english > 0) || (row.math && row.math > 0) || (row.problem && row.problem > 0) || (row.gradeSum && row.gradeSum > 0 && row.gradeSum < 20);
+    const isCompletedFinal = row.isCompleted || (row.isCompleted !== false && hasScoreInput) || hasScoreInput;
+
+    const calculatedSum = kVal + eVal + mVal + pVal;
+    const finalGradeSum = isCompletedFinal ? ((row.gradeSum && row.gradeSum > 0) ? row.gradeSum : calculatedSum) : 20;
+
     const auditMeta = {
       userId: profile.id,
       userName: profile.full_name || profile.username || '교사',
@@ -654,10 +667,11 @@ export async function batchImportVocationalAction(studentsList: VocationalImport
       english: row.english || 0,
       math: row.math || 0,
       problem: row.problem || 0,
-      gradeSum: row.isCompleted ? (kVal + eVal + mVal + pVal) : 20,
-      isCompleted: row.isCompleted,
+      gradeSum: finalGradeSum,
+      isCompleted: isCompletedFinal,
       created_by: auditMeta,
     };
+
 
     const prevDetails = prev.vocational_details || {};
     const updatedDetails = {

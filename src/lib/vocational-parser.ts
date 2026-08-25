@@ -123,16 +123,16 @@ export function parseSingleVocationalFile(
   }
 
   const headers = rows[headerRowIdx].map(c => String(c).trim());
-  const majorIdx = headers.findIndex(h => h === '학과' || h === '전공');
-  const classIdx = headers.findIndex(h => h === '반' || h === '학급' || h.includes('과반') || h.includes('학급'));
-  const numIdx = headers.findIndex(h => h.includes('번호') || h === '번');
-  const nameIdx = headers.findIndex(h => h.includes('이름') || h.includes('성명'));
-  const completedIdx = headers.findIndex(h => h.includes('완료여부') || h.includes('응시여부'));
+  const majorIdx = headers.findIndex(h => h === '학과' || h === '전공' || h === '과' || h === '계열' || h.includes('학과') || h.includes('전공'));
+  const classIdx = headers.findIndex(h => h === '반' || h === '학급' || h === '분반' || h.includes('과반') || h.includes('학급') || h.includes('반'));
+  const numIdx = headers.findIndex(h => h === '번호' || h === '번' || h === '학번' || h === 'No' || h === 'NO' || h === 'No.' || h.includes('번호'));
+  const nameIdx = headers.findIndex(h => h === '이름' || h === '성명' || h === '학생명' || h === '학생이름' || h.replace(/\s+/g, '') === '성명' || h.includes('이름') || h.includes('성명'));
+  const completedIdx = headers.findIndex(h => h.includes('완료') || h.includes('응시') || h.includes('이수') || h === '상태' || h === '구분');
   const koreanIdx = headers.findIndex(h => h.includes('국어'));
   const englishIdx = headers.findIndex(h => h.includes('영어'));
   const mathIdx = headers.findIndex(h => h.includes('수리'));
-  const problemIdx = headers.findIndex(h => h.includes('문제해결'));
-  const gradeSumIdx = headers.findIndex(h => h.includes('등급합'));
+  const problemIdx = headers.findIndex(h => h.includes('문제해결') || h.includes('문제'));
+  const gradeSumIdx = headers.findIndex(h => h.includes('등급합') || h.includes('총합') || h.includes('합계'));
 
   const records: RawVocalRecord[] = [];
 
@@ -150,20 +150,36 @@ export function parseSingleVocationalFile(
       classRaw = String(row[classIdx] || '').trim();
     }
     const numRaw = String(row[numIdx] || '').replace(/[^0-9]/g, '');
-    const isCompleted = String(row[completedIdx] || '').includes('완료');
-    
+
+    const rawCompletedStr = completedIdx !== -1 ? String(row[completedIdx] || '').trim() : '';
     const korean = Number(row[koreanIdx] || 0);
     const english = Number(row[englishIdx] || 0);
     const math = Number(row[mathIdx] || 0);
     const problem = Number(row[problemIdx] || 0);
-    
+    const rawGradeSum = gradeSumIdx !== -1 ? Number(row[gradeSumIdx] || 0) : 0;
+
     // 미응시 영역(0)은 5등급으로 계산
     const kVal = (korean > 0) ? korean : 5;
     const eVal = (english > 0) ? english : 5;
     const mVal = (math > 0) ? math : 5;
     const pVal = (problem > 0) ? problem : 5;
-    
-    const gradeSum = isCompleted ? (kVal + eVal + mVal + pVal) : 20;
+
+    // '완료' 기재 시 무조건 응시 완료 (1순위)
+    const isCompletedText = rawCompletedStr.includes('완료') || 
+      ['응시', '응시완료', 'O', 'ㅇ', 'Y', 'YES', '이수', '참여', '합격', 'TRUE', '1'].some(k => rawCompletedStr.toUpperCase().includes(k));
+    const isExplicitlyAbsent = ['미응시', '미완료', '결시', 'X', 'NO', 'FALSE', '0'].some(k => rawCompletedStr === k);
+    const hasScoreInput = (korean > 0 || english > 0 || math > 0 || problem > 0 || (rawGradeSum > 0 && rawGradeSum < 20));
+
+    let isCompleted = false;
+    if (isExplicitlyAbsent) {
+      isCompleted = false;
+    } else if (isCompletedText || hasScoreInput) {
+      isCompleted = true;
+    }
+
+    const calculatedSum = kVal + eVal + mVal + pVal;
+    const gradeSum = isCompleted ? (rawGradeSum > 0 ? rawGradeSum : calculatedSum) : 20;
+
 
     let calculatedScore = 0;
     if (grade === 1) {
@@ -173,6 +189,7 @@ export function parseSingleVocationalFile(
     } else {
       calculatedScore = calcVocalGrade3Score(gradeSum).score;
     }
+
 
     records.push({
       id: `${fileName}_row_${r}_${name}_${numRaw}`,
@@ -233,50 +250,68 @@ export function buildStudentCentricVocalRows(
     const cleanName = String(st.student_name || '').trim().replace(/\s+/g, '');
     const cleanNum = String(st.student_number || '').replace(/[^0-9]/g, '');
 
-    // 1학년 평가 후보
-    const g1Candidates = allRawRecords.filter(r => 
-      r.evalGrade === 1 &&
-      r.targetGraduationYear === st.graduation_year &&
-      r.studentName === cleanName &&
-      (r.normMajor === normDbMajor || !r.normMajor)
-    );
+    const cleanDbClass = String(st.class_info || '').replace(/[^0-9]/g, '');
+    const cleanDbNum = String(st.student_number || '').replace(/[^0-9]/g, '');
 
-    // 2학년 평가 후보
-    const g2Candidates = allRawRecords.filter(r => 
-      r.evalGrade === 2 &&
-      r.targetGraduationYear === st.graduation_year &&
-      r.studentName === cleanName &&
-      (r.normMajor === normDbMajor || !r.normMajor)
-    );
+    // 각 학년별 평가 후보 필터링 및 지능형 매핑
+    const getGradeCandidates = (targetGradeNum: number) => {
+      return allRawRecords.filter(r => 
+        r.evalGrade === targetGradeNum &&
+        r.targetGraduationYear === st.graduation_year &&
+        r.studentName === cleanName &&
+        (r.normMajor === normDbMajor || !r.normMajor)
+      );
+    };
 
-    // 3학년 평가 후보
-    const g3Candidates = allRawRecords.filter(r => 
-      r.evalGrade === 3 &&
-      r.targetGraduationYear === st.graduation_year &&
-      r.studentName === cleanName &&
-      (r.normMajor === normDbMajor || !r.normMajor)
-    );
+    const g1Candidates = getGradeCandidates(1);
+    const g2Candidates = getGradeCandidates(2);
+    const g3Candidates = getGradeCandidates(3);
 
-    // 수동 선택 또는 기본 선택 판정 헬퍼
+    // 수동 선택 또는 지능형 자동 매칭 판정 헬퍼
     const pickRecord = (gradeNum: number, candidates: RawVocalRecord[]) => {
       const manualKey = `${st.id}_grade_${gradeNum}`;
       if (manualSelections[manualKey]) {
-        if (manualSelections[manualKey] === 'none') return { id: 'none', record: undefined };
+        if (manualSelections[manualKey] === 'none') return { id: 'none', record: undefined, isAmbiguous: false };
         const found = candidates.find(c => c.id === manualSelections[manualKey]);
-        if (found) return { id: found.id, record: found };
+        if (found) return { id: found.id, record: found, isAmbiguous: false };
+      }
+
+      // 후보가 0개
+      if (candidates.length === 0) {
+        return { id: undefined, record: undefined, isAmbiguous: false };
       }
 
       // 후보가 1개인 경우 (단일 매칭)는 자동 연결
       if (candidates.length === 1) {
-        return { id: candidates[0].id, record: candidates[0] };
+        return { id: candidates[0].id, record: candidates[0], isAmbiguous: false };
       }
 
-      // 동명이인 등 복수 후보가 있는 경우: 기본값을 '선택 안 함(none)'으로 지정하여 교사가 직접 선택하도록 유도
-      if (candidates.length > 1) {
-        return { id: 'none', record: undefined };
+      // 후보가 2개 이상인 경우 (동명이인 발생):
+      // 1순위: [학과 + 반 + 번호]까지 100% 일치하는 레코드 탐색 (현재 학년도 또는 반/번호가 일치하는 경우)
+      const exactMatches = candidates.filter(r => {
+        const rNum = String(r.rawNumber || '').replace(/[^0-9]/g, '');
+        const rClass = String(r.rawClass || '').replace(/[^0-9]/g, '');
+        const numMatch = cleanDbNum && rNum ? cleanDbNum === rNum : false;
+        const classMatch = cleanDbClass && rClass ? cleanDbClass === rClass : false;
+        return numMatch && classMatch;
+      });
+
+      if (exactMatches.length === 1) {
+        // 완벽히 학적(반, 번호)이 일치하므로 동명이인 모달 없이 즉시 1:1 자동 매칭!
+        return { id: exactMatches[0].id, record: exactMatches[0], isAmbiguous: false };
       }
 
-      return { id: undefined, record: undefined };
+      // 2순위: 번호만이라도 일치하는 단일 후보가 있는 경우
+      const numMatches = candidates.filter(r => {
+        const rNum = String(r.rawNumber || '').replace(/[^0-9]/g, '');
+        return cleanDbNum && rNum && cleanDbNum === rNum;
+      });
+      if (numMatches.length === 1) {
+        return { id: numMatches[0].id, record: numMatches[0], isAmbiguous: false };
+      }
+
+      // 3순위: 과년도 데이터이거나 반/번호가 달라 특정할 수 없는 경우 -> 동명이인 선택 창 유도
+      return { id: 'none', record: undefined, isAmbiguous: true };
     };
 
     const g1 = pickRecord(1, g1Candidates);
@@ -287,9 +322,7 @@ export function buildStudentCentricVocalRows(
                        (g2.record?.calculatedScore || 0) + 
                        (g3.record?.calculatedScore || 0);
 
-    const hasAmbiguity = (g1Candidates.length > 1 && (!manualSelections[`${st.id}_grade_1`] || manualSelections[`${st.id}_grade_1`] === 'none')) || 
-                         (g2Candidates.length > 1 && (!manualSelections[`${st.id}_grade_2`] || manualSelections[`${st.id}_grade_2`] === 'none')) || 
-                         (g3Candidates.length > 1 && (!manualSelections[`${st.id}_grade_3`] || manualSelections[`${st.id}_grade_3`] === 'none'));
+    const hasAmbiguity = g1.isAmbiguous || g2.isAmbiguous || g3.isAmbiguous;
 
     resultRows.push({
       studentId: st.id,
@@ -315,6 +348,7 @@ export function buildStudentCentricVocalRows(
 
   return resultRows;
 }
+
 
 import ExcelJS from 'exceljs';
 

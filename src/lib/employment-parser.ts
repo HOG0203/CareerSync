@@ -145,12 +145,13 @@ export function parseEmploymentWorkbook(fileBuffer: ArrayBuffer, fileName: strin
 
     // 주요 컬럼 인덱스 매핑
     const colMap = {
-      grade: headers.findIndex(h => h === '학년' || h === '현재학년' || h === '학년도학년'),
-      majorClass: headers.findIndex(h => h.includes('과반') || (h.includes('학과') && h.includes('반')) || h === '학급' || h === '과'),
-      major: headers.findIndex(h => h === '학과' || h === '전공'),
-      classNum: headers.findIndex(h => h === '반' || h === '학급'),
-      studentNum: headers.findIndex(h => h === '번호' || h === '번'),
-      studentName: headers.findIndex(h => h === '이름' || h === '성명' || h === '학생명'),
+      grade: headers.findIndex(h => h === '학년' || h === '현재학년' || h === '학년도학년' || h.includes('학년')),
+      majorClass: headers.findIndex(h => h.includes('과반') || (h.includes('학과') && h.includes('반')) || h === '학급' || h === '과' || h.includes('소속') || h.includes('전공반')),
+      major: headers.findIndex(h => h === '학과' || h === '전공' || h === '과' || h === '계열' || h.includes('학과') || h.includes('전공')),
+      classNum: headers.findIndex(h => h === '반' || h === '학급' || h === '분반' || h === '반번호'),
+      studentNum: headers.findIndex(h => h === '번호' || h === '번' || h === '학번' || h === 'No' || h === 'NO' || h === 'No.' || h.includes('번호')),
+      studentName: headers.findIndex(h => h === '이름' || h === '성명' || h === '학생명' || h === '학생이름' || h.replace(/\s+/g, '') === '성명'),
+
       
       // 1. 산학교육
       edu1: isEduSheet || (!isCourseSheet && !isClubSheet && !isContestSheet && !isFieldSheet)
@@ -232,7 +233,7 @@ export function parseEmploymentWorkbook(fileBuffer: ArrayBuffer, fileName: strin
         if (!isNaN(cnVal)) classNumber = cnVal;
       }
 
-      // 과반 컬럼 병합 형태인 경우 보조 처리
+      // 과반 컬럼 병합 형태인 경우 보조 처리 (예: "바이오화학과 1반", "기계 2", "3학년 1반")
       if (colMap.majorClass !== -1 && (!major || classNumber === 0)) {
         const mcStr = String(row[colMap.majorClass] || '').trim();
         if (!parsedGrade) {
@@ -240,20 +241,33 @@ export function parseEmploymentWorkbook(fileBuffer: ArrayBuffer, fileName: strin
           if (gMatch) parsedGrade = parseInt(gMatch[1], 10);
         }
         if (!major) {
-          const mMatch = mcStr.match(/([가-힣a-zA-Z]+과?)/);
+          const mMatch = mcStr.match(/([가-힣a-zA-Z]+(?:과|계열)?)/);
           if (mMatch) major = mMatch[1];
         }
         if (classNumber === 0) {
-          const cMatch = mcStr.match(/(\d+)반/);
+          const cMatch = mcStr.match(/(\d+)\s*반/);
           if (cMatch) classNumber = parseInt(cMatch[1], 10);
         }
       }
 
       let studentNumber = 0;
-      if (colMap.studentNum !== -1) {
-        const snVal = parseInt(String(row[colMap.studentNum]).replace(/\D/g, ''), 10);
-        if (!isNaN(snVal)) studentNumber = snVal;
+      if (colMap.studentNum !== -1 && row[colMap.studentNum] !== undefined) {
+        const rawNumStr = String(row[colMap.studentNum]).trim().replace(/\D/g, '');
+        // 4자리 또는 5자리 학번 (예: 30112 -> 3학년 1반 12번 / 3112 -> 3학년 1반 12번) 자동 분해
+        if (rawNumStr.length === 5) {
+          if (!parsedGrade) parsedGrade = parseInt(rawNumStr[0], 10);
+          if (classNumber === 0) classNumber = parseInt(rawNumStr.slice(1, 3), 10);
+          studentNumber = parseInt(rawNumStr.slice(3), 10);
+        } else if (rawNumStr.length === 4) {
+          if (!parsedGrade) parsedGrade = parseInt(rawNumStr[0], 10);
+          if (classNumber === 0) classNumber = parseInt(rawNumStr[1], 10);
+          studentNumber = parseInt(rawNumStr.slice(2), 10);
+        } else {
+          const snVal = parseInt(rawNumStr, 10);
+          if (!isNaN(snVal)) studentNumber = snVal;
+        }
       }
+
 
       const recId = `emp_${fileName}_${sheetName}_${r}`;
 
@@ -581,13 +595,13 @@ export function buildUploadedOnlyEmploymentRows(
     let unmatchedReason = '';
     let candidateStudents: any[] = [];
 
-    // 숫자 및 학과 정규화 헬퍼
+    // 숫자 및 학과 정규화 헬퍼 (0 또는 빈값은 null로 처리하여 잘못된 불일치 방지)
     const toNum = (v: any) => {
-      if (v === null || v === undefined || v === '') return null;
+      if (v === null || v === undefined || v === '' || v === 0 || v === '0') return null;
       const parsed = parseInt(String(v).replace(/[^0-9]/g, ''), 10);
-      return isNaN(parsed) ? null : parsed;
+      return isNaN(parsed) || parsed === 0 ? null : parsed;
     };
-    const toMajor = (m: any) => String(m || '').trim().replace(/\s+/g, '').replace(/과$/, '').replace(/계열$/, '');
+    const toMajor = (m: any) => String(m || '').trim().replace(/\s+/g, '').replace(/과$/, '').replace(/계열$/, '').replace(/공업계$/, '');
 
     const excelGrade = toNum(rawGrade);
     const excelClass = toNum(rawClass);
@@ -653,6 +667,7 @@ export function buildUploadedOnlyEmploymentRows(
           matchedStudent = exactMatches[0];
           matchStatus = 'matched';
         } else if (exactMatches.length > 1) {
+          // 학년/과/반/번호 정보가 부족하여 여전히 동명이인 여러 명이 남은 경우
           matchStatus = 'ambiguous';
           candidateStudents = exactMatches;
           unmatchedReason = `동명이인 ${exactMatches.length}명이 존재하여 명확한 선택이 필요합니다.`;
@@ -663,6 +678,7 @@ export function buildUploadedOnlyEmploymentRows(
         }
       }
     }
+
 
     // 3. 업로드된 파일 내의 순수 데이터만 추출 (기존 DB 데이터와 혼합하지 않고, 업로드 파일의 실적만 정확히 반영)
     const industryEduList: { id: string; title: string; dateOrTerm?: string }[] = [];

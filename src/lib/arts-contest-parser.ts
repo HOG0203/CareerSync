@@ -75,32 +75,30 @@ export function parseArtsContestWorkbook(fileBuffer: ArrayBuffer, fileName: stri
 
     const headers = data[headerRowIdx].map((h: any) => String(h).trim());
 
+    // 컬럼 인덱스 매핑
     const colMap = {
-      grade: headers.findIndex(h => h === '학년' || h === '현재학년' || h === '학년도학년'),
-      major: headers.findIndex(h => h === '학과' || h === '전공'),
-      classNum: headers.findIndex(h => h === '반' || h === '학급'),
-      majorClass: headers.findIndex(h => h.includes('과반') || (h.includes('학과') && h.includes('반')) || h === '학급' || h === '과'),
-      studentNum: headers.findIndex(h => h === '번호' || h === '번'),
-      studentName: headers.findIndex(h => h === '이름' || h === '성명' || h === '학생명'),
-
-      // 예체능 (운동부 / 관악부)
-      sportsCategory: headers.findIndex(h => h.includes('구분') && (h.includes('운동') || h.includes('관악') || h.includes('예체능'))),
-      generalCategory: headers.findIndex(h => h === '구분'),
-      sportsTerm: headers.findIndex(h => (h.includes('학기') && !h.includes('실적')) || h === '참여학기'),
-      sportsDept: headers.findIndex(h => h.includes('부서명') || h.includes('활동부서') || h.includes('종목') || h.includes('운동부') || h.includes('관악부')),
-
-      // 교내외 대회 (참가 / 입상)
-      contestType: headers.findIndex(h => h === '실적구분' || h.includes('실적구분') || (h.includes('구분') && (h.includes('입상') || h.includes('참가')))),
-      contestCategory: headers.findIndex(h => h === '대회구분' || h.includes('대회구분') || h.includes('교내외') || (h.includes('구분') && (h.includes('교내') || h.includes('교외')))),
-      contestTitle: headers.findIndex(h => (h === '대회명' || h.includes('대회명') || h.includes('행사명') || h.includes('대회제목')) && !h.includes('구분')),
-      contestDate: headers.findIndex(h => h.includes('일자') || h.includes('일시') || h.includes('날짜') || h.includes('수상일')),
-      contestAward: headers.findIndex(h => (h === '수상내역' || h.includes('수상내역') || h.includes('상명') || h.includes('입상내역') || h.includes('등급')) && !h.includes('구분')),
+      grade: headers.findIndex(h => h === '학년' || h === '현재학년' || h === '학년도학년' || h.includes('학년')),
+      majorClass: headers.findIndex(h => h.includes('과반') || (h.includes('학과') && h.includes('반')) || h === '학급' || h === '과' || h.includes('소속') || h.includes('전공반')),
+      major: headers.findIndex(h => h === '학과' || h === '전공' || h === '과' || h === '계열' || h.includes('학과') || h.includes('전공')),
+      classNum: headers.findIndex(h => h === '반' || h === '학급' || h === '분반' || h === '반번호'),
+      studentNum: headers.findIndex(h => h === '번호' || h === '번' || h === '학번' || h === 'No' || h === 'NO' || h === 'No.' || h.includes('번호')),
+      studentName: headers.findIndex(h => h === '이름' || h === '성명' || h === '학생명' || h === '학생이름' || h.replace(/\s+/g, '') === '성명'),
+      
+      // 공통 구분
+      generalCategory: headers.findIndex(h => h === '구분' || h === '분야' || h === '항목'),
+      
+      // A. 예체능 (운동부 / 관악부)
+      sportsCategory: headers.findIndex(h => h === '예체능구분' || h.includes('예체능') || h.includes('운동부') || h.includes('관악부')),
+      sportsDept: headers.findIndex(h => h === '소속부' || h === '종목' || h === '부명' || h.includes('종목')),
+      sportsTerm: headers.findIndex(h => (h.includes('활동학기') || h.includes('참여학기') || h.includes('학기')) && !h.includes('대회')),
+      
+      // B. 교내외 대회
+      contestCategory: headers.findIndex(h => h === '대회구분' || h === '교내외구분' || h.includes('교내') || h.includes('교외')),
+      contestType: headers.findIndex(h => h === '실적구분' || h === '참가입상구분' || h === '수상여부' || h.includes('입상구분')),
+      contestTitle: headers.findIndex(h => h === '대회명' || h.includes('대회명') || h === '행사명' || h.includes('대회')),
+      contestAward: headers.findIndex(h => h === '수상명' || h === '입상명' || h.includes('상명') || h.includes('수상') || h.includes('입상')),
+      contestDate: headers.findIndex(h => h.includes('일자') || h.includes('일시') || h.includes('수상일') || h.includes('개최일') || h.includes('날짜')),
     };
-
-    // contestTitle 대체 탐색
-    if (colMap.contestTitle === -1) {
-      colMap.contestTitle = headers.findIndex(h => h.includes('대회') && !h.includes('구분'));
-    }
 
     if (colMap.studentName === -1) continue;
 
@@ -137,11 +135,11 @@ export function parseArtsContestWorkbook(fileBuffer: ArrayBuffer, fileName: stri
           if (gMatch) parsedGrade = parseInt(gMatch[1], 10);
         }
         if (!major) {
-          const mMatch = mcStr.match(/([가-힣a-zA-Z]+과?)/);
+          const mMatch = mcStr.match(/([가-힣a-zA-Z]+(?:과|계열)?)/);
           if (mMatch) major = mMatch[1];
         }
         if (classNumber === 0) {
-          const cMatch = mcStr.match(/(\d+)반/);
+          const cMatch = mcStr.match(/(\d+)\s*반/);
           if (cMatch) classNumber = parseInt(cMatch[1], 10);
         }
       }
@@ -311,17 +309,19 @@ export function buildUploadedOnlyArtsContestRows(
     let candidateStudents: any[] = [];
 
     // 숫자 및 학과 정규화 헬퍼
+    // 숫자 및 학과 정규화 헬퍼 (0 또는 빈값은 null로 처리하여 잘못된 불일치 방지)
     const toNum = (v: any) => {
-      if (v === null || v === undefined || v === '') return null;
+      if (v === null || v === undefined || v === '' || v === 0 || v === '0') return null;
       const parsed = parseInt(String(v).replace(/[^0-9]/g, ''), 10);
-      return isNaN(parsed) ? null : parsed;
+      return isNaN(parsed) || parsed === 0 ? null : parsed;
     };
-    const toMajor = (m: any) => String(m || '').trim().replace(/\s+/g, '').replace(/과$/, '').replace(/계열$/, '');
+    const toMajor = (m: any) => String(m || '').trim().replace(/\s+/g, '').replace(/과$/, '').replace(/계열$/, '').replace(/공업계$/, '');
 
     const excelGrade = toNum(rawGrade);
     const excelClass = toNum(rawClass);
     const excelNum = toNum(rawNum);
     const excelMajor = toMajor(rawMajor);
+
 
     if (manualSelections[key]) {
       const selectedId = manualSelections[key];

@@ -15,7 +15,7 @@ export default async function CertificationMainPage({
 }: {
   searchParams: Promise<{ grade?: string }>;
 }) {
-  // 1. 기반 설정, 프로필, 마스터 자격증, 검색 파라미터를 1회 완전 병렬 패칭
+  // 1. 프로필, 시스템 설정, 마스터 자격증, searchParams 1회 완전 동시 병렬 패칭
   const [profile, settings, masterCertificates, params] = await Promise.all([
     getCurrentUserProfile(),
     getSystemSettings(),
@@ -35,8 +35,8 @@ export default async function CertificationMainPage({
   }
   const selectedGradeNum = params.grade ? parseInt(params.grade) : defaultGradeNum;
 
-  // 2. 인메모리 캐싱된 평가 목록 즉시 로드 (0ms)
-  const evaluations = await getCachedCertificationSummaryList(selectedGradeNum);
+  // 2. 인메모리 캐싱된 평가 목록 즉시 로드 (중복 설정 쿼리 방지)
+  const evaluations = await getCachedCertificationSummaryList(selectedGradeNum, baseYear);
 
   return (
     <CertificationSummaryClient
@@ -49,4 +49,5 @@ export default async function CertificationMainPage({
     />
   );
 }
+
 
