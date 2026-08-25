@@ -5,7 +5,9 @@ import {
   getCachedTeacherProfiles, 
   getCachedClassStructureCombinations, 
   getCachedProfiles, 
-  getCachedAllStudentBaseData 
+  getCachedAllStudentBaseData,
+  getCachedYearlyRankingsSummary,
+  getDashboardStudentData
 } from '@/lib/data';
 import { getSystemSettings, getCachedMasterCertificates } from '@/app/(dashboard)/admin/settings/actions';
 import { getCachedAuditLogs } from '@/lib/audit-logger';
@@ -23,6 +25,7 @@ export async function GET() {
     // 1. 기본 설정 및 기준년도 조회 (캐시 웜업)
     const settings = await getSystemSettings();
     const currentGradYear = (settings.baseYear + 1).toString();
+    const nextGradYear = (settings.baseYear + 2).toString();
 
     // 2. 전 시스템 핵심 데이터 병렬 사전 렌더링 (Cache Warmup)
     await Promise.all([
@@ -33,7 +36,11 @@ export async function GET() {
       getCachedProfiles(),
       getCachedAllStudentBaseData(),
       getCachedAuditLogs(),
-      getCachedFilteredStudentData(currentGradYear, settings.baseYear)
+      getCachedFilteredStudentData(currentGradYear, settings.baseYear),
+      getCachedFilteredStudentData(nextGradYear, settings.baseYear),
+      getDashboardStudentData(currentGradYear),
+      getCachedYearlyRankingsSummary(settings.baseYear + 1, settings.baseYear),
+      getCachedYearlyRankingsSummary(settings.baseYear + 2, settings.baseYear)
     ]);
 
     const duration = Date.now() - startTime;

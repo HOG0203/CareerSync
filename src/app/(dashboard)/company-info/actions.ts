@@ -35,28 +35,23 @@ const STUDENT_FIELDS = 'id, student_name, phone_number, graduation_year, major, 
 const EMPLOYMENT_FIELDS = 'id, is_desiring_employment, employment_status, company_type, business_type, company, remarks';
 const TRAINING_FIELDS = 'id, student_id, training_order, company, start_date, end_date, stipend_status, hiring_status, conversion_date';
 
-// 기업 목록 서버 인메모리 캐시 (0ms 초고속 응답용, 5분 TTL)
-const companyMemoryCache: Record<string, { data: CompanyData[]; timestamp: number }> = {};
-const COMPANY_CACHE_TTL_MS = 5 * 60 * 1000;
+const g = (typeof globalThis !== 'undefined' ? globalThis : global) as any;
+
+// 기업 목록 서버 인메모리 캐시 (0ms 초고속 SWR 응답용, 30분 TTL)
+const companyMemoryCache: Record<string, { data: CompanyData[]; timestamp: number }> = 
+  g.__companyMemoryCache || (g.__companyMemoryCache = {});
+const companyInFlight: Record<string, Promise<CompanyData[]>> = 
+  g.__companyInFlight || (g.__companyInFlight = {});
+const COMPANY_CACHE_TTL_MS = 30 * 60 * 1000;
 
 export async function clearCompanyCache() {
   Object.keys(companyMemoryCache).forEach(k => delete companyMemoryCache[k]);
+  Object.keys(companyInFlight).forEach(k => delete companyInFlight[k]);
 }
 
-/**
- * 기업 목록 검색 및 조회 (취업생/실습생 카운트 + 인메모리 캐싱)
- */
-export async function getCompanies(search?: string): Promise<CompanyData[]> {
-  const cleanSearch = search ? search.trim() : '';
-  const now = Date.now();
-  const cached = companyMemoryCache[cleanSearch];
-  if (cached && (now - cached.timestamp < COMPANY_CACHE_TTL_MS)) {
-    return cached.data;
-  }
-
+async function computeCompanies(cleanSearch: string): Promise<CompanyData[]> {
   const supabase = createAdminClient();
 
-  // 시스템 기준년도 + companies + 카운트 데이터를 병렬로 조회
   let query = supabase.from('companies')
     .select('id, name, location, industry, company_type')
     .order('name');
@@ -70,16 +65,9 @@ export async function getCompanies(search?: string): Promise<CompanyData[]> {
     query,
     supabase.from('student_employments').select('company').eq('business_type', '취업').not('company', 'is', null),
     supabase.from('field_training_records')
-      .select('company, student_id, hiring_status, students!inner(graduation_year)')
+      .select('company, student_id, hiring_status')
       .in('hiring_status', ['진행중', '채용전환'])
   ]);
-
-  const baseYear = settingsData?.value ? (settingsData.value as any).year : 2026;
-
-  // baseYear 필터링 (trainees는 재학생만)
-  const filteredTrainees = (traineeRecords || []).filter((t: any) =>
-    t.students?.graduation_year >= baseYear + 1
-  );
 
   const empCounts: Record<string, number> = {};
   (empCompanies || []).forEach((e: any) => {
@@ -88,12 +76,12 @@ export async function getCompanies(search?: string): Promise<CompanyData[]> {
   });
 
   const traineeCounts: Record<string, number> = {};
-  filteredTrainees.forEach((t: any) => {
+  (traineeRecords || []).forEach((t: any) => {
     const name = (t.company || '').trim();
     if (name) traineeCounts[name] = (traineeCounts[name] || 0) + 1;
   });
 
-  const companies: CompanyData[] = (data || []).map((c: any) => {
+  return (data || []).map((c: any) => {
     const trimmedName = (c.name || '').trim();
     return {
       ...c,
@@ -101,9 +89,53 @@ export async function getCompanies(search?: string): Promise<CompanyData[]> {
       traineeCount: traineeCounts[trimmedName] || 0,
     };
   });
+}
 
-  companyMemoryCache[cleanSearch] = { data: companies, timestamp: now };
-  return companies;
+/**
+ * 기업 목록 검색 및 조회 (취업생/실습생 카운트 + SWR 인메모리 캐싱)
+ */
+export async function getCompanies(search?: string): Promise<CompanyData[]> {
+  const cleanSearch = search ? search.trim() : '';
+  const now = Date.now();
+  const cached = companyMemoryCache[cleanSearch];
+
+  // 1. Fresh Cache Hit (0ms)
+  if (cached && (now - cached.timestamp < COMPANY_CACHE_TTL_MS)) {
+    return cached.data;
+  }
+
+  // 2. Stale Cache Hit (SWR)
+  if (cached) {
+    if (!companyInFlight[cleanSearch]) {
+      companyInFlight[cleanSearch] = computeCompanies(cleanSearch)
+        .then(freshData => {
+          companyMemoryCache[cleanSearch] = { data: freshData, timestamp: Date.now() };
+          return freshData;
+        })
+        .catch(err => {
+          console.error(`SWR background refresh failed for companies (${cleanSearch}):`, err);
+          return cached.data;
+        })
+        .finally(() => {
+          delete companyInFlight[cleanSearch];
+        });
+    }
+    return cached.data;
+  }
+
+  // 3. Cold Start
+  if (!companyInFlight[cleanSearch]) {
+    companyInFlight[cleanSearch] = computeCompanies(cleanSearch)
+      .then(freshData => {
+        companyMemoryCache[cleanSearch] = { data: freshData, timestamp: Date.now() };
+        return freshData;
+      })
+      .finally(() => {
+        delete companyInFlight[cleanSearch];
+      });
+  }
+
+  return companyInFlight[cleanSearch];
 }
 
 /**

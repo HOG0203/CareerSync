@@ -6,29 +6,26 @@ import { unstable_cache } from 'next/cache';
 export type { StudentEmploymentData, FieldTrainingRecord };
 export { MAJOR_SORT_ORDER };
 
-// 대시보드 전용 슬림 데이터 인메모리 캐시 (0ms 초고속 응답용, 5분 TTL)
-const dashboardStudentDataMemoryCache: Record<string, { data: StudentEmploymentData[]; timestamp: number }> = {};
-const DASHBOARD_CACHE_TTL_MS = 5 * 60 * 1000;
+const g = (typeof globalThis !== 'undefined' ? globalThis : global) as any;
+
+// 대시보드 전용 슬림 데이터 인메모리 캐시 (0ms 초고속 SWR 응답용, 30분 TTL)
+const dashboardStudentDataMemoryCache: Record<string, { data: StudentEmploymentData[]; timestamp: number }> = 
+  g.__dashboardStudentDataMemoryCache || (g.__dashboardStudentDataMemoryCache = {});
+const dashboardInFlight: Record<string, Promise<StudentEmploymentData[]>> = 
+  g.__dashboardInFlight || (g.__dashboardInFlight = {});
+const DASHBOARD_CACHE_TTL_MS = 30 * 60 * 1000;
 
 export async function clearDashboardStudentDataCache(graduationYear?: string) {
   if (graduationYear) {
     delete dashboardStudentDataMemoryCache[graduationYear];
+    delete dashboardInFlight[graduationYear];
   } else {
     Object.keys(dashboardStudentDataMemoryCache).forEach(k => delete dashboardStudentDataMemoryCache[k]);
+    Object.keys(dashboardInFlight).forEach(k => delete dashboardInFlight[k]);
   }
 }
 
-/**
- * [대시보드 전용] 차트 렌더링에 필요한 최소한의 필드만 가져옵니다.
- */
-
-export async function getDashboardStudentData(graduationYear: string): Promise<StudentEmploymentData[]> {
-  const now = Date.now();
-  const cached = dashboardStudentDataMemoryCache[graduationYear];
-  if (cached && (now - cached.timestamp < DASHBOARD_CACHE_TTL_MS)) {
-    return cached.data;
-  }
-
+async function computeDashboardStudentData(graduationYear: string): Promise<StudentEmploymentData[]> {
   const supabase = createAdminClient();
   const gradYearInt = parseInt(graduationYear);
 
@@ -73,16 +70,59 @@ export async function getDashboardStudentData(graduationYear: string): Promise<S
     } as StudentEmploymentData;
   });
 
-  const sorted = flattened.sort((a, b) => {
+  return flattened.sort((a, b) => {
     const indexA = MAJOR_SORT_ORDER.indexOf(a.major || '');
     const indexB = MAJOR_SORT_ORDER.indexOf(b.major || '');
     if (indexA !== indexB) return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
     if (a.class_info !== b.class_info) return (a.class_info || '').localeCompare(b.class_info || '');
     return (a.student_number || '').localeCompare(b.student_number || '', undefined, { numeric: true });
   });
+}
 
-  dashboardStudentDataMemoryCache[graduationYear] = { data: sorted, timestamp: now };
-  return sorted;
+/**
+ * [대시보드 전용] 차트 렌더링에 필요한 최소한의 필드만 가져옵니다 (SWR 패턴 적용).
+ */
+export async function getDashboardStudentData(graduationYear: string): Promise<StudentEmploymentData[]> {
+  const now = Date.now();
+  const cached = dashboardStudentDataMemoryCache[graduationYear];
+
+  // 1. Fresh Cache Hit (0ms)
+  if (cached && (now - cached.timestamp < DASHBOARD_CACHE_TTL_MS)) {
+    return cached.data;
+  }
+
+  // 2. Stale Cache Hit (SWR 패턴: 기존 데이터 0ms 즉시 반환 + 백그라운드 비동기 갱신)
+  if (cached) {
+    if (!dashboardInFlight[graduationYear]) {
+      dashboardInFlight[graduationYear] = computeDashboardStudentData(graduationYear)
+        .then(freshData => {
+          dashboardStudentDataMemoryCache[graduationYear] = { data: freshData, timestamp: Date.now() };
+          return freshData;
+        })
+        .catch(err => {
+          console.error(`SWR background refresh failed for dashboard (${graduationYear}):`, err);
+          return cached.data;
+        })
+        .finally(() => {
+          delete dashboardInFlight[graduationYear];
+        });
+    }
+    return cached.data;
+  }
+
+  // 3. Cold Start (첫 1회)
+  if (!dashboardInFlight[graduationYear]) {
+    dashboardInFlight[graduationYear] = computeDashboardStudentData(graduationYear)
+      .then(freshData => {
+        dashboardStudentDataMemoryCache[graduationYear] = { data: freshData, timestamp: Date.now() };
+        return freshData;
+      })
+      .finally(() => {
+        delete dashboardInFlight[graduationYear];
+      });
+  }
+
+  return dashboardInFlight[graduationYear];
 }
 
 
@@ -207,51 +247,105 @@ export async function getFilteredStudentData(graduationYear: string, baseYear?: 
   });
 }
 
-/**
- * [캐싱 최적화] 모듈 맵 기반 고정 캐싱 제네레이터
- */
-const filteredStudentDataCacheMap = new Map<string, ReturnType<typeof unstable_cache>>();
+// 취업상세 및 취업진로현황 전용 학생 데이터 인메모리 캐시 (0ms 초고속 SWR 응답용, 30분 TTL)
+const filteredStudentDataMemoryCache: Record<string, { data: StudentEmploymentData[]; timestamp: number }> = 
+  g.__filteredStudentDataMemoryCache || (g.__filteredStudentDataMemoryCache = {});
+const filteredInFlight: Record<string, Promise<StudentEmploymentData[]>> = 
+  g.__filteredInFlight || (g.__filteredInFlight = {});
+const FILTERED_STUDENT_CACHE_TTL_MS = 30 * 60 * 1000;
+
+export async function clearFilteredStudentDataCache(graduationYear?: string) {
+  if (graduationYear) {
+    Object.keys(filteredStudentDataMemoryCache).forEach(k => {
+      if (k.startsWith(`${graduationYear}-`)) delete filteredStudentDataMemoryCache[k];
+    });
+    Object.keys(filteredInFlight).forEach(k => {
+      if (k.startsWith(`${graduationYear}-`)) delete filteredInFlight[k];
+    });
+  } else {
+    Object.keys(filteredStudentDataMemoryCache).forEach(k => delete filteredStudentDataMemoryCache[k]);
+    Object.keys(filteredInFlight).forEach(k => delete filteredInFlight[k]);
+  }
+}
 
 export async function getCachedFilteredStudentData(graduationYear: string, baseYear?: number): Promise<StudentEmploymentData[]> {
   const cacheKey = `${graduationYear}-${baseYear || 2026}`;
-  if (!filteredStudentDataCacheMap.has(cacheKey)) {
-    const cachedFn = unstable_cache(
-      async () => getFilteredStudentData(graduationYear, baseYear),
-      [`filtered-student-data-${cacheKey}`],
-      {
-        revalidate: 86400,
-        tags: [`emp-status-${graduationYear}`, 'students']
-      }
-    );
-    filteredStudentDataCacheMap.set(cacheKey, cachedFn);
-  }
-  return filteredStudentDataCacheMap.get(cacheKey)!();
-}
-
-// 노동인권교육 전용 인메모리 캐시 (0ms 초고속 응답용, 5분 TTL)
-const laborEducationMemoryCache: Record<number, { data: StudentEmploymentData[]; timestamp: number }> = {};
-const adminStudentMemoryCache: Record<number, { data: StudentEmploymentData[]; timestamp: number }> = {};
-
-export async function clearLaborEducationCache(graduationYear?: number) {
-  if (graduationYear) delete laborEducationMemoryCache[graduationYear];
-  else Object.keys(laborEducationMemoryCache).forEach(k => delete laborEducationMemoryCache[Number(k)]);
-}
-
-export async function clearAdminStudentCache(graduationYear?: number) {
-  if (graduationYear) delete adminStudentMemoryCache[graduationYear];
-  else Object.keys(adminStudentMemoryCache).forEach(k => delete adminStudentMemoryCache[Number(k)]);
-}
-
-/**
- * [캐싱] 노동인권교육 전용 초경량 학생 목록 조회 (인메모리 캐시 적용)
- */
-export async function getCachedLaborEducationData(graduationYear: number): Promise<StudentEmploymentData[]> {
   const now = Date.now();
-  const cached = laborEducationMemoryCache[graduationYear];
-  if (cached && (now - cached.timestamp < 5 * 60 * 1000)) {
+  const cached = filteredStudentDataMemoryCache[cacheKey];
+
+  // 1. Fresh Cache Hit (0ms)
+  if (cached && (now - cached.timestamp < FILTERED_STUDENT_CACHE_TTL_MS)) {
     return cached.data;
   }
 
+  // 2. Stale Cache Hit (SWR 패턴: 기존 데이터 0ms 즉시 반환 + 백그라운드 비동기 갱신)
+  if (cached) {
+    if (!filteredInFlight[cacheKey]) {
+      filteredInFlight[cacheKey] = getFilteredStudentData(graduationYear, baseYear)
+        .then(freshData => {
+          filteredStudentDataMemoryCache[cacheKey] = { data: freshData, timestamp: Date.now() };
+          return freshData;
+        })
+        .catch(err => {
+          console.error(`SWR background refresh failed for filtered student data (${cacheKey}):`, err);
+          return cached.data;
+        })
+        .finally(() => {
+          delete filteredInFlight[cacheKey];
+        });
+    }
+    return cached.data;
+  }
+
+  // 3. Cold Start (첫 1회)
+  if (!filteredInFlight[cacheKey]) {
+    filteredInFlight[cacheKey] = getFilteredStudentData(graduationYear, baseYear)
+      .then(freshData => {
+        filteredStudentDataMemoryCache[cacheKey] = { data: freshData, timestamp: Date.now() };
+        return freshData;
+      })
+      .finally(() => {
+        delete filteredInFlight[cacheKey];
+      });
+  }
+
+  return filteredInFlight[cacheKey];
+}
+
+// 노동인권교육 전용 인메모리 캐시 (0ms 초고속 SWR 응답용, 30분 TTL)
+const laborEducationMemoryCache: Record<number, { data: StudentEmploymentData[]; timestamp: number }> = 
+  g.__laborEducationMemoryCache || (g.__laborEducationMemoryCache = {});
+const laborInFlight: Record<number, Promise<StudentEmploymentData[]>> = 
+  g.__laborInFlight || (g.__laborInFlight = {});
+
+const adminStudentMemoryCache: Record<number, { data: StudentEmploymentData[]; timestamp: number }> = 
+  g.__adminStudentMemoryCache || (g.__adminStudentMemoryCache = {});
+const adminInFlight: Record<number, Promise<StudentEmploymentData[]>> = 
+  g.__adminInFlight || (g.__adminInFlight = {});
+
+const STUDENT_CACHE_TTL_MS = 30 * 60 * 1000;
+
+export async function clearLaborEducationCache(graduationYear?: number) {
+  if (graduationYear) {
+    delete laborEducationMemoryCache[graduationYear];
+    delete laborInFlight[graduationYear];
+  } else {
+    Object.keys(laborEducationMemoryCache).forEach(k => delete laborEducationMemoryCache[Number(k)]);
+    Object.keys(laborInFlight).forEach(k => delete laborInFlight[Number(k)]);
+  }
+}
+
+export async function clearAdminStudentCache(graduationYear?: number) {
+  if (graduationYear) {
+    delete adminStudentMemoryCache[graduationYear];
+    delete adminInFlight[graduationYear];
+  } else {
+    Object.keys(adminStudentMemoryCache).forEach(k => delete adminStudentMemoryCache[Number(k)]);
+    Object.keys(adminInFlight).forEach(k => delete adminInFlight[Number(k)]);
+  }
+}
+
+async function computeLaborEducationData(graduationYear: number): Promise<StudentEmploymentData[]> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('students')
@@ -266,22 +360,56 @@ export async function getCachedLaborEducationData(graduationYear: number): Promi
     console.error('Error fetching labor education students:', error);
     return [];
   }
-
-  const results = data as StudentEmploymentData[];
-  laborEducationMemoryCache[graduationYear] = { data: results, timestamp: now };
-  return results;
+  return data as StudentEmploymentData[];
 }
 
 /**
- * [캐싱] 학생 관리(Admin Students) 전용 초경량 기본 정보 조회 (인메모리 캐시 적용)
+ * [캐싱] 노동인권교육 전용 초경량 학생 목록 조회 (SWR 패턴 적용)
  */
-export async function getCachedAdminStudentData(graduationYear: number): Promise<StudentEmploymentData[]> {
+export async function getCachedLaborEducationData(graduationYear: number): Promise<StudentEmploymentData[]> {
   const now = Date.now();
-  const cached = adminStudentMemoryCache[graduationYear];
-  if (cached && (now - cached.timestamp < 5 * 60 * 1000)) {
+  const cached = laborEducationMemoryCache[graduationYear];
+
+  // 1. Fresh Cache Hit (0ms)
+  if (cached && (now - cached.timestamp < STUDENT_CACHE_TTL_MS)) {
     return cached.data;
   }
 
+  // 2. Stale Cache Hit (SWR)
+  if (cached) {
+    if (!laborInFlight[graduationYear]) {
+      laborInFlight[graduationYear] = computeLaborEducationData(graduationYear)
+        .then(freshData => {
+          laborEducationMemoryCache[graduationYear] = { data: freshData, timestamp: Date.now() };
+          return freshData;
+        })
+        .catch(err => {
+          console.error(`SWR background refresh failed for labor education (${graduationYear}):`, err);
+          return cached.data;
+        })
+        .finally(() => {
+          delete laborInFlight[graduationYear];
+        });
+    }
+    return cached.data;
+  }
+
+  // 3. Cold Start
+  if (!laborInFlight[graduationYear]) {
+    laborInFlight[graduationYear] = computeLaborEducationData(graduationYear)
+      .then(freshData => {
+        laborEducationMemoryCache[graduationYear] = { data: freshData, timestamp: Date.now() };
+        return freshData;
+      })
+      .finally(() => {
+        delete laborInFlight[graduationYear];
+      });
+  }
+
+  return laborInFlight[graduationYear];
+}
+
+async function computeAdminStudentData(graduationYear: number): Promise<StudentEmploymentData[]> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('students')
@@ -296,12 +424,54 @@ export async function getCachedAdminStudentData(graduationYear: number): Promise
     console.error('Error fetching admin students:', error);
     return [];
   }
-
-  const results = data as StudentEmploymentData[];
-  adminStudentMemoryCache[graduationYear] = { data: results, timestamp: now };
-  return results;
+  return data as StudentEmploymentData[];
 }
 
+/**
+ * [캐싱] 학생 관리(Admin Students) 전용 초경량 기본 정보 조회 (SWR 패턴 적용)
+ */
+export async function getCachedAdminStudentData(graduationYear: number): Promise<StudentEmploymentData[]> {
+  const now = Date.now();
+  const cached = adminStudentMemoryCache[graduationYear];
+
+  // 1. Fresh Cache Hit (0ms)
+  if (cached && (now - cached.timestamp < STUDENT_CACHE_TTL_MS)) {
+    return cached.data;
+  }
+
+  // 2. Stale Cache Hit (SWR)
+  if (cached) {
+    if (!adminInFlight[graduationYear]) {
+      adminInFlight[graduationYear] = computeAdminStudentData(graduationYear)
+        .then(freshData => {
+          adminStudentMemoryCache[graduationYear] = { data: freshData, timestamp: Date.now() };
+          return freshData;
+        })
+        .catch(err => {
+          console.error(`SWR background refresh failed for admin students (${graduationYear}):`, err);
+          return cached.data;
+        })
+        .finally(() => {
+          delete adminInFlight[graduationYear];
+        });
+    }
+    return cached.data;
+  }
+
+  // 3. Cold Start
+  if (!adminInFlight[graduationYear]) {
+    adminInFlight[graduationYear] = computeAdminStudentData(graduationYear)
+      .then(freshData => {
+        adminStudentMemoryCache[graduationYear] = { data: freshData, timestamp: Date.now() };
+        return freshData;
+      })
+      .finally(() => {
+        delete adminInFlight[graduationYear];
+      });
+  }
+
+  return adminInFlight[graduationYear];
+}
 
 /**
  * [캐싱] 졸업연도 목록 서버 메모리 캐싱
@@ -320,27 +490,25 @@ export async function getCachedGraduationYears(): Promise<number[]> {
 
 
 
-// 학반 관리 전용 학생 상세 데이터 인메모리 캐시 (0ms 초고속 응답용, 5분 TTL)
-const assignedStudentDetailsMemoryCache: Record<string, { data: StudentEmploymentData[]; timestamp: number }> = {};
-const ASSIGNED_CACHE_TTL_MS = 5 * 60 * 1000;
+// 학반 관리 전용 학생 상세 데이터 인메모리 캐시 (0ms 초고속 SWR 응답용, 30분 TTL)
+const assignedStudentDetailsMemoryCache: Record<string, { data: StudentEmploymentData[]; timestamp: number }> = 
+  g.__assignedStudentDetailsMemoryCache || (g.__assignedStudentDetailsMemoryCache = {});
+const assignedInFlight: Record<string, Promise<StudentEmploymentData[]>> = 
+  g.__assignedInFlight || (g.__assignedInFlight = {});
+const ASSIGNED_CACHE_TTL_MS = 30 * 60 * 1000;
 
 export async function clearAssignedStudentDetailsCache(major?: string, classInfo?: string, graduationYear?: number) {
   if (major && classInfo && graduationYear) {
     const key = `${major}-${classInfo}-${graduationYear}`;
     delete assignedStudentDetailsMemoryCache[key];
+    delete assignedInFlight[key];
   } else {
     Object.keys(assignedStudentDetailsMemoryCache).forEach(k => delete assignedStudentDetailsMemoryCache[k]);
+    Object.keys(assignedInFlight).forEach(k => delete assignedInFlight[k]);
   }
 }
 
-export async function getAssignedStudentDetails(major: string, classInfo: string, graduationYear: number, baseYear?: number) {
-  const cacheKey = `${major}-${classInfo}-${graduationYear}-${baseYear || 2026}`;
-  const now = Date.now();
-  const cached = assignedStudentDetailsMemoryCache[cacheKey];
-  if (cached && (now - cached.timestamp < ASSIGNED_CACHE_TTL_MS)) {
-    return cached.data;
-  }
-
+async function computeAssignedStudentDetails(major: string, classInfo: string, graduationYear: number, baseYear?: number): Promise<StudentEmploymentData[]> {
   const supabase = createAdminClient();
 
   // 1. 해당 학반 학생 기본 정보 초고속 조회 (20~25명)
@@ -375,39 +543,100 @@ export async function getAssignedStudentDetails(major: string, classInfo: string
   const trainings = trainingsResult.data || [];
   const historyData = historyResult?.data || [];
 
-  const results = rawStudents.map(s => {
+  return rawStudents.map(s => {
     const studentEmployments = Array.isArray(s.student_employments) ? s.student_employments[0] : s.student_employments;
-    const { student_employments, ...studentBase } = s;
-    const emp = studentEmployments || {};
+    const history = historyData.find(h => h.student_id === s.id);
     const studentTrainings = trainings.filter(t => t.student_id === s.id);
     const latestTraining = studentTrainings[0];
-    const hist = historyData.find(h => h.student_id === s.id);
-    
+
     return {
-      ...studentBase, 
-      ...emp, 
-      ...(hist ? {
-        major: hist.major,
-        class_info: hist.class_info,
-        student_number: hist.student_number,
-        teacher_name: hist.teacher_name,
-        grade: hist.grade
-      } : {}),
       id: s.id,
-      training_records: studentTrainings, 
-      counseling_logs: (s as any).student_counseling_logs || [],
+      student_name: s.student_name,
+      phone_number: s.phone_number,
+      graduation_year: s.graduation_year,
+      major: s.major,
+      class_info: s.class_info,
+      student_number: s.student_number,
+      certificates: s.certificates || [],
+      career_aspiration: s.career_aspiration || '미정',
+      career_course: s.career_course || '',
+      special_notes: s.special_notes || '',
+      personal_remarks: s.personal_remarks || '',
+      labor_education_status: s.labor_education_status || '미이수',
+      military_status: s.military_status || '미필',
+      desired_work_area: s.desired_work_area || '',
+      parents_opinion: s.parents_opinion || '',
+      shoe_size: s.shoe_size || '',
+      top_size: s.top_size || '',
+      business_type: studentEmployments?.business_type || '',
+      employment_status: studentEmployments?.employment_status || '',
+      company_type: studentEmployments?.company_type || '',
+      company: studentEmployments?.company || '',
+      remarks: studentEmployments?.remarks || '',
+      is_desiring_employment: studentEmployments?.is_desiring_employment || '예',
       has_field_training: latestTraining ? 'O' : '',
-      latest_training_company: latestTraining?.company,
+      training_records: studentTrainings,
+      latest_training_company: latestTraining?.company || '',
+      stipend_status: latestTraining?.stipend_status || '',
+      hiring_status: latestTraining?.hiring_status || '',
+      conversion_date: latestTraining?.conversion_date || '',
+      is_returned: latestTraining?.return_reason ? '복교' : '',
+      return_reason: latestTraining?.return_reason || '',
+      assigned_teacher_name: history?.teacher_name || '',
+      counseling_logs: (s as any).student_counseling_logs || [],
       start_date: latestTraining?.start_date,
       end_date: latestTraining?.end_date,
       training_stipend_status: latestTraining?.stipend_status,
       is_hiring_conversion: latestTraining?.hiring_status === '채용전환' ? latestTraining?.conversion_date : '',
-      is_returned: latestTraining?.hiring_status === '복교' ? 'O' : '',
-    };
+    } as StudentEmploymentData;
   }).sort((a, b) => (a.student_number || '').localeCompare(b.student_number || '', undefined, { numeric: true }));
+}
 
-  assignedStudentDetailsMemoryCache[cacheKey] = { data: results, timestamp: now };
-  return results;
+/**
+ * [초고속 조회] 학반 관리 전용 학생 상세 데이터 (SWR 패턴 적용)
+ */
+export async function getAssignedStudentDetails(major: string, classInfo: string, graduationYear: number, baseYear?: number): Promise<StudentEmploymentData[]> {
+  const cacheKey = `${major}-${classInfo}-${graduationYear}-${baseYear || 2026}`;
+  const now = Date.now();
+  const cached = assignedStudentDetailsMemoryCache[cacheKey];
+
+  // 1. Fresh Cache Hit (0ms)
+  if (cached && (now - cached.timestamp < ASSIGNED_CACHE_TTL_MS)) {
+    return cached.data;
+  }
+
+  // 2. Stale Cache Hit (SWR)
+  if (cached) {
+    if (!assignedInFlight[cacheKey]) {
+      assignedInFlight[cacheKey] = computeAssignedStudentDetails(major, classInfo, graduationYear, baseYear)
+        .then(freshData => {
+          assignedStudentDetailsMemoryCache[cacheKey] = { data: freshData, timestamp: Date.now() };
+          return freshData;
+        })
+        .catch(err => {
+          console.error(`SWR background refresh failed for assigned student details (${cacheKey}):`, err);
+          return cached.data;
+        })
+        .finally(() => {
+          delete assignedInFlight[cacheKey];
+        });
+    }
+    return cached.data;
+  }
+
+  // 3. Cold Start
+  if (!assignedInFlight[cacheKey]) {
+    assignedInFlight[cacheKey] = computeAssignedStudentDetails(major, classInfo, graduationYear, baseYear)
+      .then(freshData => {
+        assignedStudentDetailsMemoryCache[cacheKey] = { data: freshData, timestamp: Date.now() };
+        return freshData;
+      })
+      .finally(() => {
+        delete assignedInFlight[cacheKey];
+      });
+  }
+
+  return assignedInFlight[cacheKey];
 }
 
 /**
@@ -588,31 +817,28 @@ export async function getAllStudentScores() {
   return allScores.map(score => ({ ...score, students: studentMap[score.student_id] || null }));
 }
 
-// 직기초 성적 및 종합 요약 인메모리 캐시 (0ms 초고속 응답용, 5분 TTL)
-const yearlyRankingsMemoryCache: Record<string, { data: Record<string, any>; timestamp: number }> = {};
-const YEARLY_RANKINGS_CACHE_TTL_MS = 5 * 60 * 1000;
+// 직기초 성적 및 종합 요약 인메모리 캐시 (0ms 초고속 SWR 응답용, 30분 TTL)
+const yearlyRankingsMemoryCache: Record<string, { data: Record<string, any>; timestamp: number }> = 
+  g.__yearlyRankingsMemoryCache || (g.__yearlyRankingsMemoryCache = {});
+const yearlyRankingsInFlight: Record<string, Promise<Record<string, any>>> = 
+  g.__yearlyRankingsInFlight || (g.__yearlyRankingsInFlight = {});
+const YEARLY_RANKINGS_CACHE_TTL_MS = 30 * 60 * 1000;
 
 export async function clearYearlyRankingsCache(graduationYear?: number) {
   if (graduationYear) {
     Object.keys(yearlyRankingsMemoryCache).forEach(k => {
       if (k.startsWith(`${graduationYear}-`)) delete yearlyRankingsMemoryCache[k];
     });
+    Object.keys(yearlyRankingsInFlight).forEach(k => {
+      if (k.startsWith(`${graduationYear}-`)) delete yearlyRankingsInFlight[k];
+    });
   } else {
     Object.keys(yearlyRankingsMemoryCache).forEach(k => delete yearlyRankingsMemoryCache[k]);
+    Object.keys(yearlyRankingsInFlight).forEach(k => delete yearlyRankingsInFlight[k]);
   }
 }
 
-/**
- * [초고속 요약] 특정 졸업연도 학생들의 석차 및 성취도를 사전 계산합니다.
- */
-export async function getYearlyRankingsSummary(graduationYear: number, baseYear: number = 2026) {
-  const cacheKey = `${graduationYear}-${baseYear}`;
-  const now = Date.now();
-  const cached = yearlyRankingsMemoryCache[cacheKey];
-  if (cached && (now - cached.timestamp < YEARLY_RANKINGS_CACHE_TTL_MS)) {
-    return cached.data;
-  }
-
+async function computeYearlyRankingsSummary(graduationYear: number, baseYear: number = 2026): Promise<Record<string, any>> {
   const supabase = createAdminClient();
 
   // 1. [초고속 1단계] 학생 목록, 가중치 병렬 조회
@@ -646,17 +872,15 @@ export async function getYearlyRankingsSummary(graduationYear: number, baseYear:
       .range(0, 5000)
   );
 
-  const attendancePromises = chunks.map(chunk =>
-    supabase
-      .from('student_attendance')
-      .select('student_id, grade, semester, school_days, remarks, absent_unexcused, late_unexcused, early_unexcused, out_unexcused, absent_disease, late_disease, early_disease, out_disease, absent_other, late_other, early_other, out_other')
-      .in('student_id', chunk)
-      .range(0, 5000)
-  );
+  const attendancePromise = supabase
+    .from('student_attendance')
+    .select('student_id, grade, semester, school_days, remarks, absent_unexcused, late_unexcused, early_unexcused, out_unexcused, absent_disease, late_disease, early_disease, out_disease, absent_other, late_other, early_other, out_other')
+    .in('student_id', studentIds)
+    .range(0, 5000);
 
-  const [scoreResults, attendanceResults] = await Promise.all([
+  const [scoreResults, attendanceResult] = await Promise.all([
     Promise.all(scorePromises),
-    Promise.all(attendancePromises)
+    attendancePromise
   ]);
 
   const allScores: any[] = [];
@@ -666,16 +890,9 @@ export async function getYearlyRankingsSummary(graduationYear: number, baseYear:
     }
   });
 
-  const allAttendance: any[] = [];
-  attendanceResults.forEach(res => {
-    if (res.data && res.data.length > 0) {
-      allAttendance.push(...res.data);
-    }
-  });
+  const allAttendance = attendanceResult.data || [];
 
   const maxWeight = Math.max(...Object.values(weights), 0);
-
-
 
   // 3. 학생별 통계 집계 초기화
   const stats: Record<string, any> = {};
@@ -708,7 +925,6 @@ export async function getYearlyRankingsSummary(graduationYear: number, baseYear:
     const s = stats[record.student_id];
     if (!s) return;
 
-    
     if (!s.attnRecords) s.attnRecords = [];
     s.attnRecords.push(record);
 
@@ -754,16 +970,61 @@ export async function getYearlyRankingsSummary(graduationYear: number, baseYear:
     };
   });
 
-  yearlyRankingsMemoryCache[cacheKey] = { data: resultMap, timestamp: now };
   return resultMap;
 }
 
-let cachedAchievementScores: { data: Record<string, number>; timestamp: number } | null = null;
+/**
+ * [초고속 요약] 특정 졸업연도 학생들의 석차 및 성취도를 사전 계산합니다 (SWR 패턴 적용).
+ */
+export async function getYearlyRankingsSummary(graduationYear: number, baseYear: number = 2026): Promise<Record<string, any>> {
+  const cacheKey = `${graduationYear}-${baseYear}`;
+  const now = Date.now();
+  const cached = yearlyRankingsMemoryCache[cacheKey];
+
+  // 1. Fresh Cache Hit (0ms)
+  if (cached && (now - cached.timestamp < YEARLY_RANKINGS_CACHE_TTL_MS)) {
+    return cached.data;
+  }
+
+  // 2. Stale Cache Hit (SWR 패턴: 기존 데이터 0ms 즉시 반환 + 백그라운드 비동기 갱신)
+  if (cached) {
+    if (!yearlyRankingsInFlight[cacheKey]) {
+      yearlyRankingsInFlight[cacheKey] = computeYearlyRankingsSummary(graduationYear, baseYear)
+        .then(freshData => {
+          yearlyRankingsMemoryCache[cacheKey] = { data: freshData, timestamp: Date.now() };
+          return freshData;
+        })
+        .catch(err => {
+          console.error(`SWR background refresh failed for rankings (${cacheKey}):`, err);
+          return cached.data;
+        })
+        .finally(() => {
+          delete yearlyRankingsInFlight[cacheKey];
+        });
+    }
+    return cached.data;
+  }
+
+  // 3. Cold Start (첫 1회)
+  if (!yearlyRankingsInFlight[cacheKey]) {
+    yearlyRankingsInFlight[cacheKey] = computeYearlyRankingsSummary(graduationYear, baseYear)
+      .then(freshData => {
+        yearlyRankingsMemoryCache[cacheKey] = { data: freshData, timestamp: Date.now() };
+        return freshData;
+      })
+      .finally(() => {
+        delete yearlyRankingsInFlight[cacheKey];
+      });
+  }
+
+  return yearlyRankingsInFlight[cacheKey];
+}
 
 export async function getAchievementScores(): Promise<Record<string, number>> {
   const now = Date.now();
-  if (cachedAchievementScores && (now - cachedAchievementScores.timestamp < 5 * 60 * 1000)) {
-    return cachedAchievementScores.data;
+  const cached = g.__cachedAchievementScores as { data: Record<string, number>; timestamp: number } | undefined;
+  if (cached && (now - cached.timestamp < 30 * 60 * 1000)) {
+    return cached.data;
   }
   const supabase = createAdminClient();
   try {
@@ -772,7 +1033,7 @@ export async function getAchievementScores(): Promise<Record<string, number>> {
       return { "A": 5, "B": 4, "C": 3, "D": 2, "E": 1 };
     }
     const val = data.value as Record<string, number>;
-    cachedAchievementScores = { data: val, timestamp: now };
+    g.__cachedAchievementScores = { data: val, timestamp: now };
     return val;
   } catch (error) {
     return { "A": 5, "B": 4, "C": 3, "D": 2, "E": 1 };
@@ -829,6 +1090,19 @@ export async function getCachedTeacherProfiles() {
       tags: ['teachers']
     }
   )();
+}
+
+export async function clearAllStudentDataCaches(graduationYear?: string | number) {
+  const gyStr = graduationYear ? String(graduationYear) : undefined;
+  const gyNum = graduationYear ? Number(graduationYear) : undefined;
+  await Promise.all([
+    clearDashboardStudentDataCache(gyStr),
+    clearFilteredStudentDataCache(gyStr),
+    clearLaborEducationCache(gyNum),
+    clearAdminStudentCache(gyNum),
+    clearAssignedStudentDetailsCache(),
+    clearYearlyRankingsCache(gyNum)
+  ]);
 }
 
 

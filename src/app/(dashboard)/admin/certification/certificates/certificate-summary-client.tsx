@@ -24,7 +24,13 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
 import { StudentCertificateSummary, updateStudentCertificates, getCachedCertificateSummaries } from './actions';
-import { CertificateImportModal } from './certificate-import-modal';
+import dynamic from 'next/dynamic';
+
+const CertificateImportModal = dynamic(
+  () => import('./certificate-import-modal').then(m => m.CertificateImportModal),
+  { ssr: false }
+);
+
 import { CertificatePicker } from '@/components/dashboard/standard-spreadsheet-table/certificate-picker';
 
 import { CertificationDataSkeleton } from '@/components/dashboard/loading-skeleton';

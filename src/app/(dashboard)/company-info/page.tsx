@@ -41,7 +41,13 @@ import {
 } from 'lucide-react';
 import { StudentPopover } from '@/components/dashboard/student-popover';
 import { fetchYearlyRankings } from '@/app/(dashboard)/employment-status/actions';
-import { ImportCompanyModal } from './import-company-modal';
+import dynamic from 'next/dynamic';
+
+const ImportCompanyModal = dynamic(
+  () => import('./import-company-modal').then(m => m.ImportCompanyModal),
+  { ssr: false }
+);
+
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';

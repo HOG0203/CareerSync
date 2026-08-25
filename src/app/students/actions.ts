@@ -463,9 +463,9 @@ export async function updateStudentField(id: string, field: string, value: any) 
     }
   })();
 
-  // 학반 관리 인메모리 캐시 무효화
-  const { clearAssignedStudentDetailsCache } = await import('@/lib/data');
-  await clearAssignedStudentDetailsCache();
+  // 인메모리 SWR 캐시 즉시 무효화 (전체 페이지 실시간 반영)
+  const { clearAllStudentDataCaches } = await import('@/lib/data');
+  await clearAllStudentDataCaches(studentInfo ? undefined : undefined);
 
   revalidateTag('students');
   revalidateTag('student-accounts');
@@ -500,6 +500,9 @@ export async function updateLaborEducationStatus(id: string, status: string) {
     } catch (e) {}
   })();
 
+  const { clearAllStudentDataCaches } = await import('@/lib/data');
+  await clearAllStudentDataCaches();
+
   revalidateTag('students');
   return { success: true };
 }
@@ -522,8 +525,8 @@ export async function bulkUpdateStudentData(updates: { id: string, field: string
     details: { count: updates.length }
   });
 
-  const { clearAssignedStudentDetailsCache } = await import('@/lib/data');
-  await clearAssignedStudentDetailsCache();
+  const { clearAllStudentDataCaches } = await import('@/lib/data');
+  await clearAllStudentDataCaches();
 
   revalidateTag('students');
   revalidatePath('/students'); 
@@ -551,6 +554,9 @@ export async function createStudent(data: { graduation_year: number, major: stri
   await supabase.from('student_employments').insert([{ id: newStudent.id, is_desiring_employment: '예', business_type: '미취업' }]);
   await syncAcademicHistory(supabase, newStudent.id, newStudent, settings.baseYear);
   
+  const { clearAllStudentDataCaches } = await import('@/lib/data');
+  await clearAllStudentDataCaches(data.graduation_year);
+
   revalidateTag('students');
   revalidateTag('student-accounts');
   revalidatePath('/admin/students'); 
@@ -568,6 +574,10 @@ export async function deleteStudents(ids: string[]) {
   await supabase.from('student_employments').delete().in('id', ids)
   const { error } = await supabase.from('students').delete().in('id', ids)
   if (error) return { error: error.message }
+  
+  const { clearAllStudentDataCaches } = await import('@/lib/data');
+  await clearAllStudentDataCaches();
+
   revalidatePath('/admin/students'); 
   revalidatePath('/students'); 
   revalidatePath('/class-management');

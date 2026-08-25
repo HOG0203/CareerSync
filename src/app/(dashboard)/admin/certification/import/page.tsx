@@ -1,4 +1,4 @@
-﻿import { getCurrentUserProfile } from '@/lib/data';
+import { getCurrentUserProfile } from '@/lib/data';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { redirect } from 'next/navigation';
 import { CertificationImportClient } from './certification-import-client';
@@ -8,13 +8,15 @@ export const metadata = {
 };
 
 export default async function CertificationImportPage() {
-  const profile = await getCurrentUserProfile();
+  const [profile, settings] = await Promise.all([
+    getCurrentUserProfile(),
+    getSystemSettings()
+  ]);
 
   if (profile?.role !== 'admin' && profile?.role !== 'teacher') {
     redirect('/dashboard');
   }
 
-  const settings = await getSystemSettings();
   const baseYear = settings.baseYear;
 
   return (

@@ -11,12 +11,14 @@ export default async function CertificateSummaryPage({
 }: {
   searchParams: Promise<{ grade?: string }>;
 }) {
-  // 1. 프로필, 시스템 설정, 마스터 자격증, 검색 파라미터 1회 완전 동시 병렬 패칭
-  const [profile, settings, masterCertificates, params] = await Promise.all([
+  const params = await searchParams;
+  const gradeParam = params.grade ? parseInt(params.grade) : undefined;
+
+  // 1. 프로필, 시스템 설정, 마스터 자격증 1회 완전 동시 병렬 패칭
+  const [profile, settings, masterCertificates] = await Promise.all([
     getCurrentUserProfile(),
     getSystemSettings(),
     getCachedMasterCertificates(),
-    searchParams,
   ]);
 
   // 관리자, 교직원 권한 확인
@@ -29,10 +31,10 @@ export default async function CertificateSummaryPage({
   if (profile.role === 'teacher' && profile.assigned_grade) {
     defaultGradeNum = profile.assigned_grade;
   }
-  const selectedGradeNum = params.grade ? parseInt(params.grade) : defaultGradeNum;
+  const selectedGradeNum = gradeParam || defaultGradeNum;
 
   // 2. 인메모리 캐싱된 자격증 현황 데이터 로드 (0ms)
-  const summaries = await getCachedCertificateSummaries(selectedGradeNum);
+  const summaries = await getCachedCertificateSummaries(selectedGradeNum, settings.baseYear);
 
   return (
     <CertificateSummaryClient 

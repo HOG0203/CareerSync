@@ -1,17 +1,42 @@
 'use client';
 
 import * as React from 'react';
-import { VolunteerImportCard } from './volunteer-import-card';
-import { VocationalImportCard } from './vocational-import-card';
-import { EmploymentImportCard } from './employment-import-card';
-import { ArtsContestImportCard } from './arts-contest-import-card';
+import dynamic from 'next/dynamic';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   HeartHandshake, 
   Award, 
   Briefcase, 
-  Trophy 
+  Trophy,
+  Loader2
 } from 'lucide-react';
+
+const CardLoadingFallback = ({ title }: { title: string }) => (
+  <div className="flex flex-col items-center justify-center p-12 bg-white/60 border border-slate-200/80 rounded-2xl min-h-[300px]">
+    <Loader2 className="w-8 h-8 text-primary animate-spin mb-3" />
+    <p className="text-sm font-semibold text-slate-600">{title} 모듈 로딩 중...</p>
+  </div>
+);
+
+const VolunteerImportCard = dynamic(
+  () => import('./volunteer-import-card').then(m => m.VolunteerImportCard),
+  { loading: () => <CardLoadingFallback title="봉사활동 업로더" />, ssr: false }
+);
+
+const VocationalImportCard = dynamic(
+  () => import('./vocational-import-card').then(m => m.VocationalImportCard),
+  { loading: () => <CardLoadingFallback title="직공통 평가 업로더" />, ssr: false }
+);
+
+const EmploymentImportCard = dynamic(
+  () => import('./employment-import-card').then(m => m.EmploymentImportCard),
+  { loading: () => <CardLoadingFallback title="취업역량 업로더" />, ssr: false }
+);
+
+const ArtsContestImportCard = dynamic(
+  () => import('./arts-contest-import-card').then(m => m.ArtsContestImportCard),
+  { loading: () => <CardLoadingFallback title="예체능/대회실적 업로더" />, ssr: false }
+);
 
 interface CertificationImportClientProps {
   isAdmin: boolean;
