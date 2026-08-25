@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { getCachedAuditLogs } from '@/lib/audit-logger';
 import { getCurrentUserProfile } from '@/lib/data';
 import { redirect } from 'next/navigation';
@@ -13,14 +13,17 @@ export const metadata = {
 };
 
 export default async function LoginHistoryPage() {
-  // 1. 관리자 권한 확인
-  const userProfile = await getCurrentUserProfile();
+  // 1. 관리자 권한 확인 및 Audit Logs 병렬 조회
+  const [userProfile, allLogs] = await Promise.all([
+    getCurrentUserProfile(),
+    getCachedAuditLogs()
+  ]);
+
+
   if (!userProfile || userProfile.role !== 'admin') {
     redirect('/dashboard');
   }
 
-  // 2. 전체 Audit Logs 조회
-  const allLogs = await getCachedAuditLogs();
 
   return (
     <div className="flex flex-col h-full gap-4 sm:gap-6">

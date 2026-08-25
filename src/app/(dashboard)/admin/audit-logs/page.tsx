@@ -25,14 +25,16 @@ async function AuditLogsPageContent({
 }) {
   const params = searchParams;
 
-  // 1. 관리자 권한 확인
-  const userProfile = await getCurrentUserProfile();
+  // 1. 관리자 권한 확인 및 Audit Log 병렬 조회
+  const [userProfile, auditLogs] = await Promise.all([
+    getCurrentUserProfile(),
+    getCachedAuditLogs()
+  ]);
+
   if (!userProfile || userProfile.role !== 'admin') {
     redirect('/dashboard');
   }
 
-  // 2. Audit Log 전체 캐시 데이터 조회 (1회만)
-  const auditLogs = await getCachedAuditLogs();
 
   return (
     <div className="flex flex-col h-full gap-4 sm:gap-6">

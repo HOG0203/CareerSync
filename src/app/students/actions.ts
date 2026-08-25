@@ -463,10 +463,15 @@ export async function updateStudentField(id: string, field: string, value: any) 
     }
   })();
 
+  // 학반 관리 인메모리 캐시 무효화
+  const { clearAssignedStudentDetailsCache } = await import('@/lib/data');
+  await clearAssignedStudentDetailsCache();
+
   revalidateTag('students');
   revalidateTag('student-accounts');
   return { success: true }
 }
+
 
 /**
  * 노동인권교육 이수 상태 전용 초고속 변경 액션 (0.1초 미만 응답)
@@ -517,6 +522,9 @@ export async function bulkUpdateStudentData(updates: { id: string, field: string
     details: { count: updates.length }
   });
 
+  const { clearAssignedStudentDetailsCache } = await import('@/lib/data');
+  await clearAssignedStudentDetailsCache();
+
   revalidateTag('students');
   revalidatePath('/students'); 
   revalidatePath('/admin/students'); 
@@ -524,6 +532,7 @@ export async function bulkUpdateStudentData(updates: { id: string, field: string
   revalidatePath('/employment-status');
   revalidatePath('/labor-education');
   revalidatePath('/dashboard');
+
   return { success: true }
 }
 

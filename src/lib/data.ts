@@ -6,68 +6,85 @@ import { unstable_cache } from 'next/cache';
 export type { StudentEmploymentData, FieldTrainingRecord };
 export { MAJOR_SORT_ORDER };
 
+// 대시보드 전용 슬림 데이터 인메모리 캐시 (0ms 초고속 응답용, 5분 TTL)
+const dashboardStudentDataMemoryCache: Record<string, { data: StudentEmploymentData[]; timestamp: number }> = {};
+const DASHBOARD_CACHE_TTL_MS = 5 * 60 * 1000;
+
+export async function clearDashboardStudentDataCache(graduationYear?: string) {
+  if (graduationYear) {
+    delete dashboardStudentDataMemoryCache[graduationYear];
+  } else {
+    Object.keys(dashboardStudentDataMemoryCache).forEach(k => delete dashboardStudentDataMemoryCache[k]);
+  }
+}
+
 /**
  * [대시보드 전용] 차트 렌더링에 필요한 최소한의 필드만 가져옵니다.
- * 전화번호, 옷/신발 사이즈, 학부모 의견, 메모 등 불필요한 컬럼 제외.
  */
-const getDashboardStudentDataCached = unstable_cache(
-  async (graduationYear: string): Promise<StudentEmploymentData[]> => {
-    const supabase = createAdminClient();
-    const gradYearInt = parseInt(graduationYear);
-
-    const [studentsResult, trainingsResult] = await Promise.all([
-      supabase
-        .from('students')
-        .select('id, major, class_info, student_number, graduation_year, career_aspiration, career_course, certificates, military_status, special_notes, student_employments (business_type, company_type, employment_status)')
-        .eq('graduation_year', gradYearInt)
-        .order('major')
-        .order('class_info')
-        .order('student_number')
-        .range(0, 5000),
-      supabase
-        .from('field_training_records')
-        .select('student_id, hiring_status, students!inner(graduation_year)')
-        .eq('students.graduation_year', gradYearInt)
-        .order('training_order', { ascending: false }),
-    ]);
-
-    if (studentsResult.error) {
-      console.error('Error fetching dashboard students:', studentsResult.error);
-      return [];
-    }
-
-    const students = studentsResult.data || [];
-    const trainings = trainingsResult.data || [];
-
-    const flattened = students.map(s => {
-      const rawEmp = Array.isArray(s.student_employments) ? s.student_employments[0] : s.student_employments;
-      const { student_employments, ...studentBase } = s;
-      const emp = rawEmp || {};
-      const latestTraining = trainings.find(t => t.student_id === s.id);
-
-      return {
-        ...studentBase,
-        ...emp,
-        id: s.id,
-        has_field_training: latestTraining ? 'O' : '',
-      } as StudentEmploymentData;
-    });
-
-    return flattened.sort((a, b) => {
-      const indexA = MAJOR_SORT_ORDER.indexOf(a.major || '');
-      const indexB = MAJOR_SORT_ORDER.indexOf(b.major || '');
-      if (indexA !== indexB) return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
-      if (a.class_info !== b.class_info) return (a.class_info || '').localeCompare(b.class_info || '');
-      return (a.student_number || '').localeCompare(b.student_number || '', undefined, { numeric: true });
-    });
-  },
-  ['dashboard-student-data'],
-  { revalidate: 86400, tags: ['students'] }
-);
 
 export async function getDashboardStudentData(graduationYear: string): Promise<StudentEmploymentData[]> {
-  return getDashboardStudentDataCached(graduationYear);
+  const now = Date.now();
+  const cached = dashboardStudentDataMemoryCache[graduationYear];
+  if (cached && (now - cached.timestamp < DASHBOARD_CACHE_TTL_MS)) {
+    return cached.data;
+  }
+
+  const supabase = createAdminClient();
+  const gradYearInt = parseInt(graduationYear);
+
+  const { data: students, error } = await supabase
+    .from('students')
+    .select('id, major, class_info, student_number, graduation_year, career_aspiration, career_course, certificates, military_status, special_notes, student_employments (business_type, company_type, employment_status)')
+    .eq('graduation_year', gradYearInt)
+    .order('major')
+    .order('class_info')
+    .order('student_number')
+    .range(0, 5000);
+
+  if (error || !students) {
+    console.error('Error fetching dashboard students:', error);
+    return [];
+  }
+
+  const studentIds = students.map(s => s.id);
+
+  // 실습 기록 학생 ID 직접 쿼리 (무거운 DB Inner Join 제거)
+  let trainings: any[] = [];
+  if (studentIds.length > 0) {
+    const { data: tData } = await supabase
+      .from('field_training_records')
+      .select('student_id, hiring_status')
+      .in('student_id', studentIds)
+      .order('training_order', { ascending: false });
+    trainings = tData || [];
+  }
+
+  const flattened = students.map(s => {
+    const rawEmp = Array.isArray(s.student_employments) ? s.student_employments[0] : s.student_employments;
+    const { student_employments, ...studentBase } = s;
+    const emp = rawEmp || {};
+    const latestTraining = trainings.find(t => t.student_id === s.id);
+
+    return {
+      ...studentBase,
+      ...emp,
+      id: s.id,
+      has_field_training: latestTraining ? 'O' : '',
+    } as StudentEmploymentData;
+  });
+
+  const sorted = flattened.sort((a, b) => {
+    const indexA = MAJOR_SORT_ORDER.indexOf(a.major || '');
+    const indexB = MAJOR_SORT_ORDER.indexOf(b.major || '');
+    if (indexA !== indexB) return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+    if (a.class_info !== b.class_info) return (a.class_info || '').localeCompare(b.class_info || '');
+    return (a.student_number || '').localeCompare(b.student_number || '', undefined, { numeric: true });
+  });
+
+  dashboardStudentDataMemoryCache[graduationYear] = { data: sorted, timestamp: now };
+  return sorted;
 }
+
 
 
 /**
@@ -211,66 +228,80 @@ export async function getCachedFilteredStudentData(graduationYear: string, baseY
   return filteredStudentDataCacheMap.get(cacheKey)!();
 }
 
+// 노동인권교육 전용 인메모리 캐시 (0ms 초고속 응답용, 5분 TTL)
+const laborEducationMemoryCache: Record<number, { data: StudentEmploymentData[]; timestamp: number }> = {};
+const adminStudentMemoryCache: Record<number, { data: StudentEmploymentData[]; timestamp: number }> = {};
+
+export async function clearLaborEducationCache(graduationYear?: number) {
+  if (graduationYear) delete laborEducationMemoryCache[graduationYear];
+  else Object.keys(laborEducationMemoryCache).forEach(k => delete laborEducationMemoryCache[Number(k)]);
+}
+
+export async function clearAdminStudentCache(graduationYear?: number) {
+  if (graduationYear) delete adminStudentMemoryCache[graduationYear];
+  else Object.keys(adminStudentMemoryCache).forEach(k => delete adminStudentMemoryCache[Number(k)]);
+}
+
 /**
- * [캐싱] 노동인권교육 전용 초경량 학생 목록 조회 (불필요한 무거운 JOIN을 걷어내어 20배 초고속)
+ * [캐싱] 노동인권교육 전용 초경량 학생 목록 조회 (인메모리 캐시 적용)
  */
 export async function getCachedLaborEducationData(graduationYear: number): Promise<StudentEmploymentData[]> {
-  return unstable_cache(
-    async () => {
-      const supabase = createAdminClient();
-      const { data, error } = await supabase
-        .from('students')
-        .select('id, student_name, major, class_info, student_number, labor_education_status, graduation_year')
-        .eq('graduation_year', graduationYear)
-        .order('major')
-        .order('class_info')
-        .order('student_number')
-        .range(0, 5000);
+  const now = Date.now();
+  const cached = laborEducationMemoryCache[graduationYear];
+  if (cached && (now - cached.timestamp < 5 * 60 * 1000)) {
+    return cached.data;
+  }
 
-      if (error) {
-        console.error('Error fetching labor education students:', error);
-        return [];
-      }
-      return (data || []) as StudentEmploymentData[];
-    },
-    [`labor-edu-data-${graduationYear}`],
-    {
-      revalidate: 86400,
-      tags: ['students', `emp-status-${graduationYear}`]
-    }
-  )();
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from('students')
+    .select('id, student_name, major, class_info, student_number, labor_education_status, graduation_year')
+    .eq('graduation_year', graduationYear)
+    .order('major')
+    .order('class_info')
+    .order('student_number')
+    .range(0, 5000);
+
+  if (error || !data) {
+    console.error('Error fetching labor education students:', error);
+    return [];
+  }
+
+  const results = data as StudentEmploymentData[];
+  laborEducationMemoryCache[graduationYear] = { data: results, timestamp: now };
+  return results;
 }
 
 /**
- * [캐싱] 학생 관리(Admin Students) 전용 초경량 기본 정보 조회 (불필요한 무거운 JOIN을 걷어내어 20배 초고속)
+ * [캐싱] 학생 관리(Admin Students) 전용 초경량 기본 정보 조회 (인메모리 캐시 적용)
  */
 export async function getCachedAdminStudentData(graduationYear: number): Promise<StudentEmploymentData[]> {
-  return unstable_cache(
-    async () => {
-      const supabase = createAdminClient();
-      const { data, error } = await supabase
-        .from('students')
-        .select('id, student_name, phone_number, graduation_year, major, class_info, student_number')
-        .eq('graduation_year', graduationYear)
+  const now = Date.now();
+  const cached = adminStudentMemoryCache[graduationYear];
+  if (cached && (now - cached.timestamp < 5 * 60 * 1000)) {
+    return cached.data;
+  }
 
-        .order('major')
-        .order('class_info')
-        .order('student_number')
-        .range(0, 5000);
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from('students')
+    .select('id, student_name, phone_number, graduation_year, major, class_info, student_number')
+    .eq('graduation_year', graduationYear)
+    .order('major')
+    .order('class_info')
+    .order('student_number')
+    .range(0, 5000);
 
-      if (error) {
-        console.error('Error fetching admin students:', error);
-        return [];
-      }
-      return (data || []) as StudentEmploymentData[];
-    },
-    [`admin-students-data-${graduationYear}`],
-    {
-      revalidate: 86400,
-      tags: ['students', `emp-status-${graduationYear}`]
-    }
-  )();
+  if (error || !data) {
+    console.error('Error fetching admin students:', error);
+    return [];
+  }
+
+  const results = data as StudentEmploymentData[];
+  adminStudentMemoryCache[graduationYear] = { data: results, timestamp: now };
+  return results;
 }
+
 
 /**
  * [캐싱] 졸업연도 목록 서버 메모리 캐싱
@@ -289,56 +320,62 @@ export async function getCachedGraduationYears(): Promise<number[]> {
 
 
 
+// 학반 관리 전용 학생 상세 데이터 인메모리 캐시 (0ms 초고속 응답용, 5분 TTL)
+const assignedStudentDetailsMemoryCache: Record<string, { data: StudentEmploymentData[]; timestamp: number }> = {};
+const ASSIGNED_CACHE_TTL_MS = 5 * 60 * 1000;
+
+export async function clearAssignedStudentDetailsCache(major?: string, classInfo?: string, graduationYear?: number) {
+  if (major && classInfo && graduationYear) {
+    const key = `${major}-${classInfo}-${graduationYear}`;
+    delete assignedStudentDetailsMemoryCache[key];
+  } else {
+    Object.keys(assignedStudentDetailsMemoryCache).forEach(k => delete assignedStudentDetailsMemoryCache[k]);
+  }
+}
+
 export async function getAssignedStudentDetails(major: string, classInfo: string, graduationYear: number, baseYear?: number) {
+  const cacheKey = `${major}-${classInfo}-${graduationYear}-${baseYear || 2026}`;
+  const now = Date.now();
+  const cached = assignedStudentDetailsMemoryCache[cacheKey];
+  if (cached && (now - cached.timestamp < ASSIGNED_CACHE_TTL_MS)) {
+    return cached.data;
+  }
+
   const supabase = createAdminClient();
 
-  // 1. 학생 기본 정보 및 학적 이력 병렬 조회
-  const [studentsResult, historyResult] = await Promise.all([
-    supabase
-      .from('students')
-      .select('id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, labor_education_status, military_status, desired_work_area, parents_opinion, shoe_size, top_size, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks)')
-      .eq('major', major)
-      .eq('class_info', classInfo)
-      .eq('graduation_year', graduationYear)
-      .order('student_number'),
-    baseYear 
-      ? supabase
-          .from('student_academic_history')
-          .select('id, student_id, major, class_info, student_number, teacher_name, grade, students!inner(id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, labor_education_status, military_status, desired_work_area, parents_opinion, shoe_size, top_size, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks))')
-          .eq('academic_year', baseYear)
-          .eq('students.graduation_year', graduationYear)
-          .eq('major', major)
-          .eq('class_info', classInfo)
-      : Promise.resolve({ data: [] as any[], error: null })
-  ]);
+  // 1. 해당 학반 학생 기본 정보 초고속 조회 (20~25명)
+  const { data: rawStudents, error: sErr } = await supabase
+    .from('students')
+    .select('id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, labor_education_status, military_status, desired_work_area, parents_opinion, shoe_size, top_size, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks)')
+    .eq('major', major)
+    .eq('class_info', classInfo)
+    .eq('graduation_year', graduationYear)
+    .order('student_number');
 
-
-  if (studentsResult.error || !studentsResult.data) return [];
+  if (sErr || !rawStudents || rawStudents.length === 0) return [];
   
-  let students = [...studentsResult.data];
-  const historyData = historyResult?.data || [];
+  const studentIds = rawStudents.map(s => s.id);
 
-  // 학적 이력에만 존재하는 학생이 있다면 병합
-  historyData.forEach((h: any) => {
-    if (h.students && !students.some(s => s.id === h.students.id)) {
-      students.push(h.students);
-    }
-  });
-
-  const studentIds = students.map(s => s.id);
-
-  // 2. 해당 학반 학생 ID 목록으로 현장실습 이력 전체 직접 조회 (누락 방지)
-  let trainings: any[] = [];
-  if (studentIds.length > 0) {
-    const { data: tData } = await supabase
+  // 2. 해당 학생 ID 목록으로 실습 이력 및 학적 이력 병렬 조회
+  const [trainingsResult, historyResult] = await Promise.all([
+    supabase
       .from('field_training_records')
       .select('id, student_id, training_order, company, start_date, end_date, stipend_status, hiring_status, conversion_date, return_reason, updated_at')
       .in('student_id', studentIds)
-      .order('training_order', { ascending: false });
-    trainings = tData || [];
-  }
+      .order('training_order', { ascending: false }),
+    baseYear
+      ? supabase
+          .from('student_academic_history')
+          .select('id, student_id, major, class_info, student_number, teacher_name, grade')
+          .eq('academic_year', baseYear)
+          .in('student_id', studentIds)
+      : Promise.resolve({ data: [] as any[], error: null })
+  ]);
 
-  return students.map(s => {
+  const trainings = trainingsResult.data || [];
+  const historyData = historyResult?.data || [];
+
+  const results = rawStudents.map(s => {
     const studentEmployments = Array.isArray(s.student_employments) ? s.student_employments[0] : s.student_employments;
     const { student_employments, ...studentBase } = s;
     const emp = studentEmployments || {};
@@ -368,22 +405,18 @@ export async function getAssignedStudentDetails(major: string, classInfo: string
       is_returned: latestTraining?.hiring_status === '복교' ? 'O' : '',
     };
   }).sort((a, b) => (a.student_number || '').localeCompare(b.student_number || '', undefined, { numeric: true }));
-}
 
+  assignedStudentDetailsMemoryCache[cacheKey] = { data: results, timestamp: now };
+  return results;
+}
 
 /**
  * [캐싱] 특정 학과/반 학생 상세 데이터 서버 메모리 캐싱
  */
 export async function getCachedAssignedStudentDetails(major: string, classInfo: string, graduationYear: number, baseYear?: number) {
-  return unstable_cache(
-    async () => getAssignedStudentDetails(major, classInfo, graduationYear, baseYear),
-    [`assigned-student-details-${major}-${classInfo}-${graduationYear}-${baseYear || 2026}`],
-    {
-      revalidate: 3600,
-      tags: [`class-students-${graduationYear}-${major}-${classInfo}`, 'students']
-    }
-  )();
+  return getAssignedStudentDetails(major, classInfo, graduationYear, baseYear);
 }
+
 
 
 export async function getStudentEmploymentData(id: string): Promise<StudentEmploymentData | null> {
@@ -555,57 +588,60 @@ export async function getAllStudentScores() {
   return allScores.map(score => ({ ...score, students: studentMap[score.student_id] || null }));
 }
 
+// 직기초 성적 및 종합 요약 인메모리 캐시 (0ms 초고속 응답용, 5분 TTL)
+const yearlyRankingsMemoryCache: Record<string, { data: Record<string, any>; timestamp: number }> = {};
+const YEARLY_RANKINGS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+export async function clearYearlyRankingsCache(graduationYear?: number) {
+  if (graduationYear) {
+    Object.keys(yearlyRankingsMemoryCache).forEach(k => {
+      if (k.startsWith(`${graduationYear}-`)) delete yearlyRankingsMemoryCache[k];
+    });
+  } else {
+    Object.keys(yearlyRankingsMemoryCache).forEach(k => delete yearlyRankingsMemoryCache[k]);
+  }
+}
+
 /**
  * [초고속 요약] 특정 졸업연도 학생들의 석차 및 성취도를 사전 계산합니다.
  */
 export async function getYearlyRankingsSummary(graduationYear: number, baseYear: number = 2026) {
-  const supabase = createAdminClient();
-
-  
-  // 1. [최적화] 학생 정보 조회, 전체 성적 개수 카운트, 출결 정보 수집을 병렬로 수행하여 대기시간 단축
-  const [studentsResult, countResult, attendanceResult] = await Promise.all([
-    supabase
-      .from('students')
-      .select('id, student_name, student_number, major, class_info, graduation_year')
-      .eq('graduation_year', graduationYear),
-    supabase
-      .from('student_scores')
-      .select('student_id, students!inner(graduation_year)', { count: 'exact', head: true })
-      .eq('students.graduation_year', graduationYear),
-    supabase
-      .from('student_attendance')
-      .select('student_id, grade, semester, school_days, remarks, absent_unexcused, late_unexcused, early_unexcused, out_unexcused, absent_disease, late_disease, early_disease, out_disease, absent_other, late_other, early_other, out_other, students!inner(graduation_year)')
-      .eq('students.graduation_year', graduationYear)
-  ]);
-
-  if (studentsResult.error || !studentsResult.data || studentsResult.data.length === 0) return {};
-  const students = studentsResult.data;
-  const studentIds = students.map(s => s.id);
-  const count = countResult.count || 0;
-
-  // 2. [최적화] 성적 데이터를 페이지 단위로 병렬 수집하여 순차 루프(while)로 인한 병목 현상 완벽 제거
-  const PAGE_SIZE = 1000;
-  const numPages = Math.ceil(count / PAGE_SIZE);
-  const promises = [];
-  for (let i = 0; i < numPages; i++) {
-    promises.push(
-      supabase
-        .from('student_scores')
-        .select('student_id, credits, achievement, students!inner(graduation_year)')
-        .eq('students.graduation_year', graduationYear)
-        .range(i * PAGE_SIZE, (i + 1) * PAGE_SIZE - 1)
-    );
+  const cacheKey = `${graduationYear}-${baseYear}`;
+  const now = Date.now();
+  const cached = yearlyRankingsMemoryCache[cacheKey];
+  if (cached && (now - cached.timestamp < YEARLY_RANKINGS_CACHE_TTL_MS)) {
+    return cached.data;
   }
 
-  const results = await Promise.all(promises);
-  const allScores: any[] = [];
-  results.forEach(res => {
-    if (res.error) throw res.error;
-    if (res.data) allScores.push(...res.data);
-  });
+  const supabase = createAdminClient();
 
-  const weights = await getAchievementScores();
+  // 1. [최적화] 학생 정보 조회
+  const { data: students, error: sErr } = await supabase
+    .from('students')
+    .select('id, student_name, student_number, major, class_info, graduation_year')
+    .eq('graduation_year', graduationYear);
+
+  if (sErr || !students || students.length === 0) return {};
+  const studentIds = students.map(s => s.id);
+
+  // 2. [최적화] 해당 학생들의 성적 목록 및 출결 직접 쿼리 (무거운 JOIN 제거)
+  const [scoresResult, attendanceResult, weights] = await Promise.all([
+    supabase
+      .from('student_scores')
+      .select('student_id, credits, achievement')
+      .in('student_id', studentIds)
+      .range(0, 10000),
+    supabase
+      .from('student_attendance')
+      .select('student_id, grade, semester, school_days, remarks, absent_unexcused, late_unexcused, early_unexcused, out_unexcused, absent_disease, late_disease, early_disease, out_disease, absent_other, late_other, early_other, out_other')
+      .in('student_id', studentIds),
+    getAchievementScores()
+  ]);
+
+
+  const allScores = scoresResult.data || [];
   const maxWeight = Math.max(...Object.values(weights), 0);
+
 
   // 3. 학생별 통계 집계 초기화
   const stats: Record<string, any> = {};

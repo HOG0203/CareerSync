@@ -11,18 +11,23 @@ import { getMajorOrderIndex } from '@/lib/student-utils';
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
-  title: '학생 계정 및 로그인 관리 | CareerSync',
+  title: '학생 계정 관리 | CareerSync',
 };
 
+
 export default async function StudentAccountsPage() {
-  const profile = await getCurrentUserProfile();
+  // 1. 프로필, 시스템 설정, 계정 메타데이터 스토어 1회 완전 동시 병렬 패칭
+  const [profile, settings, accountsStore] = await Promise.all([
+    getCurrentUserProfile(),
+    getSystemSettings(),
+    getCachedStudentAccountsStore(),
+  ]);
 
   if (!profile || (profile.role !== 'admin' && profile.role !== 'teacher')) {
     redirect('/dashboard');
   }
 
   const isAdmin = profile.role === 'admin';
-  const settings = await getSystemSettings();
   const baseYear = settings.baseYear || 2026;
 
   const supabase = createAdminClient();
@@ -30,7 +35,7 @@ export default async function StudentAccountsPage() {
   // 해당 학사기준년도의 현재 1, 2, 3학년 졸업연도 배열 (예: 2026학년도 -> 3학년:2027, 2학년:2028, 1학년:2029)
   const activeGraduationYears = [baseYear + 1, baseYear + 2, baseYear + 3];
 
-  // 1. 학생 목록 조회 (현재 1, 2, 3학년 재학생만 필터링)
+  // 2. 학생 목록 조회 (현재 1, 2, 3학년 재학생만 필터링)
   let query = supabase
     .from('students')
     .select('id, student_name, graduation_year, major, class_info, student_number, phone_number')
@@ -54,14 +59,9 @@ export default async function StudentAccountsPage() {
     }
   }
 
-
-
-  const [studentsRes, accountsStore] = await Promise.all([
-    query,
-    getCachedStudentAccountsStore(),
-  ]);
-
+  const studentsRes = await query;
   const rawStudents = studentsRes.data || [];
+
 
   // 데이터 가공 및 학년 계산
   const studentRows = rawStudents.map((s) => {
@@ -114,8 +114,9 @@ export default async function StudentAccountsPage() {
         <div className="flex flex-col gap-1">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
             <UserCheck className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
-            학생 계정 및 로그인 관리
+            학생 계정 관리
           </h2>
+
           <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed">
             학생들의 <span className="text-blue-600 font-bold">로그인 접속 이력</span>과 <span className="text-blue-600 font-bold">비밀번호 상태</span>를 확인하고, 분실 시 초기화(휴대폰 뒷자리)를 지원합니다.
           </p>

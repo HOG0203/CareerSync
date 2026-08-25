@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import * as XLSX from 'xlsx';
@@ -15,10 +15,28 @@ export interface StudentCertificateSummary {
   certificates: string[];
 }
 
+// 자격증 현황 서버 인메모리 캐시 (0ms 초고속 응답용, 5분 TTL)
+const certSummariesMemoryCache: Record<number, { data: StudentCertificateSummary[]; timestamp: number }> = {};
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+export async function clearCertificateSummariesCache(gradeNum?: number) {
+  if (gradeNum) {
+    delete certSummariesMemoryCache[gradeNum];
+  } else {
+    Object.keys(certSummariesMemoryCache).forEach(k => delete certSummariesMemoryCache[Number(k)]);
+  }
+}
+
 /**
- * 특정 학년의 학생 자격증 현황 목록 조회
+ * 특정 학년의 학생 자격증 현황 목록 조회 (초고속 인메모리 캐시 적용)
  */
-export async function getCertificateSummaries(gradeNum: number) {
+export async function getCertificateSummaries(gradeNum: number): Promise<StudentCertificateSummary[]> {
+  const now = Date.now();
+  const cached = certSummariesMemoryCache[gradeNum];
+  if (cached && (now - cached.timestamp < CACHE_TTL_MS)) {
+    return cached.data;
+  }
+
   const supabase = createAdminClient();
 
   const settings = await getSystemSettings();
@@ -31,7 +49,6 @@ export async function getCertificateSummaries(gradeNum: number) {
     .from('students')
     .select('id, student_name, student_number, major, class_info, certificates')
     .eq('graduation_year', targetGradYear)
-
     .order('major', { ascending: true })
     .order('class_info', { ascending: true })
     .order('student_number', { ascending: true });
@@ -41,7 +58,7 @@ export async function getCertificateSummaries(gradeNum: number) {
     return [];
   }
 
-  return (students || []).map((s: any) => ({
+  const results = (students || []).map((s: any) => ({
     id: s.id,
     name: s.student_name,
     number: s.student_number || '',
@@ -49,20 +66,18 @@ export async function getCertificateSummaries(gradeNum: number) {
     classInfo: s.class_info || '',
     certificates: s.certificates || [],
   })) as StudentCertificateSummary[];
+
+  // 메모리 캐시에 보관
+  certSummariesMemoryCache[gradeNum] = { data: results, timestamp: now };
+
+  return results;
 }
 
 /**
- * [캐싱] 학년별 자격증 현황 목록을 학년별 동적 태그로 서버 메모리에 캐싱합니다.
+ * [캐싱] 학년별 자격증 현황 목록 조회
  */
 export async function getCachedCertificateSummaries(gradeNum: number) {
-  return unstable_cache(
-    async () => getCertificateSummaries(gradeNum),
-    [`certificate-summaries-grade-${gradeNum}`],
-    {
-      revalidate: 3600,
-      tags: [`cert-certificates-grade-${gradeNum}`, 'cert-certificates']
-    }
-  )();
+  return getCertificateSummaries(gradeNum);
 }
 
 
@@ -83,6 +98,7 @@ export async function updateStudentCertificates(studentId: string, certificates:
     return { success: false, error: error.message };
   }
 
+  await clearCertificateSummariesCache();
   [1, 2, 3].forEach(g => revalidateTag(`cert-certificates-grade-${g}`));
   revalidateTag('cert-certificates');
   revalidateTag('students');
@@ -91,6 +107,7 @@ export async function updateStudentCertificates(studentId: string, certificates:
   revalidatePath('/students');
   return { success: true };
 }
+
 
 
 
@@ -268,12 +285,14 @@ export async function importUploadedCertificates(rawRows: any[][]) {
       studentCerts
     );
 
+    await clearCertificateSummariesCache();
     revalidateTag(`cert-certificates-grade-${grade}`);
     revalidateTag('cert-certificates');
     revalidateTag('students');
     revalidatePath('/admin/certification/certificates');
     revalidatePath('/employment-status');
     revalidatePath('/students');
+
 
 
 

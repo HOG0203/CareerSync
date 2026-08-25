@@ -37,26 +37,22 @@ async function ClassManagementPageContent({
 }) {
   const params = searchParams;
   
-  // 1. 기반 공통 데이터 병렬 패칭 (서버 메모리 캐시 적용)
-  const [settings, graduationYears, masterCertificates, userProfile] = await Promise.all([
+  // 1. 기반 공통 데이터 및 학급 구조 1회 동시 병렬 패칭 (서버 메모리 캐시 적용)
+  const [settings, graduationYears, masterCertificates, userProfile, allCombinations] = await Promise.all([
     getSystemSettings(),
     getCachedGraduationYears(),
     getCachedMasterCertificates(),
-    getCurrentUserProfile()
+    getCurrentUserProfile(),
+    getCachedClassStructureCombinations()
   ]);
 
   if (!userProfile) return null;
 
   const isAdmin = userProfile.role === 'admin';
 
-  // 관리자일 경우 학년별 학과 및 반 구조 전체 조회 (서버 메모리 캐시 적용)
-  let allCombinations: any[] = [];
-  if (isAdmin) {
-    allCombinations = await getCachedClassStructureCombinations();
-  }
-
+  // 2. 학년별 학과 및 반 구조 전체 매핑 (0ms 계산)
   const classStructure: Record<number, Record<string, string[]>> = {};
-  if (isAdmin && allCombinations.length > 0) {
+  if (allCombinations.length > 0) {
     allCombinations.forEach((item: any) => {
       const g = 4 - (item.graduation_year - settings.baseYear);
       if (g >= 1 && g <= 3) {
@@ -91,7 +87,6 @@ async function ClassManagementPageContent({
       });
       classStructure[g] = sortedMajors;
     });
-
   }
 
   // 3. 학년 옵션 계산 (졸업연도 목록 기반 역산)
@@ -116,46 +111,26 @@ async function ClassManagementPageContent({
     ? (gradeToYearMap.get(selectedGrade) || settings.baseYear + (4 - selectedGrade))
     : (userProfile?.assigned_year || settings.baseYear + (4 - selectedGrade));
 
-  // 4. 해당 학년의 전체 데이터만 서버 메모리 캐시로 패칭
-  const allBaseData = await getCachedFilteredStudentData(calculatedYear.toString(), settings.baseYear);
-
-  // 학과 및 반 추출
-  const availableMajorsSet = new Set<string>();
-  const availableClassesSet = new Set<string>();
-
-  for (const s of allBaseData) {
-    if (s.major) availableMajorsSet.add(s.major);
-  }
-
-  const availableMajors = Array.from(availableMajorsSet).sort((a, b) => {
-    const orderA = getMajorOrderIndex(a);
-    const orderB = getMajorOrderIndex(b);
-    if (orderA !== orderB) return orderA - orderB;
-    return a.localeCompare(b, 'ko');
-  });
+  // 4. 학급 구조에서 학과 및 반 목록 즉시 도출 (300명 전교생 무거운 쿼리 완전 제거)
+  const gradeMajorsObj = classStructure[selectedGrade] || {};
+  const availableMajors = Object.keys(gradeMajorsObj);
 
   const targetMajor = isAdmin 
     ? (params.major && availableMajors.includes(params.major) ? params.major : (availableMajors[0] || null))
     : (userProfile?.assigned_major || null);
 
-  // 선택된 학년 + 학과에 맞는 반들 추출 (숫자 자연어 정렬)
-  for (const s of allBaseData) {
-    if (s.major === targetMajor) {
-      if (s.class_info) availableClassesSet.add(s.class_info);
-    }
-  }
-  const availableClasses = Array.from(availableClassesSet).sort((a, b) => parseInt(a || '0') - parseInt(b || '0'));
+  const availableClasses = targetMajor ? (gradeMajorsObj[targetMajor] || []) : [];
 
   const targetClass = isAdmin 
     ? (params.class && availableClasses.includes(params.class) ? params.class : (availableClasses[0] || null))
     : (userProfile?.assigned_class || null);
 
-  // --- 학생 상세 데이터 패칭 (캐시 적용) ---
+  // --- 5. 해당 학반(20~25명) 학생 상세 데이터만 초고속 핀포인트 패칭 (인메모리 캐시 적용) ---
   const isViewable = !!(targetMajor && targetClass);
   let studentData: any[] = [];
 
   if (isViewable) {
-    const rawData = await getCachedAssignedStudentDetails(targetMajor!, targetClass!, calculatedYear);
+    const rawData = await getCachedAssignedStudentDetails(targetMajor!, targetClass!, calculatedYear, settings.baseYear);
     // 학생 번호 자연어 숫자 정렬 (1번 -> 2번 -> ... -> 9번 -> 10번 -> 11번)
     studentData = [...(rawData || [])].sort((a, b) => {
       const numA = parseInt((a.student_number || '').replace(/[^0-9]/g, ''), 10) || 0;
@@ -166,6 +141,7 @@ async function ClassManagementPageContent({
   }
 
   const displayClass = targetClass && !targetClass.includes('-') ? `${selectedGrade}-${targetClass}` : targetClass;
+
 
   return (
     <div className="flex flex-col h-full gap-5">

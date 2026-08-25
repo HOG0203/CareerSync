@@ -23,7 +23,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
-import { StudentCertificateSummary, updateStudentCertificates } from './actions';
+import { StudentCertificateSummary, updateStudentCertificates, getCachedCertificateSummaries } from './actions';
 import { CertificateImportModal } from './certificate-import-modal';
 import { CertificatePicker } from '@/components/dashboard/standard-spreadsheet-table/certificate-picker';
 
@@ -44,7 +44,14 @@ export function CertificateSummaryClient({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isPending, startTransition] = React.useTransition();
+
+  // 학년별 인메모리 캐싱 (0ms 즉시 탭 전환)
+  const [activeGrade, setActiveGrade] = React.useState<number>(currentGrade);
+  const [gradeDataMap, setGradeDataMap] = React.useState<Record<number, StudentCertificateSummary[]>>({
+    [currentGrade]: initialSummaries,
+  });
+  const [isLoadingGrade, setIsLoadingGrade] = React.useState<boolean>(false);
+
   const [searchTerm, setSearchText] = React.useState('');
   const [selectedMajor, setSelectedMajor] = React.useState(() => {
     if (!isAdmin && userProfile?.role === 'teacher' && userProfile?.assigned_major) {
@@ -65,32 +72,41 @@ export function CertificateSummaryClient({
   const PAGE_SIZE = 50;
   const { toast } = useToast();
 
-  const [pendingGrade, setPendingGrade] = React.useState<number | null>(null);
+  const currentSummaries = gradeDataMap[activeGrade] || [];
 
-  React.useEffect(() => {
-    setPendingGrade(null);
-  }, [currentGrade]);
+  // 학년 변경 시 0ms 즉각 전환 및 URL 파라미터 동기화
+  const handleGradeChange = async (targetGradeNum: number) => {
+    if (targetGradeNum === activeGrade) return;
+    setActiveGrade(targetGradeNum);
+    setSelectedClass('all');
+    setSelectedMajor('all');
+    setCurrentPage(1);
 
-  // 학년 변경 시 URL 업데이트 (서버 리로딩 유도)
-  const handleGradeChange = (grade: number) => {
-    if (grade === currentGrade) return;
-    setPendingGrade(grade);
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('grade', grade.toString());
-    startTransition(() => {
-      router.push(`/admin/certification/certificates?${params.toString()}`);
-    });
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('grade', String(targetGradeNum));
+      window.history.replaceState(null, '', url.toString());
+    }
+
+    if (!gradeDataMap[targetGradeNum]) {
+      setIsLoadingGrade(true);
+      try {
+        const data = await getCachedCertificateSummaries(targetGradeNum);
+        setGradeDataMap(prev => ({ ...prev, [targetGradeNum]: data }));
+      } catch (err) {
+        console.error('Failed to load certificate data:', err);
+      } finally {
+        setIsLoadingGrade(false);
+      }
+    }
   };
 
-  const activeGrade = pendingGrade !== null ? pendingGrade : currentGrade;
-  const showSkeleton = isPending || (pendingGrade !== null && pendingGrade !== currentGrade);
-
-
+  const showSkeleton = isLoadingGrade;
 
   // 클라이언트 사이드 필터링 (학과, 반, 검색어: 이름/학번/자격증명)
   const filteredData = React.useMemo(() => {
     const termLower = searchTerm.toLowerCase().trim();
-    let filtered = initialSummaries.filter(s => {
+    let filtered = currentSummaries.filter(s => {
       const matchMajor = selectedMajor === 'all' || s.major === selectedMajor;
       const matchClass = selectedClass === 'all' || s.classInfo === selectedClass;
       const matchSearch = !termLower ||
@@ -99,6 +115,7 @@ export function CertificateSummaryClient({
         (s.certificates && s.certificates.some(cert => cert.toLowerCase().includes(termLower)));
       return matchMajor && matchClass && matchSearch;
     });
+
 
     // 학번 순으로 정렬
     filtered.sort((a, b) => {
@@ -132,19 +149,19 @@ export function CertificateSummaryClient({
   const totalPages = Math.ceil(filteredData.length / PAGE_SIZE);
 
   const majors = React.useMemo(() => {
-    const allMajors = Array.from(new Set(initialSummaries.map(s => s.major))).filter(Boolean);
+    const allMajors = Array.from(new Set(currentSummaries.map(s => s.major))).filter(Boolean);
     return allMajors.sort((a, b) => {
       const idxA = MAJOR_SORT_ORDER.indexOf(a);
       const idxB = MAJOR_SORT_ORDER.indexOf(b);
       return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
     });
-  }, [initialSummaries]);
+  }, [currentSummaries]);
 
   const availableClasses = React.useMemo(() => {
     if (selectedMajor === 'all') return [];
-    const classes = new Set(initialSummaries.filter(s => s.major === selectedMajor).map(s => s.classInfo));
+    const classes = new Set(currentSummaries.filter(s => s.major === selectedMajor).map(s => s.classInfo));
     return Array.from(classes).sort();
-  }, [initialSummaries, selectedMajor]);
+  }, [currentSummaries, selectedMajor]);
 
   // 편집 시작
   const startEdit = (student: StudentCertificateSummary) => {
@@ -159,6 +176,14 @@ export function CertificateSummaryClient({
     try {
       const res = await updateStudentCertificates(editingStudent.id, newCerts);
       if (res.success) {
+        // 로컬 상태 즉시 갱신 (0ms 반응성)
+        setGradeDataMap(prev => {
+          const updated = (prev[activeGrade] || []).map(s =>
+            s.id === editingStudent.id ? { ...s, certificates: newCerts } : s
+          );
+          return { ...prev, [activeGrade]: updated };
+        });
+
         toast({
           title: "자격증 수정 완료",
           description: `${editingStudent.name} 학생의 자격증 정보를 수정했습니다.`,
@@ -166,6 +191,7 @@ export function CertificateSummaryClient({
         setEditingStudent(null);
         router.refresh();
       } else {
+
         toast({
           variant: "destructive",
           title: "저장 실패",
@@ -239,8 +265,9 @@ export function CertificateSummaryClient({
                 className={cn("h-7 sm:h-8 px-2.5 sm:px-3 text-xs font-black items-center gap-1", activeGrade === g && "text-indigo-600 bg-indigo-50")}
               >
                 {g}학년
-                {pendingGrade === g && <Loader2 className="h-3 w-3 animate-spin text-indigo-600" />}
+                {isLoadingGrade && activeGrade === g && <Loader2 className="h-3 w-3 animate-spin text-indigo-600" />}
               </Button>
+
             ))}
           </div>
 

@@ -116,7 +116,8 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
       icon: GraduationCap,
       items: [
         { href: '/class-management', label: '학반 관리', icon: BookUser },
-        { href: '/student-accounts', label: '학생 계정/로그인 관리', icon: UserCog },
+        { href: '/student-accounts', label: '학생 계정 관리', icon: UserCog },
+
         ...(!isLowerGradeTeacher ? [{ href: '/labor-education', label: '노동인권교육', icon: ShieldAlert }] : []),
         ...(isAdmin ? [{ href: '/admin/students', label: '학생 등록/진급', icon: UserPlus }] : []),
       ]

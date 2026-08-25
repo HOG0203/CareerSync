@@ -41,9 +41,9 @@ import {
   UploadCloud,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import * as XLSX from 'xlsx';
 
 interface CertificationSummaryClientProps {
+
   initialEvaluations: FullStudentEvaluation[];
   currentGrade: number;
   baseYear: number;
@@ -246,9 +246,11 @@ export function CertificationSummaryClient({
     return filteredList.slice(start, start + pageSize);
   }, [filteredList, currentPage, pageSize]);
 
-  // 5. 엑셀 다운로드
-  const handleExportExcel = () => {
+  // 5. 엑셀 다운로드 (동적 라이브러리 로드로 초기 화면 초고속화)
+  const handleExportExcel = async () => {
     if (filteredList.length === 0) return;
+
+    const XLSX = await import('xlsx');
 
     const exportRows = filteredList.map(e => ({
       '학년': `${activeGrade}학년`,
@@ -272,6 +274,7 @@ export function CertificationSummaryClient({
     XLSX.utils.book_append_sheet(wb, ws, `${activeGrade}학년_옥저인재인증평가`);
     XLSX.writeFile(wb, `${baseYear}학년도_${activeGrade}학년_옥저인재인증제_평가결과.xlsx`);
   };
+
 
   const getRankBadge = (rank: CertificationRank) => {
     switch (rank) {

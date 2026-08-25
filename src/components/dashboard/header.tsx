@@ -57,7 +57,8 @@ const ROUTE_MAP: Record<string, { group: string; label: string }> = {
   '/admin/certification/attendance': { group: '옥저인재인증제', label: '출결현황' },
   '/admin/certification/certificates': { group: '옥저인재인증제', label: '자격증현황' },
   '/student/certification': { group: '옥저인재인증제', label: '종합평가표' },
-  '/student-accounts': { group: '학사 및 지도', label: '학생 계정 및 로그인 관리' },
+  '/student-accounts': { group: '학사 및 지도', label: '학생 계정 관리' },
+
 };
 
 

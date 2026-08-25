@@ -118,7 +118,7 @@ export default function CompanyInfoPage() {
   const loadCompanies = async (searchVal?: string) => {
     setIsLoading(true);
     // 초기 로드 시 등록 기업만 조회 (미등록 기업은 탭 클릭 시 지연 로드)
-    const { data } = await getCompanies(searchVal);
+    const data = await getCompanies(searchVal);
     if (data) setCompanies(data);
     setIsLoading(false);
   };
@@ -126,13 +126,14 @@ export default function CompanyInfoPage() {
   // 등록/수정/삭제/가져오기 시 등록/미등록 기업 전체 실시간 최신화
   const refreshAllCompanies = async (searchVal?: string) => {
     setIsLoading(true);
-    const [{ data: regData }, unregData] = await Promise.all([
+    const [regData, unregData] = await Promise.all([
       getCompanies(searchVal),
       getUnregisteredCompanies()
     ]);
     if (regData) setCompanies(regData);
     if (unregData) setUnregisteredCompanies(unregData);
     setUnregisteredLoaded(true);
+
     setIsLoading(false);
     router.refresh();
   };

@@ -156,15 +156,38 @@ export async function deleteAllStudentAttendance() {
   const supabase = await createClient();
   const { error } = await supabase.from('student_attendance').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   if (error) return { success: false, error: error.message };
-  [1, 2, 3].forEach(g => revalidateTag(`cert-attendance-grade-${g}`));
+  [1, 2, 3].forEach(g => {
+    revalidateTag(`cert-attendance-grade-${g}`);
+    clearAttendanceCache(g);
+  });
   revalidateTag('cert-attendance');
   revalidatePath('/admin/certification/attendance');
   return { success: true };
 }
 
-export async function getAllAttendanceRecords(academicYear: number, currentGrade: number) {
-  const supabase = createAdminClient();
+// 출결 현황 서버 인메모리 캐시 (0ms 초고속 응답용, 5분 TTL)
+const attendanceMemoryCache: Record<string, { data: any[]; timestamp: number }> = {};
+const ATTENDANCE_CACHE_TTL_MS = 5 * 60 * 1000;
 
+export async function clearAttendanceCache(gradeNum?: number) {
+  if (gradeNum) {
+    Object.keys(attendanceMemoryCache).forEach(k => {
+      if (k.endsWith(`-${gradeNum}`)) delete attendanceMemoryCache[k];
+    });
+  } else {
+    Object.keys(attendanceMemoryCache).forEach(k => delete attendanceMemoryCache[k]);
+  }
+}
+
+export async function getAllAttendanceRecords(academicYear: number, currentGrade: number) {
+  const cacheKey = `${academicYear}-${currentGrade}`;
+  const now = Date.now();
+  const cached = attendanceMemoryCache[cacheKey];
+  if (cached && (now - cached.timestamp < ATTENDANCE_CACHE_TTL_MS)) {
+    return cached.data;
+  }
+
+  const supabase = createAdminClient();
   const targetGraduationYear = academicYear + (4 - currentGrade);
 
   const { data: students } = await supabase
@@ -191,23 +214,15 @@ export async function getAllAttendanceRecords(academicYear: number, currentGrade
     .in('student_id', studentIds)
     .order('grade', { ascending: true });
 
-  if (error) return [];
+  if (error || !data) return [];
+  
+  attendanceMemoryCache[cacheKey] = { data, timestamp: now };
   return data;
 }
 
 /**
- * [캐싱] 학년별 전교생 출결 기록 조회 결과를 학년별 동적 태그로 서버 메모리에 캐싱합니다.
+ * [캐싱] 학년별 전교생 출결 기록 조회 (인메모리 캐시 적용)
  */
 export async function getCachedAllAttendanceRecords(academicYear: number, currentGrade: number) {
-  return unstable_cache(
-    async () => getAllAttendanceRecords(academicYear, currentGrade),
-    [`all-attendance-records-${academicYear}-${currentGrade}`],
-    {
-      revalidate: 3600,
-      tags: [`cert-attendance-grade-${currentGrade}`, 'cert-attendance']
-    }
-  )();
+  return getAllAttendanceRecords(academicYear, currentGrade);
 }
-
-
-

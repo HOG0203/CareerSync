@@ -57,7 +57,24 @@ interface AttendanceRecord {
   };
 }
 
+import { getCachedAllAttendanceRecords } from './actions';
 import { CertificationDataSkeleton } from '@/components/dashboard/loading-skeleton';
+
+interface StudentAttendanceGroup {
+  id: string;
+  name: string;
+  number: string;
+  major: string;
+  classInfo: string;
+  gradYear: number;
+  records: AttendanceRecord[];
+  stats: {
+    unexcused: { absent: number; late: number; early: number; out: number };
+    disease: { absent: number; late: number; early: number; out: number };
+    other: { absent: number; late: number; early: number; out: number };
+  };
+  hasAnyUnexcused: boolean;
+}
 
 export function AttendanceTableClient({ 
   initialData,
@@ -74,7 +91,14 @@ export function AttendanceTableClient({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isPending, startTransition] = React.useTransition();
+
+  // 학년별 인메모리 캐싱 (0ms 즉각 탭 전환)
+  const [activeGrade, setActiveGrade] = React.useState<number>(currentGrade);
+  const [gradeDataMap, setGradeDataMap] = React.useState<Record<number, AttendanceRecord[]>>({
+    [currentGrade]: initialData,
+  });
+  const [isLoadingGrade, setIsLoadingGrade] = React.useState<boolean>(false);
+
   const [searchTerm, setSearchText] = React.useState('');
   const [selectedMajor, setSelectedMajor] = React.useState(() => {
     if (!isAdmin && userProfile?.role === 'teacher' && userProfile?.assigned_major) {
@@ -90,45 +114,40 @@ export function AttendanceTableClient({
   });
 
   const [selectedStudentId, setSelectedStudentId] = React.useState<string | null>(null);
-  const [pendingGrade, setPendingGrade] = React.useState<number | null>(null);
 
-  React.useEffect(() => {
-    setPendingGrade(null);
-  }, [currentGrade]);
+  const handleGradeChange = async (targetGradeNum: number) => {
+    if (targetGradeNum === activeGrade) return;
+    setActiveGrade(targetGradeNum);
+    setSelectedClass('all');
+    setSelectedMajor('all');
 
-  const handleGradeChange = (grade: number) => {
-    if (grade === currentGrade) return;
-    setPendingGrade(grade);
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('grade', grade.toString());
-    startTransition(() => {
-      router.push(`/admin/certification/attendance?${params.toString()}`);
-    });
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('grade', String(targetGradeNum));
+      window.history.replaceState(null, '', url.toString());
+    }
+
+    if (!gradeDataMap[targetGradeNum]) {
+      setIsLoadingGrade(true);
+      try {
+        const data = await getCachedAllAttendanceRecords(baseYear, targetGradeNum);
+        setGradeDataMap(prev => ({ ...prev, [targetGradeNum]: data as any[] }));
+      } catch (err) {
+        console.error('Failed to load attendance data:', err);
+      } finally {
+        setIsLoadingGrade(false);
+      }
+    }
   };
 
-  const activeGrade = pendingGrade !== null ? pendingGrade : currentGrade;
-  const showSkeleton = isPending || (pendingGrade !== null && pendingGrade !== currentGrade);
-
+  const showSkeleton = isLoadingGrade;
+  const currentData = gradeDataMap[activeGrade] || [];
 
   // 학생별 데이터 그룹화 및 필터링
-  const studentGroups = React.useMemo(() => {
-    const groups: Record<string, {
-      id: string;
-      name: string;
-      number: string;
-      major: string;
-      classInfo: string;
-      gradYear: number;
-      records: AttendanceRecord[];
-      stats: {
-        unexcused: { absent: number, late: number, early: number, out: number },
-        disease: { absent: number, late: number, early: number, out: number },
-        other: { absent: number, late: number, early: number, out: number }
-      };
-      hasAnyUnexcused: boolean;
-    }> = {};
+  const studentGroups: StudentAttendanceGroup[] = React.useMemo(() => {
+    const groups: Record<string, StudentAttendanceGroup> = {};
 
-    initialData.forEach(item => {
+    currentData.forEach(item => {
       const s = item.students;
       if (!s) return;
 
@@ -195,26 +214,27 @@ export function AttendanceTableClient({
       // 번호 순 정렬
       return parseInt(a.number || '0') - parseInt(b.number || '0');
     });
-  }, [initialData, selectedMajor, selectedClass, searchTerm]);
+  }, [currentData, selectedMajor, selectedClass, searchTerm]);
 
   const majors = React.useMemo(() => {
-    const set = new Set(initialData.map(d => d.students?.major).filter(Boolean));
+    const set = new Set(currentData.map(d => d.students?.major).filter(Boolean));
     return Array.from(set).sort((a, b) => {
       const idxA = MAJOR_SORT_ORDER.indexOf(a!);
       const idxB = MAJOR_SORT_ORDER.indexOf(b!);
       return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
     }) as string[];
-  }, [initialData]);
+  }, [currentData]);
 
   const classes = React.useMemo(() => {
     if (selectedMajor === 'all') return [];
-    const set = new Set(initialData.filter(d => d.students?.major === selectedMajor).map(d => d.students?.class_info));
+    const set = new Set(currentData.filter(d => d.students?.major === selectedMajor).map(d => d.students?.class_info));
     return Array.from(set).sort();
-  }, [initialData, selectedMajor]);
+  }, [currentData, selectedMajor]);
 
   const selectedGroup = React.useMemo(() => 
     selectedStudentId ? studentGroups.find(g => g.id === selectedStudentId) : null
   , [selectedStudentId, studentGroups]);
+
 
   return (
     <div className="flex flex-col h-full bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-w-0">
@@ -258,10 +278,11 @@ export function AttendanceTableClient({
                 className={cn("h-7 sm:h-8 px-2.5 sm:px-4 text-xs font-black rounded-lg items-center gap-1", activeGrade === g && "bg-white shadow-sm text-indigo-600")}
               >
                 {g}학년
-                {pendingGrade === g && <Loader2 className="h-3 w-3 animate-spin text-indigo-600" />}
+                {isLoadingGrade && activeGrade === g && <Loader2 className="h-3 w-3 animate-spin text-indigo-600" />}
               </Button>
             ))}
           </div>
+
 
 
           {/* 학과 필터 */}

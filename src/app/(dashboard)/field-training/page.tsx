@@ -33,12 +33,13 @@ async function FieldTrainingPageContent({
 }) {
   const params = searchParams;
 
-  // 1. 공통 데이터 패칭 (서버 메모리 캐시)
-  const [settings, graduationYears, masterCertificates, userProfile] = await Promise.all([
+  // 1. 공통 데이터 및 학급 구조 1회 완전 동시 병렬 패칭 (서버 메모리 캐시)
+  const [settings, graduationYears, masterCertificates, userProfile, allCombinations] = await Promise.all([
     getSystemSettings(),
     getCachedGraduationYears(),
     getCachedMasterCertificates(),
-    getCurrentUserProfile()
+    getCurrentUserProfile(),
+    getCachedClassStructureCombinations()
   ]);
 
   if (!userProfile) {
@@ -52,14 +53,8 @@ async function FieldTrainingPageContent({
 
   const isAdmin = userProfile.role === 'admin';
 
-  // 관리자일 경우 학년별 학과 및 반 구조 전체 조회
-  let allCombinations: any[] = [];
-  if (isAdmin) {
-    allCombinations = await getCachedClassStructureCombinations();
-  }
-
   const classStructure: Record<number, Record<string, string[]>> = {};
-  if (isAdmin && allCombinations.length > 0) {
+  if (allCombinations && allCombinations.length > 0) {
     allCombinations.forEach((item: any) => {
       const g = 4 - (item.graduation_year - settings.baseYear);
       if (g >= 1 && g <= 3) {
@@ -89,6 +84,7 @@ async function FieldTrainingPageContent({
       classStructure[g] = sortedMajors;
     });
   }
+
 
   // 2. 학년 옵션 계산
   const availableGradesSet = new Set<number>();

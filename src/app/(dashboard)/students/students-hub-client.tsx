@@ -139,14 +139,35 @@ export function StudentsHubClient({
         const term = deferredSearchTerm.toLowerCase();
         const nameMatch = (student.student_name || '').toLowerCase().includes(term);
         const numMatch = String(student.student_number || '').includes(term);
+        const phoneMatch = (student.phone_number || '').toLowerCase().includes(term);
+        const majorMatch = (student.major || '').toLowerCase().includes(term);
         const companyMatch = (student.company || '').toLowerCase().includes(term);
         const trainingCompanyMatch = (student.latest_training_company || '').toLowerCase().includes(term);
+        const remarksMatch = (student.personal_remarks || '').toLowerCase().includes(term);
+        const specialNotesMatch = (student.special_notes || '').toLowerCase().includes(term);
+        const careerCourseMatch = (student.career_course || '').toLowerCase().includes(term);
+        const employmentStatusMatch = (student.employment_status || '').toLowerCase().includes(term);
+        const aspirationMatch = (student.career_aspiration || '').toLowerCase().includes(term);
         const certMatch = Array.isArray(student.certificates)
           ? student.certificates.some((c: string) => c.toLowerCase().includes(term))
           : false;
 
-        return nameMatch || numMatch || companyMatch || trainingCompanyMatch || certMatch;
+        return (
+          nameMatch ||
+          numMatch ||
+          phoneMatch ||
+          majorMatch ||
+          companyMatch ||
+          trainingCompanyMatch ||
+          remarksMatch ||
+          specialNotesMatch ||
+          careerCourseMatch ||
+          employmentStatusMatch ||
+          aspirationMatch ||
+          certMatch
+        );
       }
+
 
       return true;
     });

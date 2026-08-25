@@ -41,6 +41,7 @@ interface StudentSummary {
   classTotal: number;
 }
 
+import { getGradeSummaryListAction } from '../actions';
 import { CertificationDataSkeleton } from '@/components/dashboard/loading-skeleton';
 
 export function GradeSummaryClient({ 
@@ -48,17 +49,26 @@ export function GradeSummaryClient({
   weights,
   currentGrade, // 서버에서 결정된 학년
   isAdmin = false,
-  userProfile
+  userProfile,
+  baseYear
 }: { 
   initialSummaries: StudentSummary[], 
   weights: Record<string, number>,
   currentGrade: number,
   isAdmin?: boolean,
-  userProfile?: any
+  userProfile?: any,
+  baseYear?: number
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isPending, startTransition] = React.useTransition();
+
+  // 학년별 인메모리 캐싱 (0ms 즉각 탭 전환)
+  const [activeGrade, setActiveGrade] = React.useState<number>(currentGrade);
+  const [gradeDataMap, setGradeDataMap] = React.useState<Record<number, StudentSummary[]>>({
+    [currentGrade]: initialSummaries,
+  });
+  const [isLoadingGrade, setIsLoadingGrade] = React.useState<boolean>(false);
+
   const [searchTerm, setSearchText] = React.useState('');
   const [selectedMajor, setSelectedMajor] = React.useState(() => {
     if (!isAdmin && userProfile?.role === 'teacher' && userProfile?.assigned_major) {
@@ -84,31 +94,38 @@ export function GradeSummaryClient({
     direction: 'asc'
   });
 
-  const [pendingGrade, setPendingGrade] = React.useState<number | null>(null);
+  const handleGradeChange = async (targetGradeNum: number) => {
+    if (targetGradeNum === activeGrade) return;
+    setActiveGrade(targetGradeNum);
+    setSelectedClass('all');
+    setSelectedMajor('all');
+    setCurrentPage(1);
 
-  React.useEffect(() => {
-    setPendingGrade(null);
-  }, [currentGrade]);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('grade', String(targetGradeNum));
+      window.history.replaceState(null, '', url.toString());
+    }
 
-  const handleGradeChange = (grade: number) => {
-    if (grade === currentGrade) return;
-    setPendingGrade(grade);
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('grade', grade.toString());
-    startTransition(() => {
-      router.push(`/admin/certification/grades?${params.toString()}`);
-    });
+    if (!gradeDataMap[targetGradeNum]) {
+      setIsLoadingGrade(true);
+      try {
+        const data = await getGradeSummaryListAction(targetGradeNum);
+        setGradeDataMap(prev => ({ ...prev, [targetGradeNum]: data as StudentSummary[] }));
+      } catch (err) {
+        console.error('Failed to load grade summary:', err);
+      } finally {
+        setIsLoadingGrade(false);
+      }
+    }
   };
 
-  const activeGrade = pendingGrade !== null ? pendingGrade : currentGrade;
-  const showSkeleton = isPending || (pendingGrade !== null && pendingGrade !== currentGrade);
-
-
-
+  const showSkeleton = isLoadingGrade;
+  const currentSummaries = gradeDataMap[activeGrade] || [];
 
   // 클라이언트 사이드 필터링 (학과, 반, 검색어)
   const filteredData = React.useMemo(() => {
-    let filtered = initialSummaries.filter(s => {
+    let filtered = currentSummaries.filter(s => {
       const matchMajor = selectedMajor === 'all' || s.major === selectedMajor;
       const matchClass = selectedClass === 'all' || s.classInfo === selectedClass;
       const matchSearch = s.name.includes(searchTerm) || s.number.includes(searchTerm);
@@ -127,7 +144,8 @@ export function GradeSummaryClient({
     }
 
     return filtered;
-  }, [initialSummaries, searchTerm, selectedMajor, selectedClass, sortConfig]);
+  }, [currentSummaries, searchTerm, selectedMajor, selectedClass, sortConfig]);
+
 
   // 상세 성적 온디맨드 로딩
   React.useEffect(() => {
@@ -162,23 +180,23 @@ export function GradeSummaryClient({
   };
 
   const majors = React.useMemo(() => {
-    const allMajors = Array.from(new Set(initialSummaries.map(s => s.major))).filter(Boolean);
+    const allMajors = Array.from(new Set(currentSummaries.map(s => s.major))).filter(Boolean);
     return allMajors.sort((a, b) => {
       const idxA = MAJOR_SORT_ORDER.indexOf(a);
       const idxB = MAJOR_SORT_ORDER.indexOf(b);
       return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
     });
-  }, [initialSummaries]);
+  }, [currentSummaries]);
 
   const availableClasses = React.useMemo(() => {
     if (selectedMajor === 'all') return [];
-    const classes = new Set(initialSummaries.filter(s => s.major === selectedMajor).map(s => s.classInfo));
+    const classes = new Set(currentSummaries.filter(s => s.major === selectedMajor).map(s => s.classInfo));
     return Array.from(classes).sort();
-  }, [initialSummaries, selectedMajor]);
+  }, [currentSummaries, selectedMajor]);
 
   const selectedStudent = React.useMemo(() => 
-    selectedStudentId ? initialSummaries.find(s => s.id === selectedStudentId) : null
-  , [selectedStudentId, initialSummaries]);
+    selectedStudentId ? currentSummaries.find(s => s.id === selectedStudentId) : null
+  , [selectedStudentId, currentSummaries]);
 
   const groupedDetails = React.useMemo(() => {
     if (detailedScores.length === 0) return null;
@@ -232,10 +250,11 @@ export function GradeSummaryClient({
                 className={cn("h-7 sm:h-8 px-2.5 sm:px-3 text-xs font-black items-center gap-1", activeGrade === g && "text-indigo-600 bg-indigo-50")}
               >
                 {g}학년
-                {pendingGrade === g && <Loader2 className="h-3 w-3 animate-spin text-indigo-600" />}
+                {isLoadingGrade && activeGrade === g && <Loader2 className="h-3 w-3 animate-spin text-indigo-600" />}
               </Button>
             ))}
           </div>
+
 
 
           {/* 학과 필터 */}

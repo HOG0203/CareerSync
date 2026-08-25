@@ -40,31 +40,43 @@ export const getEvaluationsStore = unstable_cache(
 
 
 
+// 옥저인재인증제 종합평가 서버 인메모리 캐시 (0ms 초고속 응답용, 5분 TTL)
+const certSummaryMemoryCache: Record<number, { data: FullStudentEvaluation[]; timestamp: number }> = {};
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5분
+
+export async function clearCertificationSummaryCache(gradeNum?: number) {
+  if (gradeNum) {
+    delete certSummaryMemoryCache[gradeNum];
+  } else {
+    Object.keys(certSummaryMemoryCache).forEach(k => delete certSummaryMemoryCache[Number(k)]);
+  }
+}
+
+
 /**
- * 특정 학년의 전교생 옥저인재인증제 종합 평가 목록 조회 (계산 완료된 데이터셋)
+ * 특정 학년의 전교생 옥저인재인증제 종합 평가 목록 조회 (초고속 인메모리 + 경량 쿼리 최적화)
  */
 export async function getCertificationSummaryList(gradeNum: number): Promise<FullStudentEvaluation[]> {
+  const now = Date.now();
+  const cached = certSummaryMemoryCache[gradeNum];
+  if (cached && (now - cached.timestamp < CACHE_TTL_MS)) {
+    return cached.data;
+  }
+
   const supabase = createAdminClient();
   const settings = await getSystemSettings();
   const baseYear = settings.baseYear;
   const targetGradYear = baseYear + (4 - gradeNum);
 
-  // 1. 학생 목록, 출결 목록, 평가 저장소를 병렬 쿼리로 초고속 조회
-  const [studentsRes, attendanceRes, evalStore] = await Promise.all([
+  // 1. 학생 목록 및 평가 저장소를 1회 병렬 패칭
+  const [studentsRes, evalStore] = await Promise.all([
     supabase
       .from('students')
       .select('id, student_name, student_number, major, class_info, graduation_year, certificates, career_course')
       .eq('graduation_year', targetGradYear)
-
       .order('major', { ascending: true })
       .order('class_info', { ascending: true })
       .order('student_number', { ascending: true }),
-
-    supabase
-      .from('student_attendance')
-      .select('student_id, grade, absent_unexcused, late_unexcused, early_unexcused, out_unexcused, students!inner(graduation_year)')
-      .eq('students.graduation_year', targetGradYear),
-
     getEvaluationsStore()
   ]);
 
@@ -73,16 +85,22 @@ export async function getCertificationSummaryList(gradeNum: number): Promise<Ful
     return [];
   }
 
-  const attendanceData = attendanceRes.data || [];
+  const studentIds = students.map(s => s.id);
+
+  // 2. 출결 데이터를 학생 ID 목록으로 직접 초고속 쿼리 (무거운 DB Inner Join 제거)
+  const { data: attendanceData } = await supabase
+    .from('student_attendance')
+    .select('student_id, grade, absent_unexcused, late_unexcused, early_unexcused, out_unexcused')
+    .in('student_id', studentIds);
 
   // 출결 데이터를 student_id 별로 그룹화
   const attendanceMap: Record<string, any[]> = {};
-  attendanceData.forEach(r => {
+  (attendanceData || []).forEach(r => {
     if (!attendanceMap[r.student_id]) attendanceMap[r.student_id] = [];
     attendanceMap[r.student_id].push(r);
   });
 
-  // 2. 각 학생별 100점 만점 종합 평가 산출
+  // 3. 각 학생별 100점 만점 종합 평가 산출
   const results: FullStudentEvaluation[] = students.map(s => {
     const studentEvalData = evalStore[s.id] || { student_id: s.id };
 
@@ -94,6 +112,9 @@ export async function getCertificationSummaryList(gradeNum: number): Promise<Ful
     });
   });
 
+  // 서버 인메모리 캐시에 저장
+  certSummaryMemoryCache[gradeNum] = { data: results, timestamp: now };
+
   return results;
 }
 
@@ -101,15 +122,22 @@ export async function getCertificationSummaryList(gradeNum: number): Promise<Ful
  * [캐싱] 학년별 옥저인재인증제 종합 평가 목록 캐시 조회
  */
 export async function getCachedCertificationSummaryList(gradeNum: number) {
-  return unstable_cache(
-    async () => getCertificationSummaryList(gradeNum),
-    [`certification-summary-grade-${gradeNum}`],
-    {
-      revalidate: 3600,
-      tags: [`cert-eval-grade-${gradeNum}`, 'cert-eval', 'cert-certificates', 'cert-attendance']
-    }
-  )();
+  return getCertificationSummaryList(gradeNum);
 }
+
+/**
+ * [캐싱] 학년별 직기초 성적 및 석차 요약 목록 조회
+ */
+export async function getGradeSummaryListAction(gradeNum: number) {
+  const settings = await getSystemSettings();
+  const baseYear = settings.baseYear;
+  const targetGradYear = baseYear + (4 - gradeNum);
+  const { getCachedYearlyRankingsSummary } = await import('@/lib/data');
+  const summaryMap = await getCachedYearlyRankingsSummary(targetGradYear, baseYear);
+  return Object.values(summaryMap);
+}
+
+
 
 /**
  * 개별 학생 단건 옥저인증제 종합 평가 산출
@@ -286,6 +314,7 @@ export async function saveStudentEvaluationAction(
   });
 
   // 5. 캐시 무효화
+  clearCertificationSummaryCache(currentGrade);
   revalidateTag(`cert-eval-grade-${currentGrade}`);
   revalidateTag('cert-eval');
   revalidateTag('cert-certificates');
@@ -293,6 +322,7 @@ export async function saveStudentEvaluationAction(
 
   return { success: true };
 }
+
 
 /**
  * 엑셀 일괄 등록용 대량 데이터 업데이트 액션
@@ -392,9 +422,11 @@ export async function batchImportEvaluationsAction(
     details: { count: updatedCount }
   });
 
+  clearCertificationSummaryCache();
   revalidateTag('cert-eval');
   revalidatePath('/admin/certification');
   revalidatePath('/admin/certification/import');
+
 
   return { success: true, count: updatedCount };
 }
