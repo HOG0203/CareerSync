@@ -8,15 +8,13 @@ export const metadata = {
 };
 
 export default async function CertificationImportPage() {
-  const [profile, settings] = await Promise.all([
-    getCurrentUserProfile(),
-    getSystemSettings()
-  ]);
+  const profile = await getCurrentUserProfile();
 
   if (profile?.role !== 'admin' && profile?.role !== 'teacher') {
     redirect('/dashboard');
   }
 
+  const settings = await getSystemSettings();
   const baseYear = settings.baseYear;
 
   return (

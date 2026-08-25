@@ -158,9 +158,6 @@ export async function uploadStudentScores(
     results.success = finalScores.length;
   }
 
-  const { clearYearlyRankingsCache } = await import('@/lib/data');
-  await clearYearlyRankingsCache();
-
   revalidatePath('/admin/grades');
   revalidatePath('/admin/certification/grades');
   return { success: true, results };
@@ -184,10 +181,6 @@ export async function updateAchievementScores(scores: Record<string, number>) {
       key: 'achievement_scores', value: scores, updated_at: new Date().toISOString()
     });
     if (error) throw error;
-    
-    const { clearYearlyRankingsCache } = await import('@/lib/data');
-    await clearYearlyRankingsCache();
-
     revalidatePath('/admin/certification/grades');
     return { success: true };
   } catch (error: any) {
@@ -200,10 +193,6 @@ export async function deleteAllStudentScores() {
   try {
     const { error } = await supabase.from('student_scores').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     if (error) throw error;
-
-    const { clearYearlyRankingsCache } = await import('@/lib/data');
-    await clearYearlyRankingsCache();
-
     revalidatePath('/admin/grades');
     revalidatePath('/admin/certification/grades');
     return { success: true };

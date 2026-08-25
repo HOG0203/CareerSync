@@ -15,29 +15,32 @@ export interface StudentCertificateSummary {
   certificates: string[];
 }
 
-const g = (typeof globalThis !== 'undefined' ? globalThis : global) as any;
-
-// 자격증 현황 서버 인메모리 캐시 (0ms 초고속 SWR 응답용, 30분 TTL)
-const certSummariesMemoryCache: Record<number, { data: StudentCertificateSummary[]; timestamp: number }> = 
-  g.__certSummariesMemoryCache || (g.__certSummariesMemoryCache = {});
-const certInFlight: Record<number, Promise<StudentCertificateSummary[]>> = 
-  g.__certInFlight || (g.__certInFlight = {});
-const CACHE_TTL_MS = 30 * 60 * 1000;
+// 자격증 현황 서버 인메모리 캐시 (0ms 초고속 응답용, 5분 TTL)
+const certSummariesMemoryCache: Record<number, { data: StudentCertificateSummary[]; timestamp: number }> = {};
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 export async function clearCertificateSummariesCache(gradeNum?: number) {
   if (gradeNum) {
     delete certSummariesMemoryCache[gradeNum];
-    delete certInFlight[gradeNum];
   } else {
     Object.keys(certSummariesMemoryCache).forEach(k => delete certSummariesMemoryCache[Number(k)]);
-    Object.keys(certInFlight).forEach(k => delete certInFlight[Number(k)]);
   }
 }
 
-async function computeCertificateSummaries(gradeNum: number, preloadedBaseYear?: number): Promise<StudentCertificateSummary[]> {
+/**
+ * 특정 학년의 학생 자격증 현황 목록 조회 (초고속 인메모리 캐시 적용)
+ */
+export async function getCertificateSummaries(gradeNum: number): Promise<StudentCertificateSummary[]> {
+  const now = Date.now();
+  const cached = certSummariesMemoryCache[gradeNum];
+  if (cached && (now - cached.timestamp < CACHE_TTL_MS)) {
+    return cached.data;
+  }
+
   const supabase = createAdminClient();
 
-  const baseYear = preloadedBaseYear || (await getSystemSettings()).baseYear;
+  const settings = await getSystemSettings();
+  const baseYear = settings.baseYear;
   
   // 학년에 따른 졸업학년도 계산
   const targetGradYear = baseYear + (4 - gradeNum);
@@ -55,7 +58,7 @@ async function computeCertificateSummaries(gradeNum: number, preloadedBaseYear?:
     return [];
   }
 
-  return (students || []).map((s: any) => ({
+  const results = (students || []).map((s: any) => ({
     id: s.id,
     name: s.student_name,
     number: s.student_number || '',
@@ -63,59 +66,18 @@ async function computeCertificateSummaries(gradeNum: number, preloadedBaseYear?:
     classInfo: s.class_info || '',
     certificates: s.certificates || [],
   })) as StudentCertificateSummary[];
-}
 
-/**
- * 특정 학년의 학생 자격증 현황 목록 조회 (SWR 패턴 적용)
- */
-export async function getCertificateSummaries(gradeNum: number, preloadedBaseYear?: number): Promise<StudentCertificateSummary[]> {
-  const now = Date.now();
-  const cached = certSummariesMemoryCache[gradeNum];
+  // 메모리 캐시에 보관
+  certSummariesMemoryCache[gradeNum] = { data: results, timestamp: now };
 
-  // 1. Fresh Cache Hit (0ms)
-  if (cached && (now - cached.timestamp < CACHE_TTL_MS)) {
-    return cached.data;
-  }
-
-  // 2. Stale Cache Hit (SWR)
-  if (cached) {
-    if (!certInFlight[gradeNum]) {
-      certInFlight[gradeNum] = computeCertificateSummaries(gradeNum, preloadedBaseYear)
-        .then(freshData => {
-          certSummariesMemoryCache[gradeNum] = { data: freshData, timestamp: Date.now() };
-          return freshData;
-        })
-        .catch(err => {
-          console.error(`SWR background refresh failed for certificates (grade ${gradeNum}):`, err);
-          return cached.data;
-        })
-        .finally(() => {
-          delete certInFlight[gradeNum];
-        });
-    }
-    return cached.data;
-  }
-
-  // 3. Cold Start
-  if (!certInFlight[gradeNum]) {
-    certInFlight[gradeNum] = computeCertificateSummaries(gradeNum, preloadedBaseYear)
-      .then(freshData => {
-        certSummariesMemoryCache[gradeNum] = { data: freshData, timestamp: Date.now() };
-        return freshData;
-      })
-      .finally(() => {
-        delete certInFlight[gradeNum];
-      });
-  }
-
-  return certInFlight[gradeNum];
+  return results;
 }
 
 /**
  * [캐싱] 학년별 자격증 현황 목록 조회
  */
-export async function getCachedCertificateSummaries(gradeNum: number, preloadedBaseYear?: number) {
-  return getCertificateSummaries(gradeNum, preloadedBaseYear);
+export async function getCachedCertificateSummaries(gradeNum: number) {
+  return getCertificateSummaries(gradeNum);
 }
 
 
