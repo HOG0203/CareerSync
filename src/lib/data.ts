@@ -19,16 +19,9 @@ export async function clearDashboardStudentDataCache(graduationYear?: string) {
 }
 
 /**
- * [대시보드 전용] 차트 렌더링에 필요한 최소한의 필드만 가져옵니다.
+ * [대시보드 전용] 차트 렌더링에 필요한 최소한의 필드만 가져옵니다. (Next.js 글로벌 영구 캐싱)
  */
-
-export async function getDashboardStudentData(graduationYear: string): Promise<StudentEmploymentData[]> {
-  const now = Date.now();
-  const cached = dashboardStudentDataMemoryCache[graduationYear];
-  if (cached && (now - cached.timestamp < DASHBOARD_CACHE_TTL_MS)) {
-    return cached.data;
-  }
-
+async function fetchDashboardStudentData(graduationYear: string): Promise<StudentEmploymentData[]> {
   const supabase = createAdminClient();
   const gradYearInt = parseInt(graduationYear);
 
@@ -73,16 +66,31 @@ export async function getDashboardStudentData(graduationYear: string): Promise<S
     } as StudentEmploymentData;
   });
 
-  const sorted = flattened.sort((a, b) => {
+  return flattened.sort((a, b) => {
     const indexA = MAJOR_SORT_ORDER.indexOf(a.major || '');
     const indexB = MAJOR_SORT_ORDER.indexOf(b.major || '');
     if (indexA !== indexB) return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
     if (a.class_info !== b.class_info) return (a.class_info || '').localeCompare(b.class_info || '');
     return (a.student_number || '').localeCompare(b.student_number || '', undefined, { numeric: true });
   });
+}
 
-  dashboardStudentDataMemoryCache[graduationYear] = { data: sorted, timestamp: now };
-  return sorted;
+const dashboardStudentDataCacheMap = new Map<string, ReturnType<typeof unstable_cache>>();
+
+export async function getDashboardStudentData(graduationYear: string): Promise<StudentEmploymentData[]> {
+  const cacheKey = graduationYear;
+  if (!dashboardStudentDataCacheMap.has(cacheKey)) {
+    const cachedFn = unstable_cache(
+      async () => fetchDashboardStudentData(graduationYear),
+      [`dashboard-student-data-${cacheKey}`],
+      {
+        revalidate: 86400,
+        tags: [`dashboard-${graduationYear}`, 'students']
+      }
+    );
+    dashboardStudentDataCacheMap.set(cacheKey, cachedFn);
+  }
+  return dashboardStudentDataCacheMap.get(cacheKey)!();
 }
 
 
@@ -243,15 +251,9 @@ export async function clearAdminStudentCache(graduationYear?: number) {
 }
 
 /**
- * [캐싱] 노동인권교육 전용 초경량 학생 목록 조회 (인메모리 캐시 적용)
+ * [캐싱 최적화] 노동인권교육 전용 초경량 학생 목록 조회 (Next.js 글로벌 영구 캐싱)
  */
-export async function getCachedLaborEducationData(graduationYear: number): Promise<StudentEmploymentData[]> {
-  const now = Date.now();
-  const cached = laborEducationMemoryCache[graduationYear];
-  if (cached && (now - cached.timestamp < 5 * 60 * 1000)) {
-    return cached.data;
-  }
-
+async function fetchLaborEducationData(graduationYear: number): Promise<StudentEmploymentData[]> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('students')
@@ -267,21 +269,30 @@ export async function getCachedLaborEducationData(graduationYear: number): Promi
     return [];
   }
 
-  const results = data as StudentEmploymentData[];
-  laborEducationMemoryCache[graduationYear] = { data: results, timestamp: now };
-  return results;
+  return data as StudentEmploymentData[];
+}
+
+const laborEducationCacheMap = new Map<number, ReturnType<typeof unstable_cache>>();
+
+export async function getCachedLaborEducationData(graduationYear: number): Promise<StudentEmploymentData[]> {
+  if (!laborEducationCacheMap.has(graduationYear)) {
+    const cachedFn = unstable_cache(
+      async () => fetchLaborEducationData(graduationYear),
+      [`labor-education-data-${graduationYear}`],
+      {
+        revalidate: 86400,
+        tags: [`labor-${graduationYear}`, 'students']
+      }
+    );
+    laborEducationCacheMap.set(graduationYear, cachedFn);
+  }
+  return laborEducationCacheMap.get(graduationYear)!();
 }
 
 /**
- * [캐싱] 학생 관리(Admin Students) 전용 초경량 기본 정보 조회 (인메모리 캐시 적용)
+ * [캐싱 최적화] 학생 관리(Admin Students) 전용 초경량 기본 정보 조회 (Next.js 글로벌 영구 캐싱)
  */
-export async function getCachedAdminStudentData(graduationYear: number): Promise<StudentEmploymentData[]> {
-  const now = Date.now();
-  const cached = adminStudentMemoryCache[graduationYear];
-  if (cached && (now - cached.timestamp < 5 * 60 * 1000)) {
-    return cached.data;
-  }
-
+async function fetchAdminStudentData(graduationYear: number): Promise<StudentEmploymentData[]> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('students')
@@ -297,9 +308,24 @@ export async function getCachedAdminStudentData(graduationYear: number): Promise
     return [];
   }
 
-  const results = data as StudentEmploymentData[];
-  adminStudentMemoryCache[graduationYear] = { data: results, timestamp: now };
-  return results;
+  return data as StudentEmploymentData[];
+}
+
+const adminStudentCacheMap = new Map<number, ReturnType<typeof unstable_cache>>();
+
+export async function getCachedAdminStudentData(graduationYear: number): Promise<StudentEmploymentData[]> {
+  if (!adminStudentCacheMap.has(graduationYear)) {
+    const cachedFn = unstable_cache(
+      async () => fetchAdminStudentData(graduationYear),
+      [`admin-student-data-${graduationYear}`],
+      {
+        revalidate: 86400,
+        tags: [`admin-students-${graduationYear}`, 'students']
+      }
+    );
+    adminStudentCacheMap.set(graduationYear, cachedFn);
+  }
+  return adminStudentCacheMap.get(graduationYear)!();
 }
 
 
@@ -411,10 +437,24 @@ export async function getAssignedStudentDetails(major: string, classInfo: string
 }
 
 /**
- * [캐싱] 특정 학과/반 학생 상세 데이터 서버 메모리 캐싱
+ * [캐싱 최적화] 특정 학과/반 학생 상세 데이터 Next.js 영구 캐싱 (Vercel 환경 0.01초 공유)
  */
-export async function getCachedAssignedStudentDetails(major: string, classInfo: string, graduationYear: number, baseYear?: number) {
-  return getAssignedStudentDetails(major, classInfo, graduationYear, baseYear);
+const assignedStudentDataCacheMap = new Map<string, ReturnType<typeof unstable_cache>>();
+
+export async function getCachedAssignedStudentDetails(major: string, classInfo: string, graduationYear: number, baseYear?: number): Promise<StudentEmploymentData[]> {
+  const cacheKey = `${major}-${classInfo}-${graduationYear}-${baseYear || 2026}`;
+  if (!assignedStudentDataCacheMap.has(cacheKey)) {
+    const cachedFn = unstable_cache(
+      async () => getAssignedStudentDetails(major, classInfo, graduationYear, baseYear),
+      [`assigned-student-details-${cacheKey}`],
+      {
+        revalidate: 86400,
+        tags: [`assigned-${graduationYear}-${classInfo}`, 'students']
+      }
+    );
+    assignedStudentDataCacheMap.set(cacheKey, cachedFn);
+  }
+  return assignedStudentDataCacheMap.get(cacheKey)!();
 }
 
 
@@ -758,32 +798,48 @@ export async function getYearlyRankingsSummary(graduationYear: number, baseYear:
   return resultMap;
 }
 
-let cachedAchievementScores: { data: Record<string, number>; timestamp: number } | null = null;
-
-export async function getAchievementScores(): Promise<Record<string, number>> {
-  const now = Date.now();
-  if (cachedAchievementScores && (now - cachedAchievementScores.timestamp < 5 * 60 * 1000)) {
-    return cachedAchievementScores.data;
-  }
-  const supabase = createAdminClient();
-  try {
-    const { data, error } = await supabase.from('system_settings').select('value').eq('key', 'achievement_scores').single();
-    if (error || !data?.value) {
+/**
+ * [캐싱 최적화] 성취도 환산 점수표 Next.js 글로벌 영구 캐싱
+ */
+export const getAchievementScores = unstable_cache(
+  async (): Promise<Record<string, number>> => {
+    const supabase = createAdminClient();
+    try {
+      const { data, error } = await supabase.from('system_settings').select('value').eq('key', 'achievement_scores').single();
+      if (error || !data?.value) {
+        return { "A": 5, "B": 4, "C": 3, "D": 2, "E": 1 };
+      }
+      return data.value as Record<string, number>;
+    } catch (error) {
       return { "A": 5, "B": 4, "C": 3, "D": 2, "E": 1 };
     }
-    const val = data.value as Record<string, number>;
-    cachedAchievementScores = { data: val, timestamp: now };
-    return val;
-  } catch (error) {
-    return { "A": 5, "B": 4, "C": 3, "D": 2, "E": 1 };
+  },
+  ['achievement-scores-global'],
+  {
+    revalidate: 86400,
+    tags: ['settings', 'achievement-scores']
   }
-}
+);
 
 /**
- * [캐싱] 특정 졸업연도 학생들의 석차 및 성취도 사전 계산 결과 조회
+ * [캐싱 최적화] 특정 졸업연도 학생들의 석차 및 성취도 Next.js 영구 캐싱 (Vercel 전역 0.01초 공유)
  */
-export async function getCachedYearlyRankingsSummary(graduationYear: number, baseYear: number = 2026) {
-  return getYearlyRankingsSummary(graduationYear, baseYear);
+const yearlyRankingsSummaryCacheMap = new Map<string, ReturnType<typeof unstable_cache>>();
+
+export async function getCachedYearlyRankingsSummary(graduationYear: number, baseYear: number = 2026): Promise<Record<string, any>> {
+  const cacheKey = `${graduationYear}-${baseYear}`;
+  if (!yearlyRankingsSummaryCacheMap.has(cacheKey)) {
+    const cachedFn = unstable_cache(
+      async () => getYearlyRankingsSummary(graduationYear, baseYear),
+      [`yearly-rankings-summary-${cacheKey}`],
+      {
+        revalidate: 86400,
+        tags: [`rankings-${graduationYear}`, 'students', 'student_scores']
+      }
+    );
+    yearlyRankingsSummaryCacheMap.set(cacheKey, cachedFn);
+  }
+  return yearlyRankingsSummaryCacheMap.get(cacheKey)!();
 }
 
 

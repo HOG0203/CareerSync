@@ -124,10 +124,25 @@ export async function getCertificationSummaryList(gradeNum: number, preloadedBas
 }
 
 /**
- * [캐싱] 학년별 옥저인재인증제 종합 평가 목록 캐시 조회
+ * [캐싱 최적화] 학년별 옥저인재인증제 종합 평가 목록 Next.js 글로벌 영구 캐시 조회 (Vercel 전역 0.01초 공유)
  */
-export async function getCachedCertificationSummaryList(gradeNum: number, preloadedBaseYear?: number) {
-  return getCertificationSummaryList(gradeNum, preloadedBaseYear);
+const certSummaryCacheMap = new Map<string, ReturnType<typeof unstable_cache>>();
+
+export async function getCachedCertificationSummaryList(gradeNum: number, preloadedBaseYear?: number): Promise<FullStudentEvaluation[]> {
+  const baseYear = preloadedBaseYear || 2026;
+  const cacheKey = `${gradeNum}-${baseYear}`;
+  if (!certSummaryCacheMap.has(cacheKey)) {
+    const cachedFn = unstable_cache(
+      async () => getCertificationSummaryList(gradeNum, baseYear),
+      [`cert-summary-list-${cacheKey}`],
+      {
+        revalidate: 86400,
+        tags: [`cert-eval-grade-${gradeNum}`, 'cert-eval', 'students']
+      }
+    );
+    certSummaryCacheMap.set(cacheKey, cachedFn);
+  }
+  return certSummaryCacheMap.get(cacheKey)!();
 }
 
 

@@ -1,4 +1,4 @@
-﻿'use server';
+'use server';
 
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
@@ -232,8 +232,22 @@ export async function getAllAttendanceRecords(academicYear: number, currentGrade
 }
 
 /**
- * [캐싱] 학년별 전교생 출결 기록 조회 (인메모리 캐시 적용)
+ * [캐싱 최적화] 학년별 전교생 출결 기록 Next.js 글로벌 영구 캐시 조회 (Vercel 전역 0.01초 공유)
  */
+const attendanceCacheMap = new Map<string, ReturnType<typeof unstable_cache>>();
+
 export async function getCachedAllAttendanceRecords(academicYear: number, currentGrade: number) {
-  return getAllAttendanceRecords(academicYear, currentGrade);
+  const cacheKey = `${academicYear}-${currentGrade}`;
+  if (!attendanceCacheMap.has(cacheKey)) {
+    const cachedFn = unstable_cache(
+      async () => getAllAttendanceRecords(academicYear, currentGrade),
+      [`attendance-records-${cacheKey}`],
+      {
+        revalidate: 86400,
+        tags: [`cert-attendance-grade-${currentGrade}`, 'cert-attendance', 'students']
+      }
+    );
+    attendanceCacheMap.set(cacheKey, cachedFn);
+  }
+  return attendanceCacheMap.get(cacheKey)!();
 }

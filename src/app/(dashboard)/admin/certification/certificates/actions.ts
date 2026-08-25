@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import * as XLSX from 'xlsx';
@@ -74,10 +74,23 @@ export async function getCertificateSummaries(gradeNum: number): Promise<Student
 }
 
 /**
- * [캐싱] 학년별 자격증 현황 목록 조회
+ * [캐싱 최적화] 학년별 자격증 현황 목록 Next.js 글로벌 영구 캐시 조회 (Vercel 전역 0.01초 공유)
  */
-export async function getCachedCertificateSummaries(gradeNum: number) {
-  return getCertificateSummaries(gradeNum);
+const certSummariesCacheMap = new Map<number, ReturnType<typeof unstable_cache>>();
+
+export async function getCachedCertificateSummaries(gradeNum: number): Promise<StudentCertificateSummary[]> {
+  if (!certSummariesCacheMap.has(gradeNum)) {
+    const cachedFn = unstable_cache(
+      async () => getCertificateSummaries(gradeNum),
+      [`cert-summaries-grade-${gradeNum}`],
+      {
+        revalidate: 86400,
+        tags: [`cert-certificates-grade-${gradeNum}`, 'cert-certificates', 'students']
+      }
+    );
+    certSummariesCacheMap.set(gradeNum, cachedFn);
+  }
+  return certSummariesCacheMap.get(gradeNum)!();
 }
 
 
