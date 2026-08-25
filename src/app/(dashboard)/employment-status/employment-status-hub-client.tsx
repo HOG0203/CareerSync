@@ -22,6 +22,8 @@ import {
   RotateCcw,
   X,
   Loader2,
+  Landmark,
+  Briefcase,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StudentEmploymentData } from '@/lib/data';
@@ -221,6 +223,8 @@ export function EmploymentStatusHubClient({
         primaryRate: hopeRate,
         secondaryCount: collegeHopeCount,
         tertiaryCount: undecidedCount,
+        majorCompanyCount: 0,
+        midCompanyCount: 0,
         excludedCount: excludedHopeCount,
       };
     } else {
@@ -232,23 +236,22 @@ export function EmploymentStatusHubClient({
       const validDenominator = Math.max(0, total - excludedCount);
       const employmentRate = validDenominator > 0 ? Math.round((employedCount / validDenominator) * 100) : 0;
 
-      const trainingCount = filteredData.filter(
-        (s) => s.has_field_training === 'O' || (s.training_records && s.training_records.length > 0) || s.latest_training_company
+      // 대기업 / 공기업 / 공무원 취업자수
+      const majorCompanyCount = filteredData.filter(
+        (s) => s.business_type === '취업' && ['대기업', '공기업', '공무원'].includes(s.company_type || '')
       ).length;
 
-      // 취업희망자 중 취업현황이 빈칸 또는 미취업인 학생 (취업희망 '아니오' 제외)
-      const seekingUnemployedCount = filteredData.filter((s) => {
-        const isBlankOrUnemployed = !s.business_type || s.business_type === '미취업' || s.business_type === '아니오';
-        const isNotDesiring = s.is_desiring_employment === '아니오';
-        return isBlankOrUnemployed && !isNotDesiring;
-      }).length;
+      // 중견기업 취업자수
+      const midCompanyCount = filteredData.filter(
+        (s) => s.business_type === '취업' && (s.company_type === '중견기업' || s.company_type === '중견')
+      ).length;
 
       return {
         total,
         primaryCount: employedCount,
         primaryRate: employmentRate,
-        secondaryCount: trainingCount,
-        tertiaryCount: seekingUnemployedCount,
+        majorCompanyCount,
+        midCompanyCount,
         excludedCount,
       };
     }
@@ -256,8 +259,7 @@ export function EmploymentStatusHubClient({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* 1. 상단 4종 핵심 요약 통계 카드 (admin/students 스타일) */}
-      {/* 1. 상단 4종 핵심 요약 통계 카드 (admin/students 스타일) */}
+      {/* 1. 상단 4종 핵심 요약 통계 카드 */}
       <div 
         key={`stats-${currentAY}-${grade}-${selectedMajor}-${selectedClass}-${selectedStatus}`} 
         className="grid grid-cols-2 lg:grid-cols-4 gap-3 animate-in fade-in duration-200"
@@ -278,7 +280,7 @@ export function EmploymentStatusHubClient({
           </CardContent>
         </Card>
 
-        {/* 카드 2: 3학년 취업 (취업률%) / 1,2학년 취업희망 (희망률%) */}
+        {/* 카드 2: 3학년 취업률 / 1,2학년 취업희망률 */}
         <Card className="border-slate-200/80 shadow-2xs hover:shadow-sm transition-all rounded-2xl bg-white">
           <CardContent className="p-4 sm:p-5 flex items-center justify-between">
             <div className="space-y-1">
@@ -300,42 +302,50 @@ export function EmploymentStatusHubClient({
           </CardContent>
         </Card>
 
-        {/* 카드 3: 3학년 현장실습 참여 / 1,2학년 진학 희망 */}
+        {/* 카드 3: 3학년 대·공기업 취업 (범례: rose-600) / 1,2학년 진학 희망 (범례: rose-500) */}
         <Card className="border-slate-200/80 shadow-2xs hover:shadow-sm transition-all rounded-2xl bg-white">
           <CardContent className="p-4 sm:p-5 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-[11px] sm:text-xs font-bold text-slate-500">
-                {isLowerGrade ? '진학 희망' : '현장실습 참여'}
+                {isLowerGrade ? '진학 희망' : '대·공기업 취업'}
               </p>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-black text-indigo-600">
-                  {stats.secondaryCount}
+                <span className="text-2xl sm:text-3xl font-black text-rose-600">
+                  {isLowerGrade ? stats.secondaryCount : stats.majorCompanyCount}
                 </span>
                 <span className="text-xs font-bold text-slate-500">명</span>
               </div>
             </div>
-            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 shrink-0">
-              <Building2 className="h-5 w-5" />
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-600 border border-rose-100 shrink-0">
+              <Landmark className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
 
-        {/* 카드 4: 3학년 미연계 학생 / 1,2학년 진로 미정 */}
+        {/* 카드 4: 3학년 중견기업 취업 (범례: purple-600) / 1,2학년 진로 미정 (범례: slate) */}
         <Card className="border-slate-200/80 shadow-2xs hover:shadow-sm transition-all rounded-2xl bg-white">
           <CardContent className="p-4 sm:p-5 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-[11px] sm:text-xs font-bold text-slate-500">
-                {isLowerGrade ? '진로 미정' : '미연계 학생'}
+                {isLowerGrade ? '진로 미정' : '중견기업 취업'}
               </p>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-black text-amber-600">
-                  {stats.tertiaryCount}
+                <span className={cn(
+                  "text-2xl sm:text-3xl font-black",
+                  isLowerGrade ? "text-slate-600" : "text-purple-600"
+                )}>
+                  {isLowerGrade ? stats.tertiaryCount : stats.midCompanyCount}
                 </span>
                 <span className="text-xs font-bold text-slate-500">명</span>
               </div>
             </div>
-            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 border border-amber-100 shrink-0">
-              <HelpCircle className="h-5 w-5" />
+            <div className={cn(
+              "h-10 w-10 sm:h-11 sm:w-11 rounded-2xl flex items-center justify-center shrink-0 border",
+              isLowerGrade 
+                ? "bg-slate-50 text-slate-600 border-slate-200" 
+                : "bg-purple-50 text-purple-600 border-purple-100"
+            )}>
+              {isLowerGrade ? <HelpCircle className="h-5 w-5" /> : <Briefcase className="h-5 w-5" />}
             </div>
           </CardContent>
         </Card>

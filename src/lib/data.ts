@@ -631,8 +631,8 @@ export async function getYearlyRankingsSummary(graduationYear: number, baseYear:
   const students = studentsResult.data;
   const studentIds = students.map(s => s.id);
 
-  // 2. [초고속 2단계] 50명 단위 청크로 분할하여 무거운 JOIN 없이 B-Tree 인덱스로 초고속 병렬 쿼리
-  const CHUNK_SIZE = 50;
+  // 2. [초고속 2단계] 15명 단위 청크로 분할 (Supabase 1000개 행 제한을 초과하지 않도록 안전한 청크 크기 적용)
+  const CHUNK_SIZE = 15;
   const chunks: string[][] = [];
   for (let i = 0; i < studentIds.length; i += CHUNK_SIZE) {
     chunks.push(studentIds.slice(i, i + CHUNK_SIZE));
