@@ -75,10 +75,12 @@ export function DeleteMyRecordsDialog({
     grade1: { korean: number; english: number; math: number; problem: number; isCompleted: boolean };
     grade2: { korean: number; english: number; math: number; problem: number; isCompleted: boolean };
     grade3: { korean: number; english: number; math: number; problem: number; isCompleted: boolean };
+    mock: { korean: number; english: number; math: number; problem: number; isCompleted: boolean };
   }>({
     grade1: { korean: 5, english: 5, math: 5, problem: 5, isCompleted: false },
     grade2: { korean: 5, english: 5, math: 5, problem: 5, isCompleted: false },
     grade3: { korean: 5, english: 5, math: 5, problem: 5, isCompleted: false },
+    mock: { korean: 5, english: 5, math: 5, problem: 5, isCompleted: false },
   });
 
   // 봉사활동 수정 임시 폼 상태
@@ -148,6 +150,13 @@ export function DeleteMyRecordsDialog({
           math: vDetails.grade3?.math || 5,
           problem: vDetails.grade3?.problem || 5,
           isCompleted: Boolean(vDetails.grade3?.isCompleted),
+        },
+        mock: {
+          korean: vDetails.mock?.korean || 5,
+          english: vDetails.mock?.english || 5,
+          math: vDetails.mock?.math || 5,
+          problem: vDetails.mock?.problem || 5,
+          isCompleted: Boolean(vDetails.mock?.isCompleted),
         },
       });
     } else if (category === 'volunteer') {
@@ -542,22 +551,31 @@ export function DeleteMyRecordsDialog({
             {/* 1. 직업공통능력평가 등급 수정 폼 */}
             {category === 'vocational' && (
               <div className="space-y-4">
-                {(['grade1', 'grade2', 'grade3'] as const).map((gk, idx) => {
-                  const gYear = idx + 1;
+                {(['grade1', 'grade2', 'grade3', 'mock'] as const).map((gk) => {
                   const gState = vocationalEditForm[gk];
                   const gradeSum = gState.isCompleted 
                     ? ((gState.korean || 5) + (gState.english || 5) + (gState.math || 5) + (gState.problem || 5))
                     : 20;
+
+                  const titleBadge = gk === 'mock' 
+                    ? '3학년 모의평가' 
+                    : `${gk.replace('grade', '')}학년 평가`;
+
+                  const subtitle = gk === 'mock'
+                    ? '모의평가 (2점 만점)'
+                    : gk === 'grade3'
+                    ? '전국단위평가 (15점 만점)'
+                    : '자가진단평가';
 
                   return (
                     <div key={gk} className="bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs space-y-3">
                       <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 font-black text-xs px-2 py-0.5">
-                            {gYear}학년 평가
+                            {titleBadge}
                           </Badge>
                           <span className="text-xs font-bold text-slate-700">
-                            {gYear === 3 ? '전국단위평가' : '자가진단평가'}
+                            {subtitle}
                           </span>
                         </div>
 

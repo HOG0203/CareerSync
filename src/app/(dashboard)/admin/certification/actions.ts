@@ -616,8 +616,9 @@ export async function getAllStudentsForMatching() {
 }
 
 export interface VocationalImportStudentRow {
-  studentId: string;
+  studentId?: string;
   grade: number; // 1, 2, 3
+  isMock?: boolean; // 3학년 모의평가 여부
   academicYear: number;
   korean?: number;
   english?: number;
@@ -687,11 +688,11 @@ export async function batchImportVocationalAction(studentsList: VocationalImport
       created_by: auditMeta,
     };
 
-
+    const domainKey = row.isMock ? 'mock' : `grade${row.grade}`;
     const prevDetails = prev.vocational_details || {};
     const updatedDetails = {
       ...prevDetails,
-      [`grade${row.grade}`]: domainData,
+      [domainKey]: domainData,
     };
 
     // 학년별 직기초 개별 영역 및 등급합 반영
@@ -703,7 +704,9 @@ export async function batchImportVocationalAction(studentsList: VocationalImport
       updated_by: auditMeta,
     };
 
-    if (row.grade === 1) {
+    if (row.isMock) {
+      updatedEval.vocational_mock_grade = domainData.gradeSum;
+    } else if (row.grade === 1) {
       updatedEval.vocational_grade_1 = domainData.gradeSum;
     } else if (row.grade === 2) {
       updatedEval.vocational_grade_2 = domainData.gradeSum;
@@ -1316,14 +1319,15 @@ export async function getMyImportedRecordsAction(
       }
     } else if (category === 'vocational') {
       const vDetails = evalData.vocational_details || {};
-      for (const gradeKey of ['grade1', 'grade2', 'grade3'] as const) {
+      for (const gradeKey of ['grade1', 'grade2', 'grade3', 'mock'] as const) {
         const gData = vDetails[gradeKey];
         if (gData && gData.isCompleted) {
           const gMeta = gData.created_by;
           if (isAdmin || gMeta?.userId === currentUserId || (!gMeta && profile.role === 'teacher')) {
             hasMyItem = true;
             totalItemCount++;
-            summaryList.push(`${gradeKey.replace('grade', '')}학년 등급합: ${gData.gradeSum}등급 (국${gData.korean || 5}, 영${gData.english || 5}, 수${gData.math || 5}, 문${gData.problem || 5})`);
+            const label = gradeKey === 'mock' ? '3학년 모의평가' : `${gradeKey.replace('grade', '')}학년`;
+            summaryList.push(`${label} 등급합: ${gData.gradeSum}등급 (국${gData.korean || 5}, 영${gData.english || 5}, 수${gData.math || 5}, 문${gData.problem || 5})`);
             if (gMeta) {
               registeredAt = gMeta.at;
               registeredByName = gMeta.userName;
@@ -1535,7 +1539,7 @@ export async function updateSingleImportedRecordAction(
     const vocationalDetails = data.vocationalDetails || {};
     const updatedDetails: any = { ...(prev.vocational_details || {}) };
 
-    (['grade1', 'grade2', 'grade3'] as const).forEach((gk) => {
+    (['grade1', 'grade2', 'grade3', 'mock'] as const).forEach((gk) => {
       const gItem = vocationalDetails[gk];
       if (gItem) {
         const kVal = gItem.korean && gItem.korean > 0 ? Number(gItem.korean) : 5;
@@ -1564,6 +1568,7 @@ export async function updateSingleImportedRecordAction(
       vocational_grade_1: updatedDetails.grade1?.isCompleted ? updatedDetails.grade1.gradeSum : undefined,
       vocational_grade_2: updatedDetails.grade2?.isCompleted ? updatedDetails.grade2.gradeSum : undefined,
       vocational_grade_3: updatedDetails.grade3?.isCompleted ? updatedDetails.grade3.gradeSum : undefined,
+      vocational_mock_grade: updatedDetails.mock?.isCompleted ? updatedDetails.mock.gradeSum : undefined,
       updated_by: auditMeta,
     };
   } else if (category === 'volunteer') {
@@ -1658,7 +1663,7 @@ export async function deleteMyImportedRecordsAction(
     } else if (category === 'vocational') {
       const vDetails = evalData.vocational_details;
       if (vDetails) {
-        for (const gradeKey of ['grade1', 'grade2', 'grade3'] as const) {
+        for (const gradeKey of ['grade1', 'grade2', 'grade3', 'mock'] as const) {
           const gData = vDetails[gradeKey];
           if (gData) {
             const gMeta = gData.created_by;
@@ -1667,6 +1672,7 @@ export async function deleteMyImportedRecordsAction(
               if (gradeKey === 'grade1') evalData.vocational_grade_1 = 0;
               if (gradeKey === 'grade2') evalData.vocational_grade_2 = 0;
               if (gradeKey === 'grade3') evalData.vocational_grade_3 = 0;
+              if (gradeKey === 'mock') evalData.vocational_mock_grade = 0;
               modified = true;
               deletedItemsCount++;
             }

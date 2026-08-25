@@ -3,6 +3,7 @@ import {
   calcVocalGrade1Score, 
   calcVocalGrade2Score, 
   calcVocalGrade3Score,
+  calcVocalMockGradeScore,
   VocationalDomainGrades
 } from './certification-calculator';
 
@@ -11,6 +12,7 @@ export interface RawVocalRecord {
   fileName: string;
   academicYear: number;      // 2024, 2025 등
   evalGrade: number;         // 1, 2, 3 학년
+  isMock: boolean;           // 모의평가 여부 (3학년 모의평가: 2점 만점)
   targetGraduationYear: number; // 2027, 2028 등
   rawClass: string;          // 원본 과반 (예: 바이오화학과 1반, 건설과 1)
   rawNumber: string;         // 원본 번호 (예: 14)
@@ -34,22 +36,27 @@ export interface StudentVocalMatchRow {
   graduationYear: number;
   currentGrade: number;      // 올해 기준 학년 (1, 2, 3)
 
-  // 1학년 평가 데이터 매칭
+  // 1학년 평가 데이터 매칭 (자가진단 2점)
   grade1SelectedId?: string; // 선택된 RawVocalRecord.id
   grade1Record?: RawVocalRecord;
   grade1Candidates: RawVocalRecord[];
 
-  // 2학년 평가 데이터 매칭
+  // 2학년 평가 데이터 매칭 (자가진단 3점)
   grade2SelectedId?: string;
   grade2Record?: RawVocalRecord;
   grade2Candidates: RawVocalRecord[];
 
-  // 3학년 평가 데이터 매칭
+  // 3학년 전국단위 평가 데이터 매칭 (15점)
   grade3SelectedId?: string;
   grade3Record?: RawVocalRecord;
   grade3Candidates: RawVocalRecord[];
 
-  // 총 환산 점수
+  // 3학년 모의평가 데이터 매칭 (2점)
+  mockSelectedId?: string;
+  mockRecord?: RawVocalRecord;
+  mockCandidates: RawVocalRecord[];
+
+  // 총 환산 점수 (최대 22점 = 2 + 3 + 15 + 2)
   totalScore: number;
   hasAmbiguity: boolean;
 }
@@ -70,11 +77,12 @@ export function normalizeMajor(rawMajor?: string): string {
 }
 
 /**
- * 파일명 또는 1행 타이틀에서 평가 학년도 및 학년 추출
+ * 파일명 또는 1행 타이틀에서 평가 학년도 및 학년, 모의평가 여부 추출
  */
-export function extractEvaluationMeta(titleOrName: string, baseYear: number): { academicYear: number; grade: number } {
+export function extractEvaluationMeta(titleOrName: string, baseYear: number): { academicYear: number; grade: number; isMock: boolean } {
   let academicYear = baseYear;
   let grade = 1;
+  const isMock = titleOrName.includes('모의');
 
   const yearMatch = titleOrName.match(/(20\d{2})/);
   if (yearMatch) {
@@ -84,9 +92,11 @@ export function extractEvaluationMeta(titleOrName: string, baseYear: number): { 
   const gradeMatch = titleOrName.match(/([1-3])\s*학년/);
   if (gradeMatch) {
     grade = parseInt(gradeMatch[1], 10);
+  } else if (isMock) {
+    grade = 3;
   }
 
-  return { academicYear, grade };
+  return { academicYear, grade, isMock };
 }
 
 /**
@@ -106,7 +116,7 @@ export function parseSingleVocationalFile(
   if (rows.length > 0 && rows[0] && rows[0].length > 0) {
     titleStr = `${String(rows[0][0])} ${fileName}`;
   }
-  const { academicYear, grade } = extractEvaluationMeta(titleStr, baseYear);
+  const { academicYear, grade, isMock } = extractEvaluationMeta(titleStr, baseYear);
   const targetGraduationYear = academicYear + (4 - grade);
 
   let headerRowIdx = -1;
@@ -180,9 +190,10 @@ export function parseSingleVocationalFile(
     const calculatedSum = kVal + eVal + mVal + pVal;
     const gradeSum = isCompleted ? (rawGradeSum > 0 ? rawGradeSum : calculatedSum) : 20;
 
-
     let calculatedScore = 0;
-    if (grade === 1) {
+    if (isMock) {
+      calculatedScore = calcVocalMockGradeScore(gradeSum).score;
+    } else if (grade === 1) {
       calculatedScore = calcVocalGrade1Score(gradeSum).score;
     } else if (grade === 2) {
       calculatedScore = calcVocalGrade2Score(gradeSum).score;
@@ -190,12 +201,12 @@ export function parseSingleVocationalFile(
       calculatedScore = calcVocalGrade3Score(gradeSum).score;
     }
 
-
     records.push({
-      id: `${fileName}_row_${r}_${name}_${numRaw}`,
+      id: `${fileName}_row_${r}_${name}_${numRaw}${isMock ? '_mock' : ''}`,
       fileName,
       academicYear,
       evalGrade: grade,
+      isMock,
       targetGraduationYear,
       rawClass: classRaw,
       rawNumber: numRaw,
@@ -248,28 +259,29 @@ export function buildStudentCentricVocalRows(
     const currentGrade = Math.max(1, Math.min(3, baseYear + 4 - st.graduation_year));
     const normDbMajor = normalizeMajor(st.major);
     const cleanName = String(st.student_name || '').trim().replace(/\s+/g, '');
-    const cleanNum = String(st.student_number || '').replace(/[^0-9]/g, '');
 
     const cleanDbClass = String(st.class_info || '').replace(/[^0-9]/g, '');
     const cleanDbNum = String(st.student_number || '').replace(/[^0-9]/g, '');
 
     // 각 학년별 평가 후보 필터링 및 지능형 매핑
-    const getGradeCandidates = (targetGradeNum: number) => {
+    const getGradeCandidates = (targetGradeNum: number, targetIsMock: boolean = false) => {
       return allRawRecords.filter(r => 
         r.evalGrade === targetGradeNum &&
+        Boolean(r.isMock) === targetIsMock &&
         r.targetGraduationYear === st.graduation_year &&
         r.studentName === cleanName &&
         (r.normMajor === normDbMajor || !r.normMajor)
       );
     };
 
-    const g1Candidates = getGradeCandidates(1);
-    const g2Candidates = getGradeCandidates(2);
-    const g3Candidates = getGradeCandidates(3);
+    const g1Candidates = getGradeCandidates(1, false);
+    const g2Candidates = getGradeCandidates(2, false);
+    const g3Candidates = getGradeCandidates(3, false);
+    const mockCandidates = getGradeCandidates(3, true);
 
     // 수동 선택 또는 지능형 자동 매칭 판정 헬퍼
-    const pickRecord = (gradeNum: number, candidates: RawVocalRecord[]) => {
-      const manualKey = `${st.id}_grade_${gradeNum}`;
+    const pickRecord = (gradeNum: number, isMock: boolean, candidates: RawVocalRecord[]) => {
+      const manualKey = `${st.id}_grade_${gradeNum}${isMock ? '_mock' : ''}`;
       if (manualSelections[manualKey]) {
         if (manualSelections[manualKey] === 'none') return { id: 'none', record: undefined, isAmbiguous: false };
         const found = candidates.find(c => c.id === manualSelections[manualKey]);
@@ -314,15 +326,17 @@ export function buildStudentCentricVocalRows(
       return { id: 'none', record: undefined, isAmbiguous: true };
     };
 
-    const g1 = pickRecord(1, g1Candidates);
-    const g2 = pickRecord(2, g2Candidates);
-    const g3 = pickRecord(3, g3Candidates);
+    const g1 = pickRecord(1, false, g1Candidates);
+    const g2 = pickRecord(2, false, g2Candidates);
+    const g3 = pickRecord(3, false, g3Candidates);
+    const mock = pickRecord(3, true, mockCandidates);
 
     const totalScore = (g1.record?.calculatedScore || 0) + 
                        (g2.record?.calculatedScore || 0) + 
-                       (g3.record?.calculatedScore || 0);
+                       (g3.record?.calculatedScore || 0) +
+                       (mock.record?.calculatedScore || 0);
 
-    const hasAmbiguity = g1.isAmbiguous || g2.isAmbiguous || g3.isAmbiguous;
+    const hasAmbiguity = g1.isAmbiguous || g2.isAmbiguous || g3.isAmbiguous || mock.isAmbiguous;
 
     resultRows.push({
       studentId: st.id,
@@ -341,6 +355,9 @@ export function buildStudentCentricVocalRows(
       grade3SelectedId: g3.id,
       grade3Record: g3.record,
       grade3Candidates: g3Candidates,
+      mockSelectedId: mock.id,
+      mockRecord: mock.record,
+      mockCandidates: mockCandidates,
       totalScore,
       hasAmbiguity,
     });

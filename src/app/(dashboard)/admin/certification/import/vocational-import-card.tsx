@@ -236,15 +236,15 @@ export function VocationalImportCard({
   const stats = React.useMemo(() => {
     const totalStudents = studentRows.length;
     const ambiguousCount = studentRows.filter(r => r.hasAmbiguity).length;
-    const withDataCount = studentRows.filter(r => r.grade1Record || r.grade2Record || r.grade3Record).length;
+    const withDataCount = studentRows.filter(r => r.grade1Record || r.grade2Record || r.grade3Record || r.mockRecord).length;
     const cleanMatchedCount = withDataCount - ambiguousCount;
 
     return { totalStudents, ambiguousCount, withDataCount, cleanMatchedCount };
   }, [studentRows]);
 
   // 동명이인 수동 선택 핸들러
-  const handleSelectPastRecord = (studentId: string, gradeNum: number, rawRecordId: string) => {
-    const key = `${studentId}_grade_${gradeNum}`;
+  const handleSelectPastRecord = (studentId: string, gradeNum: number, rawRecordId: string, isMock: boolean = false) => {
+    const key = `${studentId}_grade_${gradeNum}${isMock ? '_mock' : ''}`;
     setManualSelections(prev => ({
       ...prev,
       [key]: rawRecordId
@@ -260,11 +260,12 @@ export function VocationalImportCard({
       const importRows: VocationalImportStudentRow[] = [];
 
       for (const r of studentRows) {
-        // 1학년 데이터 반영
+        // 1학년 데이터 반영 (자가진단 2점)
         if (r.grade1Record) {
           importRows.push({
             studentId: r.studentId,
             grade: 1,
+            isMock: false,
             academicYear: r.grade1Record.academicYear,
             korean: r.grade1Record.korean,
             english: r.grade1Record.english,
@@ -276,11 +277,12 @@ export function VocationalImportCard({
           });
         }
 
-        // 2학년 데이터 반영
+        // 2학년 데이터 반영 (자가진단 3점)
         if (r.grade2Record) {
           importRows.push({
             studentId: r.studentId,
             grade: 2,
+            isMock: false,
             academicYear: r.grade2Record.academicYear,
             korean: r.grade2Record.korean,
             english: r.grade2Record.english,
@@ -292,11 +294,12 @@ export function VocationalImportCard({
           });
         }
 
-        // 3학년 데이터 반영
+        // 3학년 전국단위평가 데이터 반영 (15점)
         if (r.grade3Record) {
           importRows.push({
             studentId: r.studentId,
             grade: 3,
+            isMock: false,
             academicYear: r.grade3Record.academicYear,
             korean: r.grade3Record.korean,
             english: r.grade3Record.english,
@@ -304,6 +307,23 @@ export function VocationalImportCard({
             problem: r.grade3Record.problem,
             gradeSum: r.grade3Record.gradeSum,
             isCompleted: r.grade3Record.isCompleted,
+            studentName: r.studentName,
+          });
+        }
+
+        // 3학년 모의평가 데이터 반영 (2점)
+        if (r.mockRecord) {
+          importRows.push({
+            studentId: r.studentId,
+            grade: 3,
+            isMock: true,
+            academicYear: r.mockRecord.academicYear,
+            korean: r.mockRecord.korean,
+            english: r.mockRecord.english,
+            math: r.mockRecord.math,
+            problem: r.mockRecord.problem,
+            gradeSum: r.mockRecord.gradeSum,
+            isCompleted: r.mockRecord.isCompleted,
             studentName: r.studentName,
           });
         }
@@ -672,9 +692,10 @@ export function VocationalImportCard({
                       <TableHead className="w-24 text-center">현재 학적</TableHead>
                       <TableHead className="w-28">현재 학과</TableHead>
                       <TableHead className="w-20 font-bold">학생 성명</TableHead>
-                      <TableHead className="w-60">1학년 자가진단 (매칭)</TableHead>
-                      <TableHead className="w-60">2학년 자가진단 (매칭)</TableHead>
-                      <TableHead className="w-60">3학년 전국/모의평가 (매칭)</TableHead>
+                      <TableHead className="w-52">1학년 자가진단 (매칭)</TableHead>
+                      <TableHead className="w-52">2학년 자가진단 (매칭)</TableHead>
+                      <TableHead className="w-52">3학년 전국단위 (매칭)</TableHead>
+                      <TableHead className="w-52">3학년 모의평가 (매칭)</TableHead>
                       <TableHead className="w-24 text-center">직공통 합산</TableHead>
                       <TableHead className="w-24 text-center">상태</TableHead>
                     </TableRow>
@@ -682,7 +703,7 @@ export function VocationalImportCard({
                   <TableBody>
                     {filteredRows.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="h-32 text-center text-slate-400 text-xs font-bold">
+                        <TableCell colSpan={9} className="h-32 text-center text-slate-400 text-xs font-bold">
                           조건에 일치하는 학생이 없습니다.
                         </TableCell>
                       </TableRow>
@@ -707,7 +728,7 @@ export function VocationalImportCard({
                               {st.studentName}
                             </TableCell>
 
-                            {/* 1학년 자가진단 매칭 열 */}
+                            {/* 1학년 자가진단 매칭 열 (2점) */}
                             <TableCell>
                               {st.grade1Candidates.length > 1 ? (
                                 <div className="space-y-1">
@@ -719,7 +740,7 @@ export function VocationalImportCard({
                                   </div>
                                   <Select
                                     value={st.grade1SelectedId || 'none'}
-                                    onValueChange={(val) => handleSelectPastRecord(st.studentId, 1, val)}
+                                    onValueChange={(val) => handleSelectPastRecord(st.studentId, 1, val, false)}
                                   >
                                     <SelectTrigger className={cn(
                                       "h-7 text-[11px] w-full rounded-lg transition-all",
@@ -763,7 +784,7 @@ export function VocationalImportCard({
                               )}
                             </TableCell>
 
-                            {/* 2학년 자가진단 매칭 열 */}
+                            {/* 2학년 자가진단 매칭 열 (3점) */}
                             <TableCell>
                               {st.grade2Candidates.length > 1 ? (
                                 <div className="space-y-1">
@@ -775,7 +796,7 @@ export function VocationalImportCard({
                                   </div>
                                   <Select
                                     value={st.grade2SelectedId || 'none'}
-                                    onValueChange={(val) => handleSelectPastRecord(st.studentId, 2, val)}
+                                    onValueChange={(val) => handleSelectPastRecord(st.studentId, 2, val, false)}
                                   >
                                     <SelectTrigger className={cn(
                                       "h-7 text-[11px] w-full rounded-lg transition-all",
@@ -819,7 +840,7 @@ export function VocationalImportCard({
                               )}
                             </TableCell>
 
-                            {/* 3학년 전국단위/모의평가 매칭 열 */}
+                            {/* 3학년 전국단위평가 매칭 열 (15점) */}
                             <TableCell>
                               {st.grade3Candidates.length > 1 ? (
                                 <div className="space-y-1">
@@ -827,11 +848,11 @@ export function VocationalImportCard({
                                     <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[9px] font-bold px-1 py-0 shrink-0">
                                       동명이인 ({st.grade3Candidates.length}건)
                                     </Badge>
-                                    <span className="text-[10px] text-slate-500">3학년 데이터 선택:</span>
+                                    <span className="text-[10px] text-slate-500">전국단위 데이터 선택:</span>
                                   </div>
                                   <Select
                                     value={st.grade3SelectedId || 'none'}
-                                    onValueChange={(val) => handleSelectPastRecord(st.studentId, 3, val)}
+                                    onValueChange={(val) => handleSelectPastRecord(st.studentId, 3, val, false)}
                                   >
                                     <SelectTrigger className={cn(
                                       "h-7 text-[11px] w-full rounded-lg transition-all",
@@ -875,7 +896,63 @@ export function VocationalImportCard({
                               )}
                             </TableCell>
 
-                            {/* 직기초 총 환산 점수 */}
+                            {/* 3학년 모의평가 매칭 열 (2점) */}
+                            <TableCell>
+                              {st.mockCandidates.length > 1 ? (
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-1">
+                                    <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[9px] font-bold px-1 py-0 shrink-0">
+                                      동명이인 ({st.mockCandidates.length}건)
+                                    </Badge>
+                                    <span className="text-[10px] text-slate-500">모의평가 데이터 선택:</span>
+                                  </div>
+                                  <Select
+                                    value={st.mockSelectedId || 'none'}
+                                    onValueChange={(val) => handleSelectPastRecord(st.studentId, 3, val, true)}
+                                  >
+                                    <SelectTrigger className={cn(
+                                      "h-7 text-[11px] w-full rounded-lg transition-all",
+                                      st.mockSelectedId && st.mockSelectedId !== 'none'
+                                        ? "bg-emerald-50 border-emerald-300 text-emerald-950 font-bold"
+                                        : "bg-amber-50/80 border-amber-300 text-amber-900 font-medium"
+                                    )}>
+                                      <SelectValue placeholder="선택 안 함 (선택 필요)" />
+                                    </SelectTrigger>
+                                    <SelectContent className="text-xs font-medium">
+                                      <SelectItem value="none" className="text-slate-500 font-bold">
+                                        ❌ 선택 안 함 (미지정 / 0점)
+                                      </SelectItem>
+                                      {st.mockCandidates.map(c => {
+                                        const domStr = `[국${c.korean > 0 ? c.korean : '미'}/영${c.english > 0 ? c.english : '미'}/수${c.math > 0 ? c.math : '미'}/문${c.problem > 0 ? c.problem : '미'}]`;
+                                        return (
+                                          <SelectItem key={c.id} value={c.id}>
+                                            {c.rawClass} {c.rawNumber}번 ➔ {c.gradeSum > 0 ? `${c.gradeSum}등급` : '미응시'} ({c.calculatedScore}점) {domStr}
+                                          </SelectItem>
+                                        );
+                                      })}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              ) : st.mockRecord ? (
+                                <div className="flex items-center justify-between gap-1 p-1 bg-indigo-50/60 border border-indigo-200/80 rounded-lg text-[11px]">
+                                  <div className="flex items-center gap-1 font-semibold text-indigo-900 truncate">
+                                    <span className="text-[10px] text-indigo-700 bg-indigo-100/80 px-1 py-0.5 rounded shrink-0">
+                                      {st.mockRecord.rawClass} {st.mockRecord.rawNumber}번
+                                    </span>
+                                    <span className="truncate">
+                                      {st.mockRecord.gradeSum > 0 ? `${st.mockRecord.gradeSum}등급` : '미응시'} [국{st.mockRecord.korean > 0 ? st.mockRecord.korean : '미'}/영{st.mockRecord.english > 0 ? st.mockRecord.english : '미'}/수{st.mockRecord.math > 0 ? st.mockRecord.math : '미'}/문{st.mockRecord.problem > 0 ? st.mockRecord.problem : '미'}]
+                                    </span>
+                                  </div>
+                                  <span className="font-extrabold text-indigo-700 shrink-0">
+                                    {st.mockRecord.calculatedScore}점
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 text-[11px]">- (미응시/미등록)</span>
+                              )}
+                            </TableCell>
+
+                            {/* 직기초 총 환산 점수 (최대 22점) */}
                             <TableCell className="text-center font-extrabold text-indigo-700 align-middle">
                               {st.totalScore > 0 ? `${st.totalScore}점` : '0점'}
                             </TableCell>
@@ -887,7 +964,7 @@ export function VocationalImportCard({
                                   <AlertCircle className="h-3 w-3" />
                                   <span>선택 필요</span>
                                 </Badge>
-                              ) : (st.grade1Record || st.grade2Record || st.grade3Record) ? (
+                              ) : (st.grade1Record || st.grade2Record || st.grade3Record || st.mockRecord) ? (
                                 <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[10px] font-bold px-1.5 py-0.5 gap-1">
                                   <CheckCircle2 className="h-3 w-3" />
                                   <span>매칭 완료</span>
