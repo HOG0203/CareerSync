@@ -125,18 +125,26 @@ export function ClassTable({
   }, [initialData]);
 
   React.useEffect(() => {
-    if (!graduationYear) return
-    setIsRankingsLoading(true)
+    if (!graduationYear) return;
+    let isMounted = true;
+    setIsRankingsLoading(true);
     fetchYearlyRankings(graduationYear, baseYear || 2026)
       .then(rankings => {
-        setRankingMap(rankings)
-        setIsRankingsLoading(false)
+        if (isMounted) {
+          setRankingMap(rankings);
+          setIsRankingsLoading(false);
+        }
       })
       .catch(err => {
-        console.error('Failed to load yearly rankings:', err)
-        setIsRankingsLoading(false)
-      })
-  }, [graduationYear, baseYear])
+        if (isMounted) {
+          console.error('Failed to load yearly rankings:', err);
+          setIsRankingsLoading(false);
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [graduationYear, baseYear]);
 
 
   // 현재 데이터로부터 학년 판별

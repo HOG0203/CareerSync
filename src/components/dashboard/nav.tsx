@@ -186,7 +186,7 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
                       isDashActive ? "bg-blue-50 text-blue-600 hover:bg-blue-50 hover:text-blue-600" : ""
                     )}
                   >
-                    <Link href="/dashboard" onClick={() => handleNavClick('/dashboard')}>
+                    <Link href="/dashboard" prefetch={false} onClick={() => handleNavClick('/dashboard')}>
                       <LayoutDashboard className={cn("mr-2 h-4 w-4 flex-shrink-0", isDashActive ? "text-blue-600" : "")} />
                       <span className="font-bold flex-1">대시보드</span>
                       {isDashNav && <div className="ml-auto h-3.5 w-3.5 rounded-full border-2 border-blue-600 border-t-transparent animate-spin shrink-0" />}
@@ -216,7 +216,7 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
                       isActive ? "bg-blue-50 text-blue-600 hover:bg-blue-50 hover:text-blue-600" : ""
                     )}
                   >
-                    <Link href={item.href} onClick={() => handleNavClick(item.href)}>
+                    <Link href={item.href} prefetch={false} onClick={() => handleNavClick(item.href)}>
                       <group.icon className={cn("mr-2 h-4 w-4 flex-shrink-0", isActive ? "text-blue-600" : "")} />
                       <span className="font-bold flex-1">{group.title}</span>
                       {isItemNav && <div className="ml-auto h-3.5 w-3.5 rounded-full border-2 border-blue-600 border-t-transparent animate-spin shrink-0" />}
@@ -285,7 +285,7 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
                                 isSubActive ? "text-blue-600 font-bold bg-blue-50/50" : "text-slate-500 hover:text-slate-800"
                               )}
                             >
-                              <Link href={item.href} onClick={() => handleNavClick(item.href)}>
+                              <Link href={item.href} prefetch={false} onClick={() => handleNavClick(item.href)}>
                                 <item.icon className="mr-2 h-3.5 w-3.5 flex-shrink-0" />
                                 <span className="flex-1">{item.label}</span>
                                 {isNavThis && <div className="ml-auto h-3.5 w-3.5 rounded-full border-2 border-blue-600 border-t-transparent animate-spin shrink-0" />}

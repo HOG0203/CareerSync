@@ -361,19 +361,27 @@ export function EmploymentStatusGrid({
     setIsLoading(false);
   }, [allData]);
 
-  // 성적/석차 데이터를 백그라운드에서 비동기 fetch
+  // 성적/석차 데이터를 백그라운드에서 비동기 fetch (페이지 이탈 시 즉시 취소)
   React.useEffect(() => {
     if (!graduationYear) return;
+    let isMounted = true;
     setIsRankingsLoading(true);
     fetchYearlyRankings(parseInt(graduationYear), baseYear || 2026)
       .then(rankings => {
-        setRankingMap(rankings);
-        setIsRankingsLoading(false);
+        if (isMounted) {
+          setRankingMap(rankings);
+          setIsRankingsLoading(false);
+        }
       })
       .catch(err => {
-        console.error('Failed to load yearly rankings:', err);
-        setIsRankingsLoading(false);
+        if (isMounted) {
+          console.error('Failed to load yearly rankings:', err);
+          setIsRankingsLoading(false);
+        }
       });
+    return () => {
+      isMounted = false;
+    };
   }, [graduationYear, baseYear]);
 
   // 전체 데이터에서 고유 자격증 목록 추출 (모달 자동완성 힌트용)

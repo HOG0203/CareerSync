@@ -64,6 +64,7 @@ export function MobileBottomTab({ isAdmin = false, role, userGrade }: { isAdmin?
           <Link
             key={tab.href}
             href={tab.href}
+            prefetch={false}
             onClick={() => setNavigatingHref(tab.href)}
             className={cn(
               "flex flex-col items-center justify-center min-w-[56px] flex-1 h-full gap-1 transition-all relative shrink-0",

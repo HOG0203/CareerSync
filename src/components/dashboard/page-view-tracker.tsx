@@ -48,10 +48,18 @@ export function PageViewTracker() {
 
     const pageName = PAGE_NAME_MAP[pathname] || pathname.replace('/', '');
 
-    // 3. 비동기 백그라운드 페이지 조회 기록
-    recordPageViewAction(currentFullPath, pageName).catch((err) => {
-      console.error('Failed to auto-record page view:', err);
-    });
+    // 3. 브라우저가 유휴 상태일 때(Idle) 비동기 백그라운드 페이지 조회 기록 (화면 로딩 방해 완전 차단)
+    const recordTask = () => {
+      recordPageViewAction(currentFullPath, pageName).catch((err) => {
+        console.error('Failed to auto-record page view:', err);
+      });
+    };
+
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(recordTask, { timeout: 2000 });
+    } else {
+      setTimeout(recordTask, 300);
+    }
   }, [pathname, searchParams]);
 
   return null;
