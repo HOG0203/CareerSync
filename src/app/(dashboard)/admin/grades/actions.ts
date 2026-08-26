@@ -30,6 +30,7 @@ export async function matchStudents(
 ) {
   const supabase = await createClient()
   const matchMap: Record<string, { id: string; major: string; classInfo: string }> = {};
+  const allGradeStudents: { id: string; name: string; number: string; major: string; classInfo: string; currentGrade: number }[] = [];
 
   // 학년별로 키 그룹화하여 Supabase 쿼리 최소화 및 분기 처리
   const keysByGrade: Record<number, typeof studentKeys> = {};
@@ -48,9 +49,23 @@ export async function matchStudents(
     const { data: allStudents, error } = await supabase
       .from('students')
       .select('id, student_name, student_number, major, class_info')
-      .eq('graduation_year', gradYear);
+      .eq('graduation_year', gradYear)
+      .order('major', { ascending: true })
+      .order('class_info', { ascending: true })
+      .order('student_number', { ascending: true });
 
     if (error || !allStudents) continue;
+
+    allStudents.forEach(s => {
+      allGradeStudents.push({
+        id: s.id,
+        name: s.student_name,
+        number: s.student_number,
+        major: s.major,
+        classInfo: s.class_info,
+        currentGrade
+      });
+    });
 
     keysByGrade[currentGrade].forEach(key => {
       const targetNum = Number(key.number);
@@ -58,8 +73,8 @@ export async function matchStudents(
       const targetMajorKey = (key.major || '').replace('스마트', '').replace('자동화', '').replace('과', '').trim();
       const targetClassNum = Number(key.classInfo?.replace(/[^0-9]/g, ''));
 
-      // [절대 원칙] 학과 키워드와 반 번호가 완벽히 일치하는 학생만 UUID 매칭
-      const matched = allStudents.find(s => {
+      // 1순위: 학과, 반, 번호, 성명 완벽 일치
+      let matched = allStudents.find(s => {
         const sName = (s.student_name || '').trim();
         const sNum = Number(s.student_number);
         const sMajor = (s.major || '');
@@ -71,19 +86,37 @@ export async function matchStudents(
                (targetClassNum ? sClassNum === targetClassNum : true);
       });
 
+      // 2순위: 학과 정보가 없는 경우 (전과목 성적 일람표 양식) 반, 번호, 성명 일치
+      if (!matched && targetClassNum && targetNum) {
+        matched = allStudents.find(s => {
+          const sName = (s.student_name || '').trim();
+          const sNum = Number(s.student_number);
+          const sClassNum = Number(s.class_info?.replace(/[^0-9]/g, ''));
+          return sName === targetName && sNum === targetNum && sClassNum === targetClassNum;
+        });
+      }
+
+      // 3순위: 해당 학년에 동명이인이 없는 경우 성명 단독 일치
+      if (!matched) {
+        const nameMatches = allStudents.filter(s => (s.student_name || '').trim() === targetName);
+        if (nameMatches.length === 1) {
+          matched = nameMatches[0];
+        }
+      }
+
       if (matched) {
         // 학과_반_번호_이름 조합 키로 UUID 정보 전달
-        const mapKey = `${key.major}_${key.classInfo}_${key.number}_${targetName}`;
+        const mapKey = `${key.major || ''}_${key.classInfo || ''}_${key.number}_${targetName}`;
         matchMap[mapKey] = {
           id: matched.id,
           major: matched.major || '미지정',
-          classInfo: matched.class_info || '미지정'
+          classInfo: matched.class_info ? (matched.class_info.endsWith('반') ? matched.class_info : `${matched.class_info}반`) : '미지정'
         };
       }
     });
   }
 
-  return { success: true, matchMap };
+  return { success: true, matchMap, gradeStudents: allGradeStudents };
 }
 
 /**
@@ -105,6 +138,15 @@ export async function uploadStudentScores(
       const failKey = `${item.studentName}(${item.studentNumber}번)`;
       if (!results.notMatched.includes(failKey)) results.notMatched.push(failKey);
       results.failed++;
+      continue;
+    }
+
+    // [보안] 점수(원점수)도 없고 성취도(A~E, P)도 없는 완전 빈칸/미이수 데이터만 건너뜀
+    // (체육/음악 등 성취도만 부여되는 예체능 과목은 점수가 null이어도 성취도가 있으면 정상 저장)
+    const hasScore = item.score !== null && item.score !== undefined && String(item.score).trim() !== '' && !isNaN(Number(item.score));
+    const hasAchievement = item.achievement !== null && item.achievement !== undefined && String(item.achievement).trim() !== '';
+
+    if (!hasScore && !hasAchievement) {
       continue;
     }
 
@@ -158,8 +200,19 @@ export async function uploadStudentScores(
     results.success = finalScores.length;
   }
 
+  const { revalidateTag } = await import('next/cache');
+  const { clearYearlyRankingsCache } = await import('@/lib/data');
+  revalidateTag('student_scores');
+  revalidateTag('students');
+  revalidateTag('rankings-2027');
+  revalidateTag('rankings-2028');
+  revalidateTag('rankings-2029');
+  clearYearlyRankingsCache();
+
   revalidatePath('/admin/grades');
   revalidatePath('/admin/certification/grades');
+  revalidatePath('/employment-status');
+  revalidatePath('/class-management');
   return { success: true, results };
 }
 
@@ -181,6 +234,12 @@ export async function updateAchievementScores(scores: Record<string, number>) {
       key: 'achievement_scores', value: scores, updated_at: new Date().toISOString()
     });
     if (error) throw error;
+    const { revalidateTag } = await import('next/cache');
+    const { clearYearlyRankingsCache } = await import('@/lib/data');
+    revalidateTag('settings');
+    revalidateTag('achievement-scores');
+    revalidateTag('student_scores');
+    clearYearlyRankingsCache();
     revalidatePath('/admin/certification/grades');
     return { success: true };
   } catch (error: any) {
@@ -193,8 +252,15 @@ export async function deleteAllStudentScores() {
   try {
     const { error } = await supabase.from('student_scores').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     if (error) throw error;
+    const { revalidateTag } = await import('next/cache');
+    const { clearYearlyRankingsCache } = await import('@/lib/data');
+    revalidateTag('student_scores');
+    revalidateTag('students');
+    clearYearlyRankingsCache();
     revalidatePath('/admin/grades');
     revalidatePath('/admin/certification/grades');
+    revalidatePath('/employment-status');
+    revalidatePath('/class-management');
     return { success: true };
   } catch (error: any) {
     return { error: error.message };

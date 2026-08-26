@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { FileUp, TrendingUp } from 'lucide-react';
 import { GradeImportClient } from '@/app/(dashboard)/admin/grades/grade-import-client';
 
-export function GradeImportModal() {
+export function GradeImportModal({ onSuccess }: { onSuccess?: () => void }) {
   const [open, setOpen] = React.useState(false);
 
   return (
@@ -48,7 +48,10 @@ export function GradeImportModal() {
         
         {/* 실제 컨텐츠 영역에 스크롤 부여 */}
         <div className="flex-1 overflow-y-auto bg-white custom-scrollbar">
-          <GradeImportClient />
+          <GradeImportClient onSuccess={() => {
+            setOpen(false);
+            if (onSuccess) onSuccess();
+          }} />
         </div>
       </DialogContent>
     </Dialog>

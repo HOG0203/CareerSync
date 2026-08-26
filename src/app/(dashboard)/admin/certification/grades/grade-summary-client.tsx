@@ -7,7 +7,8 @@ import {
   User, 
   ChevronRight,
   Download,
-  Loader2
+  Loader2,
+  RotateCw
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
@@ -69,6 +70,27 @@ export function GradeSummaryClient({
   });
   const [isLoadingGrade, setIsLoadingGrade] = React.useState<boolean>(false);
 
+  // 서버로부터 initialSummaries가 갱신될 때 상태 동기화
+  React.useEffect(() => {
+    setGradeDataMap(prev => ({
+      ...prev,
+      [currentGrade]: initialSummaries
+    }));
+  }, [initialSummaries, currentGrade]);
+
+  const refreshAllGrades = async (targetGrade = activeGrade) => {
+    setIsLoadingGrade(true);
+    try {
+      const data = await getGradeSummaryListAction(targetGrade, true);
+      // 업로드 또는 수동 새로고침 시 전체 캐시 리셋 후 현재 학년 최신 데이터 즉시 주입
+      setGradeDataMap({ [targetGrade]: data as StudentSummary[] });
+    } catch (err) {
+      console.error('Failed to refresh grade summary:', err);
+    } finally {
+      setIsLoadingGrade(false);
+    }
+  };
+
   const [searchTerm, setSearchText] = React.useState('');
   const [selectedMajor, setSelectedMajor] = React.useState(() => {
     if (!isAdmin && userProfile?.role === 'teacher' && userProfile?.assigned_major) {
@@ -94,6 +116,7 @@ export function GradeSummaryClient({
     direction: 'asc'
   });
 
+  // SWR 패턴: 기존 캐시가 있으면 0ms 즉각 전환 + 없으면 빠른 로딩 후 캐싱
   const handleGradeChange = async (targetGradeNum: number) => {
     if (targetGradeNum === activeGrade) return;
     setActiveGrade(targetGradeNum);
@@ -107,10 +130,11 @@ export function GradeSummaryClient({
       window.history.replaceState(null, '', url.toString());
     }
 
-    if (!gradeDataMap[targetGradeNum]) {
+    const hasCached = !!gradeDataMap[targetGradeNum];
+    if (!hasCached) {
       setIsLoadingGrade(true);
       try {
-        const data = await getGradeSummaryListAction(targetGradeNum);
+        const data = await getGradeSummaryListAction(targetGradeNum, true);
         setGradeDataMap(prev => ({ ...prev, [targetGradeNum]: data as StudentSummary[] }));
       } catch (err) {
         console.error('Failed to load grade summary:', err);
@@ -221,7 +245,7 @@ export function GradeSummaryClient({
         </div>
         {isAdmin && (
           <div className="shrink-0 ml-2">
-            <GradeImportModal />
+            <GradeImportModal onSuccess={() => refreshAllGrades(activeGrade)} />
           </div>
         )}
       </div>
@@ -253,6 +277,16 @@ export function GradeSummaryClient({
                 {isLoadingGrade && activeGrade === g && <Loader2 className="h-3 w-3 animate-spin text-indigo-600" />}
               </Button>
             ))}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              title="데이터 실시간 새로고침"
+              onClick={() => refreshAllGrades(activeGrade)}
+              disabled={isLoadingGrade}
+              className="h-7 sm:h-8 px-2 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100 transition-colors"
+            >
+              <RotateCw className={cn("h-3.5 w-3.5", isLoadingGrade && "animate-spin text-indigo-600")} />
+            </Button>
           </div>
 
 

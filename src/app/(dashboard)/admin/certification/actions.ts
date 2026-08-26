@@ -147,13 +147,20 @@ export async function getCachedCertificationSummaryList(gradeNum: number, preloa
 
 
 /**
- * [캐싱] 학년별 직기초 성적 및 석차 요약 목록 조회
+ * [캐싱 & 실시간 즉시 갱신 지원] 학년별 직기초 성적 및 석차 요약 목록 조회
  */
-export async function getGradeSummaryListAction(gradeNum: number) {
+export async function getGradeSummaryListAction(gradeNum: number, forceFresh: boolean = false) {
   const settings = await getSystemSettings();
   const baseYear = settings.baseYear;
   const targetGradYear = baseYear + (4 - gradeNum);
-  const { getCachedYearlyRankingsSummary } = await import('@/lib/data');
+  const { getCachedYearlyRankingsSummary, getYearlyRankingsSummary, clearYearlyRankingsCache } = await import('@/lib/data');
+
+  if (forceFresh) {
+    clearYearlyRankingsCache(targetGradYear);
+    const summaryMap = await getYearlyRankingsSummary(targetGradYear, baseYear);
+    return Object.values(summaryMap);
+  }
+
   const summaryMap = await getCachedYearlyRankingsSummary(targetGradYear, baseYear);
   return Object.values(summaryMap);
 }
