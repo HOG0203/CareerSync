@@ -24,7 +24,7 @@ import {
 } from './actions';
 import { cn } from '@/lib/utils';
 
-export function AttendanceImportClient({ baseYear }: { baseYear: number }) {
+export function AttendanceImportClient({ baseYear, onSuccess }: { baseYear: number; onSuccess?: () => void }) {
   const [isParsing, setIsParsing] = React.useState(false);
   const [isUploading, setIsUploading] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
@@ -42,6 +42,7 @@ export function AttendanceImportClient({ baseYear }: { baseYear: number }) {
         toast({ title: "초기화 완료", description: "출결 데이터가 모두 삭제되었습니다." });
         setParsedData([]);
         setFileNames([]);
+        onSuccess?.();
       } else {
         toast({ variant: "destructive", title: "삭제 실패", description: res.error });
       }
@@ -182,6 +183,7 @@ export function AttendanceImportClient({ baseYear }: { baseYear: number }) {
         toast({ title: "저장 완료", description: `${result.count}건의 출결 데이터를 저장했습니다.` });
         setParsedData([]);
         setFileNames([]);
+        onSuccess?.();
       }
     } catch (error) {
       toast({ variant: "destructive", title: "오류 발생", description: "서버와 통신 중 문제가 발생했습니다." });

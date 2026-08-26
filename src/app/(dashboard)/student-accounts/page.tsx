@@ -109,11 +109,11 @@ export default async function StudentAccountsPage() {
 
 
   return (
-    <div className="flex flex-col h-full gap-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 px-1">
+    <div className="flex flex-col h-full gap-4 sm:gap-6 px-1 sm:px-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 shrink-0">
         <div className="flex flex-col gap-1">
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-            <UserCheck className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
+          <h2 className="text-xl sm:text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+            <UserCheck className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 shrink-0" />
             학생 계정 관리
           </h2>
 

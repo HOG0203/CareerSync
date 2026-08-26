@@ -178,18 +178,18 @@ export async function clearAttendanceCache(gradeNum?: number) {
   }
 }
 
-export async function getAllAttendanceRecords(academicYear: number, currentGrade: number) {
+export async function getAllAttendanceRecords(academicYear: number, currentGrade: number, forceFresh: boolean = false) {
   const cacheKey = `${academicYear}-${currentGrade}`;
   const now = Date.now();
   const cached = attendanceMemoryCache[cacheKey];
-  if (cached && (now - cached.timestamp < ATTENDANCE_CACHE_TTL_MS)) {
+  if (!forceFresh && cached && (now - cached.timestamp < ATTENDANCE_CACHE_TTL_MS)) {
     return cached.data;
   }
 
   const supabase = createAdminClient();
   const targetGraduationYear = academicYear + (4 - currentGrade);
 
-  // 1. [1-Shot 초고속 병렬화] 학생 명부와 3개년 출결 레코드를 단 1번에 완전 동시 병렬 패칭
+  // 1. [1-Shot 초고속 병렬화] 학생 명부와 3개년 출결 레코드를 필요한 컬럼만 추출하여 초고속 동시 병렬 패칭
   const [studentsRes, attendanceRes] = await Promise.all([
     supabase
       .from('students')
@@ -200,7 +200,7 @@ export async function getAllAttendanceRecords(academicYear: number, currentGrade
       .order('student_number', { ascending: true }),
     supabase
       .from('student_attendance')
-      .select('*, students!inner(graduation_year)')
+      .select('id, student_id, academic_year, grade, semester, school_days, absent_unexcused, late_unexcused, early_unexcused, out_unexcused, absent_disease, late_disease, early_disease, out_disease, absent_other, late_other, early_other, out_other, remarks, students!inner(graduation_year)')
       .eq('students.graduation_year', targetGraduationYear)
       .order('grade', { ascending: true })
       .range(0, 5000)

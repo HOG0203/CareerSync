@@ -7,7 +7,8 @@ import {
   Award,
   Loader2,
   Edit2,
-  Download
+  Download,
+  RotateCw
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
@@ -23,7 +24,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
-import { StudentCertificateSummary, updateStudentCertificates, getCachedCertificateSummaries } from './actions';
+import { 
+  StudentCertificateSummary, 
+  updateStudentCertificates, 
+  getCachedCertificateSummaries,
+  getCertificateSummaries,
+  clearCertificateSummariesCache
+} from './actions';
 import { CertificateImportModal } from './certificate-import-modal';
 import { CertificatePicker } from '@/components/dashboard/standard-spreadsheet-table/certificate-picker';
 
@@ -52,6 +59,14 @@ export function CertificateSummaryClient({
   });
   const [isLoadingGrade, setIsLoadingGrade] = React.useState<boolean>(false);
 
+  // 서버로부터 전달받은 initialSummaries 동기화
+  React.useEffect(() => {
+    setGradeDataMap(prev => ({
+      ...prev,
+      [currentGrade]: initialSummaries
+    }));
+  }, [initialSummaries, currentGrade]);
+
   const [searchTerm, setSearchText] = React.useState('');
   const [selectedMajor, setSelectedMajor] = React.useState(() => {
     if (!isAdmin && userProfile?.role === 'teacher' && userProfile?.assigned_major) {
@@ -72,7 +87,9 @@ export function CertificateSummaryClient({
   const PAGE_SIZE = 50;
   const { toast } = useToast();
 
-  const currentSummaries = gradeDataMap[activeGrade] || [];
+  const currentSummaries = React.useMemo(() => {
+    return gradeDataMap[activeGrade] || [];
+  }, [gradeDataMap, activeGrade]);
 
   // 학년 변경 시 0ms 즉각 전환 및 URL 파라미터 동기화
   const handleGradeChange = async (targetGradeNum: number) => {
@@ -101,6 +118,20 @@ export function CertificateSummaryClient({
     }
   };
 
+  // 실시간 강제 새로고침 (캐시 무효화 후 라이브 DB 재조회)
+  const refreshAllGrades = async (targetGrade = activeGrade) => {
+    setIsLoadingGrade(true);
+    try {
+      await clearCertificateSummariesCache(targetGrade);
+      const data = await getCertificateSummaries(targetGrade);
+      setGradeDataMap(prev => ({ ...prev, [targetGrade]: data }));
+    } catch (err) {
+      console.error('Failed to refresh certificate data:', err);
+    } finally {
+      setIsLoadingGrade(false);
+    }
+  };
+
   const showSkeleton = isLoadingGrade;
 
   // 클라이언트 사이드 필터링 (학과, 반, 검색어: 이름/학번/자격증명)
@@ -115,7 +146,6 @@ export function CertificateSummaryClient({
         (s.certificates && s.certificates.some(cert => cert.toLowerCase().includes(termLower)));
       return matchMajor && matchClass && matchSearch;
     });
-
 
     // 학번 순으로 정렬
     filtered.sort((a, b) => {
@@ -134,7 +164,7 @@ export function CertificateSummaryClient({
     });
 
     return filtered;
-  }, [initialSummaries, searchTerm, selectedMajor, selectedClass]);
+  }, [currentSummaries, searchTerm, selectedMajor, selectedClass]);
 
   // 필터 변경 시 1페이지로 리셋
   React.useEffect(() => {
@@ -237,7 +267,7 @@ export function CertificateSummaryClient({
             <span className="hidden sm:inline">현황 양식 다운로드</span>
             <span className="sm:hidden">양식 다운로드</span>
           </Button>
-          {isAdmin && <CertificateImportModal />}
+          {isAdmin && <CertificateImportModal onSuccess={() => refreshAllGrades(activeGrade)} />}
         </div>
       </div>
 
@@ -267,8 +297,17 @@ export function CertificateSummaryClient({
                 {g}학년
                 {isLoadingGrade && activeGrade === g && <Loader2 className="h-3 w-3 animate-spin text-indigo-600" />}
               </Button>
-
             ))}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              title="데이터 실시간 새로고침"
+              onClick={() => refreshAllGrades(activeGrade)}
+              disabled={isLoadingGrade}
+              className="h-7 sm:h-8 px-2 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100 transition-colors"
+            >
+              <RotateCw className={cn("h-3.5 w-3.5", isLoadingGrade && "animate-spin text-indigo-600")} />
+            </Button>
           </div>
 
 

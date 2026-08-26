@@ -116,7 +116,7 @@ function parseNeisCertificates(rawRows: any[][]) {
   return { major, grade, classInfo, studentCerts };
 }
 
-export function CertificateImportModal() {
+export function CertificateImportModal({ onSuccess }: { onSuccess?: () => void } = {}) {
   const [open, setOpen] = React.useState(false);
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [previews, setPreviews] = React.useState<ParsedClassPreview[]>([]);
@@ -251,6 +251,7 @@ export function CertificateImportModal() {
       description: `성공: ${totalSuccess}명, 미매칭/오류: ${totalSkipped}명`,
     });
     router.refresh();
+    onSuccess?.();
   };
 
   return (

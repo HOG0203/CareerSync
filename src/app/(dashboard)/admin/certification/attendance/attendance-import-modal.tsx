@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { FileUp, CalendarCheck } from 'lucide-react';
 import { AttendanceImportClient } from './attendance-import-client';
 
-export function AttendanceImportModal({ baseYear }: { baseYear: number }) {
+export function AttendanceImportModal({ baseYear, onSuccess }: { baseYear: number; onSuccess?: () => void }) {
   const [open, setOpen] = React.useState(false);
 
   return (
@@ -48,7 +48,7 @@ export function AttendanceImportModal({ baseYear }: { baseYear: number }) {
         
         {/* 내부 컨텐츠 영역 */}
         <div className="flex-1 overflow-y-auto bg-white custom-scrollbar">
-          <AttendanceImportClient baseYear={baseYear} />
+          <AttendanceImportClient baseYear={baseYear} onSuccess={onSuccess} />
         </div>
       </DialogContent>
     </Dialog>

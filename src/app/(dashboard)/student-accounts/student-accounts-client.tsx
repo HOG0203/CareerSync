@@ -355,53 +355,53 @@ export function StudentAccountsClient({
 
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* 요약 통계 카드 */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         <Card className="border-slate-200/80 shadow-sm">
-          <CardContent className="p-4 flex items-center justify-between">
+          <CardContent className="p-3 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-500">조회 학생수</p>
-              <p className="text-2xl font-black text-slate-900 mt-1">{stats.total}명</p>
+              <p className="text-[11px] sm:text-xs font-semibold text-slate-500">조회 학생수</p>
+              <p className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5 sm:mt-1">{stats.total}명</p>
             </div>
-            <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600">
-              <Users className="h-5 w-5" />
+            <div className="p-2 sm:p-2.5 rounded-xl bg-blue-50 text-blue-600 shrink-0">
+              <Users className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-slate-200/80 shadow-sm">
-          <CardContent className="p-4 flex items-center justify-between">
+          <CardContent className="p-3 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-500">로그인 이력 있음</p>
-              <p className="text-2xl font-black text-emerald-600 mt-1">{stats.activeCount}명</p>
+              <p className="text-[11px] sm:text-xs font-semibold text-slate-500">로그인 이력 있음</p>
+              <p className="text-xl sm:text-2xl font-black text-emerald-600 mt-0.5 sm:mt-1">{stats.activeCount}명</p>
             </div>
-            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600">
-              <CheckCircle2 className="h-5 w-5" />
+            <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-50 text-emerald-600 shrink-0">
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-slate-200/80 shadow-sm">
-          <CardContent className="p-4 flex items-center justify-between">
+          <CardContent className="p-3 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-500">비밀번호 직접 변경</p>
-              <p className="text-2xl font-black text-indigo-600 mt-1">{stats.customCount}명</p>
+              <p className="text-[11px] sm:text-xs font-semibold text-slate-500">비밀번호 직접 변경</p>
+              <p className="text-xl sm:text-2xl font-black text-indigo-600 mt-0.5 sm:mt-1">{stats.customCount}명</p>
             </div>
-            <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
-              <Lock className="h-5 w-5" />
+            <div className="p-2 sm:p-2.5 rounded-xl bg-indigo-50 text-indigo-600 shrink-0">
+              <Lock className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-slate-200/80 shadow-sm">
-          <CardContent className="p-4 flex items-center justify-between">
+          <CardContent className="p-3 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-500">연락처 미등록 (로그인불가)</p>
-              <p className="text-2xl font-black text-amber-600 mt-1">{stats.noPhoneCount}명</p>
+              <p className="text-[11px] sm:text-xs font-semibold text-slate-500">연락처 미등록</p>
+              <p className="text-xl sm:text-2xl font-black text-amber-600 mt-0.5 sm:mt-1">{stats.noPhoneCount}명</p>
             </div>
-            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600">
-              <PhoneOff className="h-5 w-5" />
+            <div className="p-2 sm:p-2.5 rounded-xl bg-amber-50 text-amber-600 shrink-0">
+              <PhoneOff className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           </CardContent>
         </Card>
@@ -409,12 +409,24 @@ export function StudentAccountsClient({
 
       {/* 필터 & 검색 바 */}
       <Card className="border-slate-200/80 shadow-sm">
-        <CardContent className="p-4 space-y-3">
-          <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-            <div className="flex flex-wrap gap-2 w-full sm:w-auto items-center">
+        <CardContent className="p-3 sm:p-4 space-y-3">
+          <div className="flex flex-col md:flex-row gap-2.5 sm:gap-3 items-stretch md:items-center justify-between">
+            {/* 검색창 */}
+            <div className="relative w-full md:w-72 order-1 md:order-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="이름, 학과, 학번 검색..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 h-9 text-xs sm:text-sm bg-white"
+              />
+            </div>
+
+            {/* 필터 셀렉트 그룹 */}
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 w-full md:w-auto items-center order-2 md:order-1">
               {isAdmin && (
                 <Select value={selectedGrade} onValueChange={setSelectedGrade}>
-                  <SelectTrigger className="w-[110px] h-9 text-xs">
+                  <SelectTrigger className="w-full sm:w-[105px] h-9 text-xs bg-white">
                     <SelectValue placeholder="학년" />
                   </SelectTrigger>
                   <SelectContent>
@@ -430,7 +442,7 @@ export function StudentAccountsClient({
 
               {isAdmin && (
                 <Select value={selectedMajor} onValueChange={setSelectedMajor}>
-                  <SelectTrigger className="w-[130px] h-9 text-xs">
+                  <SelectTrigger className="w-full sm:w-[130px] h-9 text-xs bg-white">
                     <SelectValue placeholder="학과" />
                   </SelectTrigger>
                   <SelectContent>
@@ -444,10 +456,9 @@ export function StudentAccountsClient({
                 </Select>
               )}
 
-
               {isAdmin && (
                 <Select value={selectedClass} onValueChange={setSelectedClass}>
-                  <SelectTrigger className="w-[100px] h-9 text-xs">
+                  <SelectTrigger className="w-full sm:w-[95px] h-9 text-xs bg-white">
                     <SelectValue placeholder="반" />
                   </SelectTrigger>
                   <SelectContent>
@@ -461,9 +472,8 @@ export function StudentAccountsClient({
                 </Select>
               )}
 
-
               <Select value={passwordFilter} onValueChange={setPasswordFilter}>
-                <SelectTrigger className="w-[140px] h-9 text-xs">
+                <SelectTrigger className="w-full sm:w-[135px] h-9 text-xs bg-white">
                   <SelectValue placeholder="비밀번호 상태" />
                 </SelectTrigger>
                 <SelectContent>
@@ -476,7 +486,7 @@ export function StudentAccountsClient({
 
               {/* 페이지당 보기 개수 드롭다운 (기본 50명) */}
               <Select value={pageSize} onValueChange={setPageSize}>
-                <SelectTrigger className="w-[125px] h-9 text-xs bg-slate-50">
+                <SelectTrigger className="w-full sm:w-[115px] h-9 text-xs bg-slate-50">
                   <SelectValue placeholder="보기 개수" />
                 </SelectTrigger>
                 <SelectContent>
@@ -486,24 +496,15 @@ export function StudentAccountsClient({
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="이름, 번호, 학번 검색..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8 h-9 text-xs"
-              />
-            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* 학생 목록 테이블 */}
+      {/* 학생 목록 카드/테이블 뷰 */}
       <Card className="border-slate-200/80 shadow-sm overflow-hidden">
         <CardContent className="p-0">
-          <div className="overflow-x-auto custom-scrollbar">
+          {/* 데스크톱: 테이블 뷰 (md 이상) */}
+          <div className="hidden md:block overflow-x-auto custom-scrollbar">
             <Table className="w-full min-w-[900px]">
               <TableHeader className="bg-slate-50 border-b border-slate-200">
                 <TableRow>
@@ -685,9 +686,175 @@ export function StudentAccountsClient({
             </Table>
           </div>
 
+          {/* 모바일: 카드 리스트 뷰 (md 미만) */}
+          <div className="md:hidden divide-y divide-slate-100 bg-slate-50/20">
+            {paginatedStudents.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-500">
+                조건에 맞는 학생 데이터가 없습니다.
+              </div>
+            ) : (
+              paginatedStudents.map((student) => {
+                const phoneLast4 = student.phone_number
+                  ? student.phone_number.replace(/[^0-9]/g, '').slice(-4)
+                  : null;
+
+                return (
+                  <div key={student.id} className="p-3.5 space-y-3 bg-white hover:bg-slate-50/50 transition-colors">
+                    {/* 상단: 학생 기본 정보 & 비밀번호 상태 */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-sm text-slate-900">{student.student_name}</span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
+                            {student.grade}학년 {student.class_info}반 {student.student_number}번
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 font-medium truncate">
+                          {student.major}
+                        </p>
+                      </div>
+
+                      <div className="shrink-0">
+                        {student.has_custom_password ? (
+                          <div className="flex flex-col items-end">
+                            <Badge className="bg-indigo-600 text-white text-[10px] px-1.5 py-0.5 font-medium shrink-0">
+                              <Lock className="h-2.5 w-2.5 mr-1 shrink-0" />
+                              직접 변경
+                            </Badge>
+                            {student.password_changed_at && (
+                              <span className="text-[9px] text-slate-400 mt-0.5">
+                                {format(new Date(student.password_changed_at), 'MM/dd HH:mm')}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <Badge variant="secondary" className="text-slate-600 text-[10px] px-1.5 py-0.5 font-normal shrink-0">
+                            기본 (뒷4자리)
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 중간: 연락처 정보 & 인라인 수정 */}
+                    <div className="bg-slate-50 rounded-lg p-2.5 flex items-center justify-between gap-2 border border-slate-100 text-xs">
+                      <div className="min-w-0 flex-1">
+                        {editingStudentId === student.id ? (
+                          <div className="flex items-center gap-1.5 w-full">
+                            <Input
+                              autoFocus
+                              type="text"
+                              placeholder="010-0000-0000"
+                              value={phoneInputValue}
+                              onChange={(e) => setPhoneInputValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSavePhone(student);
+                                if (e.key === 'Escape') handleCancelEditPhone();
+                              }}
+                              disabled={isSavingPhone}
+                              className="h-8 flex-1 text-xs px-2 font-mono bg-white"
+                            />
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleSavePhone(student)}
+                              disabled={isSavingPhone}
+                              className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 shrink-0"
+                            >
+                              {isSavingPhone ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Check className="h-4 w-4" />
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={handleCancelEditPhone}
+                              disabled={isSavingPhone}
+                              className="h-8 w-8 p-0 text-slate-400 hover:text-slate-600 hover:bg-slate-100 shrink-0"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : student.phone_number ? (
+                          <div className="flex items-center gap-1.5 flex-wrap font-mono text-slate-800">
+                            <Smartphone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                            <span className="font-semibold text-xs">{student.phone_number}</span>
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 bg-blue-50 text-blue-700 border-blue-200 shrink-0 font-normal">
+                              뒷자리 {phoneLast4}
+                            </Badge>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 text-amber-700 font-medium">
+                            <PhoneOff className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                            <span className="text-[11px]">연락처 미등록 (로그인 불가)</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {editingStudentId !== student.id && (
+                        <div className="shrink-0">
+                          {student.phone_number ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleStartEditPhone(student)}
+                              className="h-7 px-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded text-xs shrink-0"
+                            >
+                              <Edit2 className="h-3 w-3 mr-1" />
+                              수정
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleStartEditPhone(student)}
+                              className="h-7 px-2 text-[11px] font-semibold text-amber-700 border-amber-300 bg-amber-50 hover:bg-amber-100 shrink-0"
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              등록
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 하단: 최근 로그인 일시 / 접속수 & 초기화 버튼 */}
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 text-[11px]">
+                      <div className="flex items-center gap-1.5 text-slate-500 min-w-0">
+                        <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate">
+                          {student.last_login_at
+                            ? format(new Date(student.last_login_at), 'MM/dd HH:mm', { locale: ko })
+                            : '접속 이력 없음'}
+                        </span>
+                        {student.login_count > 0 && (
+                          <span className="font-bold text-slate-700 shrink-0">
+                            ({student.login_count}회)
+                          </span>
+                        )}
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setResetTarget(student)}
+                        disabled={!student.phone_number}
+                        className="h-7 px-2.5 text-xs font-semibold text-slate-700 hover:text-red-700 hover:bg-red-50 hover:border-red-200 shrink-0"
+                      >
+                        <RotateCcw className="h-3 w-3 mr-1 shrink-0" />
+                        초기화
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
           {/* 테이블 하단 페이지네이션 바 */}
-          <div className="px-4 py-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 bg-slate-50/50">
-            <div>
+          <div className="px-3 sm:px-4 py-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs text-slate-600 bg-slate-50/50">
+            <div className="text-center sm:text-left">
               <span>총 <strong className="text-slate-900">{filteredStudents.length}</strong>명 중 </span>
               <span>
                 {filteredStudents.length === 0 ? '0' : `${startIndex} ~ ${endIndex}`}번째 표시
@@ -695,7 +862,7 @@ export function StudentAccountsClient({
             </div>
 
             {pageSize !== 'all' && totalPages > 1 && (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1 sm:gap-1.5">
                 <Button
                   variant="outline"
                   size="sm"
@@ -717,8 +884,8 @@ export function StudentAccountsClient({
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
 
-                <span className="px-2 text-xs font-semibold text-slate-800">
-                  {currentPage} / {totalPages} 페이지
+                <span className="px-1.5 sm:px-2 text-[11px] sm:text-xs font-semibold text-slate-800 shrink-0">
+                  {currentPage} / {totalPages}
                 </span>
 
                 <Button
@@ -749,11 +916,11 @@ export function StudentAccountsClient({
 
       {/* 비밀번호 초기화 확인 모달 */}
       <AlertDialog open={!!resetTarget} onOpenChange={(open) => !open && setResetTarget(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-[92vw] sm:max-w-lg p-4 sm:p-6 rounded-2xl">
           <AlertDialogHeader>
             <div className="flex items-center gap-2 text-amber-600">
-              <AlertTriangle className="h-5 w-5" />
-              <AlertDialogTitle className="text-base font-bold text-slate-900">
+              <AlertTriangle className="h-5 w-5 shrink-0" />
+              <AlertDialogTitle className="text-sm sm:text-base font-bold text-slate-900">
                 학생 비밀번호 초기화
               </AlertDialogTitle>
             </div>
@@ -765,14 +932,14 @@ export function StudentAccountsClient({
               </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isResetting} className="text-xs h-9">
+          <AlertDialogFooter className="flex-row justify-end gap-2 mt-2 sm:mt-4">
+            <AlertDialogCancel disabled={isResetting} className="text-xs h-9 flex-1 sm:flex-none mt-0">
               취소
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmReset}
               disabled={isResetting}
-              className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold h-9"
+              className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold h-9 flex-1 sm:flex-none"
             >
               {isResetting ? (
                 <>

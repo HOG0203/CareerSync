@@ -11,7 +11,8 @@ import {
   User,
   ChevronRight,
   ClipboardList,
-  Loader2
+  Loader2,
+  RotateCw
 } from 'lucide-react';
 
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -57,7 +58,7 @@ interface AttendanceRecord {
   };
 }
 
-import { getCachedAllAttendanceRecords } from './actions';
+import { getCachedAllAttendanceRecords, getAllAttendanceRecords, clearAttendanceCache } from './actions';
 import { CertificationDataSkeleton } from '@/components/dashboard/loading-skeleton';
 
 interface StudentAttendanceGroup {
@@ -99,6 +100,14 @@ export function AttendanceTableClient({
   });
   const [isLoadingGrade, setIsLoadingGrade] = React.useState<boolean>(false);
 
+  // 서버로부터 전달받은 initialData 동기화
+  React.useEffect(() => {
+    setGradeDataMap(prev => ({
+      ...prev,
+      [currentGrade]: initialData
+    }));
+  }, [initialData, currentGrade]);
+
   const [searchTerm, setSearchText] = React.useState('');
   const [selectedMajor, setSelectedMajor] = React.useState(() => {
     if (!isAdmin && userProfile?.role === 'teacher' && userProfile?.assigned_major) {
@@ -137,6 +146,20 @@ export function AttendanceTableClient({
       } finally {
         setIsLoadingGrade(false);
       }
+    }
+  };
+
+  // 실시간 강제 새로고침 (캐시 무효화 후 라이브 DB 재조회)
+  const refreshAllGrades = async (targetGrade = activeGrade) => {
+    setIsLoadingGrade(true);
+    try {
+      await clearAttendanceCache(targetGrade);
+      const data = await getAllAttendanceRecords(baseYear, targetGrade, true);
+      setGradeDataMap(prev => ({ ...prev, [targetGrade]: data as any[] }));
+    } catch (err) {
+      console.error('Failed to refresh attendance data:', err);
+    } finally {
+      setIsLoadingGrade(false);
     }
   };
 
@@ -249,7 +272,7 @@ export function AttendanceTableClient({
         </div>
         {isAdmin && (
           <div className="shrink-0 ml-2">
-            <AttendanceImportModal baseYear={baseYear} />
+            <AttendanceImportModal baseYear={baseYear} onSuccess={() => refreshAllGrades(activeGrade)} />
           </div>
         )}
       </div>
@@ -281,6 +304,16 @@ export function AttendanceTableClient({
                 {isLoadingGrade && activeGrade === g && <Loader2 className="h-3 w-3 animate-spin text-indigo-600" />}
               </Button>
             ))}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              title="데이터 실시간 새로고침"
+              onClick={() => refreshAllGrades(activeGrade)}
+              disabled={isLoadingGrade}
+              className="h-7 sm:h-8 px-2 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-200/60 transition-colors"
+            >
+              <RotateCw className={cn("h-3.5 w-3.5", isLoadingGrade && "animate-spin text-indigo-600")} />
+            </Button>
           </div>
 
 
