@@ -235,16 +235,14 @@ export async function saveStudentEvaluationAction(
   const settings = await getSystemSettings();
   const currentGrade = Math.max(1, Math.min(3, settings.baseYear + 4 - student.graduation_year));
 
-  // 2. 권한 검사 (관리자 또는 해당 학년/학반 담임교사)
+  // 2. 권한 검사 (관리자 또는 전체 교사)
   const isAdmin = profile.role === 'admin';
-  const isHomeroomTeacher = profile.role === 'teacher' && 
-    profile.assigned_grade === currentGrade && 
-    profile.assigned_class === student.class_info;
+  const isTeacher = profile.role === 'teacher';
 
-  if (!isAdmin && !isHomeroomTeacher) {
+  if (!isAdmin && !isTeacher) {
     return { 
       success: false, 
-      error: `해당 학생(${student.student_name})의 평가 데이터 수정 권한이 없습니다. (관리자 또는 ${currentGrade}학년 ${student.class_info}반 담임교사만 가능)` 
+      error: `해당 학생(${student.student_name})의 평가 데이터 수정 권한이 없습니다. (관리자 또는 교사만 가능)` 
     };
   }
 
@@ -414,13 +412,6 @@ export async function batchImportEvaluationsAction(
     });
 
     if (matched) {
-      const sGrade = Math.max(1, Math.min(3, settings.baseYear + 4 - matched.graduation_year));
-      
-      // 담임인 경우 자기 반만 수정 허용
-      if (profile.role === 'teacher' && (profile.assigned_grade !== sGrade || cleanClass(profile.assigned_class) !== cleanClass(matched.class_info))) {
-        continue;
-      }
-
       currentStore[matched.id] = {
         ...(currentStore[matched.id] || { student_id: matched.id }),
         ...row.evalData,
@@ -531,15 +522,6 @@ export async function batchImportVolunteerAction(studentsList: VolunteerImportSt
     });
 
     if (matched) {
-      // 담임교사 권한 체크: 자기 반만 수정 가능
-      if (profile.role === 'teacher') {
-        const isHomeroom = profile.assigned_grade === row.grade && cleanClass(profile.assigned_class) === cleanClass(matched.class_info);
-        if (!isHomeroom) {
-          skippedStudents.push(`${row.studentName} (권한 없음)`);
-          continue;
-        }
-      }
-
       const auditMeta = {
         userId: profile.id,
         userName: profile.full_name || profile.username || '교사',

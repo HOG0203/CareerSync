@@ -81,6 +81,8 @@ export function CertificateSummaryClient({
     return 'all';
   });
 
+  const canEdit = isAdmin || userProfile?.role === 'teacher';
+
   const [editingStudent, setEditingStudent] = React.useState<StudentCertificateSummary | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -267,7 +269,7 @@ export function CertificateSummaryClient({
             <span className="hidden sm:inline">현황 양식 다운로드</span>
             <span className="sm:hidden">양식 다운로드</span>
           </Button>
-          {isAdmin && <CertificateImportModal onSuccess={() => refreshAllGrades(activeGrade)} />}
+          {canEdit && <CertificateImportModal onSuccess={() => refreshAllGrades(activeGrade)} />}
         </div>
       </div>
 
@@ -379,14 +381,14 @@ export function CertificateSummaryClient({
                   <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider text-center w-24">번호</th>
                   <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider">학생 정보</th>
                   <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider">취득 자격증 목록</th>
-                  {isAdmin && <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider text-center w-24">작업</th>}
+                  {canEdit && <th className="px-6 py-3 font-bold text-[11px] uppercase tracking-wider text-center w-24">작업</th>}
                 </tr>
               </thead>
 
           <tbody className="divide-y divide-slate-100 bg-white">
             {paginatedData.length === 0 ? (
               <tr>
-                <td colSpan={isAdmin ? 4 : 3} className="px-6 py-12 text-center text-slate-400 font-bold text-xs sm:text-sm">
+                <td colSpan={canEdit ? 4 : 3} className="px-6 py-12 text-center text-slate-400 font-bold text-xs sm:text-sm">
                   등록된 자격증 데이터가 없거나 조건에 일치하는 학생이 없습니다.
                 </td>
               </tr>
@@ -426,7 +428,7 @@ export function CertificateSummaryClient({
                       )}
                     </div>
                   </td>
-                  {isAdmin && (
+                  {canEdit && (
                     <td className="px-6 py-4 text-center">
                       <Button 
                         variant="ghost" 
@@ -471,7 +473,7 @@ export function CertificateSummaryClient({
                 </div>
               </div>
 
-              {isAdmin && (
+              {canEdit && (
                 <Button 
                   variant="ghost" 
                   size="sm" 

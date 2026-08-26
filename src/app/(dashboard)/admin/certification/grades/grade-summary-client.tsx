@@ -243,7 +243,7 @@ export function GradeSummaryClient({
             성적 관리 및 석차 조회
           </h2>
         </div>
-        {isAdmin && (
+        {(isAdmin || userProfile?.role === 'teacher') && (
           <div className="shrink-0 ml-2">
             <GradeImportModal onSuccess={() => refreshAllGrades(activeGrade)} />
           </div>

@@ -152,15 +152,10 @@ export function CertificationSummaryClient({
     });
   }, [currentEvaluations]);
 
-  // 2. 권한 체크 헬퍼 (관리자 또는 해당 학반 담임교사 여부)
+  // 2. 권한 체크 헬퍼 (관리자 또는 전체 교사)
   const canEditStudent = (student: FullStudentEvaluation) => {
     if (isAdmin) return true;
-    if (userProfile?.role === 'teacher') {
-      return (
-        userProfile.assigned_grade === activeGrade &&
-        userProfile.assigned_class === student.classInfo
-      );
-    }
+    if (userProfile?.role === 'teacher') return true;
     return false;
   };
 

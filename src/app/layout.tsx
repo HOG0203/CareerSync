@@ -32,6 +32,8 @@ export const viewport = {
   userScalable: false,
 };
 
+import { PWARegister } from '@/components/pwa-register';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -40,6 +42,7 @@ export default function RootLayout({
   return (
     <html lang="ko" suppressHydrationWarning>
       <body className={cn('antialiased')}>
+        <PWARegister />
         {children}
         <Toaster />
       </body>

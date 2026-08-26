@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "kr.hs.dgths.careersync",
+      "sha256_cert_fingerprints": [
+        "14:6D:E9:01:07:52:68:4F:9E:B2:82:E9:1E:69:4F:C0:B6:77:C1:6D:54:92:70:1E:6C:DD:2E:07:4E:35:48:47"
+      ]
+    }
+  }
+]

@@ -270,7 +270,7 @@ export function AttendanceTableClient({
             전교생 출결 현황
           </h2>
         </div>
-        {isAdmin && (
+        {(isAdmin || userProfile?.role === 'teacher') && (
           <div className="shrink-0 ml-2">
             <AttendanceImportModal baseYear={baseYear} onSuccess={() => refreshAllGrades(activeGrade)} />
           </div>
