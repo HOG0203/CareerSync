@@ -45,6 +45,7 @@ const ROUTE_MAP: Record<string, { group: string; label: string }> = {
   '/company-info': { group: '취업진로관리', label: '업체정보' },
   '/students': { group: '취업진로관리', label: '취업상세데이터' },
   '/class-management': { group: '학사 및 지도', label: '학반 관리' },
+  '/merit-demerit': { group: '학사 및 지도', label: '상벌점 관리' },
   '/labor-education': { group: '학사 및 지도', label: '노동인권교육' },
   '/admin/students': { group: '학사 및 지도', label: '학생 등록/진급' },
   '/admin/users': { group: '시스템 관리', label: '사용자 관리' },

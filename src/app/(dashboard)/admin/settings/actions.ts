@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath, unstable_cache, revalidateTag } from 'next/cache'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 
 export interface MasterCertificate {
   name: string;
@@ -68,7 +68,7 @@ const DEFAULT_CERTIFICATION_CONFIG: CertificationConfig = {
  * 옥저인증제 종합 설정 조회 (성적, 출결, 자격증 점수)
  */
 export async function getCertificationConfig(): Promise<CertificationConfig> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   try {
     const { data, error } = await supabase
       .from('system_settings')
@@ -87,10 +87,21 @@ export async function getCertificationConfig(): Promise<CertificationConfig> {
 }
 
 /**
+ * [캐싱] 옥저인증제 종합 설정 서버 메모리 캐싱 (0.005초 응답)
+ */
+export async function getCachedCertificationConfig(): Promise<CertificationConfig> {
+  return unstable_cache(
+    async () => getCertificationConfig(),
+    ['certification-config-cache'],
+    { revalidate: 86400, tags: ['settings', 'cert-grades'] }
+  )();
+}
+
+/**
  * 옥저인증제 종합 설정 저장
  */
 export async function updateCertificationConfig(config: CertificationConfig) {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   try {
     const { error } = await supabase
       .from('system_settings')
@@ -203,7 +214,7 @@ export async function getCachedMasterCertificates(): Promise<MasterCertificate[]
  * 마스터 자격증 목록 저장
  */
 export async function updateMasterCertificates(certificates: MasterCertificate[]) {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   try {
     const { error: deleteError } = await supabase
@@ -298,6 +309,112 @@ export async function saveDashboardChartLayout(key: 'grade3Order' | 'lowerGradeO
     return { success: true };
   } catch (error: any) {
     console.error('Error saving dashboard chart layout:', error);
+    return { error: error.message };
+  }
+}
+
+export interface MeritDemeritRule {
+  id: string;
+  type: 'merit' | 'demerit';
+  category: string;
+  name: string;
+  points: number;
+  description?: string;
+  isActive: boolean;
+  order?: number;
+}
+
+const DEFAULT_MERIT_DEMERIT_RULES: MeritDemeritRule[] = [
+  // 상점 (Merit)
+  { id: 'm-1', type: 'merit', category: '봉사/선행', name: '교내외 선행 및 모범 행동', points: 3, isActive: true, order: 1 },
+  { id: 'm-2', type: 'merit', category: '봉사/선행', name: '교내 환경 정화 및 자발적 봉사활동', points: 2, isActive: true, order: 2 },
+  { id: 'm-3', type: 'merit', category: '기본생활', name: '학급 및 학생회 임원 활동 솔선수범', points: 3, isActive: true, order: 3 },
+  { id: 'm-4', type: 'merit', category: '학습활동', name: '수업 태도 우수 및 학업 성취 향상', points: 2, isActive: true, order: 4 },
+  { id: 'm-5', type: 'merit', category: '학습활동', name: '국가기술자격증/공인자격증 취득', points: 5, isActive: true, order: 5 },
+  { id: 'm-6', type: 'merit', category: '학습활동', name: '교내외 기능경기대회 및 경시대회 입상', points: 5, isActive: true, order: 6 },
+  { id: 'm-7', type: 'merit', category: '기본생활', name: '한 학기 무결석 (개근)', points: 4, isActive: true, order: 7 },
+  { id: 'm-8', type: 'merit', category: '기본생활', name: '교직원 지도 보조 및 교내 행사 지원', points: 1, isActive: true, order: 8 },
+
+  // 벌점 (Demerit)
+  { id: 'd-1', type: 'demerit', category: '출결/지각', name: '무단 지각 / 무단 조퇴 / 무단 결과', points: 1, isActive: true, order: 1 },
+  { id: 'd-2', type: 'demerit', category: '출결/지각', name: '무단 결석 (1일당)', points: 3, isActive: true, order: 2 },
+  { id: 'd-3', type: 'demerit', category: '복장/용모', name: '교복 및 용모 규정 위반', points: 1, isActive: true, order: 3 },
+  { id: 'd-4', type: 'demerit', category: '수업태도', name: '수업 중 전자기기(휴대폰) 무단 사용', points: 2, isActive: true, order: 4 },
+  { id: 'd-5', type: 'demerit', category: '수업태도', name: '수업 진행 방해 및 교사 지도 불응', points: 3, isActive: true, order: 5 },
+  { id: 'd-6', type: 'demerit', category: '생활안전', name: '교내 흡연 또는 담배/라이터 소지', points: 5, isActive: true, order: 6 },
+  { id: 'd-7', type: 'demerit', category: '생활안전', name: '교내 시설물 및 공공 비품 훼손', points: 3, isActive: true, order: 7 },
+  { id: 'd-8', type: 'demerit', category: '생활안전', name: '폭력, 괴롭힘 및 언어폭력', points: 5, isActive: true, order: 8 },
+  { id: 'd-9', type: 'demerit', category: '기본생활', name: '지정 구역 외 무단 외출', points: 2, isActive: true, order: 9 },
+];
+
+/**
+ * 표준 상벌점 기본 규정 프리셋 조회 (비동기 함수)
+ */
+export async function getDefaultMeritDemeritRules(): Promise<MeritDemeritRule[]> {
+  return DEFAULT_MERIT_DEMERIT_RULES;
+}
+
+/**
+ * 상벌점 기준 항목 조회 (캐싱 적용)
+ */
+export async function getMeritDemeritRules(): Promise<MeritDemeritRule[]> {
+  const supabase = createAdminClient();
+  try {
+    const { data, error } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'merit_demerit_rules')
+      .maybeSingle();
+
+    if (error) throw error;
+    if (data?.value && Array.isArray(data.value) && data.value.length > 0) {
+      return data.value as MeritDemeritRule[];
+    }
+    return DEFAULT_MERIT_DEMERIT_RULES;
+  } catch (error) {
+    console.error('Error fetching merit demerit rules:', error);
+    return DEFAULT_MERIT_DEMERIT_RULES;
+  }
+}
+
+/**
+ * [캐싱] 상벌점 기준 항목 서버 메모리 캐시 (초고속 응답)
+ */
+export async function getCachedMeritDemeritRules(): Promise<MeritDemeritRule[]> {
+  return unstable_cache(
+    async () => getMeritDemeritRules(),
+    ['merit-demerit-rules-cache'],
+    {
+      revalidate: 86400,
+      tags: ['settings', 'merit-demerit-rules']
+    }
+  )();
+}
+
+/**
+ * 상벌점 기준 항목 일괄 저장/수정
+ */
+export async function updateMeritDemeritRules(rules: MeritDemeritRule[]) {
+  const supabase = createAdminClient();
+  try {
+    const { error } = await supabase
+      .from('system_settings')
+      .upsert({
+        key: 'merit_demerit_rules',
+        value: rules,
+        updated_at: new Date().toISOString()
+      });
+
+    if (error) throw error;
+
+    revalidateTag('settings');
+    revalidateTag('merit-demerit-rules');
+    revalidateTag('merit-demerit');
+    revalidatePath('/admin/settings');
+    revalidatePath('/merit-demerit');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error saving merit demerit rules:', error);
     return { error: error.message };
   }
 }

@@ -57,7 +57,7 @@ export function FieldTrainingClient({
   const isAdmin = userProfile?.role === 'admin';
   const [viewMode, setViewMode] = React.useState<'timeline' | 'grid'>('timeline');
   const [searchTerm, setSearchTerm] = React.useState('');
-  const [statusFilter, setStatusFilter] = React.useState<string>('all');
+  const [statusFilter, setStatusFilter] = React.useState<string>('ongoing');
   
   // 편집 모달 관리
   const [selectedStudentForModal, setSelectedStudentForModal] = React.useState<any | null>(null);

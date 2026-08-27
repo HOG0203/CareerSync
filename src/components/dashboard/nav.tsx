@@ -41,7 +41,8 @@ import {
   History,
   KeyRound,
   FileCheck,
-  UploadCloud
+  UploadCloud,
+  Scale
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { handleClientLogout } from '@/lib/auth-helpers';
@@ -109,6 +110,7 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
         ...(!isLowerGradeTeacher ? [{ href: '/field-training', label: '현장실습현황', icon: CalendarCheck }] : []),
         { href: '/company-info', label: '업체정보', icon: Factory },
         ...(!isLowerGradeTeacher ? [{ href: '/students', label: '취업상세데이터', icon: ClipboardList }] : []),
+        ...(!isLowerGradeTeacher ? [{ href: '/labor-education', label: '노동인권교육', icon: ShieldAlert }] : []),
       ]
     },
     {
@@ -116,9 +118,8 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
       icon: GraduationCap,
       items: [
         { href: '/class-management', label: '학반 관리', icon: BookUser },
+        { href: '/merit-demerit', label: '상벌점 관리', icon: Scale },
         { href: '/student-accounts', label: '학생 계정 관리', icon: UserCog },
-
-        ...(!isLowerGradeTeacher ? [{ href: '/labor-education', label: '노동인권교육', icon: ShieldAlert }] : []),
         ...(isAdmin ? [{ href: '/admin/students', label: '학생 등록/진급', icon: UserPlus }] : []),
       ]
     },
@@ -127,10 +128,10 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
       icon: CheckCircle2,
       items: [
         { href: '/admin/certification', label: '종합 인증평가', icon: Award },
-        { href: '/admin/certification/import', label: '엑셀 일괄 등록', icon: UploadCloud },
-        { href: '/admin/certification/grades', label: '성적현황', icon: GraduationCap },
-        { href: '/admin/certification/attendance', label: '출결현황', icon: CalendarCheck },
         { href: '/admin/certification/certificates', label: '자격증현황', icon: FileCheck },
+        { href: '/admin/certification/attendance', label: '출결현황', icon: CalendarCheck },
+        { href: '/admin/certification/grades', label: '성적현황', icon: GraduationCap },
+        { href: '/admin/certification/import', label: '엑셀 일괄 등록', icon: UploadCloud },
       ]
     },
     ...(isAdmin ? [
