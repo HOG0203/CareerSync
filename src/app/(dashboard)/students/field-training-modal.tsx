@@ -40,6 +40,7 @@ interface FieldTrainingModalProps {
   onClose: () => void
   student: any | null
   isAdmin?: boolean
+  onUpdateRecords?: (studentId: string, updatedRecords: any[]) => void
 }
 
 // 텍스트 자유 입력, 복사-붙여넣기, 자동 형식 정제 및 달력 선택을 동시 지원하는 스마트 날짜 인풋
@@ -116,7 +117,7 @@ function SmartDateInput({
   );
 }
 
-export function FieldTrainingModal({ isOpen, onClose, student, isAdmin = false }: FieldTrainingModalProps) {
+export function FieldTrainingModal({ isOpen, onClose, student, isAdmin = false, onUpdateRecords }: FieldTrainingModalProps) {
   const [records, setRecords] = React.useState<any[]>([])
   const [isSaving, setIsSaving] = React.useState(false)
   const { toast } = useToast()
@@ -159,59 +160,97 @@ export function FieldTrainingModal({ isOpen, onClose, student, isAdmin = false }
 
   const handleUpdateLocal = (index: number, field: string, value: any) => {
     const newRecords = [...records]
-    newRecords[index] = { ...newRecords[index], [field]: value }
+    const target = { ...newRecords[index], [field]: value }
+
+    if (field === 'hiring_status') {
+      if (value === '채용전환') {
+        // [자동 채움] 채용전환 선택 시: 채용전환일 기본값을 현장실습종료일(end_date)로 자동 설정
+        if (!target.conversion_date) {
+          target.conversion_date = target.end_date || ''
+        }
+        target.return_reason = ''
+      } else if (value === '진행중') {
+        // [자동 삭제] 진행중으로 변경 시: 채용전환일 및 복교사유 초기화/삭제
+        target.conversion_date = ''
+        target.return_reason = ''
+      } else if (value === '복교') {
+        target.conversion_date = ''
+      }
+    }
+
+    newRecords[index] = target
     setRecords(newRecords)
   }
 
   const handleSaveRecord = async (index: number) => {
-    setIsSaving(true)
     const record = { ...records[index] }
     
     if (!record.company) {
       toast({ variant: 'destructive', title: '저장 실패', description: '실습 업체명을 입력해주세요.' })
-      setIsSaving(false)
       return
     }
 
+    // 채용전환이 아닌 경우 채용전환일 초기화
+    if (record.hiring_status !== '채용전환') {
+      record.conversion_date = ''
+    }
+    // 복교가 아닌 경우 복교사유 초기화
+    if (record.hiring_status !== '복교') {
+      record.return_reason = ''
+    }
+
+    // 1. [0.001초 낙관적 즉시 반영]: 모달 및 부모 간트차트/통계 즉시 갱신
+    const optimisticRecord = { ...record }
+    const optimisticList = [...records]
+    optimisticList[index] = optimisticRecord
+    setRecords(optimisticList)
+    onUpdateRecords?.(student.id, optimisticList)
+    toast({ title: '저장 완료 (즉시 반영)', description: `${record.training_order}차 실습 정보가 즉시 반영되었습니다.` })
+
+    // 2. [백그라운드 비동기 DB 저장]: 화면 멈춤 없이 백그라운드 동기화
     if (typeof record.id === 'string' && record.id.startsWith('temp-')) {
       delete record.id
     }
 
-    const result = await upsertFieldTrainingRecord(record)
-    if (result.success) {
-      toast({ title: '저장 완료', description: `${record.training_order}차 실습 정보가 저장되었습니다.` })
-      if (result.data) {
-        const newRecords = [...records]
-        newRecords[index] = result.data
-        setRecords(newRecords)
+    try {
+      const result = await upsertFieldTrainingRecord(record)
+      if (result.success && result.data) {
+        setRecords(prev => {
+          const updated = [...prev]
+          if (updated[index]) {
+            updated[index] = { ...updated[index], id: result.data.id }
+          }
+          return updated
+        })
+      } else if (!result.success) {
+        toast({ variant: 'destructive', title: '서버 저장 실패', description: result.error })
       }
-      router.refresh()
-    } else {
-      console.error('현장실습 저장 에러 상세:', result.error)
-      toast({ variant: 'destructive', title: '저장 실패', description: result.error })
+    } catch (err: any) {
+      console.error('현장실습 저장 에러:', err)
     }
-    setIsSaving(false)
   }
 
   const handleDeleteRecord = async (index: number) => {
     const record = records[index]
-    if (!record.id || (typeof record.id === 'string' && record.id.startsWith('temp-'))) {
-      setRecords(records.filter((_, i) => i !== index))
-      return
-    }
-
     if (!confirm(`${record.training_order}차 실습 이력을 영구 삭제하시겠습니까?`)) return
 
-    setIsSaving(true)
-    const result = await deleteFieldTrainingRecord(record.id)
-    if (result.success) {
-      toast({ title: '삭제 완료', description: '실습 이력이 삭제되었습니다.' })
-      setRecords(records.filter((_, i) => i !== index))
-      router.refresh()
-    } else {
-      toast({ variant: 'destructive', title: '삭제 실패', description: result.error })
+    // 1. [0.001초 낙관적 즉시 삭제]: 모달 및 부모 간트차트에서 즉시 삭제
+    const nextRecords = records.filter((_, i) => i !== index)
+    setRecords(nextRecords)
+    onUpdateRecords?.(student.id, nextRecords)
+    toast({ title: '삭제 완료 (즉시 반영)', description: '실습 이력이 즉시 삭제되었습니다.' })
+
+    // 2. [백그라운드 비동기 DB 삭제]
+    if (record.id && !String(record.id).startsWith('temp-')) {
+      try {
+        const result = await deleteFieldTrainingRecord(record.id)
+        if (!result.success) {
+          toast({ variant: 'destructive', title: '삭제 실패', description: result.error })
+        }
+      } catch (err: any) {
+        console.error('현장실습 삭제 에러:', err)
+      }
     }
-    setIsSaving(false)
   }
 
   if (!student) return null

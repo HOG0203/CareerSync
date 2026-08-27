@@ -51,7 +51,7 @@ interface BulkGrantModalProps {
   isOpen: boolean;
   onClose: () => void;
   allGradesDataMap: Record<number, StudentMeritDemeritSummary[]>;
-  activeGrade: number;
+  activeGrade: number | 'ALL';
   preSelectedStudentIds?: string[];
   meritRules: MeritDemeritRule[];
   classStructure: Record<number, Record<string, string[]>>;
@@ -374,7 +374,7 @@ export function BulkGrantModal({
         points: sanitizedPoints,
         date,
         memo,
-        grade: activeGrade,
+        grade: typeof activeGrade === 'number' ? activeGrade : 3,
         academicYear
       });
 

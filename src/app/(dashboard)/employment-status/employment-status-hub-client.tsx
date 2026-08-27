@@ -302,12 +302,12 @@ export function EmploymentStatusHubClient({
           </CardContent>
         </Card>
 
-        {/* 카드 3: 3학년 대·공기업 취업 (범례: rose-600) / 1,2학년 진학 희망 (범례: rose-500) */}
+        {/* 카드 3: 3학년 대·공기업·공직 취업 (범례: rose-600) / 1,2학년 진학 희망 (범례: rose-500) */}
         <Card className="border-slate-200/80 shadow-2xs hover:shadow-sm transition-all rounded-2xl bg-white">
           <CardContent className="p-4 sm:p-5 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-[11px] sm:text-xs font-bold text-slate-500">
-                {isLowerGrade ? '진학 희망' : '대·공기업 취업'}
+                {isLowerGrade ? '진학 희망' : '대·공기업·공직 취업'}
               </p>
               <div className="flex items-baseline gap-1.5">
                 <span className="text-2xl sm:text-3xl font-black text-rose-600">

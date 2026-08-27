@@ -32,7 +32,7 @@ interface GrantModalProps {
   onClose: () => void;
   selectedStudents: StudentMeritDemeritSummary[];
   meritRules: MeritDemeritRule[];
-  grade: number;
+  grade: number | 'ALL';
   academicYear: number;
   onSuccess: (params: {
     studentIds: string[];
@@ -100,7 +100,7 @@ export function GrantModal({
       student_number: s.student_number,
       major: s.major,
       class_info: s.class_info,
-      grade: s.grade || grade
+      grade: s.grade || (typeof grade === 'number' ? grade : 3)
     }));
 
     // 1. 0ms 즉각 반영 & 모달 닫기
@@ -131,7 +131,7 @@ export function GrantModal({
         points: sanitizedPoints,
         date,
         memo,
-        grade,
+        grade: typeof grade === 'number' ? grade : (selectedStudents[0]?.grade || 3),
         academicYear
       });
 

@@ -83,7 +83,7 @@ export default async function MeritDemeritPage() {
 
       {/* 메인 클라이언트 대시보드 */}
       <MeritDemeritClient
-        initialGrade={defaultGrade}
+        initialGrade={'ALL'}
         initialGradeDataMap={allGradesData}
         availableGrades={availableGrades}
         classStructure={classStructure}

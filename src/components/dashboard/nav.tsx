@@ -107,14 +107,14 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
       icon: Briefcase,
       items: [
         { href: '/employment-status', label: '취업진로현황', icon: Grid3X3 },
-        ...(!isLowerGradeTeacher ? [{ href: '/field-training', label: '현장실습현황', icon: CalendarCheck }] : []),
+        ...(!isLowerGradeTeacher ? [{ href: '/field-training', label: '현장실습/도제OJT현황', icon: CalendarCheck }] : []),
         { href: '/company-info', label: '업체정보', icon: Factory },
         ...(!isLowerGradeTeacher ? [{ href: '/students', label: '취업상세데이터', icon: ClipboardList }] : []),
         ...(!isLowerGradeTeacher ? [{ href: '/labor-education', label: '노동인권교육', icon: ShieldAlert }] : []),
       ]
     },
     {
-      title: "학사 및 지도",
+      title: "학생 및 생활지도",
       icon: GraduationCap,
       items: [
         { href: '/class-management', label: '학반 관리', icon: BookUser },
@@ -128,9 +128,9 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
       icon: CheckCircle2,
       items: [
         { href: '/admin/certification', label: '종합 인증평가', icon: Award },
-        { href: '/admin/certification/certificates', label: '자격증현황', icon: FileCheck },
-        { href: '/admin/certification/attendance', label: '출결현황', icon: CalendarCheck },
         { href: '/admin/certification/grades', label: '성적현황', icon: GraduationCap },
+        { href: '/admin/certification/attendance', label: '출결현황', icon: CalendarCheck },
+        { href: '/admin/certification/certificates', label: '자격증현황', icon: FileCheck },
         { href: '/admin/certification/import', label: '엑셀 일괄 등록', icon: UploadCloud },
       ]
     },

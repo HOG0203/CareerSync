@@ -8,7 +8,7 @@ import { recordPageViewAction } from '@/lib/audit-logger';
 const PAGE_NAME_MAP: Record<string, string> = {
   '/dashboard': '대시보드',
   '/employment-status': '취업진로현황',
-  '/field-training': '현장실습현황',
+  '/field-training': '현장실습/도제OJT현황',
   '/company-info': '업체정보',
   '/students': '취업상세데이터',
   '/class-management': '학반 관리',

@@ -1,5 +1,5 @@
-import { GridLoadingSkeleton } from "@/components/dashboard/loading-skeleton";
+import { GlobalRotatingLoader } from "@/components/dashboard/loading-skeleton";
 
 export default function Loading() {
-  return <GridLoadingSkeleton />;
+  return <GlobalRotatingLoader message="취업진로 현황 데이터를 불러오는 중입니다..." />;
 }

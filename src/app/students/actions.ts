@@ -586,16 +586,18 @@ export async function upsertFieldTrainingRecord(record: any) {
   }
 
   const supabase = await createClient(); const { id, ...data } = record
-  const sanitized = { ...data, start_date: data.start_date || null, end_date: data.end_date || null, conversion_date: data.conversion_date || null }
+  const sanitized = { 
+    ...data, 
+    start_date: data.start_date || null, 
+    end_date: data.end_date || null, 
+    conversion_date: data.hiring_status === '채용전환' ? (data.conversion_date || null) : null,
+    return_reason: data.hiring_status === '복교' ? (data.return_reason || null) : null
+  }
   const { data: upserted, error } = await supabase.from('field_training_records').upsert({ ...(id ? { id } : {}), ...sanitized, updated_at: new Date().toISOString() }).select().single()
   if (error) return { error: error.message }
   if (data.hiring_status === '채용전환') await supabase.from('student_employments').upsert({ id: data.student_id, company: data.company, updated_at: new Date().toISOString() }, { onConflict: 'id' })
   revalidateTag('students');
   revalidatePath('/field-training');
-  revalidatePath('/students');
-  revalidatePath('/class-management');
-  revalidatePath('/company-info');
-  revalidatePath('/employment-status');
   return { success: true, data: upserted }
 }
 
@@ -610,10 +612,6 @@ export async function deleteFieldTrainingRecord(id: string) {
   if (error) return { error: error.message }
   revalidateTag('students');
   revalidatePath('/field-training');
-  revalidatePath('/students');
-  revalidatePath('/class-management');
-  revalidatePath('/company-info');
-  revalidatePath('/employment-status');
   return { success: true }
 }
 

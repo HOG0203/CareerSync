@@ -1,127 +1,60 @@
-import { Loader2 } from "lucide-react"
-import { cn } from "@/lib/utils"
+'use client';
+
+import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 /**
- * 전 페이지 공통 시계방향 회전 로딩 컴포넌트
+ * 전 페이지 공통 시계방향 회전 로딩 컴포넌트 (Option 2 - 브랜드 통합 로더)
  */
-function GlobalRotatingLoader({ message = "데이터를 안전하게 불러오는 중입니다..." }: { message?: string }) {
+export function GlobalRotatingLoader({ message = "데이터를 안전하게 불러오는 중입니다..." }: { message?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[400px] w-full py-20 animate-in fade-in duration-500">
+    <div className="flex flex-col items-center justify-center min-h-[460px] w-full py-20 animate-in fade-in duration-300">
       <div className="relative">
         {/* 바깥쪽 회전 링 */}
-        <div className="absolute inset-0 rounded-full border-4 border-indigo-100 border-t-indigo-500 animate-spin" style={{ animationDuration: '1.5s' }} />
+        <div className="absolute inset-0 rounded-full border-4 border-indigo-100 border-t-indigo-600 animate-spin" style={{ animationDuration: '1.2s' }} />
         
         {/* 안쪽 아이콘 로더 */}
-        <div className="bg-white p-6 rounded-full shadow-xl border border-slate-50 relative z-10">
-          <Loader2 className="h-12 w-12 text-indigo-600 animate-spin" style={{ animationDuration: '2s' }} />
+        <div className="bg-white p-5 sm:p-6 rounded-full shadow-xl border border-slate-100 relative z-10">
+          <Loader2 className="h-10 w-10 sm:h-12 sm:w-12 text-indigo-600 animate-spin" style={{ animationDuration: '1.8s' }} />
         </div>
 
         {/* 후광 효과 */}
-        <div className="absolute -inset-4 bg-indigo-500/5 rounded-full blur-2xl animate-pulse" />
+        <div className="absolute -inset-4 bg-indigo-500/10 rounded-full blur-2xl animate-pulse" />
       </div>
 
-      <div className="mt-10 space-y-2 text-center">
-        <h3 className="text-lg font-black text-slate-800 tracking-tight">{message}</h3>
+      <div className="mt-8 space-y-2.5 text-center">
+        <h3 className="text-base sm:text-lg font-black text-slate-800 tracking-tight">{message}</h3>
         <div className="flex items-center justify-center gap-1.5">
-          <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-          <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-          <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+          <span className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+          <span className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+          <span className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
         </div>
-        <p className="text-[10px] text-slate-400 uppercase font-black tracking-[0.2em] pt-4">CareerSync Intelligence</p>
+        <p className="text-[11px] text-slate-400 font-extrabold tracking-widest pt-3 uppercase">
+          대구공업고등학교 CareerSync
+        </p>
       </div>
     </div>
-  )
+  );
 }
 
-/**
- * 기존 스켈레톤 함수들을 모두 회전 로더로 통합
- * (기존 loading.tsx 파일들의 수정을 최소화하기 위해 이름 유지)
- */
 export function DashboardLoadingSkeleton() {
-  return <GlobalRotatingLoader message="대시보드 통계를 분석하고 있습니다..." />
+  return <GlobalRotatingLoader message="대시보드 통계를 분석하고 있습니다..." />;
 }
 
 export function TableLoadingSkeleton() {
-  return <GlobalRotatingLoader message="명단 데이터를 정밀하게 조회 중입니다..." />
+  return <GlobalRotatingLoader message="명단 데이터를 정밀하게 조회 중입니다..." />;
 }
 
 export function GridLoadingSkeleton() {
-  return <GlobalRotatingLoader message="현황판 데이터를 실시간 동기화 중입니다..." />
+  return <GlobalRotatingLoader message="현황판 데이터를 실시간 동기화 중입니다..." />;
 }
 
-/**
- * 상단 필터 아래 데이터 영역 전용 순수 펄스 스켈레톤 (카드 & 테이블 레이아웃)
- */
-export function CertificationDataSkeleton() {
-  return (
-    <div className="flex-1 flex flex-col min-h-[400px] w-full bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden p-4 sm:p-6 space-y-4 animate-in fade-in duration-200">
-      {/* 모바일 뷰 카드 스켈레톤 (md:hidden) */}
-      <div className="md:hidden space-y-3 animate-pulse">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="p-4 bg-slate-50/80 rounded-xl border border-slate-100 space-y-3">
-            <div className="flex justify-between items-center">
-              <div className="h-4 w-28 bg-slate-200 rounded-md" />
-              <div className="h-4 w-16 bg-slate-200 rounded-full" />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="h-3.5 bg-slate-200/70 rounded" />
-              <div className="h-3.5 bg-slate-200/70 rounded" />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* 데스크톱 뷰 테이블/그리드 스켈레톤 (hidden md:block) */}
-      <div className="hidden md:block space-y-3 animate-pulse">
-        <div className="h-10 bg-slate-100 rounded-xl w-full" />
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="h-11 bg-slate-50/80 rounded-lg w-full flex items-center px-4 justify-between gap-4 border border-slate-100">
-            <div className="h-4 w-12 bg-slate-200 rounded" />
-            <div className="h-4 w-24 bg-slate-200 rounded" />
-            <div className="h-4 w-20 bg-slate-200 rounded" />
-            <div className="h-4 w-32 bg-slate-200 rounded" />
-            <div className="h-4 w-28 bg-slate-200 rounded" />
-            <div className="h-4 w-16 bg-slate-200 rounded" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/**
- * 성적/출결/자격증 현황 전용 전체 페이지 스켈레톤 UI
- */
 export function CertificationSkeleton() {
-  return (
-    <div className="flex flex-col h-full gap-4 sm:gap-6 animate-pulse p-1">
-      {/* 상단 타이틀 & 헤더 스켈레톤 */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
-        <div className="flex flex-col gap-2">
-          <div className="h-8 w-48 bg-slate-200 rounded-xl" />
-          <div className="h-4 w-64 bg-slate-100 rounded-lg" />
-        </div>
-        <div className="h-10 w-32 bg-slate-200 rounded-xl" />
-      </div>
-
-      {/* 필터 바 스켈레톤 */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 bg-slate-100/80 rounded-2xl border border-slate-200/80">
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-          <div className="h-9 w-20 bg-slate-200 rounded-xl shrink-0" />
-          <div className="h-9 w-20 bg-slate-200 rounded-xl shrink-0" />
-          <div className="h-9 w-20 bg-slate-200 rounded-xl shrink-0" />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="h-9 w-32 bg-slate-200 rounded-xl" />
-          <div className="h-9 w-28 bg-slate-200 rounded-xl" />
-          <div className="h-9 w-40 bg-slate-200 rounded-xl" />
-        </div>
-      </div>
-
-      {/* 데이터 영역 */}
-      <CertificationDataSkeleton />
-    </div>
-  );
+  return <GlobalRotatingLoader message="인증제 평가 데이터를 불러오는 중입니다..." />;
 }
 
+export function CertificationDataSkeleton() {
+  return <GlobalRotatingLoader message="상세 데이터를 불러오는 중입니다..." />;
+}
 
+export default GlobalRotatingLoader;

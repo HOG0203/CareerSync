@@ -1,5 +1,5 @@
 import { GlobalRotatingLoader } from "@/components/dashboard/loading-skeleton";
 
 export default function Loading() {
-  return <GlobalRotatingLoader message="현장실습/도제OJT 현황 데이터를 불러오는 중입니다..." />;
+  return <GlobalRotatingLoader message="로그인 및 접속 활동 이력을 불러오는 중입니다..." />;
 }

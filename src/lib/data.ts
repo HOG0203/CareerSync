@@ -126,7 +126,7 @@ export async function getFilteredStudentData(graduationYear: string, baseYear?: 
     studentIds.length > 0
       ? supabase
           .from('field_training_records')
-          .select('id, student_id, training_order, company, start_date, end_date, stipend_status, hiring_status, conversion_date')
+          .select('id, student_id, training_order, company, start_date, end_date, stipend_status, hiring_status, conversion_date, return_reason')
           .in('student_id', studentIds)
           .order('training_order', { ascending: false })
       : Promise.resolve({ data: [] as any[], error: null }),

@@ -17,6 +17,9 @@ import {
   CheckCircle2,
   AlertTriangle,
   ChevronRight,
+  ChevronLeft,
+  ChevronsLeft,
+  ChevronsRight,
   TrendingUp,
   X,
   FileText,
@@ -55,7 +58,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn, formatStudentClassTag } from '@/lib/utils';
 
 interface MeritDemeritClientProps {
-  initialGrade: number;
+  initialGrade?: number | 'ALL';
   initialGradeDataMap: Record<number, StudentMeritDemeritSummary[]>;
   availableGrades: number[];
   classStructure: Record<number, Record<string, string[]>>;
@@ -65,7 +68,7 @@ interface MeritDemeritClientProps {
 }
 
 export function MeritDemeritClient({
-  initialGrade,
+  initialGrade = 'ALL',
   initialGradeDataMap,
   availableGrades,
   classStructure,
@@ -78,7 +81,7 @@ export function MeritDemeritClient({
 
   // 1. [초고속 SWR 메모리 캐시] 전 학년(1,2,3학년) 데이터 100% 인메모리 탑재 (0ms 탭 전환)
   const [gradeDataMap, setGradeDataMap] = React.useState<Record<number, StudentMeritDemeritSummary[]>>(initialGradeDataMap);
-  const [activeGrade, setActiveGrade] = React.useState<number>(initialGrade);
+  const [activeGrade, setActiveGrade] = React.useState<number | 'ALL'>(initialGrade);
   const [isLoadingGrade, setIsLoadingGrade] = React.useState<boolean>(false);
 
   // 상벌점 기준 규칙 상태 (동적 변경 반영)
@@ -105,6 +108,10 @@ export function MeritDemeritClient({
 
   const [isExportingExcel, setIsExportingExcel] = React.useState(false);
 
+  // 5. [초고속 60fps 렌더링] 페이지네이션 상태 (기본 50명씩 보기)
+  const [currentPage, setCurrentPage] = React.useState<number>(1);
+  const [pageSize, setPageSize] = React.useState<number>(50);
+
   // 화면 크기에 따른 기본 뷰 모드 자동 감지
   React.useEffect(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 640) {
@@ -112,17 +119,31 @@ export function MeritDemeritClient({
     }
   }, []);
 
-  // 현재 활성 학년 학생 목록
-  const currentGradeStudents = gradeDataMap[activeGrade] || [];
+  // 필터 및 학년 변경 시 1페이지로 자동 리셋
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [activeGrade, selectedMajor, selectedClass, statusFilter, searchTerm, pageSize]);
+
+  // 현재 활성 학년 학생 목록 (전체학년 또는 1, 2, 3학년)
+  const currentGradeStudents = React.useMemo(() => {
+    if (activeGrade === 'ALL') {
+      return [
+        ...(gradeDataMap[1] || []),
+        ...(gradeDataMap[2] || []),
+        ...(gradeDataMap[3] || [])
+      ];
+    }
+    return gradeDataMap[activeGrade] || [];
+  }, [gradeDataMap, activeGrade]);
 
   // 학년 탭 전환 핸들러 (0ms 즉각 전환)
-  const handleGradeChange = async (grade: number) => {
+  const handleGradeChange = async (grade: number | 'ALL') => {
     setActiveGrade(grade);
     setSelectedStudentIds(new Set());
     setSelectedMajor('ALL');
     setSelectedClass('ALL');
 
-    if (!gradeDataMap[grade]) {
+    if (grade !== 'ALL' && !gradeDataMap[grade]) {
       setIsLoadingGrade(true);
       try {
         const students = await getCachedMeritDemeritSummaryList(grade, baseYear);
@@ -193,8 +214,19 @@ export function MeritDemeritClient({
     });
   };
 
-  // 현재 선택된 학년의 학과 목록
+  // 현재 선택된 학년(또는 전체학년)의 학과 목록
   const availableMajors = React.useMemo(() => {
+    if (activeGrade === 'ALL') {
+      const majorSet = new Set<string>();
+      Object.values(classStructure).forEach(majorsObj => {
+        Object.keys(majorsObj).forEach(m => majorSet.add(m));
+      });
+      return Array.from(majorSet).sort((a, b) => {
+        const indexA = MAJOR_SORT_ORDER.indexOf(a);
+        const indexB = MAJOR_SORT_ORDER.indexOf(b);
+        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+      });
+    }
     const majorsObj = classStructure[activeGrade] || {};
     return Object.keys(majorsObj);
   }, [classStructure, activeGrade]);
@@ -202,11 +234,19 @@ export function MeritDemeritClient({
   // 현재 선택된 학과의 반 목록
   const availableClasses = React.useMemo(() => {
     if (selectedMajor === 'ALL') return [];
+    if (activeGrade === 'ALL') {
+      const classSet = new Set<string>();
+      Object.values(classStructure).forEach(majorsObj => {
+        const classes = majorsObj[selectedMajor] || [];
+        classes.forEach(c => classSet.add(c));
+      });
+      return Array.from(classSet).sort((a, b) => a.localeCompare(b, 'ko', { numeric: true }));
+    }
     const majorsObj = classStructure[activeGrade] || {};
     return majorsObj[selectedMajor] || [];
   }, [classStructure, activeGrade, selectedMajor]);
 
-  // 클라이언트 메모리 기반 60fps 초고속 필터링 및 숫자 정렬 (1 > 2 > 3 ... > 10 > 11)
+  // 클라이언트 메모리 기반 60fps 초고속 필터링 및 숫자 정렬 (학년 > 학과 > 반 > 번호 > 이름)
   const filteredStudents = React.useMemo(() => {
     const list = currentGradeStudents.filter(s => {
       if (selectedMajor !== 'ALL' && s.major !== selectedMajor) return false;
@@ -230,30 +270,44 @@ export function MeritDemeritClient({
     });
 
     return list.sort((a, b) => {
-      // 1. 학과 정렬
+      // 1. 학년 정렬 (전체학년일 때 1학년 > 2학년 > 3학년)
+      if (a.grade !== b.grade) {
+        return a.grade - b.grade;
+      }
+
+      // 2. 학과 정렬
       const idxA = MAJOR_SORT_ORDER.indexOf(a.major);
       const idxB = MAJOR_SORT_ORDER.indexOf(b.major);
       const majorDiff = (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
       if (majorDiff !== 0) return majorDiff;
 
-      // 2. 반 정렬 (숫자 우선: 1반, 2반 ... 10반)
+      // 3. 반 정렬 (숫자 우선: 1반, 2반 ... 10반)
       const classA = parseInt(a.class_info) || 0;
       const classB = parseInt(b.class_info) || 0;
       if (classA !== classB) return classA - classB;
       const classComp = a.class_info.localeCompare(b.class_info, 'ko', { numeric: true });
       if (classComp !== 0) return classComp;
 
-      // 3. 번호 정렬 (숫자 우선: 1번 > 2번 > 3번 ... > 10번 > 11번)
+      // 4. 번호 정렬 (숫자 우선: 1번 > 2번 > 3번 ... > 10번 > 11번)
       const numA = parseInt(a.student_number) || 0;
       const numB = parseInt(b.student_number) || 0;
       if (numA !== numB) return numA - numB;
       const numComp = a.student_number.localeCompare(b.student_number, 'ko', { numeric: true });
       if (numComp !== 0) return numComp;
 
-      // 4. 이름 정렬
+      // 5. 이름 정렬
       return a.student_name.localeCompare(b.student_name, 'ko');
     });
   }, [currentGradeStudents, selectedMajor, selectedClass, searchTerm, statusFilter]);
+
+  // 현재 페이지에 노출될 50명 슬라이스 (DOM 렌더링 60fps 초고속 최적화)
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / pageSize));
+  
+  const pagedStudents = React.useMemo(() => {
+    if (pageSize >= 9999) return filteredStudents;
+    const start = (currentPage - 1) * pageSize;
+    return filteredStudents.slice(start, start + pageSize);
+  }, [filteredStudents, currentPage, pageSize]);
 
   // KPI 통계 집계
   const stats = React.useMemo(() => {
@@ -411,13 +465,23 @@ export function MeritDemeritClient({
         {/* 상단 1행: 학년 탭 (모바일 전체 너비 균등 분할) */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
           <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => handleGradeChange('ALL')}
+              className={cn(
+                "flex-1 sm:flex-initial h-9 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm font-black rounded-lg transition-all text-center select-none",
+                activeGrade === 'ALL' ? "bg-slate-900 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+              )}
+            >
+              전체학년
+            </button>
             {availableGrades.map(grade => (
               <button
                 key={grade}
                 type="button"
                 onClick={() => handleGradeChange(grade)}
                 className={cn(
-                  "flex-1 sm:flex-initial h-9 sm:h-10 px-3 sm:px-5.5 text-xs sm:text-sm font-black rounded-lg transition-all text-center select-none",
+                  "flex-1 sm:flex-initial h-9 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm font-black rounded-lg transition-all text-center select-none",
                   activeGrade === grade ? "bg-slate-900 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
                 )}
               >
@@ -699,7 +763,7 @@ export function MeritDemeritClient({
                       </td>
                     </tr>
                   ) : (
-                    filteredStudents.map((s) => {
+                    pagedStudents.map((s) => {
                       const isSelected = selectedStudentIds.has(s.id);
                       return (
                         <tr 
@@ -817,7 +881,7 @@ export function MeritDemeritClient({
                 일치하는 학생 데이터가 없습니다.
               </div>
             ) : (
-              filteredStudents.map((s) => {
+              pagedStudents.map((s) => {
                 const isSelected = selectedStudentIds.has(s.id);
                 return (
                   <Card 
@@ -923,6 +987,122 @@ export function MeritDemeritClient({
                   </Card>
                 );
               })
+            )}
+          </div>
+        )}
+
+        {/* 4. 페이지네이션 컨트롤 바 (50명씩 보기 & 고속 페이지 이동) */}
+        {filteredStudents.length > 0 && (
+          <div className="bg-white px-3.5 sm:px-4 py-3 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            {/* 좌측: 범위 정보 & 표시 개수 선택 */}
+            <div className="flex flex-wrap items-center gap-3 text-slate-500 font-medium w-full sm:w-auto justify-between sm:justify-start">
+              <div>
+                총 <strong className="text-slate-900 font-black">{filteredStudents.length}</strong>명 중{' '}
+                <strong className="text-indigo-600 font-black">
+                  {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, filteredStudents.length)}
+                </strong>
+                명 표시 ({currentPage} / {totalPages} 페이지)
+              </div>
+
+              <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
+                <span className="text-[11px] text-slate-400">보기:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="h-7 text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                >
+                  <option value={30}>30명씩</option>
+                  <option value={50}>50명씩</option>
+                  <option value={100}>100명씩</option>
+                  <option value={9999}>전체 보기</option>
+                </select>
+              </div>
+            </div>
+
+            {/* 우측: 페이지 이동 버튼 (1, 2, 3...) */}
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1 w-full sm:w-auto justify-center sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0 text-slate-600 border-slate-200 rounded-lg disabled:opacity-30"
+                  title="첫 페이지"
+                >
+                  <ChevronsLeft className="h-3.5 w-3.5" />
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0 text-slate-600 border-slate-200 rounded-lg disabled:opacity-30"
+                  title="이전 페이지"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </Button>
+
+                {(() => {
+                  const maxVisible = 5;
+                  let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+                  let endPage = startPage + maxVisible - 1;
+                  if (endPage > totalPages) {
+                    endPage = totalPages;
+                    startPage = Math.max(1, endPage - maxVisible + 1);
+                  }
+                  const pages = [];
+                  for (let p = startPage; p <= endPage; p++) {
+                    pages.push(p);
+                  }
+                  return pages.map(p => (
+                    <Button
+                      key={p}
+                      type="button"
+                      size="sm"
+                      onClick={() => setCurrentPage(p)}
+                      className={cn(
+                        "h-8 min-w-[32px] px-2 text-xs font-black rounded-lg transition-all",
+                        currentPage === p
+                          ? "bg-slate-900 text-white shadow-2xs"
+                          : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
+                      )}
+                    >
+                      {p}
+                    </Button>
+                  ));
+                })()}
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0 text-slate-600 border-slate-200 rounded-lg disabled:opacity-30"
+                  title="다음 페이지"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0 text-slate-600 border-slate-200 rounded-lg disabled:opacity-30"
+                  title="마지막 페이지"
+                >
+                  <ChevronsRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             )}
           </div>
         )}

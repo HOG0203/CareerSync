@@ -41,13 +41,13 @@ function toTitleCase(str: string) {
 const ROUTE_MAP: Record<string, { group: string; label: string }> = {
   '/dashboard': { group: '', label: '대시보드' },
   '/employment-status': { group: '취업진로관리', label: '취업진로현황' },
-  '/field-training': { group: '취업진로관리', label: '현장실습현황' },
+  '/field-training': { group: '취업진로관리', label: '현장실습/도제OJT현황' },
   '/company-info': { group: '취업진로관리', label: '업체정보' },
   '/students': { group: '취업진로관리', label: '취업상세데이터' },
-  '/class-management': { group: '학사 및 지도', label: '학반 관리' },
-  '/merit-demerit': { group: '학사 및 지도', label: '상벌점 관리' },
-  '/labor-education': { group: '학사 및 지도', label: '노동인권교육' },
-  '/admin/students': { group: '학사 및 지도', label: '학생 등록/진급' },
+  '/class-management': { group: '학생 및 생활지도', label: '학반 관리' },
+  '/merit-demerit': { group: '학생 및 생활지도', label: '상벌점 관리' },
+  '/labor-education': { group: '학생 및 생활지도', label: '노동인권교육' },
+  '/admin/students': { group: '학생 및 생활지도', label: '학생 등록/진급' },
   '/admin/users': { group: '시스템 관리', label: '사용자 관리' },
   '/admin/login-history': { group: '시스템 관리', label: '로그인 및 활동 이력' },
   '/admin/audit-logs': { group: '시스템 관리', label: '작업 이력 관리' },
@@ -58,7 +58,7 @@ const ROUTE_MAP: Record<string, { group: string; label: string }> = {
   '/admin/certification/attendance': { group: '옥저인재인증제', label: '출결현황' },
   '/admin/certification/certificates': { group: '옥저인재인증제', label: '자격증현황' },
   '/student/certification': { group: '옥저인재인증제', label: '종합평가표' },
-  '/student-accounts': { group: '학사 및 지도', label: '학생 계정 관리' },
+  '/student-accounts': { group: '학생 및 생활지도', label: '학생 계정 관리' },
 
 };
 
