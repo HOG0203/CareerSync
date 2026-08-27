@@ -22,6 +22,8 @@ const PAGE_NAME_MAP: Record<string, string> = {
   '/admin/certification/grades': '인증제 성적현황',
   '/admin/certification/attendance': '인증제 출결현황',
   '/admin/certification/certificates': '인증제 자격증현황',
+  '/student/certification': '학생 옥저인재인증 평가표',
+  '/student/merit-demerit': '학생 상벌점 내역 조회',
 };
 
 // 조회 기록에서 제외할 경로 (로그인 페이지, 로그인 및 활동 이력 페이지 등)

@@ -90,10 +90,11 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
   // 학생인 경우 전용 메뉴 그룹
   const studentGroups = [
     {
-      title: "옥저인재인증제",
-      icon: Award,
+      title: "나의 학교생활",
+      icon: GraduationCap,
       items: [
-        { href: '/student/certification', label: '종합평가표', icon: Award },
+        { href: '/student/certification', label: '옥저인재인증 평가표', icon: Award },
+        { href: '/student/merit-demerit', label: '상벌점 내역 조회', icon: Scale },
       ]
     }
   ];
