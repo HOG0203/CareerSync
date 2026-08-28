@@ -112,18 +112,18 @@ export function AddStudentModal({ isOpen, onClose, baseYear, majors }: AddStuden
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="graduation_year" className="text-xs font-bold text-slate-500">학년(졸업연도) *</Label>
+                <Label htmlFor="grade" className="text-xs font-bold text-slate-500">학년 *</Label>
                 <Select 
                   value={formData.graduation_year} 
                   onValueChange={(v) => setFormData(prev => ({ ...prev, graduation_year: v }))}
                 >
-                  <SelectTrigger id="graduation_year" className="h-10 border-slate-200 focus:ring-indigo-500">
-                    <SelectValue placeholder="연도 선택" />
+                  <SelectTrigger id="grade" className="h-10 border-slate-200 focus:ring-indigo-500">
+                    <SelectValue placeholder="학년 선택" />
                   </SelectTrigger>
                   <SelectContent>
-                    {[baseYear - 1, baseYear, baseYear + 1, baseYear + 2, baseYear + 3].map(year => (
-                      <SelectItem key={year} value={year.toString()}>{year}년 (예정)</SelectItem>
-                    ))}
+                    <SelectItem value={(baseYear + 1).toString()}>3학년</SelectItem>
+                    <SelectItem value={(baseYear + 2).toString()}>2학년</SelectItem>
+                    <SelectItem value={(baseYear + 3).toString()}>1학년</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

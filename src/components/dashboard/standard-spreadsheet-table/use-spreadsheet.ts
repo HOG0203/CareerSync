@@ -232,9 +232,18 @@ export function useSpreadsheet({
     };
 
     const container = containerRef.current;
+    let resizeObserver: ResizeObserver | null = null;
+
     if (container) {
       container.addEventListener('scroll', updateScrollPos, { passive: true });
       updateScrollPos();
+
+      if (typeof ResizeObserver !== 'undefined') {
+        resizeObserver = new ResizeObserver(() => {
+          updateScrollPos();
+        });
+        resizeObserver.observe(container);
+      }
     }
 
     const handleResize = () => updateScrollPos();
@@ -243,6 +252,9 @@ export function useSpreadsheet({
     return () => {
       if (container) {
         container.removeEventListener('scroll', updateScrollPos);
+      }
+      if (resizeObserver) {
+        resizeObserver.disconnect();
       }
       window.removeEventListener('resize', handleResize);
     };

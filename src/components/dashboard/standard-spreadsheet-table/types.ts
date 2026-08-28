@@ -32,6 +32,7 @@ export interface SpreadsheetTableProps {
   hideCheckbox?: boolean
   hideSearch?: boolean
   onFilteredDataChange?: (data: any[] | null) => void
+  tableHeightClassName?: string
 }
 
 

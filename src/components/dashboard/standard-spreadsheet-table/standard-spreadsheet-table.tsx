@@ -41,6 +41,7 @@ export function StandardSpreadsheetTable({
   hideCheckbox = pageType === 'students',
   hideSearch = false,
   onFilteredDataChange,
+  tableHeightClassName,
 }: SpreadsheetTableProps) {
 
 
@@ -141,7 +142,7 @@ export function StandardSpreadsheetTable({
   }
 
   return (
-    <div className="flex flex-col gap-2 w-full h-full overflow-hidden">
+    <div className="flex flex-col gap-2 w-full h-full min-h-0 overflow-hidden flex-1">
       {/* 선택 툴바 또는 시트 필터 초기화 버튼 (필요할 때만 슬림하게 노출) */}
       {(!hideSearch || selectedRowIds.length > 0 || isColumnFilterActive) && (
         <div className="flex items-center justify-between p-1.5 bg-slate-50/80 rounded-xl border border-slate-200/80 shrink-0">
@@ -183,21 +184,27 @@ export function StandardSpreadsheetTable({
 
 
 
-      {/* 데스크톱: 스프레드시트 테이블 (내부 전용 스크롤박스) */}
+      {/* 데스크톱: 스프레드시트 테이블 (내부 전용 가상 스크롤) */}
       {!isMobile ? (
-        <div className="flex flex-col flex-1 min-h-0 border rounded-md shadow-inner bg-white overflow-hidden">
-          <div ref={containerRef} className="relative outline-none bg-white overflow-auto h-[calc(100vh-210px)] custom-scrollbar focus-visible:ring-0" onScroll={handleTableScroll} onKeyDown={handleKeyDown} tabIndex={0}>
-            <table className="text-[11px] border-collapse table-auto min-w-max text-center relative border-none">
-              <colgroup>
-                {!hideCheckbox && <col style={{ width: 32 }} />}
-                {columns.map((c, i) => <col key={i} style={{ width: c.width, minWidth: c.width }} />)}
-              </colgroup>
-              <TableHeader
-                columns={columns}
-                groupHeaders={groupHeaders}
-                filterOptions={filterOptions}
-                columnFilters={columnFilters}
-                onFilterChange={handleFilterChange}
+        <div className="flex flex-col flex-1 min-h-0 h-full border rounded-md shadow-inner bg-white overflow-hidden">
+          <div 
+            ref={containerRef} 
+            className="relative outline-none bg-white overflow-auto w-full flex-1 min-h-0 h-full custom-scrollbar focus-visible:ring-0" 
+            onScroll={handleTableScroll} 
+            onKeyDown={handleKeyDown} 
+            tabIndex={0}
+          >
+                <table className="text-[11px] border-collapse table-auto min-w-max text-center relative border-none">
+                  <colgroup>
+                    {!hideCheckbox && <col style={{ width: 32 }} />}
+                    {columns.map((c, i) => <col key={i} style={{ width: c.width, minWidth: c.width }} />)}
+                  </colgroup>
+                  <TableHeader
+                    columns={columns}
+                    groupHeaders={groupHeaders}
+                    filterOptions={filterOptions}
+                    columnFilters={columnFilters}
+                    onFilterChange={handleFilterChange}
                 onSelectAll={handleSelectAll}
                 isAllSelected={filteredData.length > 0 && filteredData.every(r => selectedRowIds.includes(r.id))}
                 hideCheckbox={hideCheckbox}
@@ -284,8 +291,8 @@ export function StandardSpreadsheetTable({
           </div>
         </div>
       ) : (
-        /* 모바일: 페이지 유형별 특화 모바일 카드 목록 */
-        <div className="grid grid-cols-1 gap-2.5 lg:hidden p-1 overflow-y-auto">
+        /* 모바일: 페이지 유형별 특화 모바일 카드 목록 (단일 스크롤) */
+        <div className="grid grid-cols-1 gap-2.5 lg:hidden p-1">
           {filteredData.map((row) => {
             const titleCol = columns.find(c => c.key.includes('name')) || columns[1];
             const certs = normalizeCertificates(row?.certificates || []);

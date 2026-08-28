@@ -214,7 +214,7 @@ export function StudentsHubClient({
 
 
   return (
-    <div className="flex flex-col h-full gap-3 overflow-hidden">
+    <div className="flex flex-col h-[calc(100dvh-150px)] lg:h-[calc(100vh-115px)] max-h-[calc(100dvh-150px)] lg:max-h-[calc(100vh-115px)] min-h-0 gap-2.5 overflow-hidden">
       {/* 1. 상단 취업·실습 요약 통계 카드 4종 (student-accounts 스타일) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
         <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">

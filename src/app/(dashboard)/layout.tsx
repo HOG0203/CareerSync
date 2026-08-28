@@ -91,11 +91,11 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
           <MobileTopBar isAdmin={isAdmin} userProfile={userProfile} />
           
           {/* Desktop Header */}
-          <div className="hidden lg:block sticky top-0 z-40 bg-white/80 backdrop-blur-md">
+          <div className="hidden lg:block sticky top-0 z-40 bg-white/80 backdrop-blur-md shrink-0 border-b border-slate-200/60">
             <Header userProfile={userProfile} />
           </div>
 
-          <div className="flex-1 p-2 lg:p-6 lg:mt-0 mt-14 lg:mb-0 mb-16 flex flex-col min-w-0">
+          <div className="flex-1 p-2 lg:p-5 lg:mt-0 mt-14 lg:mb-0 mb-16 flex flex-col min-w-0">
             {children}
           </div>
 

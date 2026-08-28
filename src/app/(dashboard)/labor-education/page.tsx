@@ -169,7 +169,7 @@ async function LaborEducationPageContent({
   const uncompletionRate = totalStudents > 0 ? (100 - completionRate) : 0;
 
   return (
-    <div className="flex flex-col h-full gap-5">
+    <div className="flex flex-col gap-4 sm:gap-5 w-full">
       {/* 상단 타이틀 헤더 및 학년도 필터 바 */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 px-1">
         <div className="flex flex-col gap-1">
@@ -249,7 +249,7 @@ async function LaborEducationPageContent({
       </div>
 
       {/* 바둑판 그리드 뷰 메인 카드 */}
-      <Card className="flex-1 min-h-0 shadow-sm border border-slate-200/80 bg-white rounded-2xl overflow-hidden flex flex-col mb-0">
+      <Card className="shadow-sm border border-slate-200/80 bg-white rounded-2xl overflow-hidden flex flex-col">
         <CardHeader className="py-3.5 px-5 border-b border-slate-200/80 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
           <div>
             <CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2">

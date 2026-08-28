@@ -472,7 +472,7 @@ export function CompanyInfoClient({
   };
 
   return (
-    <div className="flex flex-col h-full gap-2.5 sm:gap-6">
+    <div className="flex flex-col h-[calc(100dvh-150px)] lg:h-[calc(100vh-115px)] max-h-[calc(100dvh-150px)] lg:max-h-[calc(100vh-115px)] min-h-0 gap-2.5 sm:gap-4 overflow-hidden">
       {/* 헤더 섹션 (모바일 반응형 공간 최적화) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 shrink-0 px-1">
         <div className="flex flex-col gap-0.5 sm:gap-1 min-w-0">
@@ -560,13 +560,13 @@ export function CompanyInfoClient({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-6 flex-1 min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-5 flex-1 min-h-0 h-full overflow-hidden">
         {/* 왼쪽: 업체 목록 및 통합 검색 */}
         <div className={cn(
-          "lg:col-span-4 flex flex-col gap-3 min-h-0",
+          "lg:col-span-4 flex flex-col min-h-0 h-full overflow-hidden",
           mobileTab !== 'list' && "hidden lg:flex"
         )}>
-          <Card className="flex-1 flex flex-col border-none shadow-md lg:h-[calc(100vh-130px)] lg:overflow-hidden bg-white rounded-2xl">
+          <Card className="flex-1 flex flex-col border-none shadow-md h-full overflow-hidden bg-white rounded-2xl">
             <div className="p-3 sm:p-4 border-b space-y-2 bg-slate-50/50">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-xs sm:text-sm font-bold flex items-center gap-1.5 text-slate-800">
@@ -642,7 +642,7 @@ export function CompanyInfoClient({
               </form>
             </div>
 
-            <CardContent className="p-0 flex-1 min-h-0 divide-y divide-slate-100 lg:overflow-y-auto custom-scrollbar">
+            <CardContent className="p-0 flex-1 min-h-0 divide-y divide-slate-100 overflow-y-auto custom-scrollbar">
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3">
                   <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
@@ -777,7 +777,7 @@ export function CompanyInfoClient({
 
         {/* 오른쪽: 상세 정보 및 학생 현황 */}
         <div className={cn(
-          "lg:col-span-8 flex flex-col gap-6 lg:overflow-y-auto lg:sticky lg:top-[72px] self-start lg:h-[calc(100vh-130px)] custom-scrollbar pr-1",
+          "lg:col-span-8 flex flex-col gap-4 overflow-y-auto h-full min-h-0 custom-scrollbar pr-1",
           mobileTab !== 'details' && "hidden lg:flex"
         )}>
           {isDetailsLoading ? (

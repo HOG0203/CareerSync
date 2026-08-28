@@ -282,9 +282,9 @@ export function CertificationSummaryClient({
   };
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-5 p-3 sm:p-6 w-full max-w-full">
+    <div className="flex flex-col gap-4 sm:gap-5 w-full max-w-full pb-20 sm:pb-16">
       {/* 1. 상단 종합 현황 KPI 대시보드 */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 shrink-0">
         <Card className="bg-white border-slate-200 shadow-xs rounded-xl p-3 sm:p-4 flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] sm:text-xs font-bold text-slate-500">평균 인증 점수</span>
@@ -346,7 +346,7 @@ export function CertificationSummaryClient({
       </div>
 
       {/* 2. 필터 툴바 & 엑셀 액션 */}
-      <Card className="border border-slate-200 bg-white shadow-xs rounded-2xl p-3.5 sm:p-5">
+      <Card className="border border-slate-200 bg-white shadow-xs rounded-2xl p-3 sm:p-4 shrink-0">
         <div className="flex flex-col gap-3 sm:gap-4">
           
           {/* 상단 1열: 학년 선택 + 검색창 */}

@@ -72,7 +72,7 @@ const COLUMNS: ColumnConfig[] = [
   { key: 'class_info', label: '반', width: 35, readOnly: true },
   { key: 'student_number', label: '번호', width: 35, readOnly: true },
   { key: 'student_name', label: '성명', width: 60, readOnly: true },
-  { key: 'phone_number', label: '휴대전화번호', width: 105, readOnly: true },
+  { key: 'phone_number', label: '휴대전화번호', width: 105 },
   { 
     key: 'career_aspiration', 
     label: '진로희망', 
@@ -345,7 +345,7 @@ export function StudentTable({
           <span className="text-[11px] font-bold text-amber-700">읽기 전용 모드: 담당 학반 데이터만 조회 가능하며 수정은 제한됩니다.</span>
         </div>
       )}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 h-full flex flex-col">
         <StandardSpreadsheetTable 
           data={initialData}
           columns={columns}

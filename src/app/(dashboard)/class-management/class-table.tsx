@@ -20,6 +20,7 @@ interface ClassTableProps {
   targetMajor?: string;
   displayClass?: string;
   selectedGrade?: number;
+  adminClassSelector?: React.ReactNode;
 }
 
 
@@ -102,6 +103,7 @@ export function ClassTable({
   targetMajor = '',
   displayClass = '',
   selectedGrade = 3,
+  adminClassSelector,
 }: ClassTableProps) {
   const [selectedStudent, setSelectedStudent] = React.useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = React.useState(false)
@@ -160,12 +162,21 @@ export function ClassTable({
     return Math.max(1, Math.min(3, calculatedGrade)) || 3;
   }, [initialData]);
 
+  // 학과/반 컬럼 동적 노출 여부 판별 (전체 학과/학반 조회 시 노출)
+  const isMultiClassView = !targetMajor || targetMajor === 'all' || !displayClass || displayClass === 'all' || displayClass === '전체';
+
   // 학년에 맞는 컬럼 정의 동적 생성 (항목별 색상 강화)
   const columns: ColumnConfig[] = React.useMemo(() => {
+    const prefixCols: ColumnConfig[] = isMultiClassView ? [
+      { key: 'major', label: '학과', width: 95, readOnly: true },
+      { key: 'class_info', label: '반', width: 40, readOnly: true },
+    ] : [];
+
     const baseCols: ColumnConfig[] = [
+      ...prefixCols,
       { key: 'student_number', label: '번호', width: 35, readOnly: true },
       { key: 'student_name', label: '성명', width: 55, readOnly: true },
-      { key: 'phone_number', label: '휴대전화번호', width: 100, readOnly: true },
+      { key: 'phone_number', label: '휴대전화번호', width: 105 },
       { 
         key: 'career_aspiration', 
         label: '진로희망', 
@@ -293,7 +304,7 @@ export function ClassTable({
   }, [currentGrade]);
 
   const groupHeaders = React.useMemo(() => [
-    { label: '학생 기본 정보', colSpan: 3, className: 'bg-slate-100 text-slate-900 text-[11px]' },
+    { label: '학생 기본 정보', colSpan: isMultiClassView ? 5 : 3, className: 'bg-slate-100 text-slate-900 text-[11px]' },
     { label: '희망 기업유형 및 진로코스', colSpan: 3, className: 'bg-blue-50 text-blue-900 text-[11px]' },
     { label: '취득 자격', colSpan: 1, className: 'bg-amber-50 text-amber-900 text-[11px]' },
     { label: '취업 상세 및 의견', colSpan: 3, className: 'bg-emerald-50 text-emerald-900 text-[11px]' },
@@ -303,7 +314,7 @@ export function ClassTable({
       className: 'bg-slate-50 text-slate-700 text-[11px]' 
     },
     { label: '기록', colSpan: 1, className: 'bg-indigo-50 text-indigo-900 text-[11px]' },
-  ], [currentGrade]);
+  ], [currentGrade, isMultiClassView]);
 
   const handleSave = React.useCallback(async (id: string, field: string, value: any) => {
     return await updatePersonalDetail(id, field, value)
@@ -321,14 +332,14 @@ export function ClassTable({
   }, [initialData]);
 
   return (
-    <div className="w-full flex flex-col gap-4 min-h-0 flex-1">
+    <div className="w-full flex flex-col gap-2.5 sm:gap-3 min-h-0 flex-1 h-[calc(100dvh-150px)] lg:h-[calc(100vh-115px)] max-h-[calc(100dvh-150px)] lg:max-h-[calc(100vh-115px)] overflow-hidden">
       {/* 요약 통계 카드 4종 */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card className="border-slate-200/80 shadow-2xs">
-          <CardContent className="p-4 flex items-center justify-between">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 shrink-0">
+        <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
+          <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-500">학반 학생수</p>
-              <p className="text-2xl font-black text-slate-900 mt-1">{stats.total}명</p>
+              <p className="text-[11px] font-bold text-slate-500">학반 학생수</p>
+              <p className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">{stats.total}명</p>
             </div>
             <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600">
               <Users className="h-5 w-5" />
@@ -336,12 +347,12 @@ export function ClassTable({
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200/80 shadow-2xs">
-          <CardContent className="p-4 flex items-center justify-between">
+        <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
+          <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-500">취업 희망</p>
-              <div className="flex items-baseline gap-1.5 mt-1">
-                <span className="text-2xl font-black text-blue-600">{stats.employCount}명</span>
+              <p className="text-[11px] font-bold text-slate-500">취업 희망</p>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-xl sm:text-2xl font-black text-blue-600">{stats.employCount}명</span>
                 <span className="text-xs font-bold text-slate-400">({stats.employRate}%)</span>
               </div>
             </div>
@@ -351,12 +362,12 @@ export function ClassTable({
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200/80 shadow-2xs">
-          <CardContent className="p-4 flex items-center justify-between">
+        <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
+          <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-500">진학 희망</p>
-              <div className="flex items-baseline gap-1.5 mt-1">
-                <span className="text-2xl font-black text-emerald-600">{stats.academicCount}명</span>
+              <p className="text-[11px] font-bold text-slate-500">진학 희망</p>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-xl sm:text-2xl font-black text-emerald-600">{stats.academicCount}명</span>
                 <span className="text-xs font-bold text-slate-400">({stats.academicRate}%)</span>
               </div>
             </div>
@@ -366,12 +377,12 @@ export function ClassTable({
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200/80 shadow-2xs">
-          <CardContent className="p-4 flex items-center justify-between">
+        <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
+          <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-500">자격증 취득 학생</p>
-              <div className="flex items-baseline gap-1.5 mt-1">
-                <span className="text-2xl font-black text-amber-600">{stats.certCount}명</span>
+              <p className="text-[11px] font-bold text-slate-500">자격증 취득 학생</p>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-xl sm:text-2xl font-black text-amber-600">{stats.certCount}명</span>
                 <span className="text-xs font-bold text-slate-400">({stats.total > 0 ? Math.round((stats.certCount / stats.total) * 100) : 0}%)</span>
               </div>
             </div>
@@ -382,24 +393,15 @@ export function ClassTable({
         </Card>
       </div>
 
+      {/* 학반 선택기 (드롭다운 필터 바) */}
+      {adminClassSelector && (
+        <div className="shrink-0">
+          {adminClassSelector}
+        </div>
+      )}
+
       {/* 스프레드시트 메인 테이블 카드 */}
       <Card className="flex-1 min-h-0 shadow-sm border border-slate-200/80 bg-white rounded-2xl overflow-hidden flex flex-col mb-0">
-        <CardHeader className="py-3.5 px-5 border-b border-slate-200/80 bg-slate-50/50 flex flex-row items-center justify-between shrink-0">
-          <div>
-            <CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <BookOpen className="h-4 w-4 text-blue-600" />
-              <span>{targetMajor ? `${targetMajor} ${displayClass}반` : '학반'} 세부 진로지도 및 상세 데이터</span>
-            </CardTitle>
-            <CardDescription className="text-xs text-slate-500 mt-0.5">
-              셀을 클릭하여 진로희망, 희망기업유형, 세부코스를 즉시 수정하거나 엑셀 데이터를 붙여넣을 수 있습니다.
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-bold border border-blue-100/80 shadow-2xs">
-              총 {initialData.length}명
-            </span>
-          </div>
-        </CardHeader>
         <CardContent className="p-0 flex-1 min-h-0 flex flex-col overflow-hidden">
           <StandardSpreadsheetTable 
             data={initialData}

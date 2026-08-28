@@ -320,7 +320,7 @@ export function AdminStudentHub({
   const selectedStudentsForPromotion = processedData.filter((s: any) => selectedIdsForPromotion.includes(s.id));
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col h-[calc(100dvh-150px)] lg:h-[calc(100vh-115px)] max-h-[calc(100dvh-150px)] lg:max-h-[calc(100vh-115px)] min-h-0 gap-2.5 overflow-hidden">
       {/* 상단 툴바: 타이틀 & 작업 액션 버튼들 */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between px-1 gap-3 shrink-0">
         <div className="flex flex-col gap-1">
@@ -413,7 +413,7 @@ export function AdminStudentHub({
       )}
 
       {/* 메인 학생 명부 엑셀식 스프레드시트 카드 */}
-      <Card className="shadow-2xs border border-slate-200/80 bg-white rounded-2xl overflow-hidden flex flex-col p-3 sm:p-4">
+      <Card className="flex-1 min-h-0 shadow-2xs border border-slate-200/80 bg-white rounded-2xl overflow-hidden flex flex-col p-3 sm:p-4">
         <StandardSpreadsheetTable
           data={processedData}
           columns={columns}

@@ -257,7 +257,10 @@ export async function uploadStudentsCSV(csvData: string) {
     } else {
       const { data: inserted, error: iError } = await supabase
         .from('students')
-        .insert([studentPayload])
+        .insert([{
+          ...studentPayload,
+          student_id: crypto.randomUUID(),
+        }])
         .select('id, graduation_year, major, class_info, student_number')
         .single();
       if (!iError && inserted) student = inserted;
@@ -539,10 +542,13 @@ export async function bulkUpdateStudentData(updates: { id: string, field: string
 export async function createStudent(data: { graduation_year: number, major: string, class_info: string, student_number: string, student_name: string }) {
   const supabase = await createClient(); 
   const settings = await getSystemSettings();
-  
+
   const { data: newStudent, error } = await supabase
     .from('students')
-    .insert([data])
+    .insert([{
+      ...data,
+      student_id: crypto.randomUUID(),
+    }])
     .select('id, graduation_year, major, class_info, student_number')
     .single();
 

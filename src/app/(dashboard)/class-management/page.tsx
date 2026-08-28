@@ -112,27 +112,49 @@ async function ClassManagementPageContent({
     ? (gradeToYearMap.get(selectedGrade) || settings.baseYear + (4 - selectedGrade))
     : (userProfile?.assigned_year || settings.baseYear + (4 - selectedGrade));
 
-  // 4. 학급 구조에서 학과 및 반 목록 즉시 도출 (300명 전교생 무거운 쿼리 완전 제거)
+  // 4. 학급 구조에서 학과 및 반 목록 즉시 도출
   const gradeMajorsObj = classStructure[selectedGrade] || {};
   const availableMajors = Object.keys(gradeMajorsObj);
 
   const targetMajor = isAdmin 
-    ? (params.major && availableMajors.includes(params.major) ? params.major : (availableMajors[0] || null))
+    ? (params.major && params.major !== 'all' && availableMajors.includes(params.major) ? params.major : (params.major === 'all' ? 'all' : (params.major || 'all')))
     : (userProfile?.assigned_major || null);
 
-  const availableClasses = targetMajor ? (gradeMajorsObj[targetMajor] || []) : [];
+  const availableClasses = (targetMajor && targetMajor !== 'all') ? (gradeMajorsObj[targetMajor] || []) : [];
 
   const targetClass = isAdmin 
-    ? (params.class && availableClasses.includes(params.class) ? params.class : (availableClasses[0] || null))
+    ? (params.class && params.class !== 'all' && (targetMajor === 'all' || availableClasses.includes(params.class)) ? params.class : (params.class === 'all' ? 'all' : (params.class || 'all')))
     : (userProfile?.assigned_class || null);
 
-  // --- 5. 해당 학반(20~25명) 학생 상세 데이터만 초고속 핀포인트 패칭 (인메모리 캐시 적용) ---
-  const isViewable = !!(targetMajor && targetClass);
+  // --- 5. 학생 데이터 패칭 (관리자는 학년 전체 통합 조회, 담임은 담당 학반 핀포인트 조회) ---
+  const isViewable = isAdmin ? true : !!(targetMajor && targetClass);
   let studentData: any[] = [];
 
-  if (isViewable) {
+  if (isAdmin) {
+    // 관리자: 해당 학년 전체 학생 로드 후 선택된 학과/반으로 필터링
+    const rawGradeData = await getCachedFilteredStudentData(calculatedYear.toString(), settings.baseYear);
+    let filtered = [...(rawGradeData || [])];
+    if (targetMajor && targetMajor !== 'all') {
+      filtered = filtered.filter(s => s.major === targetMajor);
+    }
+    if (targetClass && targetClass !== 'all') {
+      filtered = filtered.filter(s => s.class_info === targetClass);
+    }
+    studentData = filtered.sort((a, b) => {
+      const orderA = getMajorOrderIndex(a.major || '');
+      const orderB = getMajorOrderIndex(b.major || '');
+      if (orderA !== orderB) return orderA - orderB;
+      const classNumA = parseInt((a.class_info || '').replace(/[^0-9]/g, ''), 10) || 0;
+      const classNumB = parseInt((b.class_info || '').replace(/[^0-9]/g, ''), 10) || 0;
+      if (classNumA !== classNumB) return classNumA - classNumB;
+      const numA = parseInt((a.student_number || '').replace(/[^0-9]/g, ''), 10) || 0;
+      const numB = parseInt((b.student_number || '').replace(/[^0-9]/g, ''), 10) || 0;
+      if (numA !== numB) return numA - numB;
+      return (a.student_name || '').localeCompare(b.student_name || '', 'ko');
+    });
+  } else if (isViewable) {
+    // 담임교사: 본인 담당 학반 데이터만 핀포인트 패칭
     const rawData = await getCachedAssignedStudentDetails(targetMajor!, targetClass!, calculatedYear, settings.baseYear);
-    // 학생 번호 자연어 숫자 정렬 (1번 -> 2번 -> ... -> 9번 -> 10번 -> 11번)
     studentData = [...(rawData || [])].sort((a, b) => {
       const numA = parseInt((a.student_number || '').replace(/[^0-9]/g, ''), 10) || 0;
       const numB = parseInt((b.student_number || '').replace(/[^0-9]/g, ''), 10) || 0;
@@ -141,11 +163,11 @@ async function ClassManagementPageContent({
     });
   }
 
-  const displayClass = targetClass && !targetClass.includes('-') ? `${selectedGrade}-${targetClass}` : targetClass;
+  const displayClass = targetClass && targetClass !== 'all' && !targetClass.includes('-') ? `${selectedGrade}-${targetClass}` : targetClass;
 
 
   return (
-    <div className="flex flex-col h-full gap-5">
+    <div className="flex flex-col h-full min-h-0 gap-2.5 overflow-hidden">
       {/* 상단 타이틀 헤더 */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 px-1">
         <div className="flex flex-col gap-1">
@@ -159,18 +181,6 @@ async function ClassManagementPageContent({
         </div>
       </div>
 
-      {/* 학반 선택기 (드롭다운 필터 바) */}
-      <div className="shrink-0">
-        <AdminClassSelector 
-          availableGrades={availableGrades}
-          isAdmin={isAdmin}
-          classStructure={classStructure}
-          defaultGrade={selectedGrade}
-          defaultMajor={targetMajor || ''}
-          defaultClass={targetClass || ''}
-        />
-      </div>
-
       {isViewable ? (
         <ClassTable 
           initialData={studentData} 
@@ -182,6 +192,16 @@ async function ClassManagementPageContent({
           targetMajor={targetMajor || ''}
           displayClass={displayClass || ''}
           selectedGrade={selectedGrade}
+          adminClassSelector={
+            <AdminClassSelector 
+              availableGrades={availableGrades}
+              isAdmin={isAdmin}
+              classStructure={classStructure}
+              defaultGrade={selectedGrade}
+              defaultMajor={targetMajor || ''}
+              defaultClass={targetClass || ''}
+            />
+          }
         />
       ) : (
         <div className="flex flex-col items-center justify-center py-20 bg-muted/20 rounded-2xl border border-dashed border-muted-foreground/30">
