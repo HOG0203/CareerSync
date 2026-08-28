@@ -1182,8 +1182,8 @@ export function FieldTrainingClient({
               </div>
             </div>
 
-            {/* ===== [MOBILE TIMELINE VIEW] (md 미만 모바일 전용: 가로 스크롤 0% 스마트폰 최적화) ===== */}
-            <div className="block md:hidden flex-1 overflow-y-auto custom-scrollbar relative bg-slate-50/50">
+            {/* ===== [MOBILE TIMELINE VIEW] (md 미만 모바일 전용: 가로 스크롤 0% 스마트폰 최적화 - 단일 스크롤) ===== */}
+            <div className="block md:hidden flex-1 relative bg-slate-50/50">
               {/* 모바일 고정 월 헤더 트랙 */}
               <div className="sticky top-0 z-30 bg-slate-100 border-b border-slate-200 flex text-[10px] font-extrabold text-slate-700 shadow-xs">
                 <div className="w-28 shrink-0 p-2 pl-2.5 bg-slate-100 border-r border-slate-200 flex items-center font-extrabold text-[10px]">

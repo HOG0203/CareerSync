@@ -447,8 +447,8 @@ export function CertificateSummaryClient({
         </table>
       </div>
 
-      {/* 모바일: 카드 목록 뷰 (md 미만) */}
-      <div className="md:hidden flex-1 overflow-y-auto p-3 space-y-2.5">
+      {/* 모바일: 카드 목록 뷰 (md 미만 - 단일 스크롤) */}
+      <div className="md:hidden flex-1 p-3 space-y-2.5">
         {paginatedData.map((student, idx) => (
           <div 
             key={student.id} 

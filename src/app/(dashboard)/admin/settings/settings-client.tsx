@@ -245,7 +245,7 @@ export function AdminSettingsClient({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:max-h-[320px] sm:overflow-y-auto pr-1">
           {filteredCerts.map((cert) => (
             <div 
               key={cert.name} 
@@ -554,7 +554,7 @@ export function AdminSettingsClient({
         </div>
 
         {/* 항목 목록 리스트 */}
-        <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+        <div className="space-y-2 sm:max-h-[320px] sm:overflow-y-auto pr-1">
           {currentList.length === 0 ? (
             <div className="text-center py-8 text-xs text-slate-400 font-medium">
               등록된 {activeMeritTab === 'merit' ? '상점' : '벌점'} 항목이 없습니다.

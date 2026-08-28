@@ -107,13 +107,6 @@ export function CompanyInfoClient({
   const rankingsCacheRef = React.useRef<Map<number, any>>(new Map());
   const prefetchedRef = React.useRef<Set<string>>(new Set());
 
-  // 첫 마운트 시 첫 번째 기업 자동 선택
-  React.useEffect(() => {
-    if (initialCompanies && initialCompanies.length > 0 && !selectedCompany) {
-      handleSelectCompany(initialCompanies[0].name);
-    }
-  }, []);
-
   // 검색어 변경 시 자동 검색 (Debounce 250ms)
   const isFirstMount = React.useRef(true);
   React.useEffect(() => {
@@ -285,6 +278,17 @@ export function CompanyInfoClient({
       return 0;
     });
   };
+
+  // 메모이제이션된 취업생 및 실습생 정렬 목록 (불필요한 재연산 방지)
+  const sortedEmployees = React.useMemo(() => {
+    if (!selectedCompany?.employees) return [];
+    return getSortedData(selectedCompany.employees, employeeSort);
+  }, [selectedCompany?.employees, employeeSort]);
+
+  const sortedTrainees = React.useMemo(() => {
+    if (!selectedCompany?.trainees) return [];
+    return getSortedData(selectedCompany.trainees, traineeSort);
+  }, [selectedCompany?.trainees, traineeSort]);
 
   // 실습 기간 가로막대 (월별 격자 + 가로막대 + 오늘 마커)
   const renderTrainingTimelineBar = (s: any, baseYear: number) => {
@@ -509,14 +513,51 @@ export function CompanyInfoClient({
         )}
       </div>
 
-      {/* 모바일 전용 탭 스위처 (높이 슬림화) */}
+      {/* 모바일 전용 탭 스위처 (초고속 즉시 반응 세그먼트 컨트롤) */}
       <div className="lg:hidden shrink-0">
-        <Tabs value={mobileTab} onValueChange={(v) => setMobileTab(v as any)} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 h-8.5 sm:h-10 p-0.5 sm:p-1 bg-slate-100 rounded-xl">
-            <TabsTrigger value="list" className="rounded-lg font-bold text-[11px] sm:text-xs">업체 목록</TabsTrigger>
-            <TabsTrigger value="details" className="rounded-lg font-bold text-[11px] sm:text-xs">상세 정보</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="grid w-full grid-cols-2 h-10 sm:h-11 p-1 bg-slate-200/90 rounded-2xl border border-slate-300/60 shadow-inner">
+          <button
+            type="button"
+            onClick={() => setMobileTab('list')}
+            className={cn(
+              "rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-colors duration-75 select-none",
+              mobileTab === 'list'
+                ? "bg-blue-600 text-white shadow-md"
+                : "text-slate-600 hover:text-slate-900 active:bg-slate-300/60"
+            )}
+          >
+            <Building2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+            <span>업체 목록</span>
+            <span className={cn(
+              "text-[9.5px] px-1.5 py-0.2 rounded-full font-extrabold",
+              mobileTab === 'list' ? "bg-white text-blue-700 shadow-xs" : "bg-slate-300 text-slate-700"
+            )}>
+              {companies.length + unregisteredCompanies.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMobileTab('details')}
+            className={cn(
+              "rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-colors duration-75 select-none",
+              mobileTab === 'details'
+                ? "bg-blue-600 text-white shadow-md"
+                : "text-slate-600 hover:text-slate-900 active:bg-slate-300/60"
+            )}
+          >
+            <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+            <span>상세 정보</span>
+            {selectedCompany && (
+              <span className={cn(
+                "text-[9.5px] px-1.5 py-0.2 rounded-full font-extrabold max-w-[80px] truncate",
+                mobileTab === 'details' ? "bg-white text-blue-700 shadow-xs" : "bg-slate-300 text-slate-700"
+              )}>
+                {selectedCompany.name || selectedCompany.company?.name || '선택됨'}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-6 flex-1 min-h-0">
@@ -537,20 +578,23 @@ export function CompanyInfoClient({
                 </div>
               </div>
 
-              {/* 마스터 등록 기업 VS 학생 감지 미등록 기업 세그먼트 필터 */}
-              <div className="flex items-center gap-1 p-1 bg-slate-200/70 rounded-xl text-xs font-bold my-1">
+              {/* 마스터 등록 기업 VS 학생 감지 미등록 기업 세그먼트 필터 (고대비 적용) */}
+              <div className="flex items-center gap-1 p-1 bg-slate-200/90 rounded-xl text-xs font-bold my-1 border border-slate-300/50 shadow-inner">
                 <button
                   type="button"
                   onClick={() => setCompanyFilterType('registered')}
                   className={cn(
-                    "flex-1 py-1.5 px-2 rounded-lg text-center transition-all flex items-center justify-center gap-1.5 text-[11px]",
+                    "flex-1 py-1.5 px-2 rounded-lg text-center transition-all flex items-center justify-center gap-1.5 text-[11px] font-black",
                     companyFilterType === 'registered' 
-                      ? "bg-white text-slate-900 shadow-xs font-extrabold" 
-                      : "text-slate-500 hover:text-slate-900"
+                      ? "bg-blue-600 text-white shadow-md" 
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-300/40"
                   )}
                 >
                   <span>등록 기업</span>
-                  <span className="bg-slate-200/80 text-slate-700 text-[9.5px] px-1.5 py-0.2 rounded-full font-bold">
+                  <span className={cn(
+                    "text-[9.5px] px-1.5 py-0.2 rounded-full font-bold",
+                    companyFilterType === 'registered' ? "bg-white text-blue-700 font-extrabold" : "bg-slate-300 text-slate-700"
+                  )}>
                     {companies.length}
                   </span>
                 </button>
@@ -559,10 +603,10 @@ export function CompanyInfoClient({
                   type="button"
                   onClick={handleUnregisteredTabClick}
                   className={cn(
-                    "flex-1 py-1.5 px-2 rounded-lg text-center transition-all flex items-center justify-center gap-1 text-[11px]",
+                    "flex-1 py-1.5 px-2 rounded-lg text-center transition-all flex items-center justify-center gap-1 text-[11px] font-black",
                     companyFilterType === 'unregistered' 
-                      ? "bg-amber-500 text-white shadow-xs font-extrabold" 
-                      : "text-amber-800 hover:bg-amber-100/50"
+                      ? "bg-amber-500 text-white shadow-md" 
+                      : "text-amber-800 hover:bg-amber-100/60"
                   )}
                 >
                   <AlertTriangle className="h-3 w-3 shrink-0" />
@@ -570,7 +614,7 @@ export function CompanyInfoClient({
                   {unregisteredCompanies.length > 0 && (
                     <span className={cn(
                       "text-[9.5px] px-1.5 py-0.2 rounded-full font-bold",
-                      companyFilterType === 'unregistered' ? "bg-white/30 text-white" : "bg-amber-200 text-amber-900"
+                      companyFilterType === 'unregistered' ? "bg-white text-amber-800 font-extrabold" : "bg-amber-200 text-amber-900"
                     )}>
                       {unregisteredCompanies.length}
                     </span>
@@ -613,7 +657,7 @@ export function CompanyInfoClient({
                       onClick={() => handleSelectCompany(company.name)}
                       onMouseEnter={() => handleCompanyHover(company.name)}
                       className={cn(
-                        "p-3 sm:p-4 cursor-pointer hover:bg-slate-50 active:bg-blue-50/50 transition-all group relative border-l-4",
+                        "p-3 sm:p-4 cursor-pointer hover:bg-slate-50 active:bg-blue-50/50 transition-colors duration-75 group relative border-l-4",
                         selectedCompany?.company?.name === company.name 
                           ? "bg-blue-50/80 border-blue-600 shadow-xs" 
                           : "border-transparent"
@@ -663,7 +707,7 @@ export function CompanyInfoClient({
                           </div>
                         </div>
                         <ChevronRight className={cn(
-                          "h-4 w-4 shrink-0 transition-all duration-200",
+                          "h-4 w-4 shrink-0 transition-transform duration-75",
                           selectedCompany?.company?.name === company.name ? "text-blue-600 translate-x-0.5" : "text-slate-300 group-hover:text-slate-400"
                         )} />
                       </div>
@@ -683,10 +727,10 @@ export function CompanyInfoClient({
                       const isSelected = selectedCompany?.name === item.name || selectedCompany?.company?.name === item.name;
                       return (
                         <div 
-                          key={item.name}
+                          key={item.name} 
                           onClick={() => handleSelectCompany(item.name)}
                           className={cn(
-                            "p-3 sm:p-4 cursor-pointer hover:bg-amber-50/50 active:bg-amber-100/60 transition-all group relative border-l-4",
+                            "p-3 sm:p-4 cursor-pointer hover:bg-amber-50/50 active:bg-amber-100/60 transition-colors duration-75 group relative border-l-4",
                             isSelected 
                               ? "bg-amber-50/90 border-amber-500 shadow-xs" 
                               : "border-transparent"
@@ -713,7 +757,7 @@ export function CompanyInfoClient({
                               </div>
                             </div>
                             <ChevronRight className={cn(
-                              "h-4 w-4 shrink-0 transition-all duration-200",
+                              "h-4 w-4 shrink-0 transition-transform duration-75",
                               isSelected ? "text-amber-600 translate-x-0.5" : "text-slate-300 group-hover:text-slate-400"
                             )} />
                           </div>
@@ -743,18 +787,6 @@ export function CompanyInfoClient({
             </div>
           ) : selectedCompany ? (
             <div className="space-y-6 pb-10">
-              {/* 모바일 전용 상단 뒤로가기 버튼 */}
-              <div className="lg:hidden sticky top-0 z-20 bg-slate-50/95 backdrop-blur-sm pb-1 pt-0.5">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setMobileTab('list')}
-                  className="w-full h-9 text-xs font-bold text-slate-700 bg-white border-slate-200/80 shadow-2xs hover:bg-slate-50 flex items-center justify-center gap-1.5 rounded-xl"
-                >
-                  <ChevronRight className="h-4 w-4 rotate-180 text-blue-600 shrink-0" />
-                  <span>업체 목록으로 돌아가기</span>
-                </Button>
-              </div>
 
               {/* 미등록 기업인 경우 경고 알림 및 정식 등록 액션 카드 */}
               {!selectedCompany.company ? (
@@ -985,15 +1017,15 @@ export function CompanyInfoClient({
                   </TabsTrigger>
                 </TabsList>
                 
-                {/* 1. 취업생 현황 */}
-                <TabsContent value="employees" className="mt-3 sm:mt-4">
+                {/* 1. 취업생 현황 (forceMount로 0ms 즉각 전환) */}
+                <TabsContent value="employees" className="mt-3 sm:mt-4 data-[state=inactive]:hidden" forceMount>
                   <Card className="border-none shadow-xs">
                     <CardContent className="p-0 overflow-hidden rounded-2xl bg-white border border-slate-100">
                       {selectedCompany.employees.length > 0 ? (
                         <>
                           {/* 모바일 전용 카드 뷰 (가로 스크롤 없이 터치 한 번으로 확인) */}
                           <div className="block md:hidden divide-y divide-slate-100 p-2 space-y-2">
-                            {getSortedData(selectedCompany.employees, employeeSort).map((s: any) => (
+                            {sortedEmployees.map((s: any) => (
                               <div key={s.id} className="p-3 bg-slate-50/70 rounded-xl border border-slate-100/80 space-y-2">
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex items-center gap-1.5 min-w-0">
@@ -1052,7 +1084,7 @@ export function CompanyInfoClient({
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
-                                {getSortedData(selectedCompany.employees, employeeSort).map((s: any) => (
+                                {sortedEmployees.map((s: any) => (
                                   <tr key={s.id} className="hover:bg-slate-50/90 transition-colors">
                                     <td className="px-2.5 sm:px-4 py-3 font-bold text-slate-900 whitespace-nowrap">
                                       <StudentPopover 
@@ -1110,15 +1142,15 @@ export function CompanyInfoClient({
                   </Card>
                 </TabsContent>
                 
-                {/* 2. 현장실습생 현황 */}
-                <TabsContent value="trainees" className="mt-3 sm:mt-4">
+                {/* 2. 현장실습생 현황 (forceMount로 0ms 즉각 전환) */}
+                <TabsContent value="trainees" className="mt-3 sm:mt-4 data-[state=inactive]:hidden" forceMount>
                   <Card className="border-none shadow-xs">
                     <CardContent className="p-0 overflow-hidden rounded-2xl bg-white border border-slate-100">
                       {selectedCompany.trainees.length > 0 ? (
                         <>
                           {/* 모바일 전용 실습생 카드 뷰 */}
                           <div className="block md:hidden divide-y divide-slate-100 p-2 space-y-2">
-                            {getSortedData(selectedCompany.trainees, traineeSort).map((s: any) => {
+                            {sortedTrainees.map((s: any) => {
                               const todayStr = new Date().toISOString().split('T')[0];
                               let statusLabel = '실습중';
                               let statusColor = 'bg-emerald-100 text-emerald-700 border-emerald-200';
@@ -1207,7 +1239,7 @@ export function CompanyInfoClient({
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
-                                {getSortedData(selectedCompany.trainees, traineeSort).map((s: any) => {
+                                {sortedTrainees.map((s: any) => {
                                   const todayStr = new Date().toISOString().split('T')[0];
                                   let statusLabel = '실습중';
                                   let statusColor = 'bg-emerald-100 text-emerald-700 border-emerald-200';
@@ -1289,13 +1321,15 @@ export function CompanyInfoClient({
               </Tabs>
             </div>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center bg-white rounded-3xl border-2 border-dashed border-slate-200 p-12 text-center group min-h-[400px]">
-              <div className="p-6 bg-slate-50 rounded-full mb-6 group-hover:scale-110 transition-transform">
-                <Search className="h-12 w-12 text-slate-300" />
+            <div className="h-full flex flex-col items-center justify-center bg-white rounded-3xl border-2 border-dashed border-slate-200 p-8 sm:p-12 text-center group min-h-[420px] shadow-2xs">
+              <div className="p-5 sm:p-6 bg-blue-50/80 rounded-2xl mb-4 group-hover:scale-105 transition-transform border border-blue-100/80">
+                <Building2 className="h-10 w-10 sm:h-12 sm:w-12 text-blue-500" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">업체를 선택해주세요</h3>
-              <p className="text-slate-500 max-w-sm">
-                왼쪽 리스트에서 기업을 선택하거나 검색하여 상세 정보와 소속 학생 현황을 확인하세요.
+              <h3 className="text-lg sm:text-xl font-black text-slate-800 mb-1.5 flex items-center justify-center gap-2">
+                <span>업체를 선택해주세요</span>
+              </h3>
+              <p className="text-slate-500 text-xs sm:text-sm max-w-sm leading-relaxed">
+                왼쪽 목록에서 업체를 선택하시면 기업 상세 채용 정보 및 취업생·실습생 현황을 확인하실 수 있습니다.
               </p>
             </div>
           )}
