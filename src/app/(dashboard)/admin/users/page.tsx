@@ -10,8 +10,8 @@ import { CreateUserButton } from './create-user-button';
 import { ImportUserButton } from './import-user-button';
 import { getCachedProfiles, getCachedGraduationYears, getCachedAllStudentBaseData, getCurrentUserProfile } from '@/lib/data';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
-import { getUserCustomPermissionsMapAction, getMasterAdminInfo } from './actions';
-import { UserCog, Crown } from 'lucide-react';
+import { getUserCustomPermissionsMapAction, getMasterAdminInfo, getSubAdminList } from './actions';
+import { UserCog, Crown, ShieldCheck } from 'lucide-react';
 import React from 'react';
 import { TableLoadingSkeleton } from '@/components/dashboard/loading-skeleton';
 
@@ -23,13 +23,14 @@ export default async function AdminUsersPage() {
 
 async function AdminUsersPageContent() {
   // 서버 메모리 캐시 적용된 데이터 병렬 패칭 (Promise.all)
-  const [profiles, graduationYears, allBaseData, settings, customPermissionsMap, masterAdminInfo, currentUserProfile] = await Promise.all([
+  const [profiles, graduationYears, allBaseData, settings, customPermissionsMap, masterAdminInfo, subAdminList, currentUserProfile] = await Promise.all([
     getCachedProfiles(),
     getCachedGraduationYears(),
     getCachedAllStudentBaseData(),
     getSystemSettings(),
     getUserCustomPermissionsMapAction(),
     getMasterAdminInfo(),
+    getSubAdminList(),
     getCurrentUserProfile(),
   ]);
 
@@ -37,6 +38,16 @@ async function AdminUsersPageContent() {
     currentUserProfile?.username === masterAdminInfo.username ||
     currentUserProfile?.full_name === '이호중' ||
     currentUserProfile?.username === '이호중';
+
+  const isCurrentUserSubAdmin = Boolean(
+    isCurrentUserMasterAdmin || (
+      currentUserProfile?.role === 'admin' &&
+      currentUserProfile?.username &&
+      subAdminList.includes(currentUserProfile.username)
+    )
+  );
+
+  const canManageUsers = isCurrentUserMasterAdmin || isCurrentUserSubAdmin;
   
   // 학년도별 학과 및 반 정보 전체 매핑 데이터 생성
   const fullClassMapping: { year: number; major: string; className: string }[] = allBaseData
@@ -66,6 +77,11 @@ async function AdminUsersPageContent() {
                   <Crown className="h-3.5 w-3.5 text-amber-600" />
                   메인관리자 전용 제어권
                 </span>
+              ) : isCurrentUserSubAdmin ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-black px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200 shadow-2xs">
+                  <ShieldCheck className="h-3.5 w-3.5 text-indigo-600" />
+                  서브관리자 권한 모드
+                </span>
               ) : (
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200">
                   일반 관리자 모드
@@ -78,7 +94,7 @@ async function AdminUsersPageContent() {
           </div>
         </div>
         <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-          {isCurrentUserMasterAdmin && (
+          {canManageUsers && (
             <>
               <ImportUserButton />
               <CreateUserButton />
@@ -95,6 +111,8 @@ async function AdminUsersPageContent() {
         baseYear={settings.baseYear}
         initialCustomPermissionsMap={customPermissionsMap}
         isMasterAdmin={isCurrentUserMasterAdmin}
+        isSubAdmin={isCurrentUserSubAdmin}
+        subAdminList={subAdminList}
         masterAdminInfo={masterAdminInfo}
         currentUserId={currentUserProfile?.id}
       />

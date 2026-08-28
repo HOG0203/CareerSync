@@ -27,14 +27,14 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
   
   const isAdmin = userProfile?.role === 'admin';
 
-  // 3. 메인관리자 여부 조회
+  // 3. 메인관리자 및 서브관리자 여부 조회
   let isMasterAdmin = false;
+  let isSubAdmin = false;
   try {
-    const { data: masterSetting } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'master_admin_info')
-      .maybeSingle();
+    const [{ data: masterSetting }, { data: subAdminSetting }] = await Promise.all([
+      supabase.from('system_settings').select('value').eq('key', 'master_admin_info').maybeSingle(),
+      supabase.from('system_settings').select('value').eq('key', 'sub_admin_list').maybeSingle(),
+    ]);
 
     const masterUsername = (masterSetting?.value as any)?.username || '이호중';
     isMasterAdmin = Boolean(
@@ -44,8 +44,12 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
         userProfile?.username === '이호중'
       )
     );
+
+    const subAdminList = Array.isArray(subAdminSetting?.value) ? (subAdminSetting.value as string[]) : [];
+    isSubAdmin = Boolean(isMasterAdmin || (isAdmin && userProfile?.username && subAdminList.includes(userProfile.username)));
   } catch (err) {
     isMasterAdmin = Boolean(isAdmin && (userProfile?.full_name === '이호중' || userProfile?.username === '이호중'));
+    isSubAdmin = isMasterAdmin;
   }
 
   // 4. 사용자별 개별 메뉴 권한 조회 (system_settings)
@@ -75,6 +79,7 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
             <Nav 
               isAdmin={isAdmin} 
               isMasterAdmin={isMasterAdmin}
+              isSubAdmin={isSubAdmin}
               userProfile={userProfile} 
               customPermissions={customPermissions} 
             />

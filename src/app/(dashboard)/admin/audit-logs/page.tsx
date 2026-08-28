@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { TableLoadingSkeleton } from '@/components/dashboard/loading-skeleton';
 import { AuditLogsClient } from './audit-logs-client';
 
-import { getMasterAdminInfo, getUserCustomPermissionsMapAction } from '@/app/(dashboard)/admin/users/actions';
+import { getMasterAdminInfo, getUserCustomPermissionsMapAction, getSubAdminList } from '@/app/(dashboard)/admin/users/actions';
 
 export const dynamic = 'force-dynamic';
 

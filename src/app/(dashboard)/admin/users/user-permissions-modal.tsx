@@ -77,12 +77,18 @@ export const ALL_SYSTEM_MENU_GROUPS = [
   },
 ];
 
-export function getDefaultRoutesForUser(profile: any): string[] {
+export function getDefaultRoutesForUser(profile: any, subAdminList: string[] = []): string[] {
   const isMaster = profile?.username === '이호중' || profile?.full_name === '이호중';
+  const isSubAdmin = isMaster || (profile?.username && subAdminList.includes(profile.username));
 
   if (profile?.role === 'admin') {
     if (isMaster) {
       return ALL_SYSTEM_MENU_GROUPS.flatMap(g => g.items.map(i => i.href));
+    }
+    if (isSubAdmin) {
+      // 서브관리자는 기본 권한에서 '로그인 및 활동 이력'과 '작업 이력 관리'를 제외 (시스템 설정 및 사용자 관리는 포함)
+      return ALL_SYSTEM_MENU_GROUPS.flatMap(g => g.items.map(i => i.href))
+        .filter(href => href !== '/admin/login-history' && href !== '/admin/audit-logs');
     }
     // 일반 관리자는 기본 권한에서 로그인 및 활동 이력, 작업 이력 관리, 시스템 설정을 제외
     return ALL_SYSTEM_MENU_GROUPS.flatMap(g => g.items.map(i => i.href))
@@ -124,6 +130,7 @@ interface UserPermissionsModalProps {
   onClose: () => void;
   profile: any | null;
   customPermissionsMap: Record<string, string[]>;
+  subAdminList?: string[];
   onSaved: (newMap: Record<string, string[]>) => void;
 }
 
@@ -132,6 +139,7 @@ export function UserPermissionsModal({
   onClose,
   profile,
   customPermissionsMap,
+  subAdminList = [],
   onSaved,
 }: UserPermissionsModalProps) {
   const { toast } = useToast();
@@ -140,7 +148,7 @@ export function UserPermissionsModal({
   const [isSaving, setIsSaving] = React.useState(false);
 
   const isCustom = profile ? customPermissionsMap[profile.id] !== undefined : false;
-  const defaultRoutes = React.useMemo(() => (profile ? getDefaultRoutesForUser(profile) : []), [profile]);
+  const defaultRoutes = React.useMemo(() => (profile ? getDefaultRoutesForUser(profile, subAdminList) : []), [profile, subAdminList]);
 
   // 모달 열릴 때 권한 초기화
   React.useEffect(() => {
@@ -149,10 +157,10 @@ export function UserPermissionsModal({
       if (saved && Array.isArray(saved)) {
         setSelectedRoutes(saved);
       } else {
-        setSelectedRoutes(getDefaultRoutesForUser(profile));
+        setSelectedRoutes(getDefaultRoutesForUser(profile, subAdminList));
       }
     }
-  }, [isOpen, profile, customPermissionsMap]);
+  }, [isOpen, profile, customPermissionsMap, subAdminList]);
 
   if (!profile) return null;
 

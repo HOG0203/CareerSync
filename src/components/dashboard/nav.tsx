@@ -53,19 +53,24 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from '@/lib/utils';
 import * as React from 'react';
+import ProfileSettingsModal from './profile-settings-modal';
+import { ChangePasswordDialog } from '@/app/(dashboard)/student/certification/change-password-dialog';
 
 export default function Nav({ 
   isAdmin = false, 
   isMasterAdmin = false,
+  isSubAdmin = false,
   userProfile,
   customPermissions
 }: { 
   isAdmin?: boolean; 
   isMasterAdmin?: boolean;
+  isSubAdmin?: boolean;
   userProfile?: any;
   customPermissions?: string[] | null;
 }) {
   const [mounted, setMounted] = React.useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = React.useState(false);
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { setOpenMobile } = useSidebar();
@@ -88,7 +93,9 @@ export default function Nav({
   };
 
   const handleNavClick = (href: string) => {
-    setNavigatingHref(href);
+    if (pathname !== href) {
+      setNavigatingHref(href);
+    }
     closeMobile();
   };
 
@@ -156,6 +163,8 @@ export default function Nav({
           ...(isMasterAdmin ? [
             { href: '/admin/login-history', label: '로그인 및 활동 이력', icon: KeyRound },
             { href: '/admin/audit-logs', label: '작업 이력 관리', icon: History },
+          ] : []),
+          ...((isMasterAdmin || isSubAdmin) ? [
             { href: '/admin/settings', label: '시스템 설정', icon: ShieldCheck },
           ] : []),
         ]
@@ -374,7 +383,15 @@ export default function Nav({
         })}
 
       </SidebarContent>
-      <SidebarFooter className="p-2 border-t border-slate-50">
+      <SidebarFooter className="p-2 border-t border-slate-100 flex flex-col gap-1">
+        <Button 
+          variant="ghost" 
+          className="w-full justify-start text-slate-600 hover:text-blue-600 hover:bg-blue-50 h-10 px-3 transition-colors"
+          onClick={() => setIsPasswordModalOpen(true)}
+        >
+          <KeyRound className="mr-2 h-4 w-4 text-slate-500" />
+          <span className="font-medium">비밀번호 변경</span>
+        </Button>
         <Button 
           variant="ghost" 
           className="w-full justify-start text-slate-500 hover:text-rose-600 hover:bg-rose-50 h-10 px-3 transition-colors"
@@ -384,6 +401,18 @@ export default function Nav({
           <span className="font-medium">로그아웃</span>
         </Button>
       </SidebarFooter>
+
+      {userProfile?.role === 'student' ? (
+        <ChangePasswordDialog 
+          open={isPasswordModalOpen} 
+          onOpenChange={setIsPasswordModalOpen} 
+        />
+      ) : (
+        <ProfileSettingsModal 
+          open={isPasswordModalOpen} 
+          onOpenChange={setIsPasswordModalOpen} 
+        />
+      )}
     </>
   );
 }

@@ -64,7 +64,7 @@ import {
   Sparkles,
   Crown
 } from 'lucide-react';
-import { updateUserRole, deleteUser, updateAssignedClass, resetUserPassword, transferMasterAdminAction } from './actions';
+import { updateUserRole, deleteUser, updateAssignedClass, resetUserPassword, transferMasterAdminAction, toggleSubAdminAction } from './actions';
 import { UserPermissionsModal } from './user-permissions-modal';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -78,6 +78,8 @@ interface UserTableProps {
   baseYear: number;
   initialCustomPermissionsMap?: Record<string, string[]>;
   isMasterAdmin?: boolean;
+  isSubAdmin?: boolean;
+  subAdminList?: string[];
   masterAdminInfo?: { username: string; name: string };
   currentUserId?: string;
 }
@@ -89,6 +91,8 @@ export function UserTable({
   baseYear,
   initialCustomPermissionsMap = {},
   isMasterAdmin = false,
+  isSubAdmin = false,
+  subAdminList = [],
   masterAdminInfo = { username: '이호중', name: '이호중' },
   currentUserId
 }: UserTableProps) {
@@ -97,10 +101,44 @@ export function UserTable({
   const [profiles, setProfiles] = React.useState(initialProfiles);
   const [customPermissionsMap, setCustomPermissionsMap] = React.useState<Record<string, string[]>>(initialCustomPermissionsMap);
   const [currentMasterAdmin, setCurrentMasterAdmin] = React.useState(masterAdminInfo);
+  const [currentSubAdmins, setCurrentSubAdmins] = React.useState<string[]>(subAdminList);
+  const [isTogglingSubAdmin, setIsTogglingSubAdmin] = React.useState<string | null>(null);
   const [isTransferModalOpen, setIsTransferModalOpen] = React.useState(false);
   const [transferTargetProfile, setTransferTargetProfile] = React.useState<any>(null);
 
-  // 서버 컴포넌트에서 전달된 initialProfiles / initialCustomPermissionsMap 갱신 시 로컬 상태 동기화
+  // 로그인한 사용자의 권한 등급 (1: 메인관리자, 2: 서브관리자, 3: 일반관리자, 4: 일반교직원)
+  const currentUserProfile = React.useMemo(() => {
+    return profiles.find(p => p.id === currentUserId);
+  }, [profiles, currentUserId]);
+
+  const currentUserRank: number = React.useMemo(() => {
+    if (isMasterAdmin) return 1;
+    if (isSubAdmin) return 2;
+    if (currentUserProfile?.role === 'admin') return 3;
+    return 4;
+  }, [isMasterAdmin, isSubAdmin, currentUserProfile]);
+
+  const getProfileRank = React.useCallback((p: any): number => {
+    if (!p) return 4;
+    if (
+      p.username === currentMasterAdmin.username ||
+      p.full_name === '이호중' ||
+      p.username === '이호중'
+    ) {
+      return 1;
+    }
+    if (p.role === 'admin') {
+      if (p.username && currentSubAdmins.includes(p.username)) {
+        return 2;
+      }
+      return 3;
+    }
+    return 4;
+  }, [currentMasterAdmin, currentSubAdmins]);
+
+  const canManageUsers = currentUserRank <= 2;
+
+  // 서버 컴포넌트에서 전달된 props 갱신 시 로컬 상태 동기화
   React.useEffect(() => {
     setProfiles(initialProfiles);
   }, [initialProfiles]);
@@ -112,6 +150,32 @@ export function UserTable({
   React.useEffect(() => {
     setCurrentMasterAdmin(masterAdminInfo);
   }, [masterAdminInfo]);
+
+  React.useEffect(() => {
+    setCurrentSubAdmins(subAdminList);
+  }, [subAdminList]);
+
+  const handleToggleSubAdmin = async (targetUsername: string) => {
+    setIsTogglingSubAdmin(targetUsername);
+    try {
+      const res = await toggleSubAdminAction(targetUsername);
+      if (res.error) {
+        toast({ title: '설정 실패', description: res.error, variant: 'destructive' });
+      } else {
+        const nextList = res.subAdminList || [];
+        setCurrentSubAdmins(nextList);
+        toast({
+          title: res.isSubAdmin ? '서브관리자 임명 완료' : '서브관리자 해제 완료',
+          description: `${targetUsername} 사용자가 ${res.isSubAdmin ? '서브관리자로 임명되었습니다.' : '서브관리자에서 해제되었습니다.'}`,
+        });
+        router.refresh();
+      }
+    } catch (err: any) {
+      toast({ title: '오류 발생', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsTogglingSubAdmin(null);
+    }
+  };
 
   const [searchTerm, setSearchTerm] = React.useState('');
   const [roleFilter, setRoleFilter] = React.useState<'all' | 'admin' | 'teacher'>('all');
@@ -552,10 +616,14 @@ export function UserTable({
               <TableBody className="divide-y divide-slate-100">
                 {filteredProfiles.length > 0 ? (
                   filteredProfiles.map((profile) => {
-                    const isThisUserMasterAdmin = 
-                      profile.username === masterAdminInfo?.username || 
-                      profile.full_name === '이호중' || 
-                      profile.username === '이호중';
+                    const targetRank = getProfileRank(profile);
+                    const isThisUserMasterAdmin = targetRank === 1;
+                    const isThisUserSubAdmin = targetRank === 2;
+                    const isThisUserGeneralAdmin = targetRank === 3;
+                    
+                    // 상위 관리자만 하위 관리자/교직원의 권한 및 정보를 수정할 수 있음 (상위 > 하위)
+                    const canManageThisUser = currentUserRank < targetRank;
+
                     const hasCustomPermissions = customPermissionsMap[profile.id] !== undefined;
                     const customCount = customPermissionsMap[profile.id]?.length;
 
@@ -567,9 +635,11 @@ export function UserTable({
                               "h-7 w-7 rounded-lg flex items-center justify-center font-black text-xs shrink-0 border",
                               isThisUserMasterAdmin 
                                 ? "bg-amber-100 text-amber-800 border-amber-300" 
+                                : isThisUserSubAdmin
+                                ? "bg-indigo-50 text-indigo-700 border-indigo-200"
                                 : "bg-blue-50 text-blue-600 border-blue-100"
                             )}>
-                              {isThisUserMasterAdmin ? '👑' : (profile.full_name?.[0] || profile.username?.[0] || '?')}
+                              {isThisUserMasterAdmin ? '👑' : isThisUserSubAdmin ? '🥈' : (profile.full_name?.[0] || profile.username?.[0] || '?')}
                             </div>
                             <span>{profile.username}</span>
                           </div>
@@ -577,11 +647,15 @@ export function UserTable({
                         <TableCell className="font-bold text-slate-900">
                           <div className="flex items-center gap-1.5">
                             <span>{profile.full_name}</span>
-                            {isThisUserMasterAdmin && (
+                            {isThisUserMasterAdmin ? (
                               <Badge className="text-[10px] font-black bg-amber-50 text-amber-800 border-amber-300 shadow-2xs py-0 px-1.5">
                                 메인
                               </Badge>
-                            )}
+                            ) : isThisUserSubAdmin ? (
+                              <Badge className="text-[10px] font-black bg-indigo-50 text-indigo-700 border-indigo-200 shadow-2xs py-0 px-1.5">
+                                서브
+                              </Badge>
+                            ) : null}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -590,16 +664,12 @@ export function UserTable({
                               <Crown className="h-3 w-3 text-amber-600" />
                               메인관리자
                             </Badge>
-                          ) : !isMasterAdmin ? (
-                            <Badge className={cn(
-                              "text-xs font-bold py-1 px-2.5",
-                              profile.role === 'admin' 
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
-                                : "bg-slate-100 text-slate-700 border-slate-200"
-                            )}>
-                              {profile.role === 'admin' ? '일반 관리자' : '교직원'}
+                          ) : isThisUserSubAdmin ? (
+                            <Badge className="text-xs font-black bg-indigo-50 text-indigo-800 border-indigo-200 flex items-center gap-1 shadow-2xs py-1 px-2.5">
+                              <ShieldCheck className="h-3 w-3 text-indigo-600" />
+                              서브관리자
                             </Badge>
-                          ) : (
+                          ) : currentUserRank <= 2 && canManageThisUser ? (
                             <Select defaultValue={profile.role} onValueChange={(v) => handleRoleChange(profile.id, v)}>
                               <SelectTrigger className="h-8 w-[95px] text-xs font-semibold rounded-lg bg-white border-slate-200">
                                 <SelectValue />
@@ -609,6 +679,15 @@ export function UserTable({
                                 <SelectItem value="teacher" className="text-xs font-bold text-slate-700">교직원</SelectItem>
                               </SelectContent>
                             </Select>
+                          ) : (
+                            <Badge className={cn(
+                              "text-xs font-bold py-1 px-2.5",
+                              profile.role === 'admin' 
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
+                                : "bg-slate-100 text-slate-700 border-slate-200"
+                            )}>
+                              {profile.role === 'admin' ? '일반 관리자' : '교직원'}
+                            </Badge>
                           )}
                         </TableCell>
                         <TableCell className="text-xs">
@@ -639,8 +718,8 @@ export function UserTable({
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
-                            {/* 메뉴 권한 설정: 오직 메인관리자만 가능 */}
-                            {isMasterAdmin && (
+                            {/* 메뉴 권한 설정: 상위 관리자(1,2)가 하위 사용자 관리 시 가능 */}
+                            {currentUserRank <= 2 && canManageThisUser && (
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
@@ -652,31 +731,58 @@ export function UserTable({
                               </Button>
                             )}
 
-                            {/* 담당 학반 설정 */}
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 rounded-lg text-blue-600 hover:text-blue-700 hover:bg-blue-50" 
-                              onClick={() => { setSelectedProfile(profile); setIsAssignOpen(true); }} 
-                              title="담당 학반 설정"
-                            >
-                              <GraduationCap className="h-4 w-4" />
-                            </Button>
+                            {/* 담당 학반 설정: 상위 관리자만 하위 사용자 배정 가능 */}
+                            {canManageThisUser && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 rounded-lg text-blue-600 hover:text-blue-700 hover:bg-blue-50" 
+                                onClick={() => { setSelectedProfile(profile); setIsAssignOpen(true); }} 
+                                title="담당 학반 설정"
+                              >
+                                <GraduationCap className="h-4 w-4" />
+                              </Button>
+                            )}
 
-                            {/* 비밀번호 초기화 */}
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 rounded-lg text-amber-600 hover:text-amber-700 hover:bg-amber-50" 
-                              title="비밀번호 초기화 (123123)"
-                              disabled={isResetting === profile.id}
-                              onClick={() => { setSelectedProfile(profile); setIsResetOpen(true); }}
-                            >
-                              {isResetting === profile.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-                            </Button>
+                            {/* 비밀번호 초기화: 상위 관리자만 하위 사용자 초기화 가능 */}
+                            {canManageThisUser && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 rounded-lg text-amber-600 hover:text-amber-700 hover:bg-amber-50" 
+                                title="비밀번호 초기화 (123123)"
+                                disabled={isResetting === profile.id}
+                                onClick={() => { setSelectedProfile(profile); setIsResetOpen(true); }}
+                              >
+                                {isResetting === profile.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+                              </Button>
+                            )}
 
-                            {/* 메인관리자 권한 이양: 메인관리자 전용 & 본인 제외 */}
-                            {isMasterAdmin && !isThisUserMasterAdmin && (
+                            {/* 서브관리자 임명/해제: 오직 메인관리자만 가능 & 메인관리자 본인 제외 */}
+                            {currentUserRank === 1 && !isThisUserMasterAdmin && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className={cn(
+                                  "h-8 w-8 rounded-lg transition-colors",
+                                  isThisUserSubAdmin 
+                                    ? "text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50" 
+                                    : "text-slate-400 hover:text-indigo-600 hover:bg-slate-50"
+                                )}
+                                onClick={() => handleToggleSubAdmin(profile.username)} 
+                                title={isThisUserSubAdmin ? "서브관리자 해제" : "서브관리자 임명"}
+                                disabled={isTogglingSubAdmin === profile.username}
+                              >
+                                {isTogglingSubAdmin === profile.username ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <ShieldCheck className="h-4 w-4" />
+                                )}
+                              </Button>
+                            )}
+
+                            {/* 메인관리자 권한 이양: 오직 메인관리자만 가능 & 본인 제외 */}
+                            {currentUserRank === 1 && !isThisUserMasterAdmin && (
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
@@ -688,8 +794,8 @@ export function UserTable({
                               </Button>
                             )}
 
-                            {/* 계정 삭제: 메인관리자 전용 & 메인관리자 본인 삭제 불가 */}
-                            {isMasterAdmin && !isThisUserMasterAdmin && (
+                            {/* 계정 삭제: 상위 관리자(1,2)가 하위 사용자 삭제 시 가능 */}
+                            {currentUserRank <= 2 && canManageThisUser && (
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
@@ -721,10 +827,13 @@ export function UserTable({
           <div className="md:hidden divide-y divide-slate-100">
             {filteredProfiles.length > 0 ? (
               filteredProfiles.map((profile) => {
-                const isThisUserMasterAdmin = 
-                  profile.username === masterAdminInfo?.username || 
-                  profile.full_name === '이호중' || 
-                  profile.username === '이호중';
+                const targetRank = getProfileRank(profile);
+                const isThisUserMasterAdmin = targetRank === 1;
+                const isThisUserSubAdmin = targetRank === 2;
+                const isThisUserGeneralAdmin = targetRank === 3;
+                
+                // 상위 관리자만 하위 관리자/교직원의 권한 및 정보를 수정할 수 있음 (상위 > 하위)
+                const canManageThisUser = currentUserRank < targetRank;
                 const hasCustomPermissions = customPermissionsMap[profile.id] !== undefined;
 
                 return (
@@ -733,9 +842,13 @@ export function UserTable({
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className={cn(
                           "h-9 w-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 border",
-                          isThisUserMasterAdmin ? "bg-amber-100 text-amber-800 border-amber-300" : "bg-blue-50 text-blue-600 border-blue-100"
+                          isThisUserMasterAdmin 
+                            ? "bg-amber-100 text-amber-800 border-amber-300" 
+                            : isThisUserSubAdmin
+                            ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                            : "bg-blue-50 text-blue-600 border-blue-100"
                         )}>
-                          {isThisUserMasterAdmin ? '👑' : (profile.full_name?.[0] || profile.username?.[0] || '?')}
+                          {isThisUserMasterAdmin ? '👑' : isThisUserSubAdmin ? '🥈' : (profile.full_name?.[0] || profile.username?.[0] || '?')}
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
@@ -743,6 +856,10 @@ export function UserTable({
                             {isThisUserMasterAdmin ? (
                               <Badge className="text-[9px] font-black bg-amber-50 text-amber-800 border-amber-300 shrink-0">
                                 👑 메인관리자
+                              </Badge>
+                            ) : isThisUserSubAdmin ? (
+                              <Badge className="text-[9px] font-black bg-indigo-50 text-indigo-700 border-indigo-200 shrink-0">
+                                🥈 서브관리자
                               </Badge>
                             ) : hasCustomPermissions ? (
                               <Badge className="text-[9px] font-bold px-1.5 py-0 bg-amber-50 text-amber-700 border-amber-200 shrink-0">
@@ -755,12 +872,18 @@ export function UserTable({
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0">
-                        {isThisUserMasterAdmin || !isMasterAdmin ? (
+                        {isThisUserMasterAdmin || isThisUserSubAdmin || !(currentUserRank <= 2 && canManageThisUser) ? (
                           <Badge className={cn(
                             "text-[10px] font-bold py-0.5 px-2",
-                            profile.role === 'admin' ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-600 border-slate-200"
+                            isThisUserMasterAdmin 
+                              ? "bg-amber-50 text-amber-800 border-amber-300"
+                              : isThisUserSubAdmin
+                              ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                              : profile.role === 'admin' 
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
+                              : "bg-slate-100 text-slate-600 border-slate-200"
                           )}>
-                            {isThisUserMasterAdmin ? '메인' : profile.role === 'admin' ? '관리자' : '교직원'}
+                            {isThisUserMasterAdmin ? '메인' : isThisUserSubAdmin ? '서브' : profile.role === 'admin' ? '관리자' : '교직원'}
                           </Badge>
                         ) : (
                           <Select defaultValue={profile.role} onValueChange={(v) => handleRoleChange(profile.id, v)}>
@@ -780,10 +903,10 @@ export function UserTable({
                               <MoreVertical className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-44 rounded-xl shadow-lg border-slate-200">
+                          <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg border-slate-200">
                             <DropdownMenuLabel className="text-[10px] font-black text-slate-400 uppercase tracking-widest">관리 메뉴</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            {isMasterAdmin && (
+                            {currentUserRank <= 2 && canManageThisUser && (
                               <DropdownMenuItem 
                                 onSelect={() => { 
                                   (document.activeElement as HTMLElement)?.blur();
@@ -797,33 +920,44 @@ export function UserTable({
                                 <Sliders className="h-4 w-4" /> 메뉴 권한 설정
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem 
-                              onSelect={() => { 
-                                (document.activeElement as HTMLElement)?.blur();
-                                setTimeout(() => {
-                                  setSelectedProfile(profile); 
-                                  setIsAssignOpen(true); 
-                                }, 50);
-                              }} 
-                              className="gap-2 font-medium cursor-pointer text-blue-600 focus:text-blue-700 focus:bg-blue-50"
-                            >
-                              <GraduationCap className="h-4 w-4" /> 담당 학반 배정
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onSelect={() => { 
-                                (document.activeElement as HTMLElement)?.blur();
-                                setTimeout(() => {
-                                  setSelectedProfile(profile); 
-                                  setIsResetOpen(true); 
-                                }, 50);
-                              }} 
-                              className="gap-2 font-medium cursor-pointer text-amber-600 focus:text-amber-700 focus:bg-amber-50"
-                            >
-                              <KeyRound className="h-4 w-4" /> 비밀번호 초기화
-                            </DropdownMenuItem>
-                            {isMasterAdmin && !isThisUserMasterAdmin && (
+                            {canManageThisUser && (
+                              <>
+                                <DropdownMenuItem 
+                                  onSelect={() => { 
+                                    (document.activeElement as HTMLElement)?.blur();
+                                    setTimeout(() => {
+                                      setSelectedProfile(profile); 
+                                      setIsAssignOpen(true); 
+                                    }, 50);
+                                  }} 
+                                  className="gap-2 font-medium cursor-pointer text-blue-600 focus:text-blue-700 focus:bg-blue-50"
+                                >
+                                  <GraduationCap className="h-4 w-4" /> 담당 학반 배정
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onSelect={() => { 
+                                    (document.activeElement as HTMLElement)?.blur();
+                                    setTimeout(() => {
+                                      setSelectedProfile(profile); 
+                                      setIsResetOpen(true); 
+                                    }, 50);
+                                  }} 
+                                  className="gap-2 font-medium cursor-pointer text-amber-600 focus:text-amber-700 focus:bg-amber-50"
+                                >
+                                  <KeyRound className="h-4 w-4" /> 비밀번호 초기화
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {currentUserRank === 1 && !isThisUserMasterAdmin && (
                               <>
                                 <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  onSelect={() => handleToggleSubAdmin(profile.username)} 
+                                  className="gap-2 font-medium text-indigo-700 focus:text-indigo-800 focus:bg-indigo-50 cursor-pointer"
+                                >
+                                  <ShieldCheck className="h-4 w-4 text-indigo-600" />
+                                  {isThisUserSubAdmin ? '서브관리자 해제' : '서브관리자 임명'}
+                                </DropdownMenuItem>
                                 <DropdownMenuItem 
                                   onSelect={() => { 
                                     (document.activeElement as HTMLElement)?.blur();
@@ -836,6 +970,11 @@ export function UserTable({
                                 >
                                   <Crown className="h-4 w-4 text-amber-600" /> 메인관리자 권한 이양
                                 </DropdownMenuItem>
+                              </>
+                            )}
+                            {currentUserRank <= 2 && canManageThisUser && (
+                              <>
+                                <DropdownMenuSeparator />
                                 <DropdownMenuItem 
                                   onSelect={() => { 
                                     (document.activeElement as HTMLElement)?.blur();
@@ -849,6 +988,11 @@ export function UserTable({
                                   <Trash2 className="h-4 w-4" /> 계정 삭제
                                 </DropdownMenuItem>
                               </>
+                            )}
+                            {!canManageThisUser && currentUserRank !== 1 && (
+                              <div className="px-3 py-2 text-[11px] text-slate-400 font-medium text-center">
+                                권한 제어 불가 (상위/동급)
+                              </div>
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -1124,6 +1268,7 @@ export function UserTable({
         onClose={() => setIsPermissionsOpen(false)}
         profile={selectedPermissionProfile}
         customPermissionsMap={customPermissionsMap}
+        subAdminList={currentSubAdmins}
         onSaved={(newMap) => setCustomPermissionsMap(newMap)}
       />
     </div>

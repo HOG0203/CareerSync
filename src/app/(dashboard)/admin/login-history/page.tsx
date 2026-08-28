@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { KeyRound, ShieldAlert } from 'lucide-react';
 import { LoginHistoryClient } from './login-history-client';
 
-import { getMasterAdminInfo, getUserCustomPermissionsMapAction } from '@/app/(dashboard)/admin/users/actions';
+import { getMasterAdminInfo, getUserCustomPermissionsMapAction, getSubAdminList } from '@/app/(dashboard)/admin/users/actions';
 
 export const dynamic = 'force-dynamic';
 

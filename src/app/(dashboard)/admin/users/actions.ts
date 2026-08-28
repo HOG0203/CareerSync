@@ -84,6 +84,126 @@ export async function checkIsMasterAdmin(): Promise<boolean> {
 }
 
 /**
+ * 서브관리자(Sub-Admin) 목록 조회
+ */
+export async function getSubAdminList(): Promise<string[]> {
+  try {
+    const { data } = await supabaseAdmin
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'sub_admin_list')
+      .maybeSingle();
+
+    if (data?.value && Array.isArray(data.value)) {
+      return data.value as string[];
+    }
+    return [];
+  } catch (err) {
+    console.error('Failed to get sub admin list:', err);
+    return [];
+  }
+}
+
+/**
+ * 현재 로그인한 사용자가 서브관리자(또는 메인관리자)인지 검증 (방안 A형 준최고관리자)
+ */
+export async function checkIsSubAdmin(): Promise<boolean> {
+  try {
+    const isMaster = await checkIsMasterAdmin();
+    if (isMaster) return true;
+
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('username, role')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile || profile.role !== 'admin') return false;
+
+    const subAdmins = await getSubAdminList();
+    return subAdmins.includes(profile.username);
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
+ * 서브관리자 임명 / 해제 (메인관리자 전용)
+ */
+export async function toggleSubAdminAction(targetUsername: string) {
+  const isMaster = await checkIsMasterAdmin();
+  if (!isMaster) {
+    return { error: '메인관리자만 서브관리자를 임명하거나 해제할 수 있습니다.' };
+  }
+
+  const masterInfo = await getMasterAdminInfo();
+  if (targetUsername === masterInfo.username || targetUsername === '이호중') {
+    return { error: '메인관리자는 서브관리자로 변경할 수 없습니다.' };
+  }
+
+  const { data: targetProfile } = await supabaseAdmin
+    .from('profiles')
+    .select('id, username, full_name, role')
+    .eq('username', targetUsername)
+    .maybeSingle();
+
+  if (!targetProfile) {
+    return { error: '대상 사용자를 찾을 수 없습니다.' };
+  }
+
+  const currentSubAdmins = await getSubAdminList();
+  const isAlreadySubAdmin = currentSubAdmins.includes(targetUsername);
+
+  let newSubAdmins: string[];
+  let actionVerb: string;
+
+  if (isAlreadySubAdmin) {
+    newSubAdmins = currentSubAdmins.filter(u => u !== targetUsername);
+    actionVerb = '서브관리자 해제';
+  } else {
+    newSubAdmins = [...currentSubAdmins, targetUsername];
+    actionVerb = '서브관리자 임명';
+
+    // 서브관리자로 임명 시 관리자(admin) 역할로 자동 승격
+    if (targetProfile.role !== 'admin') {
+      await supabaseAdmin
+        .from('profiles')
+        .update({ role: 'admin' })
+        .eq('id', targetProfile.id);
+    }
+  }
+
+  const { error } = await supabaseAdmin
+    .from('system_settings')
+    .upsert({
+      key: 'sub_admin_list',
+      value: newSubAdmins,
+      updated_at: new Date().toISOString(),
+    });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  const { logAuditAction } = await import('@/lib/audit-logger');
+  await logAuditAction({
+    action_type: 'USER_ROLE_UPDATE',
+    target_name: `${actionVerb} ➔ ${targetProfile.full_name || targetProfile.username} (${targetProfile.username})`,
+    details: { targetUsername, isSubAdmin: !isAlreadySubAdmin },
+  });
+
+  revalidateTag('system_settings');
+  revalidateTag('profiles');
+  revalidatePath('/admin/users');
+  revalidatePath('/', 'layout');
+  return { success: true, isSubAdmin: !isAlreadySubAdmin, subAdminList: newSubAdmins };
+}
+
+/**
  * 메인관리자 권한을 다른 사용자에게 이양
  */
 export async function transferMasterAdminAction(newMasterUsername: string) {
@@ -141,9 +261,9 @@ export async function transferMasterAdminAction(newMasterUsername: string) {
 const DOMAIN = 'careersync.local'
 
 export async function createUser(formData: FormData) {
-  const isMaster = await checkIsMasterAdmin()
-  if (!isMaster) {
-    return { error: '메인관리자만 신규 사용자를 등록할 수 있습니다.' }
+  const canManage = (await checkIsMasterAdmin()) || (await checkIsSubAdmin())
+  if (!canManage) {
+    return { error: '메인관리자 또는 서브관리자만 신규 사용자를 등록할 수 있습니다.' }
   }
 
   const username = formData.get('username') as string
@@ -218,12 +338,12 @@ export async function createUser(formData: FormData) {
 }
 
 /**
- * 사용자 일괄 생성 (Excel Import용 - 메인관리자 전용)
+ * 사용자 일괄 생성 (Excel Import용 - 메인관리자 및 서브관리자 허용)
  */
 export async function bulkCreateUsers(users: { username: string, fullName: string, role: string }[]) {
-  const isMaster = await checkIsMasterAdmin()
-  if (!isMaster) {
-    return { error: '메인관리자만 일괄 계정을 생성할 수 있습니다.' }
+  const canManage = (await checkIsMasterAdmin()) || (await checkIsSubAdmin())
+  if (!canManage) {
+    return { error: '메인관리자 또는 서브관리자만 일괄 계정을 생성할 수 있습니다.' }
   }
 
   const results = {
@@ -304,32 +424,83 @@ export async function bulkCreateUsers(users: { username: string, fullName: strin
 }
 
 /**
- * 관리자용 사용자 비밀번호 초기화 (123123으로 초기화)
+ * 사용자 권한 등급 체계 (1: 메인관리자, 2: 서브관리자, 3: 일반관리자, 4: 일반교직원)
+ */
+export type AdminRank = 1 | 2 | 3 | 4;
+
+export async function getUserRank(profile: { username?: string | null; full_name?: string | null; role?: string | null } | null): Promise<AdminRank> {
+  if (!profile) return 4;
+  const masterInfo = await getMasterAdminInfo();
+  if (
+    profile.username === masterInfo.username ||
+    profile.full_name === '이호중' ||
+    profile.username === '이호중'
+  ) {
+    return 1;
+  }
+  if (profile.role === 'admin') {
+    const subAdmins = await getSubAdminList();
+    if (profile.username && subAdmins.includes(profile.username)) {
+      return 2;
+    }
+    return 3;
+  }
+  return 4;
+}
+
+export async function getCurrentUserRank(): Promise<{ rank: AdminRank; profile: any | null }> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { rank: 4, profile: null };
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, username, full_name, role')
+      .eq('id', user.id)
+      .single();
+
+    const rank = await getUserRank(profile);
+    return { rank, profile };
+  } catch (err) {
+    return { rank: 4, profile: null };
+  }
+}
+
+/**
+ * 관리자용 사용자 비밀번호 초기화 (123123으로 초기화 - 상위 관리자만 하위 관리자/교직원 초기화 가능)
  */
 export async function resetUserPassword(userId: string) {
-  const isAdmin = await checkIsAdmin()
-  if (!isAdmin) {
-    return { error: '권한이 없습니다.' }
+  const { rank: actorRank } = await getCurrentUserRank();
+  if (actorRank >= 4) {
+    return { error: '비밀번호를 초기화할 권한이 없습니다.' };
   }
 
   const { data: targetProfile } = await supabaseAdmin
     .from('profiles')
-    .select('username, full_name')
+    .select('id, username, full_name, role')
     .eq('id', userId)
-    .maybeSingle()
+    .maybeSingle();
+
+  if (!targetProfile) {
+    return { error: '대상 사용자를 찾을 수 없습니다.' };
+  }
+
+  const targetRank = await getUserRank(targetProfile);
+  if (actorRank >= targetRank) {
+    return { error: '상위 또는 동급 관리자의 비밀번호는 초기화할 수 없습니다. (자신보다 하위 등급만 가능)' };
+  }
 
   const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
     password: '123123'
-  })
+  });
 
   if (authError) {
-    console.error('Error resetting password:', authError)
-    return { error: `비밀번호 초기화 실패: ${authError.message}` }
+    console.error('Error resetting password:', authError);
+    return { error: `비밀번호 초기화 실패: ${authError.message}` };
   }
 
-  const targetLabel = targetProfile
-    ? `${targetProfile.full_name || targetProfile.username} (${targetProfile.username})`
-    : `계정 (ID: ${userId})`;
+  const targetLabel = `${targetProfile.full_name || targetProfile.username} (${targetProfile.username})`;
 
   const { logAuditAction } = await import('@/lib/audit-logger');
   await logAuditAction({
@@ -338,41 +509,43 @@ export async function resetUserPassword(userId: string) {
     details: { userId }
   });
 
-  return { success: true }
+  return { success: true };
 }
 
 /**
- * 사용자 역할 변경 (메인관리자 전용)
+ * 사용자 역할 변경 (상위 관리자만 하위 사용자의 역할 변경 가능)
  */
 export async function updateUserRole(userId: string, newRole: string) {
-  const isMaster = await checkIsMasterAdmin()
-  if (!isMaster) {
-    return { error: '메인관리자만 사용자의 역할을 변경할 수 있습니다.' }
+  const { rank: actorRank } = await getCurrentUserRank();
+  if (actorRank > 2) {
+    return { error: '메인관리자 또는 서브관리자만 사용자의 역할을 변경할 수 있습니다.' };
   }
 
   const { data: targetProfile } = await supabaseAdmin
     .from('profiles')
-    .select('username, full_name, role')
+    .select('id, username, full_name, role')
     .eq('id', userId)
-    .maybeSingle()
+    .maybeSingle();
 
-  const masterInfo = await getMasterAdminInfo()
-  if (targetProfile && (targetProfile.username === masterInfo.username || targetProfile.full_name === '이호중')) {
-    return { error: '메인관리자의 역할은 변경할 수 없습니다.' }
+  if (!targetProfile) {
+    return { error: '대상 사용자를 찾을 수 없습니다.' };
+  }
+
+  const targetRank = await getUserRank(targetProfile);
+  if (actorRank >= targetRank) {
+    return { error: '상위 또는 동급 관리자의 역할은 변경할 수 없습니다. (자신보다 하위 등급만 가능)' };
   }
 
   const { error } = await supabaseAdmin
     .from('profiles')
     .update({ role: newRole as any })
-    .eq('id', userId)
+    .eq('id', userId);
 
   if (error) {
-    return { error: error.message }
+    return { error: error.message };
   }
 
-  const targetLabel = targetProfile
-    ? `${targetProfile.full_name || targetProfile.username} (${targetProfile.username})`
-    : `계정 (ID: ${userId})`;
+  const targetLabel = `${targetProfile.full_name || targetProfile.username} (${targetProfile.username})`;
 
   const { logAuditAction } = await import('@/lib/audit-logger');
   await logAuditAction({
@@ -381,16 +554,34 @@ export async function updateUserRole(userId: string, newRole: string) {
     details: { userId, oldRole: targetProfile?.role, newRole }
   });
 
-  revalidateTag('profiles')
-  revalidateTag('teachers')
-  revalidatePath('/admin/users')
-  return { success: true }
+  revalidateTag('profiles');
+  revalidateTag('teachers');
+  revalidatePath('/admin/users');
+  return { success: true };
 }
 
+/**
+ * 담당 학반 배정 (상위 관리자만 하위 사용자의 담당 학반 변경 가능)
+ */
 export async function updateAssignedClass(userId: string, data: { year: number | null, major: string | null, className: string | null, grade: number | null }) {
-  const isAdmin = await checkIsAdmin()
-  if (!isAdmin) {
-    return { error: '권한이 없습니다.' }
+  const { rank: actorRank } = await getCurrentUserRank();
+  if (actorRank >= 4) {
+    return { error: '담당 학반을 배정할 권한이 없습니다.' };
+  }
+
+  const { data: targetProfile } = await supabaseAdmin
+    .from('profiles')
+    .select('id, username, full_name, role')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (!targetProfile) {
+    return { error: '대상 사용자를 찾을 수 없습니다.' };
+  }
+
+  const targetRank = await getUserRank(targetProfile);
+  if (actorRank >= targetRank) {
+    return { error: '상위 또는 동급 관리자의 담당 학반은 변경할 수 없습니다. (자신보다 하위 등급만 가능)' };
   }
 
   const { error } = await supabaseAdmin
@@ -401,16 +592,16 @@ export async function updateAssignedClass(userId: string, data: { year: number |
       assigned_class: data.className,
       assigned_grade: data.grade
     })
-    .eq('id', userId)
+    .eq('id', userId);
 
   if (error) {
-    return { error: error.message }
+    return { error: error.message };
   }
 
   const { logAuditAction } = await import('@/lib/audit-logger');
   await logAuditAction({
     action_type: 'HOMEROOM_ASSIGN',
-    target_name: `담임 배정 변경 (${data.grade ? `${data.grade}학년 ` : ''}${data.major || ''} ${data.className ? `${data.className}반` : ''})`,
+    target_name: `${targetProfile.full_name || targetProfile.username} 담임 배정 변경 (${data.grade ? `${data.grade}학년 ` : ''}${data.major || ''} ${data.className ? `${data.className}반` : ''})`,
     details: { userId, ...data }
   });
 
@@ -424,50 +615,50 @@ export async function updateAssignedClass(userId: string, data: { year: number |
 }
 
 /**
- * 사용자 삭제 (메인관리자 전용 & 메인관리자 계정 보호)
+ * 사용자 삭제 (상위 관리자만 하위 사용자 삭제 가능 & 본인 삭제 불가)
  */
 export async function deleteUser(userId: string) {
-  const isMaster = await checkIsMasterAdmin()
-  if (!isMaster) {
-    return { error: '메인관리자만 계정을 삭제할 수 있습니다.' }
+  const { rank: actorRank, profile: actorProfile } = await getCurrentUserRank();
+  if (actorRank > 2) {
+    return { error: '메인관리자 또는 서브관리자만 계정을 삭제할 수 있습니다.' };
   }
 
-  const supabase = await createClient()
-  const { data: { user: currentUser } } = await supabase.auth.getUser()
-  if (currentUser && currentUser.id === userId) {
-    return { error: '현재 로그인 중인 본인 계정은 삭제할 수 없습니다.' }
+  if (actorProfile && actorProfile.id === userId) {
+    return { error: '현재 로그인 중인 본인 계정은 삭제할 수 없습니다.' };
   }
 
   // 삭제 대상 프로필 정보 먼저 조회
   const { data: targetProfile } = await supabaseAdmin
     .from('profiles')
-    .select('username, full_name, role')
+    .select('id, username, full_name, role')
     .eq('id', userId)
-    .maybeSingle()
+    .maybeSingle();
 
-  const masterInfo = await getMasterAdminInfo()
-  if (targetProfile && (targetProfile.username === masterInfo.username || targetProfile.full_name === '이호중')) {
-    return { error: '메인관리자 계정은 삭제할 수 없습니다.' }
+  if (!targetProfile) {
+    return { error: '대상 사용자를 찾을 수 없습니다.' };
   }
 
-  const targetLabel = targetProfile
-    ? `${targetProfile.full_name || targetProfile.username} (${targetProfile.username})`
-    : `계정 (ID: ${userId})`;
+  const targetRank = await getUserRank(targetProfile);
+  if (actorRank >= targetRank) {
+    return { error: '상위 또는 동급 관리자의 계정은 삭제할 수 없습니다. (자신보다 하위 등급만 가능)' };
+  }
+
+  const targetLabel = `${targetProfile.full_name || targetProfile.username} (${targetProfile.username})`;
 
   // 1. public.profiles 테이블에서 먼저 삭제
   const { error: profileErr } = await supabaseAdmin
     .from('profiles')
     .delete()
-    .eq('id', userId)
+    .eq('id', userId);
 
   if (profileErr) {
-    return { error: `프로필 삭제 실패: ${profileErr.message}` }
+    return { error: `프로필 삭제 실패: ${profileErr.message}` };
   }
 
   // 2. Supabase Auth 유저 삭제
-  const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(userId)
+  const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(userId);
   if (authErr && !authErr.message?.toLowerCase().includes('not found')) {
-    console.warn('Auth user delete notice:', authErr.message)
+    console.warn('Auth user delete notice:', authErr.message);
   }
 
   const { logAuditAction } = await import('@/lib/audit-logger');
@@ -477,10 +668,10 @@ export async function deleteUser(userId: string) {
     details: { userId, username: targetProfile?.username, role: targetProfile?.role }
   });
 
-  revalidateTag('profiles')
-  revalidateTag('teachers')
-  revalidatePath('/admin/users')
-  return { success: true }
+  revalidateTag('profiles');
+  revalidateTag('teachers');
+  revalidatePath('/admin/users');
+  return { success: true };
 }
 
 /**
@@ -505,16 +696,31 @@ export async function getUserCustomPermissionsMapAction(): Promise<Record<string
 }
 
 /**
- * 특정 사용자의 개별 메뉴 권한 설정 (메인관리자 전용)
+ * 특정 사용자의 개별 메뉴 권한 설정 (상위 관리자만 하위 사용자의 권한 설정 가능)
  */
 export async function saveUserCustomPermissionsAction(
   userId: string,
   allowedRoutes: string[] | null,
   userName?: string
 ) {
-  const isMaster = await checkIsMasterAdmin();
-  if (!isMaster) {
-    return { error: '메인관리자만 개별 메뉴 권한을 설정할 수 있습니다.' };
+  const { rank: actorRank } = await getCurrentUserRank();
+  if (actorRank > 2) {
+    return { error: '메인관리자 또는 서브관리자만 개별 메뉴 권한을 설정할 수 있습니다.' };
+  }
+
+  const { data: targetProfile } = await supabaseAdmin
+    .from('profiles')
+    .select('id, username, full_name, role')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (!targetProfile) {
+    return { error: '대상 사용자를 찾을 수 없습니다.' };
+  }
+
+  const targetRank = await getUserRank(targetProfile);
+  if (actorRank >= targetRank) {
+    return { error: '상위 또는 동급 관리자의 메뉴 권한은 변경할 수 없습니다. (자신보다 하위 등급만 가능)' };
   }
 
   try {
@@ -550,10 +756,10 @@ export async function saveUserCustomPermissionsAction(
     const { logAuditAction } = await import('@/lib/audit-logger');
     await logAuditAction({
       action_type: 'USER_ROLE_UPDATE',
-      target_name: `메뉴 권한 설정: ${userName || userId}`,
+      target_name: `메뉴 권한 설정: ${userName || targetProfile.full_name || userId}`,
       details: {
         userId,
-        userName,
+        userName: targetProfile.full_name,
         isCustom: allowedRoutes !== null,
         allowedRoutes,
       },

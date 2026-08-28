@@ -1,15 +1,6 @@
 'use client';
 
-const MAJOR_SORT_ORDER = [
-  '자동화기계과',
-  '친환경자동차과',
-  '공간스마트운용과',
-  '스마트융합건설과',
-  '스마트팩토리건축과',
-  '스마트전기과',
-  '스마트화학공업과',
-  '토탈패션디자인과'
-]; 
+import { MAJOR_SORT_ORDER } from '@/lib/types';
 
 /**
  * 오늘 날짜 기준 실제 유효 실습/채용 상태 판별
@@ -39,7 +30,6 @@ function getEffectiveRecordStatus(r: any, todayStr: string): 'upcoming' | 'ongoi
   
   return 'ongoing';
 }
-
 
 import * as React from 'react';
 import { 
@@ -74,7 +64,6 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { format, parseISO, differenceInDays, isAfter, isBefore, isValid } from 'date-fns';
 import { ko } from 'date-fns/locale';
-
 import { useRouter } from 'next/navigation';
 
 interface FieldTrainingClientProps {
@@ -106,6 +95,7 @@ export function FieldTrainingClient({
   const [selectedClass, setSelectedClass] = React.useState<string>(
     isAdmin ? 'ALL' : (userProfile?.assigned_class || 'ALL')
   );
+  const [selectedStartDate, setSelectedStartDate] = React.useState<string>('ALL');
 
   const [viewMode, setViewMode] = React.useState<'timeline' | 'grid'>('timeline');
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -169,12 +159,40 @@ export function FieldTrainingClient({
     });
   }, [students, selectedGrade, selectedMajor, selectedClass]);
 
+  // 학년/학과/반 필터가 적용된 학생들의 고유 실습 시작일자 목록 및 인원수 자동 집계
+  const availableStartDates = React.useMemo(() => {
+    const dateCountMap: Record<string, number> = {};
+    baseFilteredStudents.forEach(s => {
+      const records = s.training_records || [];
+      records.forEach((r: any) => {
+        if (r.start_date) {
+          dateCountMap[r.start_date] = (dateCountMap[r.start_date] || 0) + 1;
+        }
+      });
+    });
+
+    return Object.entries(dateCountMap)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, count]) => ({ date, count }));
+  }, [baseFilteredStudents]);
+
+  // 학년/학과/반 및 시작일자 필터까지 적용된 학생 목록 (KPI 통계 및 상태 칩 집계 기준)
+  const dateFilteredStudents = React.useMemo(() => {
+    return baseFilteredStudents.filter(s => {
+      if (selectedStartDate !== 'ALL') {
+        const hasStartDate = s.training_records?.some((r: any) => r.start_date === selectedStartDate);
+        if (!hasStartDate) return false;
+      }
+      return true;
+    });
+  }, [baseFilteredStudents, selectedStartDate]);
+
   // 오늘 날짜 YYYY-MM-DD
   const todayStr = React.useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
 
   // 검색 및 상태 필터까지 적용된 최종 학생 목록 (오늘 날짜 기준 스마트 상태 매칭)
   const filteredStudents = React.useMemo(() => {
-    return baseFilteredStudents.filter(s => {
+    return dateFilteredStudents.filter(s => {
       const matchSearch = !searchTerm || 
         s.student_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         s.student_number?.includes(searchTerm) ||
@@ -190,8 +208,11 @@ export function FieldTrainingClient({
       if (statusFilter === 'none') return (!records || records.length === 0);
       if (statusFilter === 'stipend') return records.some((r: any) => r.stipend_status === 'O');
 
-      const latest = records[0];
-      const effectiveStatus = latest ? getEffectiveRecordStatus(latest, todayStr) : 'none';
+      const targetRecord = selectedStartDate !== 'ALL'
+        ? (records.find((r: any) => r.start_date === selectedStartDate) || records[0])
+        : records[0];
+
+      const effectiveStatus = targetRecord ? getEffectiveRecordStatus(targetRecord, todayStr) : 'none';
 
       if (statusFilter === 'upcoming') return effectiveStatus === 'upcoming';
       if (statusFilter === 'ongoing') return effectiveStatus === 'ongoing';
@@ -200,7 +221,7 @@ export function FieldTrainingClient({
 
       return true;
     }).sort((a, b) => {
-      if (a.grade !== b.grade) return (a.grade || 3) - (b.grade || 3);
+      if (a.grade !== b.grade) return (b.grade || 3) - (a.grade || 3);
       const idxA = MAJOR_SORT_ORDER.indexOf(a.major);
       const idxB = MAJOR_SORT_ORDER.indexOf(b.major);
       if (idxA !== idxB) return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
@@ -210,51 +231,75 @@ export function FieldTrainingClient({
       if (numA !== numB) return numA - numB;
       return (a.student_name || '').localeCompare(b.student_name || '', 'ko');
     });
-  }, [baseFilteredStudents, searchTerm, statusFilter, todayStr]);
+  }, [dateFilteredStudents, searchTerm, statusFilter, selectedStartDate, todayStr]);
 
-  // KPI 집계 통계 계산 (오늘 날짜 기준 실습예정/진행중/채용전환 자동 분류)
-  const stats = React.useMemo(() => {
-    const total = baseFilteredStudents.length;
+  // 하단 7종 상태 필터 칩에 표시될 카테고리별 인원수 집계 (학년/학과/반/시작일자 기준)
+  const categoryCounts = React.useMemo(() => {
     let participatingCount = 0;
     let upcomingCount = 0;
     let ongoingCount = 0;
     let convertedCount = 0;
     let returnedCount = 0;
-    let stipendCount = 0;
 
-    baseFilteredStudents.forEach(s => {
+    dateFilteredStudents.forEach(s => {
       const records = s.training_records || [];
       if (records.length > 0) {
         participatingCount++;
-        const latest = records[0]; // 최신 차수
-        const effectiveStatus = getEffectiveRecordStatus(latest, todayStr);
+        const targetRecord = selectedStartDate !== 'ALL'
+          ? (records.find((r: any) => r.start_date === selectedStartDate) || records[0])
+          : records[0];
+
+        const effectiveStatus = getEffectiveRecordStatus(targetRecord, todayStr);
 
         if (effectiveStatus === 'upcoming') upcomingCount++;
         else if (effectiveStatus === 'converted') convertedCount++;
         else if (effectiveStatus === 'returned') returnedCount++;
         else if (effectiveStatus === 'ongoing') ongoingCount++;
-
-        if (records.some((r: any) => r.stipend_status === 'O')) {
-          stipendCount++;
-        }
       }
     });
 
-    const participationRate = total > 0 ? Math.round((participatingCount / total) * 100) : 0;
-    const stipendRate = participatingCount > 0 ? Math.round((stipendCount / participatingCount) * 100) : 0;
-
     return {
-      total,
+      total: dateFilteredStudents.length,
       participatingCount,
-      participationRate,
       upcomingCount,
       ongoingCount,
       convertedCount,
       returnedCount,
-      stipendCount,
-      stipendRate
+      noneCount: dateFilteredStudents.length - participatingCount
     };
-  }, [baseFilteredStudents, todayStr]);
+  }, [dateFilteredStudents, selectedStartDate, todayStr]);
+
+  // 상단 5개 KPI 카드 통계 (현재 화면에 필터링된 모든 조건 및 검색 결과 실시간 반영)
+  const stats = React.useMemo(() => {
+    let upcomingCount = 0;
+    let ongoingCount = 0;
+    let convertedCount = 0;
+    let returnedCount = 0;
+
+    filteredStudents.forEach(s => {
+      const records = s.training_records || [];
+      if (records.length > 0) {
+        const targetRecord = selectedStartDate !== 'ALL'
+          ? (records.find((r: any) => r.start_date === selectedStartDate) || records[0])
+          : records[0];
+
+        const effectiveStatus = getEffectiveRecordStatus(targetRecord, todayStr);
+
+        if (effectiveStatus === 'upcoming') upcomingCount++;
+        else if (effectiveStatus === 'converted') convertedCount++;
+        else if (effectiveStatus === 'returned') returnedCount++;
+        else if (effectiveStatus === 'ongoing') ongoingCount++;
+      }
+    });
+
+    return {
+      total: filteredStudents.length,
+      upcomingCount,
+      ongoingCount,
+      convertedCount,
+      returnedCount,
+    };
+  }, [filteredStudents, selectedStartDate, todayStr]);
 
   // 동적 간트 타임라인 월범위 계산 (실제 데이터의 시작월~종료월 스캔 + 기본 범위 보장)
   const timelineMonths = React.useMemo(() => {
@@ -368,24 +413,52 @@ export function FieldTrainingClient({
     <div className="flex flex-col h-full gap-4 w-full overflow-hidden">
       {/* 1. 상단 KPI 집계 카드 대시보드 */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 shrink-0">
+        {/* 1. 조회 학생 수 (하단 상태 필터 및 검색 적용 결과 실시간 반영) */}
         <Card className="bg-white border-slate-200/80 shadow-sm rounded-xl p-3 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500">전체 실습 참여율</span>
+            <span className="text-[11px] font-bold text-slate-500">조회 학생 수</span>
             <div className="h-7 w-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-              <TrendingUp className="h-4 w-4" />
+              <Users className="h-4 w-4" />
             </div>
           </div>
           <div className="mt-2">
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-xl font-extrabold text-slate-900">{stats.participationRate}%</span>
-              <span className="text-[11px] font-bold text-slate-500">({stats.participatingCount}/{stats.total}명)</span>
+            <div className="flex items-baseline justify-between">
+              <span className="text-xl font-extrabold text-slate-900">{filteredStudents.length}명</span>
+              <span className={cn(
+                "text-[10px] font-bold px-1.5 py-0.5 rounded border",
+                (statusFilter !== 'all' || searchTerm)
+                  ? "text-blue-700 bg-blue-50 border-blue-200"
+                  : "text-slate-600 bg-slate-100 border-slate-200"
+              )}>
+                {(statusFilter !== 'all' || searchTerm) ? 'FILTERED' : 'TOTAL'}
+              </span>
             </div>
-            <div className="w-full bg-slate-100 h-1.5 rounded-full mt-1.5 overflow-hidden">
-              <div className="bg-blue-600 h-full rounded-full transition-all duration-500" style={{ width: `${stats.participationRate}%` }} />
-            </div>
+            <p className="text-[10px] text-slate-400 font-medium mt-1 truncate">
+              {(statusFilter !== 'all' || searchTerm) 
+                ? `전체 ${stats.total}명 중 필터 조회`
+                : '현재 필터 조건 기준 전체'}
+            </p>
           </div>
         </Card>
 
+        {/* 2. 실습 예정 */}
+        <Card className="bg-white border-slate-200/80 shadow-sm rounded-xl p-3 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-500">실습 예정</span>
+            <div className="h-7 w-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center">
+              <Calendar className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="mt-2">
+            <div className="flex items-baseline justify-between">
+              <span className="text-xl font-extrabold text-sky-600">{stats.upcomingCount}명</span>
+              <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">UPCOMING</span>
+            </div>
+            <p className="text-[10px] text-slate-400 font-medium mt-1">시작일자 도래 전 학생</p>
+          </div>
+        </Card>
+
+        {/* 3. 현재 실습 진행중 */}
         <Card className="bg-white border-slate-200/80 shadow-sm rounded-xl p-3 flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-slate-500">현재 실습 진행중</span>
@@ -394,7 +467,7 @@ export function FieldTrainingClient({
             </div>
           </div>
           <div className="mt-2">
-            <div className="flex items-baseline gap-1.5">
+            <div className="flex items-baseline justify-between">
               <span className="text-xl font-extrabold text-emerald-600">{stats.ongoingCount}명</span>
               <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">ONGOING</span>
             </div>
@@ -402,6 +475,7 @@ export function FieldTrainingClient({
           </div>
         </Card>
 
+        {/* 4. 채용 전환 완료 */}
         <Card className="bg-white border-slate-200/80 shadow-sm rounded-xl p-3 flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-slate-500">채용 전환 완료</span>
@@ -410,7 +484,7 @@ export function FieldTrainingClient({
             </div>
           </div>
           <div className="mt-2">
-            <div className="flex items-baseline gap-1.5">
+            <div className="flex items-baseline justify-between">
               <span className="text-xl font-extrabold text-purple-600">{stats.convertedCount}명</span>
               <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">CONVERTED</span>
             </div>
@@ -418,6 +492,7 @@ export function FieldTrainingClient({
           </div>
         </Card>
 
+        {/* 5. 복교 및 중단 */}
         <Card className="bg-white border-slate-200/80 shadow-sm rounded-xl p-3 flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-slate-500">복교 및 중단</span>
@@ -426,34 +501,18 @@ export function FieldTrainingClient({
             </div>
           </div>
           <div className="mt-2">
-            <div className="flex items-baseline gap-1.5">
+            <div className="flex items-baseline justify-between">
               <span className="text-xl font-extrabold text-amber-600">{stats.returnedCount}명</span>
               <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">RETURNED</span>
             </div>
             <p className="text-[10px] text-slate-400 font-medium mt-1">실습 중도 복교 처리 건수</p>
           </div>
         </Card>
-
-        <Card className="bg-white border-slate-200/80 shadow-sm rounded-xl p-3 flex flex-col justify-between col-span-2 sm:col-span-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500">지원금 신청 현황</span>
-            <div className="h-7 w-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center">
-              <DollarSign className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-2">
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-xl font-extrabold text-sky-600">{stats.stipendCount}명</span>
-              <span className="text-[11px] font-bold text-slate-500">({stats.stipendRate}%)</span>
-            </div>
-            <p className="text-[10px] text-slate-400 font-medium mt-1">지원금 신청 완료 학생 수</p>
-          </div>
-        </Card>
       </div>
 
       {/* 2. 툴바 & 뷰 모드 전환 및 검색 필터 */}
       <div className="bg-white p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border border-slate-200/90 shadow-sm shrink-0 space-y-2 sm:space-y-2.5">
-        {/* 상단 1열: 학년 탭 & 학과/반 선택 드롭다운 & 초기화 */}
+        {/* 상단 1열: 학년 탭 & 학과/반/시작일자 선택 드롭다운 & 초기화 */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 sm:gap-2.5 pb-2 border-b border-slate-100">
           {/* 학년 선택 탭 */}
           <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
@@ -463,6 +522,7 @@ export function FieldTrainingClient({
                 setSelectedGrade('ALL');
                 setSelectedMajor('ALL');
                 setSelectedClass('ALL');
+                setSelectedStartDate('ALL');
               }}
               className={cn(
                 "h-8 sm:h-8.5 px-3 rounded-xl text-xs font-black transition-all shrink-0 flex items-center gap-1.5",
@@ -481,6 +541,7 @@ export function FieldTrainingClient({
                   setSelectedGrade(g);
                   setSelectedMajor('ALL');
                   setSelectedClass('ALL');
+                  setSelectedStartDate('ALL');
                 }}
                 className={cn(
                   "h-8 sm:h-8.5 px-3 rounded-xl text-xs font-black transition-all shrink-0 flex items-center gap-1.5",
@@ -494,8 +555,8 @@ export function FieldTrainingClient({
             ))}
           </div>
 
-          {/* 학과 & 반 선택 셀렉터 */}
-          <div className="flex items-center gap-2">
+          {/* 학과 & 반 & 시작일자 선택 셀렉터 */}
+          <div className="flex flex-wrap items-center gap-2">
             {/* 학과 선택 */}
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] font-bold text-slate-500 shrink-0 hidden sm:inline">학과:</span>
@@ -504,6 +565,7 @@ export function FieldTrainingClient({
                 onChange={(e) => {
                   setSelectedMajor(e.target.value);
                   setSelectedClass('ALL');
+                  setSelectedStartDate('ALL');
                 }}
                 className="h-8 sm:h-8.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-2.5 text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
               >
@@ -519,7 +581,10 @@ export function FieldTrainingClient({
               <span className="text-[11px] font-bold text-slate-500 shrink-0 hidden sm:inline">반:</span>
               <select
                 value={selectedClass}
-                onChange={(e) => setSelectedClass(e.target.value)}
+                onChange={(e) => {
+                  setSelectedClass(e.target.value);
+                  setSelectedStartDate('ALL');
+                }}
                 disabled={availableClasses.length === 0 && selectedMajor !== 'ALL'}
                 className="h-8 sm:h-8.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-2.5 text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-40 cursor-pointer"
               >
@@ -530,10 +595,28 @@ export function FieldTrainingClient({
               </select>
             </div>
 
+            {/* 시작일자 선택 (방안 1) */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold text-slate-500 shrink-0 hidden sm:inline">시작일:</span>
+              <select
+                value={selectedStartDate}
+                onChange={(e) => setSelectedStartDate(e.target.value)}
+                className="h-8 sm:h-8.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-2.5 text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer max-w-[170px]"
+              >
+                <option value="ALL">전체 시작일 ({availableStartDates.length}개 일자)</option>
+                {availableStartDates.map(({ date, count }) => (
+                  <option key={date} value={date}>
+                    {date} ({count}명)
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* 필터 초기화 버튼 */}
             {(selectedGrade !== (isAdmin ? 'ALL' : (userProfile?.assigned_grade || 3)) ||
               selectedMajor !== (isAdmin ? 'ALL' : (userProfile?.assigned_major || 'ALL')) ||
               selectedClass !== (isAdmin ? 'ALL' : (userProfile?.assigned_class || 'ALL')) ||
+              selectedStartDate !== 'ALL' ||
               searchTerm ||
               statusFilter !== 'participating') && (
               <Button
@@ -544,6 +627,7 @@ export function FieldTrainingClient({
                   setSelectedGrade(isAdmin ? 'ALL' : (userProfile?.assigned_grade || 3));
                   setSelectedMajor(isAdmin ? 'ALL' : (userProfile?.assigned_major || 'ALL'));
                   setSelectedClass(isAdmin ? 'ALL' : (userProfile?.assigned_class || 'ALL'));
+                  setSelectedStartDate('ALL');
                   setSearchTerm('');
                   setStatusFilter('participating');
                 }}
@@ -623,7 +707,7 @@ export function FieldTrainingClient({
           >
             <span>전체</span>
             <span className={cn("text-[10px] px-1.5 py-0.2 rounded-full font-black", statusFilter === 'all' ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700")}>
-              {baseFilteredStudents.length}
+              {categoryCounts.total}
             </span>
           </button>
 
@@ -640,7 +724,7 @@ export function FieldTrainingClient({
           >
             <span>✨ 실습참여 전체</span>
             <span className={cn("text-[10px] px-1.5 py-0.2 rounded-full font-black", statusFilter === 'participating' ? "bg-white/20 text-white" : "bg-blue-200 text-blue-900")}>
-              {stats.participatingCount}
+              {categoryCounts.participatingCount}
             </span>
           </button>
 
@@ -657,7 +741,7 @@ export function FieldTrainingClient({
           >
             <span>실습예정</span>
             <span className={cn("text-[10px] px-1.5 py-0.2 rounded-full font-black", statusFilter === 'upcoming' ? "bg-white/20 text-white" : "bg-sky-200 text-sky-900")}>
-              {stats.upcomingCount}
+              {categoryCounts.upcomingCount}
             </span>
           </button>
 
@@ -674,7 +758,7 @@ export function FieldTrainingClient({
           >
             <span>실습중</span>
             <span className={cn("text-[10px] px-1.5 py-0.2 rounded-full font-black", statusFilter === 'ongoing' ? "bg-white/20 text-white" : "bg-emerald-200 text-emerald-900")}>
-              {stats.ongoingCount}
+              {categoryCounts.ongoingCount}
             </span>
           </button>
 
@@ -691,7 +775,7 @@ export function FieldTrainingClient({
           >
             <span>채용전환</span>
             <span className={cn("text-[10px] px-1.5 py-0.2 rounded-full font-black", statusFilter === 'converted' ? "bg-white/20 text-white" : "bg-purple-200 text-purple-900")}>
-              {stats.convertedCount}
+              {categoryCounts.convertedCount}
             </span>
           </button>
 
@@ -708,7 +792,7 @@ export function FieldTrainingClient({
           >
             <span>복교</span>
             <span className={cn("text-[10px] px-1.5 py-0.2 rounded-full font-black", statusFilter === 'returned' ? "bg-white/20 text-white" : "bg-rose-200 text-rose-900")}>
-              {stats.returnedCount}
+              {categoryCounts.returnedCount}
             </span>
           </button>
 
@@ -725,7 +809,7 @@ export function FieldTrainingClient({
           >
             <span>미실습</span>
             <span className={cn("text-[10px] px-1.5 py-0.2 rounded-full font-black", statusFilter === 'none' ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700")}>
-              {baseFilteredStudents.length - stats.participatingCount}
+              {categoryCounts.noneCount}
             </span>
           </button>
         </div>
@@ -770,8 +854,8 @@ export function FieldTrainingClient({
               <div className="w-full min-w-0">
                 {/* 헤더 행: 좌측 고정 학생 정보 컬럼 + 가변 월별 컬럼 */}
                 <div className="sticky top-0 z-30 bg-slate-100 border-b border-slate-200 flex text-xs font-extrabold text-slate-700 shadow-sm">
-                  <div className="w-[240px] xl:w-[270px] shrink-0 p-2.5 pl-3.5 border-r border-slate-200 bg-slate-100 flex items-center sticky left-0 z-30 shadow-xs">
-                    학생 기본 정보 (성명 / 학번 / 학반)
+                  <div className="w-[260px] xl:w-[290px] shrink-0 p-2.5 pl-3.5 border-r border-slate-200 bg-slate-100 flex items-center sticky left-0 z-30 shadow-xs">
+                    학생 기본 정보
                   </div>
                   <div className="flex-1 grid relative" style={{ gridTemplateColumns: `repeat(${timelineMonths.length}, minmax(0, 1fr))` }}>
                     {timelineMonths.map((m, idx) => (
@@ -808,19 +892,19 @@ export function FieldTrainingClient({
                       return (
                         <div key={s.id} className="flex hover:bg-slate-50/70 transition-colors group min-h-[52px]">
                           {/* 좌측 학생 프로필 정보 영역 (가로 스크롤 시 좌측 Sticky 고정) */}
-                          <div className="w-[240px] xl:w-[270px] shrink-0 p-2.5 pl-3.5 border-r border-slate-200/80 flex items-center justify-between bg-white group-hover:bg-slate-50/70 sticky left-0 z-20 shadow-xs">
-                            <div className="flex items-center gap-2 min-w-0 flex-1 mr-1.5">
-                              <div className="h-8 w-8 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 font-black text-xs flex items-center justify-center shrink-0">
-                                {s.student_number ? `${s.student_number}번` : (sIdx + 1)}
+                          <div className="w-[260px] xl:w-[290px] shrink-0 p-2.5 pl-3 border-r border-slate-200/80 flex items-center justify-between bg-white group-hover:bg-slate-50/70 sticky left-0 z-20 shadow-xs">
+                            <div className="flex items-center gap-2 min-w-0 flex-1 mr-1">
+                              {/* 1. 맨 앞 학년 뱃지 */}
+                              <div className="h-8 px-2 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-700 font-extrabold text-[11px] flex items-center justify-center shrink-0">
+                                {s.grade ? `${s.grade}학년` : '3학년'}
                               </div>
+                              {/* 2. 성명 학과 반 번호 및 하단 휴대전화번호 */}
                               <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="font-black text-slate-900 text-xs whitespace-nowrap shrink-0">{s.student_name}</span>
-                                  {s.major && (
-                                    <span className="text-[10px] text-slate-500 font-semibold truncate">
-                                      {s.grade ? `${s.grade}학년 ` : ''}{s.major} {s.class_info ? `${s.class_info}반` : ''}
-                                    </span>
-                                  )}
+                                <div className="flex items-center gap-1.5 min-w-0 truncate">
+                                  <span className="font-black text-slate-900 text-xs shrink-0">{s.student_name}</span>
+                                  <span className="text-[11px] text-slate-600 font-bold truncate">
+                                    {s.major} {s.class_info ? `${s.class_info}반` : ''} {s.student_number ? `${s.student_number}번` : ''}
+                                  </span>
                                 </div>
                                 <p className="text-[10.5px] text-slate-400 font-mono truncate">
                                   {s.phone_number || '전화번호 미입력'}
@@ -1102,8 +1186,8 @@ export function FieldTrainingClient({
             <div className="block md:hidden flex-1 overflow-y-auto custom-scrollbar relative bg-slate-50/50">
               {/* 모바일 고정 월 헤더 트랙 */}
               <div className="sticky top-0 z-30 bg-slate-100 border-b border-slate-200 flex text-[10px] font-extrabold text-slate-700 shadow-xs">
-                <div className="w-24 shrink-0 p-2 pl-2.5 bg-slate-100 border-r border-slate-200 flex items-center">
-                  학생 (성명/번호)
+                <div className="w-28 shrink-0 p-2 pl-2.5 bg-slate-100 border-r border-slate-200 flex items-center font-extrabold text-[10px]">
+                  학생 기본 정보
                 </div>
                 <div className="flex-1 grid relative" style={{ gridTemplateColumns: `repeat(${timelineMonths.length}, minmax(0, 1fr))` }}>
                   {timelineMonths.map((m, idx) => (
@@ -1127,10 +1211,17 @@ export function FieldTrainingClient({
 
                     return (
                       <div key={s.id} onClick={() => handleOpenModal(s)} className="flex items-stretch hover:bg-slate-50 transition-colors cursor-pointer min-h-[48px]">
-                        {/* 학생 성명 & 번호 컬럼 */}
-                        <div className="w-24 shrink-0 p-1.5 pl-2.5 flex flex-col justify-center border-r border-slate-200/80 bg-white">
-                          <span className="font-black text-slate-900 text-xs whitespace-nowrap">{s.student_name}</span>
-                          <span className="text-[9.5px] text-slate-400 font-mono truncate">{s.student_number ? `${s.student_number}번` : (sIdx + 1)}</span>
+                        {/* 학생 학년 성명 & 학과 반 번호 컬럼 */}
+                        <div className="w-28 shrink-0 p-1.5 pl-2 flex flex-col justify-center border-r border-slate-200/80 bg-white">
+                          <div className="flex items-center gap-1 min-w-0">
+                            <span className="text-[9.5px] font-black text-indigo-700 bg-indigo-50 px-1 py-0.2 rounded border border-indigo-100 shrink-0">
+                              {s.grade || 3}학년
+                            </span>
+                            <span className="font-black text-slate-900 text-xs truncate">{s.student_name}</span>
+                          </div>
+                          <span className="text-[9.5px] text-slate-500 font-semibold truncate mt-0.5">
+                            {s.major} {s.class_info ? `${s.class_info}반` : ''} {s.student_number ? `${s.student_number}번` : ''}
+                          </span>
                         </div>
 
                         {/* 100% 폭 화면 슬림 타임라인 바 */}
@@ -1150,84 +1241,41 @@ export function FieldTrainingClient({
                                 let startPct = 0;
                                 let endPct = 100;
                                 let convPct = 0;
-                                let startDateFormatted = '';
-                                let endDateFormatted = '';
-
+                                
                                 const isConverted = r.hiring_status === '채용전환';
                                 const isReturned = r.hiring_status === '복교';
+                                const isStipendDone = r.stipend_status === 'O';
 
                                 if (r.start_date) {
-                                  const sDate = parseISO(r.start_date);
-                                  if (isValid(sDate)) {
-                                    startDateFormatted = format(sDate, 'MM.dd');
-                                    if (isBefore(sDate, timelineStart)) startPct = 0;
-                                    else if (isAfter(sDate, timelineEnd)) startPct = 100;
-                                    else startPct = Math.min(100, Math.max(0, (differenceInDays(sDate, timelineStart) / totalDays) * 100));
-                                  }
+                                  const d = parseISO(r.start_date);
+                                  if (isValid(d)) startPct = Math.min(100, Math.max(0, (differenceInDays(d, timelineStart) / totalDays) * 100));
+                                }
+                                if (r.end_date) {
+                                  const d = parseISO(r.end_date);
+                                  if (isValid(d)) endPct = Math.min(100, Math.max(0, (differenceInDays(d, timelineStart) / totalDays) * 100));
                                 }
 
-                                if (isConverted) {
-                                  endPct = 100;
-                                  endDateFormatted = '졸업';
-
-                                  const convDateStr = r.conversion_date || r.end_date;
-                                  if (convDateStr) {
-                                    const cDate = parseISO(convDateStr);
-                                    if (isValid(cDate)) {
-                                      if (isBefore(cDate, timelineStart)) convPct = startPct;
-                                      else if (isAfter(cDate, timelineEnd)) convPct = 100;
-                                      else convPct = Math.min(100, Math.max(startPct, (differenceInDays(cDate, timelineStart) / totalDays) * 100));
-                                    } else {
-                                      convPct = Math.min(100, startPct + 35);
-                                    }
-                                  } else {
-                                    convPct = Math.min(100, startPct + 35);
-                                  }
-                                } else if (r.end_date) {
-                                  const eDate = parseISO(r.end_date);
-                                  if (isValid(eDate)) {
-                                    endDateFormatted = format(eDate, 'MM.dd');
-                                    if (isBefore(eDate, timelineStart)) endPct = 0;
-                                    else if (isAfter(eDate, timelineEnd)) endPct = 100;
-                                    else endPct = Math.min(100, Math.max(0, (differenceInDays(eDate, timelineStart) / totalDays) * 100));
-                                  }
-                                }
-
-                                const barWidthPct = Math.max(6, endPct - startPct);
-                                const trainingRatio = isConverted && barWidthPct > 0 
-                                  ? Math.min(90, Math.max(15, ((convPct - startPct) / barWidthPct) * 100)) 
-                                  : 100;
-                                const conversionRatio = 100 - trainingRatio;
+                                const widthPct = Math.max(4, endPct - startPct);
+                                const effectiveStatus = getEffectiveRecordStatus(r, todayStr);
 
                                 return (
-                                  <div
-                                    key={r.id || r.training_order}
+                                  <div 
+                                    key={r.id}
+                                    style={{ left: `${startPct}%`, width: `${widthPct}%` }}
                                     className={cn(
-                                      "h-6 rounded-md shadow-2xs border text-[8.5px] font-extrabold text-white transition-all overflow-hidden",
-                                      isConverted 
-                                        ? "border-purple-400 p-0 flex items-stretch shadow-2xs" 
+                                      "relative h-6.5 rounded-lg flex items-center justify-between px-1.5 text-[10px] font-black text-white shadow-2xs",
+                                      effectiveStatus === 'upcoming' 
+                                        ? "bg-gradient-to-r from-sky-400 to-sky-500 border border-sky-300"
                                         : isReturned
-                                        ? "bg-rose-600 border-rose-500 flex items-center px-1 shadow-2xs"
-                                        : (r.start_date && r.start_date > todayStr)
-                                        ? "bg-sky-500 border-sky-400 flex items-center px-1 shadow-2xs"
-                                        : "bg-emerald-600 border-emerald-500 flex items-center px-1 shadow-2xs"
+                                        ? "bg-gradient-to-r from-rose-500 to-rose-600 border border-rose-400"
+                                        : effectiveStatus === 'converted'
+                                        ? "bg-gradient-to-r from-purple-600 to-purple-700 border border-purple-400"
+                                        : "bg-gradient-to-r from-emerald-500 to-emerald-600 border border-emerald-400"
                                     )}
-                                    style={{
-                                      marginLeft: `${startPct}%`,
-                                      width: `${barWidthPct}%`
-                                    }}
                                   >
-                                    {isConverted ? (
-                                      <div className="flex w-full h-full text-[8px] font-bold">
-                                        <div style={{ width: `${trainingRatio}%` }} className="bg-emerald-600 text-white flex items-center px-1 border-r border-white/80 shrink-0 truncate">
-                                          실습
-                                        </div>
-                                        <div style={{ width: `${conversionRatio}%` }} className="bg-purple-600 text-white flex items-center px-1 shrink-0 truncate flex-1">
-                                          채용
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <span className="truncate drop-shadow-xs">{r.company || `${r.training_order}차`}</span>
+                                    <span className="truncate">{r.company}</span>
+                                    {isStipendDone && (
+                                      <span className="bg-white text-blue-700 text-[8px] font-black px-1 rounded shadow-2xs shrink-0">O</span>
                                     )}
                                   </div>
                                 );
@@ -1258,16 +1306,18 @@ export function FieldTrainingClient({
                   return (
                     <Card key={s.id} className="bg-white border-slate-200/80 shadow-sm rounded-2xl p-3.5 space-y-3 hover:border-blue-300 transition-all flex flex-col justify-between">
                       <div className="space-y-3">
-                        {/* 상단 프로필 헤더 */}
+                        {/* 상단 프로필 헤더 (학년 + 성명 학과 반 번호 + 휴대전화번호) */}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="h-9 w-9 rounded-full bg-blue-50 text-blue-700 font-extrabold text-xs flex items-center justify-center shrink-0 border border-blue-100">
-                              {s.student_number ? `${s.student_number}번` : (idx + 1)}
+                            <div className="h-9 px-2.5 rounded-xl bg-indigo-50 text-indigo-700 font-extrabold text-xs flex items-center justify-center shrink-0 border border-indigo-100">
+                              {s.grade ? `${s.grade}학년` : '3학년'}
                             </div>
                             <div className="min-w-0">
-                              <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
-                                {s.student_name}
-                                <span className="text-xs text-slate-500 font-normal truncate">({s.major} {s.class_info}반)</span>
+                              <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5 flex-wrap">
+                                <span>{s.student_name}</span>
+                                <span className="text-xs text-slate-600 font-bold truncate">
+                                  {s.major} {s.class_info ? `${s.class_info}반` : ''} {s.student_number ? `${s.student_number}번` : ''}
+                                </span>
                               </h3>
                               <p className="text-[11px] text-slate-400 font-mono">{s.phone_number || '전화번호 미입력'}</p>
                             </div>
