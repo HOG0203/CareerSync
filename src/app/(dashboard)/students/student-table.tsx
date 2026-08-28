@@ -280,7 +280,7 @@ export function StudentTable({
   rankingMap?: Record<string, any>,
   userProfile?: any,
   baseYear?: number,
-  onFilteredDataChange?: (data: any[]) => void
+  onFilteredDataChange?: (data: any[] | null) => void
 }) {
 
   const [selectedStudent, setSelectedStudent] = React.useState<any | null>(null)

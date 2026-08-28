@@ -114,7 +114,7 @@ export default function ProfileSettingsModal({ open, onOpenChange }: ProfileSett
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <KeyRound className="h-5 w-5 text-blue-600" />
-            프로필 설정
+            비밀번호 변경
           </DialogTitle>
           <DialogDescription>
             계정 보안을 위해 주기적으로 비밀번호를 변경하는 것을 권장합니다.

@@ -123,9 +123,6 @@ export default async function DashboardPage({
             <span className="bg-slate-100 text-slate-700 text-[11px] font-bold px-2 py-0.5 rounded-full">
               {grade}학년 분석
             </span>
-            <span className="text-xs text-slate-400 font-medium hidden sm:inline">
-              대구공업고등학교 DGTHS
-            </span>
           </div>
 
           <h2 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-slate-900 flex items-center gap-2.5">

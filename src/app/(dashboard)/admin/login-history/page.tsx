@@ -5,6 +5,8 @@ import { redirect } from 'next/navigation';
 import { KeyRound, ShieldAlert } from 'lucide-react';
 import { LoginHistoryClient } from './login-history-client';
 
+import { getMasterAdminInfo, getUserCustomPermissionsMapAction } from '@/app/(dashboard)/admin/users/actions';
+
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
@@ -13,14 +15,23 @@ export const metadata = {
 };
 
 export default async function LoginHistoryPage() {
-  // 1. 관리자 권한 확인 및 Audit Logs 병렬 조회
-  const [userProfile, allLogs] = await Promise.all([
+  // 1. 관리자 권한 및 메인관리자/커스텀 권한 병렬 조회
+  const [userProfile, allLogs, masterInfo, customPermMap] = await Promise.all([
     getCurrentUserProfile(),
-    getCachedAuditLogs()
+    getCachedAuditLogs(),
+    getMasterAdminInfo(),
+    getUserCustomPermissionsMapAction(),
   ]);
 
+  const isMasterAdmin = Boolean(
+    userProfile?.username === masterInfo.username ||
+    userProfile?.full_name === '이호중' ||
+    userProfile?.username === '이호중'
+  );
 
-  if (!userProfile || userProfile.role !== 'admin') {
+  const hasExplicitPerm = userProfile?.id && customPermMap[userProfile.id]?.includes('/admin/login-history');
+
+  if (!userProfile || userProfile.role !== 'admin' || (!isMasterAdmin && !hasExplicitPerm)) {
     redirect('/dashboard');
   }
 

@@ -54,7 +54,17 @@ import {
 import { cn } from '@/lib/utils';
 import * as React from 'react';
 
-export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolean; userProfile?: any }) {
+export default function Nav({ 
+  isAdmin = false, 
+  isMasterAdmin = false,
+  userProfile,
+  customPermissions
+}: { 
+  isAdmin?: boolean; 
+  isMasterAdmin?: boolean;
+  userProfile?: any;
+  customPermissions?: string[] | null;
+}) {
   const [mounted, setMounted] = React.useState(false);
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -84,8 +94,12 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
 
 
   const userGrade = userProfile?.assigned_grade;
-  const isLowerGradeTeacher = userProfile?.role === 'teacher' && (userGrade === 1 || userGrade === 2);
+  const isHomeroomTeacher = userProfile?.role === 'teacher' && Boolean(userProfile?.assigned_class?.trim());
+  const isLowerGradeTeacher = isHomeroomTeacher && (userGrade === 1 || userGrade === 2);
   const isStudent = userProfile?.role === 'student';
+
+  // 3학년 담임교사 또는 관리자에게만 취업상세데이터 및 노동인권교육 표시 (비담임 교직원 제외)
+  const canView3rdGradeDetailMenus = isAdmin || (isHomeroomTeacher && !isLowerGradeTeacher);
 
   // 학생인 경우 전용 메뉴 그룹
   const studentGroups = [
@@ -99,10 +113,8 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
     }
   ];
 
-
-
-  // 교직원/관리자 그룹 정의
-  const staffGroups = [
+  // 교직원/관리자 그룹 기본 규칙
+  const defaultStaffGroups = [
     {
       title: "취업진로관리",
       icon: Briefcase,
@@ -110,17 +122,17 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
         { href: '/employment-status', label: '취업진로현황', icon: Grid3X3 },
         ...(!isLowerGradeTeacher ? [{ href: '/field-training', label: '현장실습/도제OJT현황', icon: CalendarCheck }] : []),
         { href: '/company-info', label: '업체정보', icon: Factory },
-        ...(!isLowerGradeTeacher ? [{ href: '/students', label: '취업상세데이터', icon: ClipboardList }] : []),
-        ...(!isLowerGradeTeacher ? [{ href: '/labor-education', label: '노동인권교육', icon: ShieldAlert }] : []),
+        ...(canView3rdGradeDetailMenus ? [{ href: '/students', label: '취업상세데이터', icon: ClipboardList }] : []),
+        ...(canView3rdGradeDetailMenus ? [{ href: '/labor-education', label: '노동인권교육', icon: ShieldAlert }] : []),
       ]
     },
     {
       title: "학생 및 생활지도",
       icon: GraduationCap,
       items: [
-        { href: '/class-management', label: '학반 관리', icon: BookUser },
+        ...((isAdmin || isHomeroomTeacher) ? [{ href: '/class-management', label: '학반 관리', icon: BookUser }] : []),
         { href: '/merit-demerit', label: '상벌점 관리', icon: Scale },
-        { href: '/student-accounts', label: '학생 계정 관리', icon: UserCog },
+        ...((isAdmin || isHomeroomTeacher) ? [{ href: '/student-accounts', label: '학생 계정 관리', icon: UserCog }] : []),
         ...(isAdmin ? [{ href: '/admin/students', label: '학생 등록/진급', icon: UserPlus }] : []),
       ]
     },
@@ -141,13 +153,70 @@ export default function Nav({ isAdmin = false, userProfile }: { isAdmin?: boolea
         icon: Settings,
         items: [
           { href: '/admin/users', label: '사용자 관리', icon: UserCog },
-          { href: '/admin/login-history', label: '로그인 및 활동 이력', icon: KeyRound },
-          { href: '/admin/audit-logs', label: '작업 이력 관리', icon: History },
-          { href: '/admin/settings', label: '시스템 설정', icon: ShieldCheck },
+          ...(isMasterAdmin ? [
+            { href: '/admin/login-history', label: '로그인 및 활동 이력', icon: KeyRound },
+            { href: '/admin/audit-logs', label: '작업 이력 관리', icon: History },
+            { href: '/admin/settings', label: '시스템 설정', icon: ShieldCheck },
+          ] : []),
         ]
       }
     ] : [])
   ];
+
+  // 전체 풀 (커스텀 권한 필터링용)
+  const fullStaffGroups = [
+    {
+      title: "취업진로관리",
+      icon: Briefcase,
+      items: [
+        { href: '/employment-status', label: '취업진로현황', icon: Grid3X3 },
+        { href: '/field-training', label: '현장실습/도제OJT현황', icon: CalendarCheck },
+        { href: '/company-info', label: '업체정보', icon: Factory },
+        { href: '/students', label: '취업상세데이터', icon: ClipboardList },
+        { href: '/labor-education', label: '노동인권교육', icon: ShieldAlert },
+      ]
+    },
+    {
+      title: "학생 및 생활지도",
+      icon: GraduationCap,
+      items: [
+        { href: '/class-management', label: '학반 관리', icon: BookUser },
+        { href: '/merit-demerit', label: '상벌점 관리', icon: Scale },
+        { href: '/student-accounts', label: '학생 계정 관리', icon: UserCog },
+        { href: '/admin/students', label: '학생 등록/진급', icon: UserPlus },
+      ]
+    },
+    {
+      title: "옥저인재인증제",
+      icon: CheckCircle2,
+      items: [
+        { href: '/admin/certification', label: '종합 인증평가', icon: Award },
+        { href: '/admin/certification/grades', label: '성적현황', icon: GraduationCap },
+        { href: '/admin/certification/attendance', label: '출결현황', icon: CalendarCheck },
+        { href: '/admin/certification/certificates', label: '자격증현황', icon: FileCheck },
+        { href: '/admin/certification/import', label: '엑셀 일괄 등록', icon: UploadCloud },
+      ]
+    },
+    {
+      title: "시스템 관리",
+      icon: Settings,
+      items: [
+        { href: '/admin/users', label: '사용자 관리', icon: UserCog },
+        { href: '/admin/login-history', label: '로그인 및 활동 이력', icon: KeyRound },
+        { href: '/admin/audit-logs', label: '작업 이력 관리', icon: History },
+        { href: '/admin/settings', label: '시스템 설정', icon: ShieldCheck },
+      ]
+    }
+  ];
+
+  const staffGroups = customPermissions && Array.isArray(customPermissions)
+    ? fullStaffGroups
+        .map(group => ({
+          ...group,
+          items: group.items.filter(item => customPermissions.includes(item.href)),
+        }))
+        .filter(group => group.items.length > 0)
+    : defaultStaffGroups;
 
   const groups = isStudent ? studentGroups : staffGroups;
 

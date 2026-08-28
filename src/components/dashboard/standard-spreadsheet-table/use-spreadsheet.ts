@@ -103,28 +103,46 @@ export function useSpreadsheet({
   React.useEffect(() => { if (!isSyncingRef.current) { setData(initialData); } }, [initialData])
   React.useEffect(() => { setInternalSelectedRowIds([]); setSelectionStart(null); setSelectionEnd(null); }, [initialData])
 
-  // Filter options (faceted)
+  // Filter options (faceted) - Optimized Linear Pass
   const filterOptions = React.useMemo(() => {
     const opts: Record<string, Set<any>> = {};
-    columns.forEach(c => opts[c.key] = new Set());
+    columns.forEach(c => (opts[c.key] = new Set()));
+    
+    const activeFilterEntries = Object.entries(columnFilters).filter(([_, v]) => Array.isArray(v) && v.length > 0);
+    const hasActiveFilters = activeFilterEntries.length > 0;
+    const lowerSearch = searchTerm.trim().toLowerCase();
+
     initialData.forEach(s => {
-      columns.forEach(c => {
-        const matchesOtherFilters = Object.entries(columnFilters).every(([f, v]) => {
-          if (f === c.key) return true;
-          if (v === undefined) return true;
-          const rowVal = s[f];
-          const nV = (rowVal === null || rowVal === undefined || rowVal === '') ? '(빈칸)' : String(rowVal);
-          return v.includes(nV);
-        });
-        const matchesSearch = !searchTerm || columns.some(col =>
-          String(s[col.key] || '').toLowerCase().includes(searchTerm.toLowerCase())
+      // 1. Calculate row search match once per student row
+      if (lowerSearch) {
+        const matchesSearch = columns.some(col =>
+          String(s[col.key] || '').toLowerCase().includes(lowerSearch)
         );
-        if (matchesOtherFilters && matchesSearch) {
+        if (!matchesSearch) return;
+      }
+
+      // 2. Add options for columns
+      if (!hasActiveFilters) {
+        columns.forEach(c => {
           const val = s[c.key];
           opts[c.key].add((val === null || val === undefined || val === '') ? '(빈칸)' : String(val));
-        }
-      });
+        });
+      } else {
+        columns.forEach(c => {
+          const matchesOtherFilters = activeFilterEntries.every(([f, v]) => {
+            if (f === c.key) return true;
+            const rowVal = s[f];
+            const nV = (rowVal === null || rowVal === undefined || rowVal === '') ? '(빈칸)' : String(rowVal);
+            return v.includes(nV);
+          });
+          if (matchesOtherFilters) {
+            const val = s[c.key];
+            opts[c.key].add((val === null || val === undefined || val === '') ? '(빈칸)' : String(val));
+          }
+        });
+      }
     });
+
     const result: Record<string, any[]> = {};
     Object.keys(opts).forEach(k => {
       result[k] = Array.from(opts[k]).sort((a, b) => {
@@ -134,7 +152,7 @@ export function useSpreadsheet({
       });
     });
     return result;
-  }, [initialData, columns, columnFilters, searchTerm])
+  }, [initialData, columns, columnFilters, searchTerm]);
 
   const handleFilterChange = React.useCallback((key: string, value: string) => {
     if (key === 'ALL' && value === 'RESET') {
@@ -163,18 +181,35 @@ export function useSpreadsheet({
       }
       return { ...prev, [key]: nextSelected };
     });
-  }, [filterOptions])
+  }, [filterOptions]);
 
-  const filteredData = React.useMemo(() => data.filter(row => {
-    const mF = Object.entries(columnFilters).every(([f, v]) => {
-      if (v === undefined) return true;
-      const rowVal = row[f];
-      const nV = (rowVal === null || rowVal === undefined || rowVal === '') ? '(빈칸)' : String(rowVal);
-      return v.includes(nV);
+  const filteredData = React.useMemo(() => {
+    const activeFilterEntries = Object.entries(columnFilters).filter(([_, v]) => Array.isArray(v) && v.length > 0);
+    const lowerSearch = searchTerm.trim().toLowerCase();
+
+    // Fast path: If no column filters and no internal search, return data directly without re-filtering
+    if (activeFilterEntries.length === 0 && !lowerSearch) {
+      return data;
+    }
+
+    return data.filter(row => {
+      if (activeFilterEntries.length > 0) {
+        const mF = activeFilterEntries.every(([f, v]) => {
+          const rowVal = row[f];
+          const nV = (rowVal === null || rowVal === undefined || rowVal === '') ? '(빈칸)' : String(rowVal);
+          return v.includes(nV);
+        });
+        if (!mF) return false;
+      }
+      
+      if (lowerSearch) {
+        const mS = columns.some(c => String(row[c.key] || '').toLowerCase().includes(lowerSearch));
+        if (!mS) return false;
+      }
+
+      return true;
     });
-    const mS = !searchTerm || columns.some(c => String(row[c.key] || '').toLowerCase().includes(searchTerm.toLowerCase()));
-    return mF && mS;
-  }), [data, columnFilters, searchTerm, columns])
+  }, [data, columnFilters, searchTerm, columns]);
 
   // Effects
   React.useEffect(() => {

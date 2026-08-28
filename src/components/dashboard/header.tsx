@@ -178,17 +178,8 @@ export default function Header({ userProfile }: { userProfile?: any }) {
               }} 
               className="cursor-pointer py-3 px-4 focus:bg-indigo-50 focus:text-indigo-700 transition-colors"
             >
-              {userProfile?.role === 'student' ? (
-                <>
-                  <KeyRound className="mr-3 h-4 w-4 text-blue-600" />
-                  <span className="font-semibold text-slate-800">비밀번호 변경</span>
-                </>
-              ) : (
-                <>
-                  <Settings className="mr-3 h-4 w-4" />
-                  <span className="font-semibold">프로필 설정</span>
-                </>
-              )}
+              <KeyRound className="mr-3 h-4 w-4 text-blue-600" />
+              <span className="font-semibold text-slate-800">비밀번호 변경</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem 

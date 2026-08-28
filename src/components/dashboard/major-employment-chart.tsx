@@ -101,7 +101,7 @@ export default function MajorEmploymentChart({
         <div className="flex flex-col gap-0.5 min-w-0 pr-2">
           <CardTitle className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
             <LayoutGrid className="h-5 w-5 text-indigo-600 shrink-0" />
-            <span>학과별 취업 구분 현황</span>
+            <span>취업구분현황</span>
           </CardTitle>
           <CardDescription className="text-xs text-slate-500 font-medium">{selectedMajor === 'all' ? '전체 학과' : `${selectedMajor}`} 취업 구분별 현황입니다.</CardDescription>
         </div>

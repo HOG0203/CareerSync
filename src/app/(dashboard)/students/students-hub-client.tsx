@@ -80,10 +80,14 @@ export function StudentsHubClient({
 
   const [sheetFilteredData, setSheetFilteredData] = React.useState<any[] | null>(null);
 
-  // 상위 필터 변경 시 시트 필터 상태 초기화 동기화
+  // 학사 학년도나 학년 변경 시에만 시트 필터 상태 초기화
   React.useEffect(() => {
     setSheetFilteredData(null);
-  }, [selectedMajor, selectedClass, selectedStatus, deferredSearchTerm, grade, currentAY]);
+  }, [grade, currentAY]);
+
+  const handleFilteredDataChange = React.useCallback((data: any[] | null) => {
+    setSheetFilteredData(data);
+  }, []);
 
   // 1. 학과 옵션 추출 (공식 순서 정렬)
   const majorOptions = React.useMemo(() => {
@@ -377,7 +381,7 @@ export function StudentsHubClient({
               rankingMap={rankingMap}
               userProfile={userProfile}
               baseYear={baseYear}
-              onFilteredDataChange={setSheetFilteredData}
+              onFilteredDataChange={handleFilteredDataChange}
             />
           </div>
         </CardContent>

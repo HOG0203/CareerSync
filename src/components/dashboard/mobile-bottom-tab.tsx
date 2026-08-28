@@ -8,6 +8,7 @@ import {
   ClipboardList,
   Factory,
   BookUser,
+  Scale,
   Menu
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -16,7 +17,17 @@ import { useSidebar } from '@/components/ui/sidebar';
 import * as React from 'react';
 import { Loader2 } from 'lucide-react';
 
-export function MobileBottomTab({ isAdmin = false, role, userGrade }: { isAdmin?: boolean; role?: string; userGrade?: number }) {
+export function MobileBottomTab({ 
+  isAdmin = false, 
+  role, 
+  userGrade,
+  customPermissions
+}: { 
+  isAdmin?: boolean; 
+  role?: string; 
+  userGrade?: number;
+  customPermissions?: string[] | null;
+}) {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
   const [navigatingHref, setNavigatingHref] = React.useState<string | null>(null);
@@ -28,31 +39,29 @@ export function MobileBottomTab({ isAdmin = false, role, userGrade }: { isAdmin?
   const isLowerGradeTeacher = role === 'teacher' && (userGrade === 1 || userGrade === 2);
   const isStudent = role === 'student';
 
-  // 학생(student), 담임 선생님(teacher)과 관리자(admin)의 하단 탭 구성을 다르게 설정
-  const tabs = isStudent
+  // 학생(student), 1·2학년 담임(teacher), 3학년 담임 및 관리자(admin)의 하단 탭 구성
+  const defaultTabs = isStudent
     ? [
         { href: '/student/certification', label: '내 평가표', icon: BookUser },
+        { href: '/student/merit-demerit', label: '상벌점', icon: Scale },
       ]
     : isLowerGradeTeacher
     ? [
-        { href: '/dashboard', label: '홈', icon: LayoutDashboard },
+        { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
         { href: '/employment-status', label: '현황', icon: Grid3X3 },
-        { href: '/company-info', label: '업체정보', icon: Factory },
         { href: '/class-management', label: '학반관리', icon: BookUser },
-      ]
-    : role === 'teacher'
-    ? [
-        { href: '/dashboard', label: '홈', icon: LayoutDashboard },
-        { href: '/employment-status', label: '현황', icon: Grid3X3 },
-        { href: '/students', label: '취업데이터', icon: ClipboardList },
-        { href: '/class-management', label: '학반관리', icon: BookUser },
+        { href: '/merit-demerit', label: '상벌점', icon: Scale },
       ]
     : [
-        { href: '/dashboard', label: '홈', icon: LayoutDashboard },
+        { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
         { href: '/employment-status', label: '현황', icon: Grid3X3 },
-        { href: '/company-info', label: '업체정보', icon: Factory },
-        { href: '/students', label: '취업데이터', icon: ClipboardList },
+        { href: '/company-info', label: '업체현황', icon: Factory },
+        { href: '/merit-demerit', label: '상벌점', icon: Scale },
       ];
+
+  const tabs = customPermissions && Array.isArray(customPermissions)
+    ? defaultTabs.filter(tab => tab.href === '/dashboard' || customPermissions.includes(tab.href))
+    : defaultTabs;
 
 
   return (

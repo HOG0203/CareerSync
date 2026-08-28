@@ -52,23 +52,23 @@ export function CreateUserButton() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-blue-600 hover:bg-blue-700 font-bold gap-2 shadow-lg shadow-blue-100">
+        <Button className="h-9 px-3.5 sm:px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs gap-1.5 shadow-xs">
           <Plus className="h-4 w-4" />
           신규 사용자 등록
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[450px] rounded-2xl p-0 overflow-hidden border-none shadow-2xl">
-        <DialogHeader className="p-4 sm:p-5 bg-white border-b border-slate-100 shrink-0">
-          <div className="flex items-center gap-3 sm:gap-4 mr-6">
-            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100">
-              <UserPlus className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
+      <DialogContent className="sm:max-w-[450px] rounded-2xl p-0 overflow-hidden bg-white border border-slate-200 shadow-2xl">
+        <DialogHeader className="p-4 sm:p-5 bg-slate-50/80 border-b border-slate-200/80 shrink-0">
+          <div className="flex items-center gap-3 mr-6">
+            <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100 text-blue-600">
+              <UserPlus className="h-5 w-5" />
             </div>
             <div className="flex flex-col text-left min-w-0">
-              <DialogTitle className="text-base sm:text-lg font-black flex items-center gap-2 text-slate-900 truncate">
+              <DialogTitle className="text-base sm:text-lg font-bold text-slate-900 truncate">
                 신규 사용자 등록
               </DialogTitle>
-              <DialogDescription className="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
-                시스템 접속 신규 계정 생성
+              <DialogDescription className="text-slate-500 text-xs font-medium mt-0.5 truncate">
+                시스템에 신규 교직원 또는 관리자 계정을 등록합니다.
               </DialogDescription>
             </div>
           </div>

@@ -64,7 +64,7 @@ export default function SpecificCourseChart({
   selectedMajor?: string
 }) {
   const [viewType, setViewType] = React.useState<'pie' | 'bar'>('pie');
-  const chartTitle = grade === 3 ? '진로 코스 (취업 현황)' : '세부 진로 경로 (희망)';
+  const chartTitle = grade === 3 ? '현재 진로코스' : '세부 진로 경로 (희망)';
 
   // 1. 도넛 차트용 전체 집계 데이터
   const formattedPieData = React.useMemo(() => {

@@ -7,6 +7,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { TableLoadingSkeleton } from '@/components/dashboard/loading-skeleton';
 import { AuditLogsClient } from './audit-logs-client';
 
+import { getMasterAdminInfo, getUserCustomPermissionsMapAction } from '@/app/(dashboard)/admin/users/actions';
+
 export const dynamic = 'force-dynamic';
 
 export default async function AuditLogsPage({
@@ -25,13 +27,23 @@ async function AuditLogsPageContent({
 }) {
   const params = searchParams;
 
-  // 1. 관리자 권한 확인 및 Audit Log 병렬 조회
-  const [userProfile, auditLogs] = await Promise.all([
+  // 1. 관리자 권한 및 메인관리자/커스텀 권한 병렬 조회
+  const [userProfile, auditLogs, masterInfo, customPermMap] = await Promise.all([
     getCurrentUserProfile(),
-    getCachedAuditLogs()
+    getCachedAuditLogs(),
+    getMasterAdminInfo(),
+    getUserCustomPermissionsMapAction(),
   ]);
 
-  if (!userProfile || userProfile.role !== 'admin') {
+  const isMasterAdmin = Boolean(
+    userProfile?.username === masterInfo.username ||
+    userProfile?.full_name === '이호중' ||
+    userProfile?.username === '이호중'
+  );
+
+  const hasExplicitPerm = userProfile?.id && customPermMap[userProfile.id]?.includes('/admin/audit-logs');
+
+  if (!userProfile || userProfile.role !== 'admin' || (!isMasterAdmin && !hasExplicitPerm)) {
     redirect('/dashboard');
   }
 

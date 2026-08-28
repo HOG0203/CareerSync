@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import {
   Select,
@@ -731,48 +732,76 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
 
       {/* 4. 작업 상세 다이얼로그 모달 */}
       <Dialog open={!!detailModalLog} onOpenChange={(open) => !open && setDetailModalLog(null)}>
-        <DialogContent className="max-w-xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl">
-          <DialogHeader className="p-5 sm:p-6 bg-slate-900 text-white">
-            <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-xl bg-white/10 text-white flex items-center justify-center">
+        <DialogContent className="w-[95vw] sm:max-w-xl max-h-[90vh] p-0 flex flex-col overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-2xl">
+          <DialogHeader className="p-4 sm:p-5 border-b bg-slate-50/80 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 shadow-3xs">
                 <FileText className="h-5 w-5" />
               </div>
               <div>
-                <DialogTitle className="text-base font-bold text-white">작업 상세 이력</DialogTitle>
-                <DialogDescription className="text-xs text-slate-400 mt-0.5">
-                  수행된 작업의 변경 전/후 상세 정보를 확인합니다.
+                <DialogTitle className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <span>작업 상세 이력</span>
+                  {detailModalLog && (
+                    <Badge className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border", ACTION_TYPE_CONFIG[detailModalLog.action_type]?.color || "bg-slate-50 text-slate-700")}>
+                      {ACTION_TYPE_CONFIG[detailModalLog.action_type]?.label || detailModalLog.action_type}
+                    </Badge>
+                  )}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-500 font-medium mt-0.5">
+                  수행된 작업의 변경 전/후 상세 정보 및 JSON 데이터를 확인합니다.
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
 
           {detailModalLog && (
-            <div className="p-5 sm:p-6 flex flex-col gap-4 bg-white max-h-[70vh] overflow-y-auto">
-              <div className="grid grid-cols-2 gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+            <div className="p-4 sm:p-6 flex-1 overflow-y-auto space-y-4 bg-white">
+              <div className="grid grid-cols-2 gap-3 p-4 bg-slate-50/80 rounded-xl border border-slate-200/70 text-xs">
                 <div>
-                  <span className="font-semibold text-slate-500 block mb-0.5">작업 수행자</span>
-                  <span className="font-bold text-slate-900">{detailModalLog.actor_name}</span>
+                  <span className="font-semibold text-slate-400 block mb-0.5 text-[11px]">작업 수행자</span>
+                  <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5 text-indigo-500" />
+                    {detailModalLog.actor_name}
+                  </span>
                 </div>
                 <div>
-                  <span className="font-semibold text-slate-500 block mb-0.5">작업 일시</span>
-                  <span className="font-bold text-slate-900">{formatDate(detailModalLog.created_at)}</span>
+                  <span className="font-semibold text-slate-400 block mb-0.5 text-[11px]">작업 일시</span>
+                  <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 text-indigo-500" />
+                    {formatDate(detailModalLog.created_at)}
+                  </span>
                 </div>
-                <div className="col-span-2 pt-2 border-t border-slate-200/60">
-                  <span className="font-semibold text-slate-500 block mb-0.5">작업 대상 및 내용</span>
+                <div className="col-span-2 pt-2.5 border-t border-slate-200/80">
+                  <span className="font-semibold text-slate-400 block mb-0.5 text-[11px]">작업 대상 및 내용</span>
                   <span className="font-extrabold text-indigo-700 text-sm">{formatTargetName(detailModalLog.target_name)}</span>
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-bold text-slate-700">상세 변경 데이터 (JSON Payload):</span>
-                <pre className="p-4 bg-slate-900 text-slate-100 text-xs rounded-xl overflow-x-auto font-mono max-h-[250px] custom-scrollbar leading-relaxed">
-                  {typeof detailModalLog.details === 'object' 
-                    ? JSON.stringify(detailModalLog.details, null, 2) 
-                    : String(detailModalLog.details || '내용 없음')}
-                </pre>
+              <div className="space-y-1.5">
+                <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                  <span>상세 변경 데이터 (Payload JSON):</span>
+                </span>
+                <div className="relative rounded-xl border border-slate-800/60 overflow-hidden shadow-inner">
+                  <pre className="p-4 bg-slate-950 text-slate-100 text-xs rounded-xl overflow-x-auto font-mono max-h-[260px] custom-scrollbar leading-relaxed">
+                    {typeof detailModalLog.details === 'object' 
+                      ? JSON.stringify(detailModalLog.details, null, 2) 
+                      : String(detailModalLog.details || '내용 없음')}
+                  </pre>
+                </div>
               </div>
             </div>
           )}
+
+          <DialogFooter className="p-3.5 sm:p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDetailModalLog(null)}
+              className="h-9 px-4 rounded-xl text-xs font-bold border-slate-200 hover:bg-slate-100 transition-all shadow-3xs"
+            >
+              닫기
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

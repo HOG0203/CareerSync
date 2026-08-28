@@ -18,12 +18,132 @@ async function checkIsAdmin() {
   return profile?.role === 'admin'
 }
 
+/**
+ * 메인관리자(최고 관리자) 식별 정보 조회 (초기값: '이호중')
+ */
+export async function getMasterAdminInfo(): Promise<{ username: string; name: string }> {
+  try {
+    const { data } = await supabaseAdmin
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'master_admin_info')
+      .maybeSingle();
+
+    if (data?.value && typeof data.value === 'object' && (data.value as any).username) {
+      return data.value as { username: string; name: string };
+    }
+  } catch (err) {
+    console.error('Failed to get master admin info:', err);
+  }
+
+  // 기본값: '이호중' 성명 또는 '이호중' 아이디를 가진 관리자 계정 탐색
+  try {
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('username, full_name')
+      .or('full_name.eq.이호중,username.eq.이호중')
+      .limit(1)
+      .maybeSingle();
+
+    if (profile) {
+      return { username: profile.username, name: profile.full_name || profile.username };
+    }
+  } catch (err) {
+    // fallback
+  }
+
+  return { username: '이호중', name: '이호중' };
+}
+
+/**
+ * 현재 로그인한 사용자가 메인관리자(최고 관리자)인지 검증
+ */
+export async function checkIsMasterAdmin(): Promise<boolean> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('username, full_name, role')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile || profile.role !== 'admin') return false;
+
+    const masterInfo = await getMasterAdminInfo();
+    return (
+      profile.username === masterInfo.username ||
+      profile.full_name === '이호중' ||
+      profile.username === '이호중'
+    );
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
+ * 메인관리자 권한을 다른 사용자에게 이양
+ */
+export async function transferMasterAdminAction(newMasterUsername: string) {
+  const isMaster = await checkIsMasterAdmin();
+  if (!isMaster) {
+    return { error: '메인관리자만 메인관리자 권한을 이양할 수 있습니다.' };
+  }
+
+  const { data: targetProfile } = await supabaseAdmin
+    .from('profiles')
+    .select('id, username, full_name, role')
+    .eq('username', newMasterUsername)
+    .maybeSingle();
+
+  if (!targetProfile) {
+    return { error: '대상 사용자를 찾을 수 없습니다.' };
+  }
+
+  // 대상 사용자를 관리자로 자동 승격
+  if (targetProfile.role !== 'admin') {
+    await supabaseAdmin
+      .from('profiles')
+      .update({ role: 'admin' })
+      .eq('id', targetProfile.id);
+  }
+
+  const { error } = await supabaseAdmin
+    .from('system_settings')
+    .upsert({
+      key: 'master_admin_info',
+      value: {
+        username: targetProfile.username,
+        name: targetProfile.full_name || targetProfile.username,
+      },
+      updated_at: new Date().toISOString(),
+    });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  const { logAuditAction } = await import('@/lib/audit-logger');
+  await logAuditAction({
+    action_type: 'USER_ROLE_UPDATE',
+    target_name: `메인관리자 권한 이양 ➔ ${targetProfile.full_name || targetProfile.username} (${targetProfile.username})`,
+    details: { newMasterUsername, newMasterName: targetProfile.full_name },
+  });
+
+  revalidateTag('system_settings');
+  revalidateTag('profiles');
+  revalidatePath('/admin/users');
+  return { success: true };
+}
+
 const DOMAIN = 'careersync.local'
 
 export async function createUser(formData: FormData) {
-  const isAdmin = await checkIsAdmin()
-  if (!isAdmin) {
-    return { error: '권한이 없습니다.' }
+  const isMaster = await checkIsMasterAdmin()
+  if (!isMaster) {
+    return { error: '메인관리자만 신규 사용자를 등록할 수 있습니다.' }
   }
 
   const username = formData.get('username') as string
@@ -98,12 +218,12 @@ export async function createUser(formData: FormData) {
 }
 
 /**
- * 사용자 일괄 생성 (Excel Import용)
+ * 사용자 일괄 생성 (Excel Import용 - 메인관리자 전용)
  */
 export async function bulkCreateUsers(users: { username: string, fullName: string, role: string }[]) {
-  const isAdmin = await checkIsAdmin()
-  if (!isAdmin) {
-    return { error: '권한이 없습니다.' }
+  const isMaster = await checkIsMasterAdmin()
+  if (!isMaster) {
+    return { error: '메인관리자만 일괄 계정을 생성할 수 있습니다.' }
   }
 
   const results = {
@@ -167,7 +287,6 @@ export async function bulkCreateUsers(users: { username: string, fullName: strin
         })
 
       if (profileError) {
-        // Auth는 생성되었는데 프로필이 실패한 경우 (일단 실패로 기록)
         results.failures.push({ username: trimmedUsername, reason: `프로필 생성 실패: ${profileError.message}` })
         continue
       }
@@ -222,10 +341,13 @@ export async function resetUserPassword(userId: string) {
   return { success: true }
 }
 
+/**
+ * 사용자 역할 변경 (메인관리자 전용)
+ */
 export async function updateUserRole(userId: string, newRole: string) {
-  const isAdmin = await checkIsAdmin()
-  if (!isAdmin) {
-    return { error: '권한이 없습니다.' }
+  const isMaster = await checkIsMasterAdmin()
+  if (!isMaster) {
+    return { error: '메인관리자만 사용자의 역할을 변경할 수 있습니다.' }
   }
 
   const { data: targetProfile } = await supabaseAdmin
@@ -233,6 +355,11 @@ export async function updateUserRole(userId: string, newRole: string) {
     .select('username, full_name, role')
     .eq('id', userId)
     .maybeSingle()
+
+  const masterInfo = await getMasterAdminInfo()
+  if (targetProfile && (targetProfile.username === masterInfo.username || targetProfile.full_name === '이호중')) {
+    return { error: '메인관리자의 역할은 변경할 수 없습니다.' }
+  }
 
   const { error } = await supabaseAdmin
     .from('profiles')
@@ -296,10 +423,13 @@ export async function updateAssignedClass(userId: string, data: { year: number |
   return { success: true };
 }
 
+/**
+ * 사용자 삭제 (메인관리자 전용 & 메인관리자 계정 보호)
+ */
 export async function deleteUser(userId: string) {
-  const isAdmin = await checkIsAdmin()
-  if (!isAdmin) {
-    return { error: '관리자 권한이 필요합니다.' }
+  const isMaster = await checkIsMasterAdmin()
+  if (!isMaster) {
+    return { error: '메인관리자만 계정을 삭제할 수 있습니다.' }
   }
 
   const supabase = await createClient()
@@ -315,6 +445,11 @@ export async function deleteUser(userId: string) {
     .eq('id', userId)
     .maybeSingle()
 
+  const masterInfo = await getMasterAdminInfo()
+  if (targetProfile && (targetProfile.username === masterInfo.username || targetProfile.full_name === '이호중')) {
+    return { error: '메인관리자 계정은 삭제할 수 없습니다.' }
+  }
+
   const targetLabel = targetProfile
     ? `${targetProfile.full_name || targetProfile.username} (${targetProfile.username})`
     : `계정 (ID: ${userId})`;
@@ -329,7 +464,7 @@ export async function deleteUser(userId: string) {
     return { error: `프로필 삭제 실패: ${profileErr.message}` }
   }
 
-  // 2. Supabase Auth 유저 삭제 (Auth에 유저가 없더라도 무시하고 정상 처리)
+  // 2. Supabase Auth 유저 삭제
   const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(userId)
   if (authErr && !authErr.message?.toLowerCase().includes('not found')) {
     console.warn('Auth user delete notice:', authErr.message)
@@ -346,4 +481,89 @@ export async function deleteUser(userId: string) {
   revalidateTag('teachers')
   revalidatePath('/admin/users')
   return { success: true }
+}
+
+/**
+ * 전체 사용자의 개별 메뉴 권한 맵 조회
+ */
+export async function getUserCustomPermissionsMapAction(): Promise<Record<string, string[]>> {
+  try {
+    const { data } = await supabaseAdmin
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'user_custom_permissions')
+      .maybeSingle();
+
+    if (data?.value && typeof data.value === 'object') {
+      return data.value as Record<string, string[]>;
+    }
+    return {};
+  } catch (err) {
+    console.error('Failed to get user custom permissions:', err);
+    return {};
+  }
+}
+
+/**
+ * 특정 사용자의 개별 메뉴 권한 설정 (메인관리자 전용)
+ */
+export async function saveUserCustomPermissionsAction(
+  userId: string,
+  allowedRoutes: string[] | null,
+  userName?: string
+) {
+  const isMaster = await checkIsMasterAdmin();
+  if (!isMaster) {
+    return { error: '메인관리자만 개별 메뉴 권한을 설정할 수 있습니다.' };
+  }
+
+  try {
+    const { data } = await supabaseAdmin
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'user_custom_permissions')
+      .maybeSingle();
+
+    let currentMap: Record<string, string[]> = {};
+    if (data?.value && typeof data.value === 'object') {
+      currentMap = { ...(data.value as Record<string, string[]>) };
+    }
+
+    if (allowedRoutes === null) {
+      delete currentMap[userId];
+    } else {
+      currentMap[userId] = allowedRoutes;
+    }
+
+    const { error } = await supabaseAdmin
+      .from('system_settings')
+      .upsert({
+        key: 'user_custom_permissions',
+        value: currentMap,
+        updated_at: new Date().toISOString(),
+      });
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    const { logAuditAction } = await import('@/lib/audit-logger');
+    await logAuditAction({
+      action_type: 'USER_ROLE_UPDATE',
+      target_name: `메뉴 권한 설정: ${userName || userId}`,
+      details: {
+        userId,
+        userName,
+        isCustom: allowedRoutes !== null,
+        allowedRoutes,
+      },
+    });
+
+    revalidateTag('system_settings');
+    revalidatePath('/admin/users');
+    revalidatePath('/', 'layout');
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || '저장 중 오류가 발생했습니다.' };
+  }
 }

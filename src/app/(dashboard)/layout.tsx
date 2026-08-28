@@ -27,6 +27,44 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
   
   const isAdmin = userProfile?.role === 'admin';
 
+  // 3. 메인관리자 여부 조회
+  let isMasterAdmin = false;
+  try {
+    const { data: masterSetting } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'master_admin_info')
+      .maybeSingle();
+
+    const masterUsername = (masterSetting?.value as any)?.username || '이호중';
+    isMasterAdmin = Boolean(
+      isAdmin && (
+        userProfile?.username === masterUsername ||
+        userProfile?.full_name === '이호중' ||
+        userProfile?.username === '이호중'
+      )
+    );
+  } catch (err) {
+    isMasterAdmin = Boolean(isAdmin && (userProfile?.full_name === '이호중' || userProfile?.username === '이호중'));
+  }
+
+  // 4. 사용자별 개별 메뉴 권한 조회 (system_settings)
+  let customPermissions: string[] | null = null;
+  if (userProfile?.id) {
+    const { data: permSetting } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'user_custom_permissions')
+      .maybeSingle();
+
+    if (permSetting?.value && typeof permSetting.value === 'object') {
+      const permMap = permSetting.value as Record<string, string[]>;
+      if (permMap[userProfile.id] && Array.isArray(permMap[userProfile.id])) {
+        customPermissions = permMap[userProfile.id];
+      }
+    }
+  }
+
   return (
     <SidebarProvider>
       <PageViewTracker />
@@ -34,7 +72,12 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
         {/* Desktop Sidebar */}
         <div className="hidden lg:block">
           <Sidebar>
-            <Nav isAdmin={isAdmin} userProfile={userProfile} />
+            <Nav 
+              isAdmin={isAdmin} 
+              isMasterAdmin={isMasterAdmin}
+              userProfile={userProfile} 
+              customPermissions={customPermissions} 
+            />
           </Sidebar>
         </div>
 
@@ -52,7 +95,12 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
           </div>
 
           {/* Mobile Bottom Tab */}
-          <MobileBottomTab isAdmin={isAdmin} role={userProfile?.role} userGrade={userProfile?.assigned_grade} />
+          <MobileBottomTab 
+            isAdmin={isAdmin} 
+            role={userProfile?.role} 
+            userGrade={userProfile?.assigned_grade} 
+            customPermissions={customPermissions}
+          />
         </SidebarInset>
       </div>
     </SidebarProvider>

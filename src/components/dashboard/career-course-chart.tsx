@@ -157,7 +157,7 @@ export default function CareerCourseChart({
         <div className="flex flex-col gap-0.5 min-w-0 pr-2">
           <CardTitle className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
             <LayoutGrid className="h-5 w-5 text-indigo-600 shrink-0" />
-            <span>희망 기업유형 (진로 코스)</span>
+            <span>희망 기업유형</span>
           </CardTitle>
           <CardDescription className="text-xs text-slate-500 font-medium">{selectedMajor === 'all' ? '전체 학과' : `${selectedMajor}`} 희망 기업유형 현황입니다.</CardDescription>
         </div>

@@ -120,11 +120,15 @@ export function StandardSpreadsheetTable({
     }
   }
 
-  React.useEffect(() => {
-    onFilteredDataChange?.(filteredData);
-  }, [filteredData, onFilteredDataChange]);
-
   const isColumnFilterActive = Object.values(columnFilters).some(v => Array.isArray(v) && v.length > 0);
+
+  React.useEffect(() => {
+    if (isColumnFilterActive) {
+      onFilteredDataChange?.(filteredData);
+    } else {
+      onFilteredDataChange?.(null);
+    }
+  }, [filteredData, isColumnFilterActive, onFilteredDataChange]);
 
 
   if (!mounted) {

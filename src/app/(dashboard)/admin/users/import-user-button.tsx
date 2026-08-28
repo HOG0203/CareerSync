@@ -112,22 +112,22 @@ export function ImportUserButton() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="font-bold gap-2 border-blue-200 text-blue-600 hover:bg-blue-50">
-          <FileUp className="h-4 w-4" /> 엑셀 일괄 추가
+        <Button variant="outline" className="h-9 px-3.5 sm:px-4 rounded-xl font-bold text-xs gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-50 shadow-2xs">
+          <FileUp className="h-4 w-4 text-slate-500" /> 엑셀 일괄 추가
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[450px] rounded-2xl p-0 overflow-hidden border-none shadow-2xl flex flex-col">
-        <DialogHeader className="p-4 sm:p-5 bg-white border-b border-slate-100 shrink-0">
-          <div className="flex items-center gap-3 sm:gap-4 mr-6">
-            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100">
-              <FileUp className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
+      <DialogContent className="sm:max-w-[450px] rounded-2xl p-0 overflow-hidden bg-white border border-slate-200 shadow-2xl flex flex-col">
+        <DialogHeader className="p-4 sm:p-5 bg-slate-50/80 border-b border-slate-200/80 shrink-0">
+          <div className="flex items-center gap-3 mr-6">
+            <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100 text-blue-600">
+              <FileUp className="h-5 w-5" />
             </div>
             <div className="flex flex-col text-left min-w-0">
-              <DialogTitle className="text-base sm:text-lg font-black flex items-center gap-2 text-slate-900 truncate">
+              <DialogTitle className="text-base sm:text-lg font-bold text-slate-900 truncate">
                 사용자 일괄 등록
               </DialogTitle>
-              <DialogDescription className="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
-                엑셀 업로드 방식 다수 계정 등록 (기본 PW: 123123)
+              <DialogDescription className="text-slate-500 text-xs font-medium mt-0.5 truncate">
+                엑셀 업로드로 여러 교직원 계정을 한 번에 생성합니다.
               </DialogDescription>
             </div>
           </div>

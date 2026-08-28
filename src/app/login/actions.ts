@@ -148,7 +148,68 @@ import { revalidatePath } from 'next/cache'
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions'
 import { saveStudentAccountMeta, getStudentAccountMeta } from '@/lib/student-accounts'
 import { extractPhoneLast4, getStudentUsername, formatStudentAuthPassword } from '@/lib/student-utils'
+import { MAJOR_SORT_ORDER } from '@/lib/types'
 
+/**
+ * 현재학년도 기준 재학생(1~3학년)의 실제 등록된 학과 목록을 조회합니다.
+ */
+export async function getActiveEnrolledMajors(): Promise<{
+  all: string[];
+  byGrade: Record<number, string[]>;
+}> {
+  try {
+    const settings = await getSystemSettings()
+    const baseYear = settings.baseYear || 2026
+    const enrolledGradYears = [baseYear + 1, baseYear + 2, baseYear + 3]
+
+    const { data, error } = await supabaseAdmin
+      .from('students')
+      .select('major, graduation_year')
+      .in('graduation_year', enrolledGradYears)
+
+    if (error || !data || data.length === 0) {
+      return {
+        all: MAJOR_SORT_ORDER,
+        byGrade: { 1: MAJOR_SORT_ORDER, 2: MAJOR_SORT_ORDER, 3: MAJOR_SORT_ORDER }
+      }
+    }
+
+    const sortMajors = (majors: string[]) => {
+      return majors.sort((a, b) => {
+        const idxA = MAJOR_SORT_ORDER.indexOf(a)
+        const idxB = MAJOR_SORT_ORDER.indexOf(b)
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB
+        if (idxA !== -1) return -1
+        if (idxB !== -1) return 1
+        return a.localeCompare(b)
+      })
+    }
+
+    const allUnique = Array.from(new Set(data.map(d => d.major).filter(Boolean))) as string[]
+    const allSorted = sortMajors(allUnique)
+
+    const byGrade: Record<number, string[]> = {
+      1: sortMajors(Array.from(new Set(data.filter(d => d.graduation_year === baseYear + 3).map(d => d.major).filter(Boolean)))),
+      2: sortMajors(Array.from(new Set(data.filter(d => d.graduation_year === baseYear + 2).map(d => d.major).filter(Boolean)))),
+      3: sortMajors(Array.from(new Set(data.filter(d => d.graduation_year === baseYear + 1).map(d => d.major).filter(Boolean)))),
+    }
+
+    return {
+      all: allSorted.length > 0 ? allSorted : MAJOR_SORT_ORDER,
+      byGrade: {
+        1: byGrade[1].length > 0 ? byGrade[1] : allSorted,
+        2: byGrade[2].length > 0 ? byGrade[2] : allSorted,
+        3: byGrade[3].length > 0 ? byGrade[3] : allSorted,
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching active enrolled majors:', err)
+    return {
+      all: MAJOR_SORT_ORDER,
+      byGrade: { 1: MAJOR_SORT_ORDER, 2: MAJOR_SORT_ORDER, 3: MAJOR_SORT_ORDER }
+    }
+  }
+}
 
 export async function studentLogin(formData: FormData) {
 
