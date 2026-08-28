@@ -128,17 +128,17 @@ export function DraggableChartGrid({
     <div className="flex flex-col gap-3">
       {/* 툴바 안내 및 초기화 버튼 (관리자일 때만 표시) */}
       {isAdmin && isMounted && (
-        <div className="flex items-center justify-between px-1 text-xs text-slate-500 font-medium">
-          <div className="flex items-center gap-1.5 text-indigo-700 bg-indigo-50/80 px-2.5 py-1 rounded-md border border-indigo-100 shadow-2xs">
-            <ShieldCheck className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
-            <span>관리자 모드: 차트 우측 상단 손잡이(<GripVertical className="h-3 w-3 inline text-indigo-500" />)를 드래그하여 전체 사용자의 그래프 순서를 지정합니다.</span>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-1 text-xs text-slate-500 font-medium">
+          <div className="flex items-center gap-1.5 text-indigo-700 bg-indigo-50/80 px-3 py-1.5 rounded-xl border border-indigo-100/80 shadow-2xs">
+            <ShieldCheck className="h-4 w-4 text-indigo-600 shrink-0" />
+            <span>관리자 모드: 차트 우측 상단 손잡이(<GripVertical className="h-3.5 w-3.5 inline text-indigo-500" />)를 드래그하여 전체 사용자의 그래프 순서를 지정합니다.</span>
           </div>
           {isModified && (
             <button
               onClick={handleResetOrder}
-              className="flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100/80 px-2.5 py-1 rounded-md border border-rose-200 transition-all shrink-0 active:scale-95 shadow-2xs"
+              className="flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100/80 px-3 py-1.5 rounded-xl border border-rose-200 transition-all shrink-0 active:scale-95 shadow-2xs"
             >
-              <RotateCcw className="h-3 w-3" />
+              <RotateCcw className="h-3.5 w-3.5" />
               <span>순서 초기화</span>
             </button>
           )}
@@ -160,7 +160,7 @@ export function DraggableChartGrid({
               onDrop={(e) => handleDrop(e, idx)}
               onDragEnd={handleDragEnd}
               className={cn(
-                "relative group transition-all duration-200 rounded-xl",
+                "relative group transition-all duration-200 rounded-2xl",
                 isDragging && "opacity-30 scale-[0.98] border-2 border-dashed border-indigo-400 shadow-inner",
                 isTarget && "ring-2 ring-indigo-500 ring-offset-2 scale-[1.01] shadow-lg"
               )}
@@ -168,7 +168,7 @@ export function DraggableChartGrid({
               {/* 드래그 핸들 배지 (관리자에게만 표시) */}
               {isAdmin && isMounted && (
                 <div 
-                  className="absolute top-3.5 right-3.5 z-20 flex items-center gap-1 px-2 py-1 bg-white/90 hover:bg-indigo-50 backdrop-blur border border-indigo-200 rounded-md text-[11px] font-bold text-indigo-700 shadow-2xs cursor-grab active:cursor-grabbing transition-all opacity-80 group-hover:opacity-100 select-none"
+                  className="absolute top-3.5 right-3.5 z-20 flex items-center gap-1 px-2.5 py-1 bg-white/90 hover:bg-indigo-50 backdrop-blur border border-slate-200/80 rounded-xl text-[11px] font-bold text-slate-700 shadow-xs cursor-grab active:cursor-grabbing transition-all opacity-80 group-hover:opacity-100 select-none"
                   title="드래그하여 전체 사용자 차트 순서 변경"
                 >
                   <GripVertical className="h-3.5 w-3.5 text-indigo-500" />

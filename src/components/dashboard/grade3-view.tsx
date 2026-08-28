@@ -64,53 +64,81 @@ export default function Grade3View({
   };
 
   return (
-    <div className="flex flex-col gap-4 lg:gap-6 animate-in fade-in duration-500">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="bg-blue-50/30 border-blue-100 shadow-sm border-l-4 border-l-blue-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
-            <CardTitle className="text-[10px] sm:text-sm font-semibold text-blue-900">총 학생 수</CardTitle>
-            <Users className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-            <div className="text-lg sm:text-2xl font-bold text-blue-900">{filteredData.length}명</div>
-            <p className="text-[9px] sm:text-xs text-blue-700/70 mt-0.5">분석 대상</p>
+    <div className="flex flex-col gap-5 lg:gap-6 animate-in fade-in duration-500">
+      {/* 4종 핵심 KPI 요약 카드 */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+        {/* 1. 총 학생 수 */}
+        <Card className="rounded-2xl border-slate-200/80 shadow-xs bg-white hover:border-indigo-200 transition-all overflow-hidden">
+          <CardContent className="p-4 sm:p-5 flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-xs font-bold text-slate-500">총 학생 수</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl sm:text-3xl font-black text-slate-900">{filteredData.length}</span>
+                <span className="text-xs font-bold text-slate-500">명</span>
+              </div>
+              <p className="text-[11px] text-slate-400 font-medium">분석 대상 인원</p>
+            </div>
+            <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100/80 flex items-center justify-center shrink-0 shadow-3xs">
+              <Users className="h-5 w-5 sm:h-6 sm:w-6" />
+            </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-emerald-50/30 border-emerald-100 shadow-sm border-l-4 border-l-emerald-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
-            <CardTitle className="text-[10px] sm:text-sm font-semibold text-emerald-900">전체 취업률</CardTitle>
-            <Briefcase className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-600" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-            <div className="text-lg sm:text-2xl font-bold text-emerald-900">{employmentRate.toFixed(1)}%</div>
-            <p className="text-[9px] sm:text-xs text-emerald-700/70 mt-0.5">{employedStudents}명 확정</p>
+        {/* 2. 전체 취업률 */}
+        <Card className="rounded-2xl border-slate-200/80 shadow-xs bg-white hover:border-emerald-200 transition-all overflow-hidden">
+          <CardContent className="p-4 sm:p-5 flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-xs font-bold text-slate-500">전체 취업률</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl sm:text-3xl font-black text-emerald-600">{employmentRate.toFixed(1)}</span>
+                <span className="text-xs font-bold text-emerald-600">%</span>
+              </div>
+              <p className="text-[11px] text-emerald-600/80 font-bold">
+                {employedStudents}명 확정 {excludingStudents > 0 && `(제외 ${excludingStudents}명)`}
+              </p>
+            </div>
+            <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100/80 flex items-center justify-center shrink-0 shadow-3xs">
+              <Briefcase className="h-5 w-5 sm:h-6 sm:w-6" />
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-cyan-50/30 border-cyan-100 shadow-sm border-l-4 border-l-cyan-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
-            <CardTitle className="text-[10px] sm:text-sm font-semibold text-cyan-900">현장실습 / 도제OJT</CardTitle>
-            <GraduationCap className="h-3 w-3 sm:h-4 sm:w-4 text-cyan-600" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-            <div className="text-lg sm:text-2xl font-bold text-cyan-900">{trainingStudents}명</div>
-            <p className="text-[9px] sm:text-xs text-cyan-700/70 mt-0.5">참여 인원</p>
+        {/* 3. 현장실습 / 도제OJT */}
+        <Card className="rounded-2xl border-slate-200/80 shadow-xs bg-white hover:border-purple-200 transition-all overflow-hidden">
+          <CardContent className="p-4 sm:p-5 flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-xs font-bold text-slate-500">현장실습 / 도제OJT</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl sm:text-3xl font-black text-purple-600">{trainingStudents}</span>
+                <span className="text-xs font-bold text-purple-600">명</span>
+              </div>
+              <p className="text-[11px] text-purple-600/80 font-bold">실습 참여 및 파견</p>
+            </div>
+            <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-purple-50 text-purple-600 border border-purple-100/80 flex items-center justify-center shrink-0 shadow-3xs">
+              <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6" />
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-indigo-50/30 border-indigo-100 shadow-sm border-l-4 border-l-indigo-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
-            <CardTitle className="text-[10px] sm:text-sm font-semibold text-indigo-900">주요 기업</CardTitle>
-            <Building2 className="h-3 w-3 sm:h-4 sm:w-4 text-indigo-600" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-            <div className="text-lg sm:text-2xl font-bold text-indigo-900">{majorCompanyStudents}명</div>
-            <p className="text-[9px] sm:text-xs text-indigo-700/70 mt-0.5">대/공기업/공직</p>
+        {/* 4. 대·공기업·공직 취업 */}
+        <Card className="rounded-2xl border-slate-200/80 shadow-xs bg-white hover:border-amber-200 transition-all overflow-hidden">
+          <CardContent className="p-4 sm:p-5 flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-xs font-bold text-slate-500">대·공기업·공직 취업</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl sm:text-3xl font-black text-amber-600">{majorCompanyStudents}</span>
+                <span className="text-xs font-bold text-amber-600">명</span>
+              </div>
+              <p className="text-[11px] text-amber-600/80 font-bold">대기업/공기업/공무원</p>
+            </div>
+            <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-100/80 flex items-center justify-center shrink-0 shadow-3xs">
+              <Building2 className="h-5 w-5 sm:h-6 sm:w-6" />
+            </div>
           </CardContent>
         </Card>
       </div>
 
+      {/* 6종 차트 그리드 */}
       <DraggableChartGrid
         storageKey="dashboard_chart_order_grade3"
         defaultKeys={DEFAULT_KEYS}

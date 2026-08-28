@@ -112,25 +112,43 @@ export default async function DashboardPage({
   const employmentRate = analysisTargetCount > 0 ? (employedStudents / analysisTargetCount) * 100 : 0;
 
   return (
-    <div className="flex flex-col gap-4 lg:gap-6">
-      <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between shrink-0 gap-4 px-1">
-        <div className="flex flex-col gap-1 min-w-0 items-start">
-          <h2 className="text-2xl lg:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2 whitespace-nowrap">
-            <LayoutDashboard className="h-7 w-7 lg:h-8 lg:w-8 text-indigo-600 shrink-0" />
-            종합 통계 대시보드
-          </h2>
-          <div className="flex flex-col gap-0.5 text-muted-foreground text-[10px] lg:text-xs font-medium leading-relaxed items-start">
-            <p className="whitespace-nowrap">학교 전체의 진로 및 취업 현황을 실시간 통계로 분석합니다.</p>
-            <p className="text-indigo-600 font-bold whitespace-nowrap">
-              {ay}학년도 {grade}학년 {selectedMajor !== 'all' ? `${selectedMajor} ` : '전체 학과 '}
-              {selectedClass !== 'all' ? `${selectedClass}반 ` : ''}
-              분석 결과
-            </p>
+    <div className="flex flex-col gap-5 lg:gap-6">
+      {/* 1. 상단 모던 헤더 & 필터 바 영역 */}
+      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between shrink-0 gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="bg-indigo-50 text-indigo-700 border border-indigo-100/80 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full">
+              {ay}학년도
+            </span>
+            <span className="bg-slate-100 text-slate-700 text-[11px] font-bold px-2 py-0.5 rounded-full">
+              {grade}학년 분석
+            </span>
+            <span className="text-xs text-slate-400 font-medium hidden sm:inline">
+              대구공업고등학교 DGTHS
+            </span>
           </div>
+
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-slate-900 flex items-center gap-2.5">
+            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
+              <LayoutDashboard className="h-5 w-5 sm:h-6 sm:w-6" />
+            </div>
+            <span>종합 통계 대시보드</span>
+          </h2>
+
+          <p className="text-xs text-slate-500 font-medium">
+            전교생 진로 희망, 취업률 및 현장실습/도제OJT 지표를 실시간으로 분석합니다.
+            {selectedMajor !== 'all' && (
+              <span className="ml-1.5 font-bold text-indigo-600">[{selectedMajor}]</span>
+            )}
+            {selectedClass !== 'all' && (
+              <span className="ml-1 font-bold text-indigo-600">[{selectedClass}반]</span>
+            )}
+          </p>
         </div>
-        <div className="shrink-0 xl:scale-100 origin-left xl:origin-bottom-right overflow-x-auto w-full xl:w-auto">
+
+        <div className="shrink-0 overflow-x-auto w-full xl:w-auto pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-100">
           <div className="flex justify-start xl:justify-end">
-            <React.Suspense fallback={<div className="h-10 w-[450px] bg-slate-50 animate-pulse rounded-lg" />}>
+            <React.Suspense fallback={<div className="h-10 w-[450px] bg-slate-50 animate-pulse rounded-xl" />}>
               <DashboardFilters 
                 graduationYears={graduationYears} 
                 majors={majors} 

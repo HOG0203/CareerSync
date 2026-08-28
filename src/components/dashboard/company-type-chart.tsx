@@ -92,17 +92,22 @@ export default function CompanyTypeChart({
   const hasData = formattedPieData.length > 0;
 
   return (
-    <Card className="flex flex-col border-none shadow-sm bg-white/50 backdrop-blur-sm overflow-hidden h-full">
-      <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-        <div className="flex flex-col gap-1">
-          <CardTitle className="text-lg font-bold text-blue-900">기업 규모별 취업 분포</CardTitle>
-          <CardDescription>{selectedMajor === 'all' ? '전체 학과' : `${selectedMajor}`} 기업 유형 분석입니다.</CardDescription>
+    <Card className="rounded-2xl border-slate-200/80 shadow-xs bg-white overflow-hidden flex flex-col h-full hover:border-slate-300 transition-all">
+      <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-4 sm:p-5 flex flex-row items-center justify-between space-y-0">
+        <div className="flex flex-col gap-0.5 min-w-0 pr-2">
+          <CardTitle className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
+            <PieChartIcon className="h-5 w-5 text-indigo-600 shrink-0" />
+            <span>취업 기업 유형 분석</span>
+          </CardTitle>
+          <CardDescription className="text-xs text-slate-500 font-medium">{selectedMajor === 'all' ? '전체 학과' : `${selectedMajor}`} 취업 확정자의 기업 규모/유형 분석입니다.</CardDescription>
         </div>
-        <Tabs value={viewType} onValueChange={(v: any) => setViewType(v)} className="w-auto">
-          <TabsList className="grid w-full grid-cols-2 h-8">
-            <TabsTrigger value="pie" className="px-2 py-1"><PieChartIcon className="h-3.5 w-3.5 mr-1" />분포</TabsTrigger>
-            <TabsTrigger value="bar" className="px-2 py-1">
-              <LayoutGrid className="h-3.5 w-3.5 mr-1" />
+        <Tabs value={viewType} onValueChange={(v: any) => setViewType(v)} className="w-auto shrink-0">
+          <TabsList className="bg-slate-200/70 p-0.5 rounded-xl h-8 gap-0.5">
+            <TabsTrigger value="pie" className="rounded-lg text-xs font-bold px-2.5 py-1 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-xs">
+              <PieChartIcon className="h-3.5 w-3.5 mr-1 text-indigo-600" />분포
+            </TabsTrigger>
+            <TabsTrigger value="bar" className="rounded-lg text-xs font-bold px-2.5 py-1 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-xs">
+              <LayoutGrid className="h-3.5 w-3.5 mr-1 text-indigo-600" />
               {selectedMajor === 'all' ? '학과별' : '반별'}
             </TabsTrigger>
           </TabsList>
