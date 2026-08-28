@@ -269,6 +269,7 @@ export function StudentTable({
   initialData, 
   isAdmin = false, 
   masterCertificates = [],
+  masterCompanies = [],
   rankingMap = {},
   userProfile = null,
   baseYear,
@@ -277,6 +278,7 @@ export function StudentTable({
   initialData: any[], 
   isAdmin?: boolean,
   masterCertificates?: MasterCertificate[],
+  masterCompanies?: any[],
   rankingMap?: Record<string, any>,
   userProfile?: any,
   baseYear?: number,
@@ -353,6 +355,7 @@ export function StudentTable({
           onAction={handleAction}
           searchPlaceholder="빠른 학생 검색..."
           masterCertificates={masterCertificates}
+          masterCompanies={masterCompanies}
           rankingMap={asyncRankingMap}
           isRankingsLoading={isRankingsLoading}
           userProfile={userProfile}
@@ -379,6 +382,7 @@ export function StudentTable({
         onClose={() => setIsModalOpen(false)}
         student={selectedStudent}
         isAdmin={isAdmin}
+        masterCompanies={masterCompanies}
       />
     </div>
   )

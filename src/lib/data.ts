@@ -887,5 +887,26 @@ export async function getCachedTeacherProfiles() {
   )();
 }
 
+/**
+ * [캐싱] 등록 기업 마스터 목록 서버 메모리 캐싱 (companies 태그 적용, 회사명 자동완성용)
+ */
+export async function getCachedRegisteredCompanies() {
+  return unstable_cache(
+    async () => {
+      const supabase = createAdminClient();
+      const { data } = await supabase
+        .from('companies')
+        .select('id, name, company_type, location, industry')
+        .order('name');
+      return data || [];
+    },
+    ['master-registered-companies-autocomplete-v1'],
+    {
+      revalidate: 3600,
+      tags: ['companies']
+    }
+  )();
+}
+
 
 

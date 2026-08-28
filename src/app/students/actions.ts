@@ -586,16 +586,24 @@ export async function upsertFieldTrainingRecord(record: any) {
   }
 
   const supabase = await createClient(); const { id, ...data } = record
+  
+  // DB Check Constraint ('진행중', '채용전환', '복교') 호환 보장
+  let dbHiringStatus = data.hiring_status;
+  if (dbHiringStatus === '현장실습' || !dbHiringStatus) {
+    dbHiringStatus = '진행중';
+  }
+
   const sanitized = { 
     ...data, 
+    hiring_status: dbHiringStatus,
     start_date: data.start_date || null, 
     end_date: data.end_date || null, 
-    conversion_date: data.hiring_status === '채용전환' ? (data.conversion_date || null) : null,
-    return_reason: data.hiring_status === '복교' ? (data.return_reason || null) : null
+    conversion_date: dbHiringStatus === '채용전환' ? (data.conversion_date || null) : null,
+    return_reason: dbHiringStatus === '복교' ? (data.return_reason || null) : null
   }
   const { data: upserted, error } = await supabase.from('field_training_records').upsert({ ...(id ? { id } : {}), ...sanitized, updated_at: new Date().toISOString() }).select().single()
   if (error) return { error: error.message }
-  if (data.hiring_status === '채용전환') await supabase.from('student_employments').upsert({ id: data.student_id, company: data.company, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+  if (dbHiringStatus === '채용전환') await supabase.from('student_employments').upsert({ id: data.student_id, company: data.company, updated_at: new Date().toISOString() }, { onConflict: 'id' })
   revalidateTag('students');
   revalidatePath('/field-training');
   return { success: true, data: upserted }

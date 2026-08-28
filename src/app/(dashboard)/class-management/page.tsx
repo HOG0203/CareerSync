@@ -1,4 +1,4 @@
-import { getCachedAssignedStudentDetails, getCachedGraduationYears, getCachedFilteredStudentData, getCachedClassStructureCombinations, getCurrentUserProfile } from '@/lib/data';
+import { getCachedAssignedStudentDetails, getCachedGraduationYears, getCachedFilteredStudentData, getCachedClassStructureCombinations, getCurrentUserProfile, getCachedRegisteredCompanies } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -38,10 +38,11 @@ async function ClassManagementPageContent({
   const params = searchParams;
   
   // 1. 기반 공통 데이터 및 학급 구조 1회 동시 병렬 패칭 (서버 메모리 캐시 적용)
-  const [settings, graduationYears, masterCertificates, userProfile, allCombinations] = await Promise.all([
+  const [settings, graduationYears, masterCertificates, masterCompanies, userProfile, allCombinations] = await Promise.all([
     getSystemSettings(),
     getCachedGraduationYears(),
     getCachedMasterCertificates(),
+    getCachedRegisteredCompanies(),
     getCurrentUserProfile(),
     getCachedClassStructureCombinations()
   ]);
@@ -174,6 +175,7 @@ async function ClassManagementPageContent({
         <ClassTable 
           initialData={studentData} 
           masterCertificates={masterCertificates} 
+          masterCompanies={masterCompanies}
           userProfile={userProfile}
           baseYear={settings.baseYear}
           graduationYear={calculatedYear}

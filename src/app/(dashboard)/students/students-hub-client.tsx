@@ -29,6 +29,7 @@ interface StudentsHubClientProps {
   initialData: any[];
   isAdmin: boolean;
   masterCertificates: MasterCertificate[];
+  masterCompanies?: any[];
   rankingMap: Record<string, any>;
   userProfile: any;
   baseYear: number;
@@ -42,6 +43,7 @@ export function StudentsHubClient({
   initialData,
   isAdmin,
   masterCertificates,
+  masterCompanies = [],
   rankingMap,
   userProfile,
   baseYear,
@@ -378,6 +380,7 @@ export function StudentsHubClient({
               initialData={filteredData}
               isAdmin={isAdmin}
               masterCertificates={masterCertificates}
+              masterCompanies={masterCompanies}
               rankingMap={rankingMap}
               userProfile={userProfile}
               baseYear={baseYear}

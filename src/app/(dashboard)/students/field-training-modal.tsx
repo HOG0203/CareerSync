@@ -41,6 +41,7 @@ interface FieldTrainingModalProps {
   student: any | null
   isAdmin?: boolean
   onUpdateRecords?: (studentId: string, updatedRecords: any[]) => void
+  masterCompanies?: any[]
 }
 
 // 텍스트 자유 입력, 복사-붙여넣기, 자동 형식 정제 및 달력 선택을 동시 지원하는 스마트 날짜 인풋
@@ -117,7 +118,7 @@ function SmartDateInput({
   );
 }
 
-export function FieldTrainingModal({ isOpen, onClose, student, isAdmin = false, onUpdateRecords }: FieldTrainingModalProps) {
+export function FieldTrainingModal({ isOpen, onClose, student, isAdmin = false, onUpdateRecords, masterCompanies = [] }: FieldTrainingModalProps) {
   const [records, setRecords] = React.useState<any[]>([])
   const [isSaving, setIsSaving] = React.useState(false)
   const { toast } = useToast()
@@ -151,7 +152,7 @@ export function FieldTrainingModal({ isOpen, onClose, student, isAdmin = false, 
       start_date: '',
       end_date: '',
       stipend_status: 'X',
-      hiring_status: '진행중',
+      hiring_status: '현장실습',
       conversion_date: '',
       return_reason: ''
     }
@@ -169,8 +170,8 @@ export function FieldTrainingModal({ isOpen, onClose, student, isAdmin = false, 
           target.conversion_date = target.end_date || ''
         }
         target.return_reason = ''
-      } else if (value === '진행중') {
-        // [자동 삭제] 진행중으로 변경 시: 채용전환일 및 복교사유 초기화/삭제
+      } else if (value === '현장실습' || value === '진행중') {
+        // [자동 삭제] 현장실습으로 변경 시: 채용전환일 및 복교사유 초기화/삭제
         target.conversion_date = ''
         target.return_reason = ''
       } else if (value === '복교') {
@@ -340,19 +341,43 @@ export function FieldTrainingModal({ isOpen, onClose, student, isAdmin = false, 
                     <div className="p-4 sm:p-5 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                       <div className="space-y-1">
                         <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">실습 업체명</Label>
-                        <Input 
-                          value={record.company || ''} 
-                          onChange={(e) => handleUpdateLocal(index, 'company', e.target.value)}
-                          placeholder="회사명"
-                          disabled={!isAdmin}
-                          className="h-8 sm:h-9 text-xs sm:text-sm focus:ring-indigo-500"
-                        />
+                        <div className="space-y-1">
+                          <Input 
+                            value={record.company || ''} 
+                            onChange={(e) => handleUpdateLocal(index, 'company', e.target.value)}
+                            placeholder="회사명 입력..."
+                            disabled={!isAdmin}
+                            className="h-8 sm:h-9 text-xs sm:text-sm focus:ring-indigo-500"
+                          />
+                          {isAdmin && masterCompanies && masterCompanies.length > 0 && record.company && (
+                            (() => {
+                              const search = (record.company || '').trim().toLowerCase();
+                              const matches = masterCompanies.filter((c: any) => (c.name || '').toLowerCase().includes(search)).slice(0, 5);
+                              if (matches.length === 0) return null;
+                              return (
+                                <div className="flex flex-wrap gap-1 pt-1">
+                                  <span className="text-[9px] text-slate-400 font-bold self-center">추천:</span>
+                                  {matches.map((c: any) => (
+                                    <button
+                                      key={c.id || c.name}
+                                      type="button"
+                                      onClick={() => handleUpdateLocal(index, 'company', c.name)}
+                                      className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold border border-indigo-100 hover:bg-indigo-100 transition-colors"
+                                    >
+                                      {c.name}
+                                    </button>
+                                  ))}
+                                </div>
+                              );
+                            })()
+                          )}
+                        </div>
                       </div>
 
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">실습 결과</Label>
+                        <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">실습내용</Label>
                         <Select 
-                          value={record.hiring_status || '진행중'} 
+                          value={record.hiring_status === '진행중' ? '현장실습' : (record.hiring_status || '현장실습')} 
                           onValueChange={(v) => handleUpdateLocal(index, 'hiring_status', v)}
                           disabled={!isAdmin}
                         >
@@ -360,9 +385,9 @@ export function FieldTrainingModal({ isOpen, onClose, student, isAdmin = false, 
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="z-[150]">
-                            <SelectItem value="진행중" className="text-xs">⏳ 진행중</SelectItem>
-                            <SelectItem value="채용전환" className="text-xs">✅ 채용전환</SelectItem>
-                            <SelectItem value="복교" className="text-xs">🔄 복교</SelectItem>
+                            <SelectItem value="현장실습" className="text-xs">🏃 현장실습</SelectItem>
+                            <SelectItem value="채용전환" className="text-xs">🎯 채용전환</SelectItem>
+                            <SelectItem value="복교" className="text-xs">↩️ 복교</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

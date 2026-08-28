@@ -21,6 +21,7 @@ export interface SpreadsheetTableProps {
   groupHeaders?: { label: string; colSpan: number; className?: string }[]
   searchPlaceholder?: string
   masterCertificates?: any[]
+  masterCompanies?: any[]
   rankingMap?: Record<string, any>
   isRankingsLoading?: boolean
   userProfile?: any

@@ -14,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { normalizeCertificates } from './utils'
 
-export const MobileDetailModal = ({ isOpen, onClose, data, columns, onSave, onAction }: any) => {
+export const MobileDetailModal = ({ isOpen, onClose, data, columns, onSave, onAction, masterCompanies = [] }: any) => {
   if (!data) return null;
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -40,6 +40,12 @@ export const MobileDetailModal = ({ isOpen, onClose, data, columns, onSave, onAc
           <div className="grid grid-cols-1 gap-3">
             {columns.filter((c: any) => c.type !== 'action').map((col: any) => {
               const resolvedOptions = typeof col.options === 'function' ? col.options(data) : col.options;
+              const isCompanyField = col.key === 'company';
+              const companySearch = (data[col.key] || '').trim().toLowerCase();
+              const matchingCompanies = isCompanyField && masterCompanies && masterCompanies.length > 0
+                ? masterCompanies.filter((c: any) => (c.name || '').toLowerCase().includes(companySearch)).slice(0, 6)
+                : [];
+
               return (
                 <div key={col.key} className="space-y-1.5 p-3 rounded-xl bg-white border border-slate-200 shadow-sm">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{col.label}</label>
@@ -91,9 +97,31 @@ export const MobileDetailModal = ({ isOpen, onClose, data, columns, onSave, onAc
                       {data[col.key] && (<Button variant="outline" size="icon" className="h-10 w-10 shrink-0 text-slate-400 hover:text-rose-500" onClick={() => onSave(data.id, col.key, '')}><X className="h-4 w-4" /></Button>)}
                     </div>
                   ) : (
-                    <div className="relative">
-                      <Input value={data[col.key] || ''} onChange={(e) => onSave(data.id, col.key, e.target.value)} className="h-10 w-full bg-white pr-10 font-medium" />
-                      {data[col.key] && (<button onClick={() => onSave(data.id, col.key, '')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500 transition-colors"><X className="h-4 w-4" /></button>)}
+                    <div className="space-y-1.5">
+                      <div className="relative">
+                        <Input value={data[col.key] || ''} onChange={(e) => onSave(data.id, col.key, e.target.value)} placeholder={isCompanyField ? "회사명 입력..." : ""} className="h-10 w-full bg-white pr-10 font-medium" />
+                        {data[col.key] && (<button onClick={() => onSave(data.id, col.key, '')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500 transition-colors"><X className="h-4 w-4" /></button>)}
+                      </div>
+                      {isCompanyField && matchingCompanies.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          <span className="text-[10px] text-slate-400 font-bold self-center mr-0.5">추천:</span>
+                          {matchingCompanies.map((comp: any) => (
+                            <button
+                              key={comp.id || comp.name}
+                              type="button"
+                              onClick={() => {
+                                onSave(data.id, col.key, comp.name);
+                                if (comp.company_type && data.company_type !== comp.company_type) {
+                                  onSave(data.id, 'company_type', comp.company_type);
+                                }
+                              }}
+                              className="text-[10px] px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold border border-blue-100 hover:bg-blue-100 transition-colors"
+                            >
+                              {comp.name} {comp.company_type ? `(${comp.company_type})` : ''}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

@@ -1101,7 +1101,7 @@ export function FieldTrainingClient({
                                               "text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs shrink-0", 
                                               isConverted ? "bg-purple-600 text-white" : isReturned ? "bg-rose-600 text-white" : (r.start_date && r.start_date > todayStr) ? "bg-sky-500 text-white" : "bg-emerald-600 text-white"
                                             )}>
-                                              {isConverted ? "✨ 채용전환" : isReturned ? "🔄 복교" : (r.start_date && r.start_date > todayStr) ? "⏳ 실습예정" : "🟢 실습진행중"}
+                                              {isConverted ? "✨ 채용전환" : isReturned ? "🔄 복교" : (r.start_date && r.start_date > todayStr) ? "⏳ 실습예정" : "🟢 실습중"}
                                             </Badge>
                                           </div>
 
@@ -1250,27 +1250,55 @@ export function FieldTrainingClient({
                                   const d = parseISO(r.start_date);
                                   if (isValid(d)) startPct = Math.min(100, Math.max(0, (differenceInDays(d, timelineStart) / totalDays) * 100));
                                 }
-                                if (r.end_date) {
+                                if (isConverted) {
+                                  endPct = 100;
+                                  if (r.conversion_date) {
+                                    const cDate = parseISO(r.conversion_date);
+                                    if (isValid(cDate)) convPct = Math.min(100, Math.max(0, (differenceInDays(cDate, timelineStart) / totalDays) * 100));
+                                  } else if (r.end_date) {
+                                    const eDate = parseISO(r.end_date);
+                                    if (isValid(eDate)) convPct = Math.min(100, Math.max(0, (differenceInDays(eDate, timelineStart) / totalDays) * 100));
+                                  }
+                                } else if (r.end_date) {
                                   const d = parseISO(r.end_date);
                                   if (isValid(d)) endPct = Math.min(100, Math.max(0, (differenceInDays(d, timelineStart) / totalDays) * 100));
                                 }
 
                                 const widthPct = Math.max(4, endPct - startPct);
                                 const effectiveStatus = getEffectiveRecordStatus(r, todayStr);
+                                const trainingRatio = isConverted && widthPct > 0 
+                                  ? Math.min(90, Math.max(15, ((convPct - startPct) / widthPct) * 100)) 
+                                  : 100;
+                                const conversionRatio = 100 - trainingRatio;
 
-                                return (
+                                return isConverted ? (
+                                  /* 모바일 View 1 [채용전환 투톤 막대]: 좌측 녹색 + 우측 보라색 */
+                                  <div 
+                                    key={r.id}
+                                    style={{ left: `${startPct}%`, width: `${widthPct}%` }}
+                                    className="relative h-6.5 rounded-lg flex items-stretch text-[10px] font-black text-white shadow-2xs overflow-hidden border border-purple-400"
+                                  >
+                                    <div style={{ width: `${trainingRatio}%` }} className="bg-emerald-600 px-1.5 flex items-center justify-between border-r border-white/80 shrink-0 min-w-0 overflow-hidden">
+                                      <span className="truncate">{r.company}</span>
+                                    </div>
+                                    <div style={{ width: `${conversionRatio}%` }} className="bg-purple-600 px-1 flex items-center justify-between shrink-0 min-w-0 overflow-hidden flex-1">
+                                      <span className="truncate text-[9px] text-purple-100">✨전환</span>
+                                      {isStipendDone && (
+                                        <span className="bg-white text-blue-700 text-[8px] font-black px-1 rounded shadow-2xs shrink-0">O</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : (
                                   <div 
                                     key={r.id}
                                     style={{ left: `${startPct}%`, width: `${widthPct}%` }}
                                     className={cn(
                                       "relative h-6.5 rounded-lg flex items-center justify-between px-1.5 text-[10px] font-black text-white shadow-2xs",
                                       effectiveStatus === 'upcoming' 
-                                        ? "bg-gradient-to-r from-sky-400 to-sky-500 border border-sky-300"
+                                        ? "bg-sky-500 border border-sky-400"
                                         : isReturned
-                                        ? "bg-gradient-to-r from-rose-500 to-rose-600 border border-rose-400"
-                                        : effectiveStatus === 'converted'
-                                        ? "bg-gradient-to-r from-purple-600 to-purple-700 border border-purple-400"
-                                        : "bg-gradient-to-r from-emerald-500 to-emerald-600 border border-emerald-400"
+                                        ? "bg-rose-500 border border-rose-400"
+                                        : "bg-emerald-600 border border-emerald-500"
                                     )}
                                   >
                                     <span className="truncate">{r.company}</span>
@@ -1359,9 +1387,29 @@ export function FieldTrainingClient({
                                 }
                               }
 
+                              let convPct = endPct;
+                              let convDateFormatted = '';
+
                               if (isConverted) {
                                 endPct = 100;
                                 endDateFormatted = '졸업';
+                                if (r.conversion_date) {
+                                  const cDate = parseISO(r.conversion_date);
+                                  if (isValid(cDate)) {
+                                    convDateFormatted = format(cDate, 'MM.dd');
+                                    if (isBefore(cDate, timelineStart)) convPct = 0;
+                                    else if (isAfter(cDate, timelineEnd)) convPct = 100;
+                                    else convPct = Math.min(100, Math.max(0, (differenceInDays(cDate, timelineStart) / totalDays) * 100));
+                                  }
+                                } else if (r.end_date) {
+                                  const eDate = parseISO(r.end_date);
+                                  if (isValid(eDate)) {
+                                    convDateFormatted = format(eDate, 'MM.dd');
+                                    if (isBefore(eDate, timelineStart)) convPct = 0;
+                                    else if (isAfter(eDate, timelineEnd)) convPct = 100;
+                                    else convPct = Math.min(100, Math.max(0, (differenceInDays(eDate, timelineStart) / totalDays) * 100));
+                                  }
+                                }
                               } else if (r.end_date) {
                                 const eDate = parseISO(r.end_date);
                                 if (isValid(eDate)) {
@@ -1373,6 +1421,11 @@ export function FieldTrainingClient({
                               }
 
                               const barWidthPct = Math.max(8, endPct - startPct);
+                              const trainingRatio = isConverted && barWidthPct > 0 
+                                ? Math.min(90, Math.max(15, ((convPct - startPct) / barWidthPct) * 100)) 
+                                : 100;
+                              const conversionRatio = 100 - trainingRatio;
+                              const effectiveStatus = getEffectiveRecordStatus(r, todayStr);
 
                               return (
                                 <div key={r.id || r.training_order} className="bg-slate-50/90 border border-slate-200/80 rounded-xl p-2.5 space-y-2">
@@ -1385,8 +1438,19 @@ export function FieldTrainingClient({
                                       <span className="font-extrabold text-slate-900 truncate text-xs">{r.company || '업체 미지정'}</span>
                                     </div>
                                     <div className="flex items-center gap-1 shrink-0">
-                                      <Badge className={cn("text-[10px] font-extrabold px-1.5 py-0.2 rounded-full", isConverted ? "bg-purple-600 text-white" : isReturned ? "bg-rose-500 text-white" : "bg-emerald-600 text-white")}>
-                                        {r.hiring_status || '진행중'}
+                                      <Badge className={cn(
+                                        "text-[10px] font-extrabold px-1.5 py-0.2 rounded-full",
+                                        effectiveStatus === 'upcoming' && "bg-sky-500 text-white",
+                                        effectiveStatus === 'ongoing' && "bg-emerald-600 text-white",
+                                        effectiveStatus === 'converted' && "bg-purple-600 text-white",
+                                        effectiveStatus === 'returned' && "bg-rose-500 text-white",
+                                        effectiveStatus === 'none' && "bg-slate-200 text-slate-700"
+                                      )}>
+                                        {effectiveStatus === 'upcoming' ? '⏳ 실습예정'
+                                          : effectiveStatus === 'ongoing' ? '🟢 실습중'
+                                          : effectiveStatus === 'converted' ? '✨ 채용전환'
+                                          : effectiveStatus === 'returned' ? '🔄 복교'
+                                          : '미실습'}
                                       </Badge>
                                       <button
                                         type="button"
@@ -1412,25 +1476,55 @@ export function FieldTrainingClient({
                                       ))}
                                     </div>
 
-                                    {/* 100% 폭 트랙 위에 얹어지는 그라데이션 실습 기간 가로바 */}
-                                    <div 
-                                      className={cn(
-                                        "absolute top-0.5 bottom-0.5 rounded-md shadow-md flex items-center px-1.5 transition-all z-10",
-                                        isConverted 
-                                          ? "bg-gradient-to-r from-purple-600 to-indigo-600 border border-purple-400 text-white"
-                                          : isReturned
-                                          ? "bg-gradient-to-r from-amber-500 to-rose-500 border-rose-400 text-white"
-                                          : "bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 border border-emerald-300 text-white"
-                                      )}
-                                      style={{
-                                        left: `${startPct}%`,
-                                        width: `${barWidthPct}%`
-                                      }}
-                                    >
-                                      <span className="text-[9px] font-black tracking-tighter truncate drop-shadow-xs">
-                                        {startDateFormatted} ~ {endDateFormatted}
-                                      </span>
-                                    </div>
+                                    {/* 100% 폭 트랙 위에 얹어지는 실습 기간 가로바 */}
+                                    {isConverted ? (
+                                      /* [채용전환 전용 투톤 막대]: 좌측 녹색 + 우측 보라색 */
+                                      <div 
+                                        className="absolute top-0.5 bottom-0.5 rounded-md shadow-sm flex items-stretch transition-all z-10 overflow-hidden border border-purple-400"
+                                        style={{
+                                          left: `${startPct}%`,
+                                          width: `${barWidthPct}%`
+                                        }}
+                                      >
+                                        {/* 좌측 녹색 실습 구간 (원톤) */}
+                                        <div 
+                                          style={{ width: `${trainingRatio}%` }}
+                                          className="bg-emerald-600 text-white flex items-center px-1.5 border-r border-white/80 shrink-0 min-w-0 overflow-hidden"
+                                        >
+                                          <span className="text-[8.5px] font-black tracking-tighter truncate">
+                                            {startDateFormatted}~{convDateFormatted || endDateFormatted}
+                                          </span>
+                                        </div>
+                                        {/* 우측 보라색 채용전환 구간 (원톤) */}
+                                        <div 
+                                          style={{ width: `${conversionRatio}%` }}
+                                          className="bg-purple-600 text-white flex items-center px-1.5 shrink-0 min-w-0 overflow-hidden flex-1"
+                                        >
+                                          <span className="text-[8.5px] font-black tracking-tighter truncate text-purple-100">
+                                            ✨채용전환 ({convDateFormatted ? `${convDateFormatted}~졸업` : '전환~졸업'})
+                                          </span>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div 
+                                        className={cn(
+                                          "absolute top-0.5 bottom-0.5 rounded-md shadow-sm flex items-center px-1.5 transition-all z-10",
+                                          effectiveStatus === 'upcoming'
+                                            ? "bg-sky-500 border border-sky-400 text-white"
+                                            : isReturned
+                                            ? "bg-rose-500 border border-rose-400 text-white"
+                                            : "bg-emerald-600 border border-emerald-500 text-white"
+                                        )}
+                                        style={{
+                                          left: `${startPct}%`,
+                                          width: `${barWidthPct}%`
+                                        }}
+                                      >
+                                        <span className="text-[9px] font-black tracking-tighter truncate">
+                                          {startDateFormatted} ~ {endDateFormatted}
+                                        </span>
+                                      </div>
+                                    )}
 
                                     {/* 오늘 날짜 위치 마커 */}
                                     {todayPositionPercent > 0 && todayPositionPercent < 100 && (

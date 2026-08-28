@@ -1,4 +1,4 @@
-import { getCachedFilteredStudentData, getCachedGraduationYears, MAJOR_SORT_ORDER, getCurrentUserProfile } from '@/lib/data';
+import { getCachedFilteredStudentData, getCachedGraduationYears, MAJOR_SORT_ORDER, getCurrentUserProfile, getCachedRegisteredCompanies } from '@/lib/data';
 import { Users } from 'lucide-react';
 import { StudentsHubClient } from './students-hub-client';
 import { redirect } from 'next/navigation';
@@ -35,10 +35,11 @@ async function StudentsPageContent({
     : (params.year || defaultGradYear);
 
   // 2. 기반 설정, 마스터 정보, 프로필, 학생 데이터를 완전한 1회 병렬(Promise.all)로 동시 패칭 (속도 2배 향상)
-  const [settings, graduationYears, masterCertificates, userProfile, rawStudentData] = await Promise.all([
+  const [settings, graduationYears, masterCertificates, masterCompanies, userProfile, rawStudentData] = await Promise.all([
     getSystemSettings(),
     getCachedGraduationYears(),
     getCachedMasterCertificates(),
+    getCachedRegisteredCompanies(),
     getCurrentUserProfile(),
     getCachedFilteredStudentData(selectedYear, ay)
   ]);
@@ -122,6 +123,7 @@ async function StudentsPageContent({
           initialData={allStudentData}
           isAdmin={isAdmin}
           masterCertificates={masterCertificates}
+          masterCompanies={masterCompanies}
           rankingMap={rankingMap}
           userProfile={userProfile}
           baseYear={settings.baseYear}

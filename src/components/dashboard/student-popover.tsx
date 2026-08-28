@@ -349,11 +349,11 @@ export function StudentPopover({
           </p>
           <div className="space-y-1 bg-emerald-50/30 p-2 rounded-lg border border-emerald-100">
             <div className="grid grid-cols-2 gap-x-3 text-[10px]">
-              <p className="flex justify-between"><span className="text-slate-400">실습결과</span> <span className={cn(
+              <p className="flex justify-between"><span className="text-slate-400">실습내용</span> <span className={cn(
                 "font-black text-right",
                 student.is_hiring_conversion ? "text-blue-600" : 
                 student.is_returned === 'O' ? "text-rose-600" : "text-emerald-700"
-              )}>{student.is_hiring_conversion ? '채용전환' : student.is_returned === 'O' ? '복교' : student.has_field_training === 'O' ? '진행중' : '-'}</span></p>
+              )}>{student.is_hiring_conversion ? '채용전환' : student.is_returned === 'O' ? '복교' : student.has_field_training === 'O' ? '현장실습' : '-'}</span></p>
               <p className="flex justify-between"><span className="text-slate-400 pl-2">지원금</span> <span className="font-bold text-slate-700">{student.training_stipend_status || '-'}</span></p>
             </div>
             <div className="pt-1 border-t border-emerald-100 mt-1 space-y-1">

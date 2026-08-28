@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { X } from 'lucide-react'
+import { X, Building2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -12,11 +12,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { StudentPopover } from '@/components/dashboard/student-popover'
 
-export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, rIdx, cIdx, isEditing, isSelected, isFocused, onMouseDown, onMouseEnter, onStartEdit, onEndEdit, onSave, onAction, rankingMap, isRankingsLoading, userProfile, disableNamePopover, baseYear }: any) => {
+export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, rIdx, cIdx, isEditing, isSelected, isFocused, onMouseDown, onMouseEnter, onStartEdit, onEndEdit, onSave, onAction, rankingMap, isRankingsLoading, userProfile, disableNamePopover, baseYear, masterCompanies = [] }: any) => {
   const [localValue, setLocalValue] = React.useState(value || '')
   const [isManualInput, setIsManualInput] = React.useState(false)
   const isManualRef = React.useRef(false)
   const selectRef = React.useRef<HTMLSelectElement>(null)
+  const [autocompleteActiveIndex, setAutocompleteActiveIndex] = React.useState(-1)
 
   const resolvedOptions = React.useMemo(() => {
     if (!isEditing) return undefined;
@@ -24,13 +25,28 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
     return config.options;
   }, [isEditing, config.options, rowData]);
 
+  // 회사명(company) 자동완성 추천 목록 산출
+  const isCompanyField = field === 'company' || config.key === 'company';
+  const filteredCompanies = React.useMemo(() => {
+    if (!isEditing || !isCompanyField || !masterCompanies || masterCompanies.length === 0) return [];
+    const search = (localValue || '').trim().toLowerCase();
+    if (!search) {
+      return masterCompanies.slice(0, 8);
+    }
+    return masterCompanies
+      .filter((c: any) => (c.name || '').toLowerCase().includes(search))
+      .slice(0, 10);
+  }, [isEditing, isCompanyField, masterCompanies, localValue]);
+
   React.useEffect(() => {
     if (!isEditing) {
       setIsManualInput(false);
       isManualRef.current = false;
+      setAutocompleteActiveIndex(-1);
       return;
     }
     setLocalValue(value || '');
+    setAutocompleteActiveIndex(-1);
     const isInOptions = resolvedOptions?.some((o: any) => o.value === value);
     const isManual = !!value && !isInOptions && value !== '기타(직접입력)';
     setIsManualInput(isManual);
@@ -81,6 +97,17 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
     }
     onEndEdit();
   }, [id, field, value, onSave, onEndEdit]);
+
+  const handleSelectCompany = React.useCallback((comp: any) => {
+    const selectedName = comp.name || '';
+    setLocalValue(selectedName);
+    handleCommit(selectedName);
+
+    // 등록 기업의 기업구분(company_type)이 존재하고 학생의 기존 기업구분과 다르면 자동 연동 입력
+    if (comp.company_type && rowData?.company_type !== comp.company_type) {
+      onSave(id, 'company_type', comp.company_type);
+    }
+  }, [handleCommit, id, onSave, rowData?.company_type]);
 
   if (isEditing && !config.readOnly && config.type !== 'action') {
     if (config.type === 'select') {
@@ -163,6 +190,110 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
       </td>
     )
     if (config.type === 'multi-select') return <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative h-8 z-40 bg-white" style={{ minWidth: config.width, width: config.width }} />;
+
+    // 취업처(회사명) 자동완성 셀 렌더링
+    if (isCompanyField) {
+      return (
+        <td 
+          data-row={rIdx} 
+          data-col={cIdx} 
+          className="p-0 border-r border-b relative h-8 z-50 bg-white ring-2 ring-blue-500 ring-inset" 
+          style={{ minWidth: config.width, width: config.width }}
+        >
+          <Input 
+            autoFocus 
+            value={localValue} 
+            onChange={(e) => {
+              setLocalValue(e.target.value);
+              setAutocompleteActiveIndex(0);
+            }} 
+            onBlur={() => {
+              // 마우스 클릭 시 자동완성 선택할 수 있도록 약간의 지연 처리
+              setTimeout(() => {
+                if (!isCommittingRef.current) {
+                  handleCommit(localValue);
+                }
+              }, 180);
+            }} 
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown') {
+                if (filteredCompanies.length > 0) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setAutocompleteActiveIndex(prev => (prev < filteredCompanies.length - 1 ? prev + 1 : 0));
+                }
+              } else if (e.key === 'ArrowUp') {
+                if (filteredCompanies.length > 0) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setAutocompleteActiveIndex(prev => (prev > 0 ? prev - 1 : filteredCompanies.length - 1));
+                }
+              } else if (e.key === 'Enter' || e.key === 'Tab') {
+                if (autocompleteActiveIndex >= 0 && filteredCompanies[autocompleteActiveIndex]) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSelectCompany(filteredCompanies[autocompleteActiveIndex]);
+                } else {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }
+                  handleCommit(localValue);
+                }
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                onEndEdit();
+              }
+            }} 
+            placeholder="기업명 입력..."
+            className="h-8 w-full text-[11px] border-none rounded-none focus-visible:ring-0 px-1 bg-transparent font-medium" 
+          />
+
+          {/* 등록 기업 자동완성 플로팅 드롭다운 */}
+          {filteredCompanies.length > 0 && (
+            <div className="absolute top-full left-0 mt-0.5 min-w-[210px] max-w-[320px] max-h-56 overflow-y-auto bg-white rounded-lg shadow-2xl border border-slate-200/90 z-[99999] py-1 text-left">
+              <div className="px-2 py-1 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-500 flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <Building2 className="h-3 w-3 text-blue-600" />
+                  등록 기업 ({filteredCompanies.length})
+                </span>
+                <span className="text-[9px] text-slate-400 font-normal">↑↓ 이동 · Enter 선택</span>
+              </div>
+              <div className="divide-y divide-slate-50">
+                {filteredCompanies.map((comp: any, idx: number) => (
+                  <div
+                    key={comp.id || comp.name}
+                    className={cn(
+                      "px-2.5 py-1.5 cursor-pointer text-left transition-colors flex items-center justify-between gap-2",
+                      idx === autocompleteActiveIndex ? "bg-blue-50 text-blue-900 font-bold" : "hover:bg-slate-50 text-slate-800 font-medium"
+                    )}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleSelectCompany(comp);
+                    }}
+                  >
+                    <div className="min-w-0 flex items-center gap-1.5">
+                      <span className="text-[11px] truncate text-slate-900">{comp.name}</span>
+                      {comp.location && (
+                        <span className="text-[9px] text-slate-400 truncate">({comp.location})</span>
+                      )}
+                    </div>
+                    {comp.company_type && (
+                      <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200/80 shrink-0">
+                        {comp.company_type}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </td>
+      );
+    }
+
     return (
       <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative h-8 z-40 bg-white ring-2 ring-blue-500 ring-inset overflow-hidden" style={{ minWidth: config.width, width: config.width }}>
         <Input autoFocus value={localValue} onChange={(e) => setLocalValue(e.target.value)} onBlur={() => handleCommit(localValue)} onKeyDown={(e) => { if(e.key==='Enter') { e.preventDefault(); e.stopPropagation(); handleCommit(localValue); } if(e.key==='Escape') { e.preventDefault(); e.stopPropagation(); onEndEdit(); } }} className="h-8 w-full text-[11px] border-none rounded-none focus-visible:ring-0 px-1 bg-transparent font-medium" />
@@ -208,6 +339,8 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
   p.userProfile === n.userProfile &&
   p.onMouseDown === n.onMouseDown &&
   p.onMouseEnter === n.onMouseEnter &&
-  p.disableNamePopover === n.disableNamePopover
+  p.disableNamePopover === n.disableNamePopover &&
+  p.masterCompanies === n.masterCompanies
 );
 SpreadsheetCell.displayName = 'SpreadsheetCell';
+

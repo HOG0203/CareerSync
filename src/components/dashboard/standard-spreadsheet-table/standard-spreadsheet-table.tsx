@@ -30,6 +30,7 @@ export function StandardSpreadsheetTable({
   groupHeaders,
   searchPlaceholder = "검색...",
   masterCertificates = [],
+  masterCompanies = [],
   rankingMap = {},
   isRankingsLoading = false,
   userProfile = null,
@@ -263,6 +264,7 @@ export function StandardSpreadsheetTable({
                         disableNamePopover={disableNamePopover}
                         baseYear={baseYear}
                         hideCheckbox={hideCheckbox}
+                        masterCompanies={masterCompanies}
                       />
                     );
                   }
@@ -645,6 +647,7 @@ export function StandardSpreadsheetTable({
         columns={columns}
         onSave={handleSaveInternal}
         onAction={onAction}
+        masterCompanies={masterCompanies}
       />
     </div>
   );

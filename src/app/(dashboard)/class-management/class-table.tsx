@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 interface ClassTableProps {
   initialData: any[];
   masterCertificates: MasterCertificate[];
+  masterCompanies?: any[];
   userProfile?: any;
   baseYear?: number;
   graduationYear: number;
@@ -94,6 +95,7 @@ const GET_SPECIFIC_COURSE_OPTIONS = (rowData: any) => {
 export function ClassTable({ 
   initialData, 
   masterCertificates,
+  masterCompanies = [],
   userProfile = null,
   baseYear,
   graduationYear,
@@ -408,6 +410,7 @@ export function ClassTable({
             onAction={handleAction}
             searchPlaceholder="학반 학생 검색 (이름, 번호, 진로희망...)"
             masterCertificates={masterCertificates}
+            masterCompanies={masterCompanies}
             rankingMap={rankingMap}
             isRankingsLoading={isRankingsLoading}
             userProfile={userProfile}
