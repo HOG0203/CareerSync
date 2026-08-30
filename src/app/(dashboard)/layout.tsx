@@ -74,7 +74,7 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
       <PageViewTracker />
       <div className="h-screen w-full flex bg-background overflow-hidden">
         {/* Desktop Sidebar */}
-        <div className="hidden lg:block">
+        <div className="hidden lg:block print:hidden">
           <Sidebar>
             <Nav 
               isAdmin={isAdmin} 
@@ -86,26 +86,30 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
           </Sidebar>
         </div>
 
-        <SidebarInset className="flex flex-col flex-1 min-w-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
+        <SidebarInset className="flex flex-col flex-1 min-w-0 overflow-y-auto overflow-x-hidden custom-scrollbar print:overflow-visible print:h-auto print:block print:p-0 print:m-0">
           {/* Mobile Navigation */}
-          <MobileTopBar isAdmin={isAdmin} userProfile={userProfile} />
+          <div className="print:hidden">
+            <MobileTopBar isAdmin={isAdmin} userProfile={userProfile} />
+          </div>
           
           {/* Desktop Header */}
-          <div className="hidden lg:block sticky top-0 z-40 bg-white/80 backdrop-blur-md shrink-0 border-b border-slate-200/60">
+          <div className="hidden lg:block sticky top-0 z-40 bg-white/80 backdrop-blur-md shrink-0 border-b border-slate-200/60 print:hidden">
             <Header userProfile={userProfile} />
           </div>
 
-          <div className="flex-1 p-2 lg:p-5 lg:mt-0 mt-14 lg:mb-0 mb-16 flex flex-col min-w-0">
+          <div className="flex-1 p-2 lg:p-5 lg:mt-0 mt-14 lg:mb-0 mb-16 flex flex-col min-w-0 print:p-0 print:m-0 print:block print:overflow-visible">
             {children}
           </div>
 
           {/* Mobile Bottom Tab */}
-          <MobileBottomTab 
-            isAdmin={isAdmin} 
-            role={userProfile?.role} 
-            userGrade={userProfile?.assigned_grade} 
-            customPermissions={customPermissions}
-          />
+          <div className="print:hidden">
+            <MobileBottomTab 
+              isAdmin={isAdmin} 
+              role={userProfile?.role} 
+              userGrade={userProfile?.assigned_grade} 
+              customPermissions={customPermissions}
+            />
+          </div>
         </SidebarInset>
       </div>
     </SidebarProvider>

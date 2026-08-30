@@ -332,7 +332,7 @@ export function ClassTable({
   }, [initialData]);
 
   return (
-    <div className="w-full flex flex-col gap-2.5 sm:gap-3 min-h-0 flex-1 h-[calc(100dvh-150px)] lg:h-[calc(100vh-115px)] max-h-[calc(100dvh-150px)] lg:max-h-[calc(100vh-115px)] overflow-hidden">
+    <div className="w-full flex flex-col gap-2.5 sm:gap-3 h-auto overflow-visible lg:min-h-0 lg:flex-1 lg:h-[calc(100vh-115px)] lg:max-h-[calc(100vh-115px)] lg:overflow-hidden">
       {/* 요약 통계 카드 4종 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 shrink-0">
         <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
@@ -401,8 +401,8 @@ export function ClassTable({
       )}
 
       {/* 스프레드시트 메인 테이블 카드 */}
-      <Card className="flex-1 min-h-0 shadow-sm border border-slate-200/80 bg-white rounded-2xl overflow-hidden flex flex-col mb-0">
-        <CardContent className="p-0 flex-1 min-h-0 flex flex-col overflow-hidden">
+      <Card className="h-auto overflow-visible lg:flex-1 lg:min-h-0 lg:overflow-hidden shadow-sm border border-slate-200/80 bg-white rounded-2xl flex flex-col mb-0">
+        <CardContent className="p-0 h-auto overflow-visible lg:flex-1 lg:min-h-0 flex flex-col lg:overflow-hidden">
           <StandardSpreadsheetTable 
             data={initialData}
             columns={columns}

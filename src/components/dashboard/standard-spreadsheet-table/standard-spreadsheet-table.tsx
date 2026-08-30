@@ -142,7 +142,7 @@ export function StandardSpreadsheetTable({
   }
 
   return (
-    <div className="flex flex-col gap-2 w-full h-full min-h-0 overflow-hidden flex-1">
+    <div className="flex flex-col gap-2 w-full h-auto overflow-visible lg:h-full lg:min-h-0 lg:overflow-hidden lg:flex-1">
       {/* 선택 툴바 또는 시트 필터 초기화 버튼 (필요할 때만 슬림하게 노출) */}
       {(!hideSearch || selectedRowIds.length > 0 || isColumnFilterActive) && (
         <div className="flex items-center justify-between p-1.5 bg-slate-50/80 rounded-xl border border-slate-200/80 shrink-0">

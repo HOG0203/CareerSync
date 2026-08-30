@@ -214,7 +214,7 @@ export function StudentsHubClient({
 
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-150px)] lg:h-[calc(100vh-115px)] max-h-[calc(100dvh-150px)] lg:max-h-[calc(100vh-115px)] min-h-0 gap-2.5 overflow-hidden">
+    <div className="flex flex-col h-auto min-h-full max-h-none overflow-visible lg:h-[calc(100vh-115px)] lg:max-h-[calc(100vh-115px)] lg:min-h-0 lg:overflow-hidden gap-2.5 pb-12 lg:pb-0">
       {/* 1. 상단 취업·실습 요약 통계 카드 4종 (student-accounts 스타일) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
         <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
@@ -373,9 +373,9 @@ export function StudentsHubClient({
       </Card>
 
       {/* 3. 핵심 시트 영역 (엑셀식 셀 즉각 편집 & Ctrl+C/V & 키보드 이동 100% 보존) */}
-      <Card className="flex-1 min-h-0 shadow-sm border border-slate-200/80 bg-white flex flex-col rounded-2xl overflow-hidden min-w-full mb-0">
-        <CardContent className="flex-1 overflow-hidden p-0 relative flex flex-col min-h-0">
-          <div className="w-full h-full flex flex-col min-h-0">
+      <Card className="h-auto overflow-visible lg:flex-1 lg:min-h-0 lg:overflow-hidden shadow-sm border border-slate-200/80 bg-white flex flex-col rounded-2xl min-w-full mb-0">
+        <CardContent className="h-auto overflow-visible lg:flex-1 lg:overflow-hidden p-0 relative flex flex-col lg:min-h-0">
+          <div className="w-full h-auto lg:h-full flex flex-col lg:min-h-0">
             <StudentTable
               initialData={filteredData}
               isAdmin={isAdmin}

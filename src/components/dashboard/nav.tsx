@@ -42,7 +42,10 @@ import {
   KeyRound,
   FileCheck,
   UploadCloud,
-  Scale
+  Scale,
+  BookOpen,
+  CalendarDays,
+  ArrowLeftRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { handleClientLogout } from '@/lib/auth-helpers';
@@ -134,6 +137,15 @@ export default function Nav({
       ]
     },
     {
+      title: "교수학습지원",
+      icon: BookOpen,
+      items: [
+        { href: '/teaching-support/timetable', label: '시간표 조회/관리', icon: CalendarDays },
+        { href: '/teaching-support/substitute', label: '결보강 처리', icon: ArrowLeftRight },
+        { href: '/teaching-support/substitute/admin', label: '결보강 승인/관리', icon: ShieldCheck },
+      ]
+    },
+    {
       title: "학생 및 생활지도",
       icon: GraduationCap,
       items: [
@@ -183,6 +195,13 @@ export default function Nav({
         { href: '/company-info', label: '업체정보', icon: Factory },
         { href: '/students', label: '취업상세데이터', icon: ClipboardList },
         { href: '/labor-education', label: '노동인권교육', icon: ShieldAlert },
+      ]
+    },
+    {
+      title: "교수학습지원",
+      icon: BookOpen,
+      items: [
+        { href: '/teaching-support/timetable', label: '시간표 조회/관리', icon: CalendarDays },
       ]
     },
     {

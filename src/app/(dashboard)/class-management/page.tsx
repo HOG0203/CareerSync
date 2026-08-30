@@ -167,7 +167,7 @@ async function ClassManagementPageContent({
 
 
   return (
-    <div className="flex flex-col h-full min-h-0 gap-2.5 overflow-hidden">
+    <div className="flex flex-col h-auto min-h-full max-h-none overflow-visible lg:h-full lg:min-h-0 lg:overflow-hidden gap-2.5 pb-12 lg:pb-0">
       {/* 상단 타이틀 헤더 */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 px-1">
         <div className="flex flex-col gap-1">
