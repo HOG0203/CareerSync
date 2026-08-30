@@ -728,8 +728,17 @@ export function GradeImportClient({ onSuccess }: { onSuccess?: () => void }) {
       if (result.error) {
         toast({ variant: "destructive", title: "저장 실패", description: result.error });
       } else {
-        toast({ title: "저장 완료", description: `성공: ${result.results?.success}건, 매칭 실패: ${result.results?.failed}건` });
+        toast({ 
+          title: "DB 저장 완료 🎉", 
+          description: `성공: ${result.results?.success}건 반영 완료. 다른 엑셀 파일을 이어서 업로드할 수 있습니다.` 
+        });
         setParsedData([]);
+        setFileName(null);
+        setDetectedFileInfo(null);
+        setStudentMatchMap({});
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
         router.refresh();
         if (onSuccess) onSuccess();
       }

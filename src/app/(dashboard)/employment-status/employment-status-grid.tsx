@@ -80,6 +80,9 @@ const SORT_ORDER = [
 ];
 
 const getCompanyTypeVariant = (type?: string, businessType?: string, careerAspiration?: string) => {
+  if (businessType === '제외인정자' || careerAspiration === '제외인정자') {
+    return 'bg-slate-300 text-slate-800 border-slate-400 font-medium';
+  }
   if (businessType === '채용진행중') return 'bg-amber-100 text-amber-950 border-amber-500 border-x';
   if (businessType === '현장실습중') return 'bg-blue-400 text-white border-blue-500 border-x';
   if (businessType === '도제OJT') return 'bg-emerald-100 text-emerald-900 border-emerald-500 border-x';
@@ -410,6 +413,28 @@ export function EmploymentStatusGrid({
       const rankingSummary = rankingMap[student.id];
 
       const matches = customRule.conditions.map(cond => {
+        // 0. 학과 대분류 (단일 및 다중 선택 지원)
+        if (cond.mainCategory === 'major' || (cond as any).category === 'major') {
+          if (!cond.value || cond.value.trim() === '') return true;
+          const selectedMajors = cond.value.split(',').map(m => m.trim()).filter(Boolean);
+          if (selectedMajors.length === 0) return true;
+          const studentMajor = (student.major || '').trim();
+          return selectedMajors.some(m => {
+            const cleanM = m.replace(/과|공업계/g, '').trim();
+            const cleanSM = studentMajor.replace(/과|공업계/g, '').trim();
+            return studentMajor === m || studentMajor.includes(m) || m.includes(studentMajor) || (cleanM && cleanSM && (cleanSM.includes(cleanM) || cleanM.includes(cleanSM)));
+          });
+        }
+
+        // 0.1 희망진로코스 대분류 (단일 및 다중 선택 지원)
+        if (cond.mainCategory === 'course' || (cond as any).category === 'course') {
+          if (!cond.value || cond.value.trim() === '') return true;
+          const selectedCourses = cond.value.split(',').map(c => c.trim()).filter(Boolean);
+          if (selectedCourses.length === 0) return true;
+          const studentCourse = (student.career_course || '').trim();
+          return selectedCourses.some(c => studentCourse === c || studentCourse.includes(c) || c.includes(studentCourse));
+        }
+
         // 1. 자격증 대분류
         if (cond.mainCategory === 'cert' || (cond as any).category === 'cert_name' || (cond as any).category === 'cert_count') {
           const isName = cond.subType === 'name' || (cond as any).category === 'cert_name';
@@ -575,6 +600,21 @@ export function EmploymentStatusGrid({
     return allData.filter(s => (s.employment_status || '').trim() === currentCourseFilter).length;
   }, [allData, currentCourseFilter]);
 
+  const allMajors = React.useMemo(() => {
+    const set = new Set<string>();
+    allData.forEach(s => {
+      if (s.major && s.major.trim()) set.add(s.major.trim());
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [allData]);
+
+  const allCourses = React.useMemo(() => {
+    const set = new Set<string>(CAREER_COURSE_OPTIONS);
+    allData.forEach(s => {
+      if (s.career_course && s.career_course.trim()) set.add(s.career_course.trim());
+    });
+    return Array.from(set);
+  }, [allData]);
 
   if (isLoading) {
     return (
@@ -700,6 +740,8 @@ export function EmploymentStatusGrid({
         onApply={(rule) => setCustomRule(rule)}
         currentRule={customRule}
         allCertificates={allCertificates}
+        allMajors={allMajors}
+        allCourses={allCourses}
       />
     </div>
   );

@@ -33,12 +33,12 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type MainCategory = 'cert' | 'attendance' | 'status' | 'rank';
+export type MainCategory = 'major' | 'course' | 'cert' | 'attendance' | 'status' | 'rank';
 
 export interface ConditionItem {
   id: string;
   mainCategory: MainCategory;
-  subType: string; // cert: 'name' | 'count'; attendance: 'perfect' | 'unexcused' | 'disease'; status: 'main'; rank: 'main'
+  subType: string; // major: 'select'; course: 'select'; cert: 'name' | 'count'; attendance: 'perfect' | 'unexcused' | 'disease'; status: 'main'; rank: 'main'
   value: string;
 }
 
@@ -57,6 +57,17 @@ export interface PresetItem {
 const PRESET_STORAGE_KEY = 'careersync_combination_presets';
 
 const DEFAULT_PRESETS: PresetItem[] = [
+  {
+    id: 'preset_major_cert',
+    name: '기계/제어과 + 자격증 2개 이상',
+    rule: {
+      operator: 'AND',
+      conditions: [
+        { id: 'c1', mainCategory: 'major', subType: 'select', value: '스마트기계과,스마트제어과' },
+        { id: 'c2', mainCategory: 'cert', subType: 'count', value: '2+' }
+      ]
+    }
+  },
   {
     id: 'preset_1',
     name: '선반기능사 + 완벽 개근 (미인정/질병 0건)',
@@ -93,12 +104,22 @@ const DEFAULT_PRESETS: PresetItem[] = [
   }
 ];
 
+const DEFAULT_MAJORS = ['스마트기계과', '스마트제어과', '스마트전기과', '스마트전자과', '소프트웨어과', '스마트화공과', '공간시스템과', '도시공간개발과', '바이오화학과'];
+
+const DEFAULT_COURSES = [
+  '청솔반', '취업맞춤반', '중견기업반', '반도체아카데미반', '혁신인재반',
+  '부사관반', '일학습병행', '계약학과', '도제반', '아우스빌둥',
+  '일반취업', '기술사관', '군특성화', '운동부', '진학', '입대', '기타'
+];
+
 interface CustomCombinationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onApply: (rule: CustomRule | null) => void;
   currentRule: CustomRule | null;
   allCertificates?: string[];
+  allMajors?: string[];
+  allCourses?: string[];
 }
 
 export function CustomCombinationModal({
@@ -106,7 +127,9 @@ export function CustomCombinationModal({
   onClose,
   onApply,
   currentRule,
-  allCertificates = []
+  allCertificates = [],
+  allMajors = [],
+  allCourses = []
 }: CustomCombinationModalProps) {
   const [operator, setOperator] = React.useState<'AND' | 'OR'>('AND');
   const [conditions, setConditions] = React.useState<ConditionItem[]>([]);
@@ -114,6 +137,16 @@ export function CustomCombinationModal({
   const [newPresetName, setNewPresetName] = React.useState('');
   const [isSavingPreset, setIsSavingPreset] = React.useState(false);
   const [directInputMap, setDirectInputMap] = React.useState<Record<string, boolean>>({});
+
+  const effectiveMajors = React.useMemo(() => {
+    if (allMajors && allMajors.length > 0) return allMajors;
+    return DEFAULT_MAJORS;
+  }, [allMajors]);
+
+  const effectiveCourses = React.useMemo(() => {
+    if (allCourses && allCourses.length > 0) return allCourses;
+    return DEFAULT_COURSES;
+  }, [allCourses]);
 
   // 모달 열릴 때 기존 상태 또는 기본 상태 로드
   React.useEffect(() => {
@@ -176,7 +209,11 @@ export function CustomCombinationModal({
   const handleMainCategoryChange = (id: string, mainCat: MainCategory) => {
     setConditions(conditions.map(c => {
       if (c.id === id) {
-        if (mainCat === 'cert') {
+        if (mainCat === 'major') {
+          return { ...c, mainCategory: mainCat, subType: 'select', value: effectiveMajors.length > 0 ? effectiveMajors[0] : '' };
+        } else if (mainCat === 'course') {
+          return { ...c, mainCategory: mainCat, subType: 'select', value: effectiveCourses.length > 0 ? effectiveCourses[0] : '' };
+        } else if (mainCat === 'cert') {
           setDirectInputMap(prev => ({ ...prev, [id]: true }));
           return { ...c, mainCategory: mainCat, subType: 'name', value: '' };
         } else if (mainCat === 'attendance') {
@@ -285,7 +322,7 @@ export function CustomCombinationModal({
                   자유 커스텀 검색 하이라이트 빌더
                 </DialogTitle>
                 <DialogDescription className="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
-                  대분류(자격증, 출결, 취업, 성적) 선택 후 세부 항목을 자유롭게 조립하여 하이라이트합니다.
+                  대분류(학과, 희망진로코스, 자격증, 출결, 취업, 성적) 선택 후 세부 항목을 자유롭게 조립하여 하이라이트합니다.
                 </DialogDescription>
               </div>
             </div>
@@ -403,18 +440,20 @@ export function CustomCombinationModal({
                       value={cond.mainCategory}
                       onValueChange={val => handleMainCategoryChange(cond.id, val as MainCategory)}
                     >
-                      <SelectTrigger className="w-full sm:w-[125px] h-9 text-xs font-bold bg-white border-slate-200">
+                      <SelectTrigger className="w-full sm:w-[155px] h-9 text-xs font-bold bg-white border-slate-200">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="major" className="text-xs font-bold">🏫 학과 (다중선택)</SelectItem>
+                        <SelectItem value="course" className="text-xs font-bold">🎯 희망진로코스</SelectItem>
                         <SelectItem value="cert" className="text-xs font-bold">📜 자격증</SelectItem>
-                        <SelectItem value="attendance" className="text-xs font-bold">🏫 출결</SelectItem>
+                        <SelectItem value="attendance" className="text-xs font-bold">⏰ 출결</SelectItem>
                         <SelectItem value="status" className="text-xs font-bold">💼 취업/진로</SelectItem>
                         <SelectItem value="rank" className="text-xs font-bold">📊 성적/석차</SelectItem>
                       </SelectContent>
                     </Select>
 
-                    {/* 2차 세부유형 선택 */}
+                    {/* 2차 세부유형 선택 (자격증, 출결 시에만 표시) */}
                     {cond.mainCategory === 'cert' && (
                       <Select
                         value={cond.subType}
@@ -448,6 +487,90 @@ export function CustomCombinationModal({
 
                     {/* 3차 세부 값 선택/입력 */}
                     <div className="flex-1 min-w-0">
+                      {/* 학과 다중 선택 (넓고 시원한 칩 영역) */}
+                      {cond.mainCategory === 'major' && (
+                        <div className="flex flex-col gap-1.5 w-full">
+                          <div className="flex flex-wrap items-center gap-1.5 p-2 bg-white rounded-xl border border-slate-200 shadow-sm">
+                            {effectiveMajors.map(m => {
+                              const selectedList = cond.value ? cond.value.split(',').map(s => s.trim()).filter(Boolean) : [];
+                              const isSelected = selectedList.includes(m);
+                              return (
+                                <button
+                                  key={m}
+                                  type="button"
+                                  onClick={() => {
+                                    let nextList = [...selectedList];
+                                    if (isSelected) {
+                                      nextList = nextList.filter(item => item !== m);
+                                    } else {
+                                      nextList.push(m);
+                                    }
+                                    handleValueChange(cond.id, nextList.join(','));
+                                  }}
+                                  className={cn(
+                                    "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border shadow-2xs",
+                                    isSelected 
+                                      ? "bg-indigo-600 text-white border-indigo-600 shadow-sm ring-1 ring-indigo-300" 
+                                      : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-indigo-50 hover:text-indigo-900 hover:border-indigo-200"
+                                  )}
+                                >
+                                  {isSelected ? <Check className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5 text-slate-400" />}
+                                  <span>{m}</span>
+                                </button>
+                              );
+                            })}
+                            {/* 전체 선택 / 전체 해제 */}
+                            <div className="flex items-center gap-1.5 ml-auto text-xs pl-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleValueChange(cond.id, effectiveMajors.join(','))}
+                                className="text-indigo-600 hover:text-indigo-800 font-extrabold px-2 py-1 rounded hover:bg-indigo-50 transition-colors"
+                              >
+                                전체선택
+                              </button>
+                              <span className="text-slate-300">|</span>
+                              <button
+                                type="button"
+                                onClick={() => handleValueChange(cond.id, '')}
+                                className="text-slate-400 hover:text-slate-600 font-extrabold px-2 py-1 rounded hover:bg-slate-100 transition-colors"
+                              >
+                                선택해제
+                              </button>
+                            </div>
+                          </div>
+                          {cond.value ? (
+                            <p className="text-[11px] text-indigo-600 font-bold flex items-center gap-1 pl-1">
+                              <Check className="h-3.5 w-3.5 text-indigo-600" />
+                              <span>{cond.value.split(',').filter(Boolean).length}개 학과 선택됨:</span>
+                              <span className="text-slate-600 font-medium">({cond.value.split(',').filter(Boolean).join(', ')})</span>
+                            </p>
+                          ) : (
+                            <p className="text-[11px] text-amber-600 font-medium pl-1">
+                              ⚠️ 검색할 학과를 클릭하여 1개 이상 선택해주세요.
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* 희망진로코스 단일 드롭다운 선택 */}
+                      {cond.mainCategory === 'course' && (
+                        <Select
+                          value={cond.value || (effectiveCourses.length > 0 ? effectiveCourses[0] : '')}
+                          onValueChange={val => handleValueChange(cond.id, val)}
+                        >
+                          <SelectTrigger className="w-full sm:w-[220px] h-9 text-xs font-bold bg-white border-slate-200">
+                            <SelectValue placeholder="희망진로코스 선택" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {effectiveCourses.map(course => (
+                              <SelectItem key={course} value={course} className="text-xs font-bold">
+                                {course}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+
                       {/* 자격증 명칭 (기본값: 직접입력 창, 버튼 클릭 시 등록 자격증 목록 선택) */}
                       {cond.mainCategory === 'cert' && cond.subType === 'name' && (
                         <div className="w-full">

@@ -34,6 +34,28 @@ export const StudentGridCell = React.memo(function StudentGridCell({ student, id
     const certCount = certList.length;
 
     const matches = customRule.conditions.map(cond => {
+      // 0. 학과 대분류 (단일 및 다중 선택 지원)
+      if (cond.mainCategory === 'major' || (cond as any).category === 'major') {
+        if (!cond.value || cond.value.trim() === '') return true;
+        const selectedMajors = cond.value.split(',').map(m => m.trim()).filter(Boolean);
+        if (selectedMajors.length === 0) return true;
+        const studentMajor = (student.major || '').trim();
+        return selectedMajors.some(m => {
+          const cleanM = m.replace(/과|공업계/g, '').trim();
+          const cleanSM = studentMajor.replace(/과|공업계/g, '').trim();
+          return studentMajor === m || studentMajor.includes(m) || m.includes(studentMajor) || (cleanM && cleanSM && (cleanSM.includes(cleanM) || cleanM.includes(cleanSM)));
+        });
+      }
+
+      // 0.1 희망진로코스 대분류 (단일 및 다중 선택 지원)
+      if (cond.mainCategory === 'course' || (cond as any).category === 'course') {
+        if (!cond.value || cond.value.trim() === '') return true;
+        const selectedCourses = cond.value.split(',').map(c => c.trim()).filter(Boolean);
+        if (selectedCourses.length === 0) return true;
+        const studentCourse = (student.career_course || '').trim();
+        return selectedCourses.some(c => studentCourse === c || studentCourse.includes(c) || c.includes(studentCourse));
+      }
+
       // 1. 자격증 대분류
       if (cond.mainCategory === 'cert' || (cond as any).category === 'cert_name' || (cond as any).category === 'cert_count') {
         const isName = cond.subType === 'name' || (cond as any).category === 'cert_name';
@@ -140,6 +162,7 @@ export const StudentGridCell = React.memo(function StudentGridCell({ student, id
   const getDesireColor = (student: StudentEmploymentData) => {
     const isDesiring = student.is_desiring_employment;
     const aspiration = student.career_aspiration;
+    const bType = student.business_type;
 
     if (isLowerGrade) {
       if (aspiration === '취업') return 'bg-emerald-500';
@@ -147,10 +170,16 @@ export const StudentGridCell = React.memo(function StudentGridCell({ student, id
       if (aspiration === '제외인정자') return 'bg-slate-400';
     }
 
-    if (isDesiring === '예') return 'bg-emerald-500';
+    // 취업희망 여부가 있는 경우 (아니오 -> 빨강, 예 -> 녹색)
     if (isDesiring === '아니오') return 'bg-rose-500';
+    if (isDesiring === '예') return 'bg-emerald-500';
 
-    return 'bg-transparent';
+    // 제외인정자 기본 회색 표시
+    if (bType === '제외인정자' || aspiration === '제외인정자') {
+      return 'bg-slate-400';
+    }
+
+    return null;
   };
 
   // 3. 진로코스 필터 매칭 (2학년 전용)
@@ -185,9 +214,10 @@ export const StudentGridCell = React.memo(function StudentGridCell({ student, id
     >
       <div
         className={cn(
-          "h-7 border-b border-gray-200 flex items-center justify-between px-0.5 text-[10px] transition-opacity cursor-pointer relative pr-[5px]",
+          "h-7 border-b border-gray-200 flex items-center justify-between px-0.5 text-[10px] transition-all cursor-pointer relative pr-[5px]",
           variant,
-          isDimmed && "opacity-15 grayscale-[60%] blur-[0.2px] hover:opacity-80 hover:grayscale-0 hover:blur-none",
+          isFullyMatched && "ring-2 ring-inset ring-indigo-600 font-black",
+          isDimmed && "opacity-10 grayscale-[90%] blur-[0.3px] hover:opacity-80 hover:grayscale-0 hover:blur-none",
           !hasAnyHighlight && "hover:opacity-80 active:bg-slate-100"
         )}
       >
@@ -211,8 +241,8 @@ export const StudentGridCell = React.memo(function StudentGridCell({ student, id
             }}
           />
         )}
-        {!isLowerGrade && (
-          <div className={cn("absolute right-[1px] top-[2px] bottom-[2px] w-[2.5px] rounded-full", getDesireColor(student))} />
+        {!isLowerGrade && getDesireColor(student) && (
+          <div className={cn("absolute right-[1.5px] top-[2px] bottom-[2px] w-[3px] rounded-full ring-1 ring-white shadow-2xs", getDesireColor(student))} />
         )}
       </div>
     </StudentPopover>

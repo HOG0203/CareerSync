@@ -49,7 +49,6 @@ export function GradeImportModal({ onSuccess }: { onSuccess?: () => void }) {
         {/* 실제 컨텐츠 영역에 스크롤 부여 */}
         <div className="flex-1 overflow-y-auto bg-white custom-scrollbar">
           <GradeImportClient onSuccess={() => {
-            setOpen(false);
             if (onSuccess) onSuccess();
           }} />
         </div>

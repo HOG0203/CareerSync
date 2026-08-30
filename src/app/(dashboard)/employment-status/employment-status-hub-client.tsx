@@ -139,6 +139,20 @@ export function EmploymentStatusHubClient({
     });
   }, [initialData]);
 
+  // 1.5 진로코스 옵션 추출
+  const courseOptions = React.useMemo(() => {
+    const DEFAULT_COURSES = [
+      '청솔반', '취업맞춤반', '중견기업반', '반도체아카데미반', '혁신인재반',
+      '부사관반', '일학습병행', '계약학과', '도제반', '아우스빌둥',
+      '일반취업', '기술사관', '군특성화', '운동부', '진학', '입대', '기타'
+    ];
+    const set = new Set<string>(DEFAULT_COURSES);
+    initialData.forEach((s) => {
+      if (s.career_course && s.career_course.trim()) set.add(s.career_course.trim());
+    });
+    return Array.from(set);
+  }, [initialData]);
+
   // 2. 반 옵션 추출
   const classOptions = React.useMemo(() => {
     const set = new Set<string>();
@@ -539,6 +553,22 @@ export function EmploymentStatusHubClient({
                   <span className="flex items-center justify-center bg-amber-100 text-amber-950 border border-amber-300 px-1.5 py-0.5 rounded shadow-2xs">
                     채용진행중
                   </span>
+                  <span className="flex items-center justify-center bg-slate-300 text-slate-800 border border-slate-400 px-1.5 py-0.5 rounded shadow-2xs">
+                    제외인정자
+                  </span>
+
+                  {/* 우측 취업희망 색띠 범례 (미니 캡슐형) */}
+                  <div className="flex items-center gap-1.5 pl-2 ml-1 border-l border-slate-200 text-slate-600 shrink-0">
+                    <span className="text-[9.5px] text-slate-400 font-extrabold">색띠:</span>
+                    <span className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded shadow-2xs">
+                      <span className="w-1.5 h-3 bg-emerald-500 rounded-full ring-1 ring-white shadow-2xs shrink-0" />
+                      <span className="text-[10px] text-slate-700">취업희망</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded shadow-2xs">
+                      <span className="w-1.5 h-3 bg-rose-500 rounded-full ring-1 ring-white shadow-2xs shrink-0" />
+                      <span className="text-[10px] text-slate-700">미희망</span>
+                    </span>
+                  </div>
                 </div>
               )}
 
@@ -584,6 +614,8 @@ export function EmploymentStatusHubClient({
         onApply={(rule) => setCustomRule(rule)}
         currentRule={customRule}
         allCertificates={allCertificates}
+        allMajors={majorOptions}
+        allCourses={courseOptions}
       />
     </div>
   );

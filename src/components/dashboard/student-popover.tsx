@@ -27,7 +27,8 @@ import {
   ClipboardList,
   MessageSquare,
   Phone,
-  ChevronDown
+  ChevronDown,
+  AlertTriangle
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { getStudentScoresById, getStudentRankSummary, updateStudentField } from '@/app/students/actions';
@@ -184,6 +185,35 @@ export function StudentPopover({
     if (!effectiveRankSummary?.attnRecords) return null;
     return (effectiveRankSummary.attnRecords as any[]).sort((a, b) => a.grade - b.grade);
   }, [effectiveRankSummary]);
+
+  const totalAttendance = React.useMemo(() => {
+    if (!attendanceByGrade || attendanceByGrade.length === 0) return null;
+    const tot = {
+      unexcused: { absent: 0, late: 0, early: 0, out: 0, total: 0 },
+      disease: { absent: 0, late: 0, early: 0, out: 0, total: 0 },
+      other: { absent: 0, late: 0, early: 0, out: 0, total: 0 },
+    };
+    attendanceByGrade.forEach((r: any) => {
+      tot.unexcused.absent += (r.absent_unexcused || 0);
+      tot.unexcused.late += (r.late_unexcused || 0);
+      tot.unexcused.early += (r.early_unexcused || 0);
+      tot.unexcused.out += (r.out_unexcused || 0);
+
+      tot.disease.absent += (r.absent_disease || 0);
+      tot.disease.late += (r.late_disease || 0);
+      tot.disease.early += (r.early_disease || 0);
+      tot.disease.out += (r.out_disease || 0);
+
+      tot.other.absent += (r.absent_other || 0);
+      tot.other.late += (r.late_other || 0);
+      tot.other.early += (r.early_other || 0);
+      tot.other.out += (r.out_other || 0);
+    });
+    tot.unexcused.total = tot.unexcused.absent + tot.unexcused.late + tot.unexcused.early + tot.unexcused.out;
+    tot.disease.total = tot.disease.absent + tot.disease.late + tot.disease.early + tot.disease.out;
+    tot.other.total = tot.other.absent + tot.other.late + tot.other.early + tot.other.out;
+    return tot;
+  }, [attendanceByGrade]);
 
   const popoverBody = (
     <div className="space-y-4">
@@ -588,71 +618,71 @@ export function StudentPopover({
 
       {/* 성적 상세 모달 */}
       <Dialog open={isGradeModalOpen} onOpenChange={setIsGradeModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-3xl z-[200] bg-white">
-          <DialogHeader className="p-4 sm:p-6 bg-white border-b border-slate-100 shrink-0">
-            <div className="flex items-center justify-between mr-6 sm:mr-8">
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0 border border-indigo-100">
-                  <User className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-600" />
+        <DialogContent className="w-[96vw] sm:max-w-4xl max-h-[90vh] sm:max-h-[85vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-2xl sm:rounded-3xl z-[200] bg-white">
+          <DialogHeader className="p-3 sm:p-6 bg-white border-b border-slate-100 shrink-0">
+            <div className="flex items-center justify-between mr-4 sm:mr-8">
+              <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+                <div className="h-9 w-9 sm:h-12 sm:w-12 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0 border border-indigo-100">
+                  <User className="h-4 w-4 sm:h-6 sm:w-6 text-indigo-600" />
                 </div>
                 <div className="flex flex-col text-left min-w-0">
-                  <DialogTitle className="text-base sm:text-xl font-black flex items-center gap-2 text-slate-900 truncate">
+                  <DialogTitle className="text-sm sm:text-xl font-black flex items-center gap-1.5 sm:gap-2 text-slate-900 truncate">
                     {student.student_name}
-                    <span className="text-[10px] sm:text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full font-bold shrink-0">
+                    <span className="text-[9px] sm:text-xs bg-indigo-600 text-white px-1.5 sm:px-2 py-0.5 rounded-full font-bold shrink-0">
                       {student.student_number}번
                     </span>
                   </DialogTitle>
-                  <DialogDescription className="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
-                    {student.major} • {student.class_info}반 • {student.graduation_year}년 졸업예정
+                  <DialogDescription className="text-slate-500 text-[10px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
+                    {student.major} • {student.class_info}반 • {student.graduation_year}년 졸업
                   </DialogDescription>
                 </div>
               </div>
-              <div className="text-right shrink-0">
-                <p className="text-[9px] sm:text-[10px] text-slate-400 font-black uppercase tracking-tighter mb-0.5 sm:mb-1">전교 석차</p>
-                <p className="text-lg sm:text-2xl font-black text-indigo-600">
+              <div className="text-right shrink-0 pl-2">
+                <p className="text-[9px] sm:text-[10px] text-slate-400 font-black uppercase tracking-tighter mb-0.5">전교 석차</p>
+                <p className="text-base sm:text-2xl font-black text-indigo-600">
                   {effectiveRankSummary?.totalRank ? `${effectiveRankSummary.totalRank}위` : '-'}
                 </p>
               </div>
             </div>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto p-8 bg-slate-50">
+          <div className="flex-1 overflow-y-auto p-2.5 sm:p-6 bg-slate-50 custom-scrollbar">
             {isLoading ? (
-              <div className="h-64 flex flex-col items-center justify-center gap-4">
-                <Loader2 className="h-8 w-8 text-indigo-500 animate-spin" />
-                <p className="text-sm font-bold text-slate-400">상세 성적을 불러오는 중...</p>
+              <div className="h-64 flex flex-col items-center justify-center gap-3 sm:gap-4">
+                <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 text-indigo-500 animate-spin" />
+                <p className="text-xs sm:text-sm font-bold text-slate-400">상세 성적을 불러오는 중...</p>
               </div>
             ) : (
-              groupedDetails ? groupedDetails.map(([semesterKey, records]) => (
-                <div key={semesterKey} className="mb-8 last:mb-0 space-y-3">
-                  <h4 className="font-black text-slate-800 flex items-center gap-2 text-sm border-l-4 border-indigo-500 pl-3">
+              groupedDetails && groupedDetails.length > 0 ? groupedDetails.map(([semesterKey, records]) => (
+                <div key={semesterKey} className="mb-4 sm:mb-8 last:mb-0 space-y-1.5 sm:space-y-3">
+                  <h4 className="font-black text-slate-800 flex items-center gap-2 text-xs sm:text-sm border-l-4 border-indigo-500 pl-2 sm:pl-3">
                     {semesterKey} 
-                    <span className="text-[10px] text-slate-400 font-bold bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                    <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold bg-white px-1.5 py-0.5 rounded border border-slate-200">
                       {records.length}개 과목
                     </span>
                   </h4>
-                  <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-slate-50/50 text-slate-400 border-b font-black uppercase tracking-widest text-[10px]">
+                  <div className="bg-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm overflow-x-auto custom-scrollbar">
+                    <table className="w-full text-xs text-left min-w-[360px] sm:min-w-[480px]">
+                      <thead className="bg-slate-50/50 text-slate-400 border-b font-black uppercase tracking-widest text-[9px] sm:text-[10px]">
                         <tr>
-                          <th className="px-6 py-4">과목명</th>
-                          <th className="px-4 py-4 text-center">학점</th>
-                          <th className="px-4 py-4 text-center text-indigo-600">원점수</th>
-                          <th className="px-4 py-4 text-center">과목평균</th>
-                          <th className="px-4 py-4 text-center">성취도</th>
-                          <th className="px-4 py-4 text-center">석차등급</th>
+                          <th className="px-2.5 sm:px-4 py-2 sm:py-3.5">과목명</th>
+                          <th className="px-1.5 sm:px-3 py-2 sm:py-3.5 text-center">학점</th>
+                          <th className="px-1.5 sm:px-3 py-2 sm:py-3.5 text-center text-indigo-600">원점수</th>
+                          <th className="px-1.5 sm:px-3 py-2 sm:py-3.5 text-center">과목평균</th>
+                          <th className="px-1.5 sm:px-3 py-2 sm:py-3.5 text-center">성취도</th>
+                          <th className="px-1.5 sm:px-3 py-2 sm:py-3.5 text-center">석차등급</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {records.map((r, i) => (
                           <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="px-6 py-4 font-bold text-slate-700">{r.subject}</td>
-                            <td className="px-4 py-4 text-center font-medium text-slate-500">{r.credits || '-'}</td>
-                            <td className="px-4 py-4 text-center font-black text-indigo-600 text-sm">{r.score || '-'}</td>
-                            <td className="px-4 py-4 text-center text-slate-400 font-medium">{r.average_score || '-'}</td>
-                            <td className="px-4 py-4 text-center">
+                            <td className="px-2.5 sm:px-4 py-2 sm:py-3 font-bold text-slate-700 text-[11px] sm:text-xs">{r.subject}</td>
+                            <td className="px-1.5 sm:px-3 py-2 sm:py-3 text-center font-medium text-slate-500 text-[10px] sm:text-xs">{r.credits || '-'}</td>
+                            <td className="px-1.5 sm:px-3 py-2 sm:py-3 text-center font-black text-indigo-600 text-xs sm:text-sm">{r.score || '-'}</td>
+                            <td className="px-1.5 sm:px-3 py-2 sm:py-3 text-center text-slate-400 font-medium text-[10px] sm:text-xs">{r.average_score || '-'}</td>
+                            <td className="px-1.5 sm:px-3 py-2 sm:py-3 text-center">
                               <span className={cn(
-                                "px-2.5 py-1 rounded-full font-black text-[10px]",
+                                "px-1.5 sm:px-2.5 py-0.5 rounded-full font-black text-[9px] sm:text-[10px]",
                                 r.achievement === 'A' ? "bg-emerald-100 text-emerald-700" :
                                 r.achievement === 'B' ? "bg-blue-100 text-blue-700" :
                                 r.achievement === 'C' ? "bg-amber-100 text-amber-700" :
@@ -663,7 +693,7 @@ export function StudentPopover({
                                 {r.achievement || 'P'}
                               </span>
                             </td>
-                            <td className="px-4 py-4 text-center font-black text-slate-700">{r.rank_grade ? `${r.rank_grade}등급` : '-'}</td>
+                            <td className="px-1.5 sm:px-3 py-2 sm:py-3 text-center font-black text-slate-700 text-[11px] sm:text-xs">{r.rank_grade ? `${r.rank_grade}등급` : '-'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -671,7 +701,7 @@ export function StudentPopover({
                   </div>
                 </div>
               )) : (
-                <div className="h-64 flex flex-col items-center justify-center text-slate-400 italic">
+                <div className="h-64 flex flex-col items-center justify-center text-slate-400 italic text-xs sm:text-sm">
                   기록된 성적 데이터가 없습니다.
                 </div>
               )
@@ -682,87 +712,123 @@ export function StudentPopover({
 
       {/* 출결 상세 모달 */}
       <Dialog open={isAttendanceModalOpen} onOpenChange={setIsAttendanceModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-3xl z-[200] bg-white">
-          <DialogHeader className="p-4 sm:p-6 bg-white border-b border-slate-100 shrink-0">
-            <div className="flex items-center justify-between mr-6 sm:mr-8">
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-rose-50 flex items-center justify-center shrink-0 border border-rose-100">
-                  <User className="h-5 w-5 sm:h-6 sm:w-6 text-rose-600" />
+        <DialogContent className="w-[96vw] sm:max-w-4xl max-h-[90vh] sm:max-h-[85vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-2xl sm:rounded-3xl z-[200] bg-white">
+          <DialogHeader className="p-3 sm:p-6 bg-white border-b border-slate-100 shrink-0">
+            <div className="flex items-center justify-between mr-4 sm:mr-8">
+              <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+                <div className="h-9 w-9 sm:h-12 sm:w-12 rounded-xl bg-rose-50 flex items-center justify-center shrink-0 border border-rose-100">
+                  <User className="h-4 w-4 sm:h-6 sm:w-6 text-rose-600" />
                 </div>
                 <div className="flex flex-col text-left min-w-0">
-                  <DialogTitle className="text-base sm:text-xl font-black flex items-center gap-2 text-slate-900 truncate">
+                  <DialogTitle className="text-sm sm:text-xl font-black flex items-center gap-1.5 sm:gap-2 text-slate-900 truncate">
                     {student.student_name}
-                    <span className="text-[10px] sm:text-xs bg-rose-600 text-white px-2 py-0.5 rounded-full font-bold shrink-0">
+                    <span className="text-[9px] sm:text-xs bg-rose-600 text-white px-1.5 sm:px-2 py-0.5 rounded-full font-bold shrink-0">
                       {student.student_number}번
                     </span>
                   </DialogTitle>
-                  <DialogDescription className="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
-                    {student.major} • {student.class_info}반 • {student.graduation_year}년 졸업예정
+                  <DialogDescription className="text-slate-500 text-[10px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
+                    {student.major} • {student.class_info}반 • {student.graduation_year}년 졸업
                   </DialogDescription>
                 </div>
               </div>
-              <div className="text-right shrink-0">
-                <p className="text-[9px] sm:text-[10px] text-slate-400 font-black uppercase tracking-tighter mb-0.5 sm:mb-1">미인정 결석</p>
-                <p className="text-lg sm:text-2xl font-black text-rose-600">
+              <div className="text-right shrink-0 pl-2">
+                <p className="text-[9px] sm:text-[10px] text-slate-400 font-black uppercase tracking-tighter mb-0.5">미인정 결석</p>
+                <p className="text-base sm:text-2xl font-black text-rose-600">
                   {effectiveRankSummary?.attendance?.unexcused?.absent ? `${effectiveRankSummary.attendance.unexcused.absent}회` : '0회'}
                 </p>
               </div>
             </div>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto p-8 bg-slate-50 space-y-8">
-            <div className="space-y-4">
-              <h3 className="text-sm font-black text-slate-800 flex items-center gap-2 uppercase tracking-tight">
-                <ClipboardList className="h-4 w-4 text-rose-500" />
+          <div className="flex-1 overflow-y-auto p-2.5 sm:p-6 bg-slate-50 space-y-3 sm:space-y-6 custom-scrollbar">
+            <div className="space-y-2 sm:space-y-3">
+              <h3 className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1.5 sm:gap-2 uppercase tracking-tight">
+                <ClipboardList className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-rose-500 shrink-0" />
                 학년별 상세 출결 기록
               </h3>
-              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-                <table className="w-full text-xs text-left border-collapse">
-                  <thead className="bg-slate-50 text-slate-500 font-black uppercase text-[10px] tracking-widest border-b">
+
+              {/* 통일된 컴팩트 표 형식 (가로 스크롤 지원) */}
+              <div className="bg-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm overflow-x-auto custom-scrollbar">
+                <table className="w-full text-xs text-left border-collapse min-w-[480px]">
+                  <thead className="bg-slate-50 text-slate-600 font-black text-[9px] sm:text-[10px] tracking-tight border-b">
                     <tr>
-                      <th className="px-6 py-4 border-r w-24 text-center">대상 학년</th>
-                      <th className="px-6 py-4 border-r text-rose-600 bg-rose-50/30 text-center" colSpan={4}>미인정(무단)</th>
-                      <th className="px-6 py-4 border-r text-blue-600 bg-blue-50/30 text-center" colSpan={4}>질병</th>
-                      <th className="px-6 py-4 text-center bg-slate-50/30" colSpan={4}>기타</th>
+                      <th className="px-2.5 sm:px-4 py-2 sm:py-3 border-r w-16 sm:w-20 text-center bg-slate-100/50">학년</th>
+                      <th className="px-2 sm:px-4 py-2 sm:py-3 border-r text-rose-600 bg-rose-50/40 text-center font-black" colSpan={4}>미인정(무단)</th>
+                      <th className="px-2 sm:px-4 py-2 sm:py-3 border-r text-blue-600 bg-blue-50/40 text-center font-black" colSpan={4}>질병</th>
+                      <th className="px-2 sm:px-4 py-2 sm:py-3 text-center bg-slate-50 font-black text-slate-700" colSpan={4}>기타</th>
                     </tr>
-                    <tr className="bg-slate-50/30 text-[9px] text-slate-400 border-b">
-                      <th className="border-r"></th>
-                      <th className="px-2 py-2 border-r text-center">결석</th><th className="px-2 py-2 border-r text-center">지각</th><th className="px-2 py-2 border-r text-center">조퇴</th><th className="px-2 py-2 border-r text-center">결과</th>
-                      <th className="px-2 py-2 border-r text-center">결석</th><th className="px-2 py-2 border-r text-center">지각</th><th className="px-2 py-2 border-r text-center">조퇴</th><th className="px-2 py-2 border-r text-center">결과</th>
-                      <th className="px-2 py-2 border-r text-center">결석</th><th className="px-2 py-2 border-r text-center">지각</th><th className="px-2 py-2 border-r text-center">조퇴</th><th className="px-2 py-2 text-center">결과</th>
+                    <tr className="bg-slate-50/80 text-[8.5px] sm:text-[9.5px] text-slate-500 border-b font-bold">
+                      <th className="border-r bg-slate-100/30"></th>
+                      <th className="px-1.5 sm:px-2 py-1 sm:py-1.5 border-r text-center text-rose-500">결석</th>
+                      <th className="px-1.5 sm:px-2 py-1 sm:py-1.5 border-r text-center text-rose-500">지각</th>
+                      <th className="px-1.5 sm:px-2 py-1 sm:py-1.5 border-r text-center text-rose-500">조퇴</th>
+                      <th className="px-1.5 sm:px-2 py-1 sm:py-1.5 border-r text-center text-rose-500">결과</th>
+                      <th className="px-1.5 sm:px-2 py-1 sm:py-1.5 border-r text-center text-blue-500">결석</th>
+                      <th className="px-1.5 sm:px-2 py-1 sm:py-1.5 border-r text-center text-blue-500">지각</th>
+                      <th className="px-1.5 sm:px-2 py-1 sm:py-1.5 border-r text-center text-blue-500">조퇴</th>
+                      <th className="px-1.5 sm:px-2 py-1 sm:py-1.5 border-r text-center text-blue-500">결과</th>
+                      <th className="px-1.5 sm:px-2 py-1 sm:py-1.5 border-r text-center text-slate-500">결석</th>
+                      <th className="px-1.5 sm:px-2 py-1 sm:py-1.5 border-r text-center text-slate-500">지각</th>
+                      <th className="px-1.5 sm:px-2 py-1 sm:py-1.5 border-r text-center text-slate-500">조퇴</th>
+                      <th className="px-1.5 sm:px-2 py-1 sm:py-1.5 text-center text-slate-500">결과</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {attendanceByGrade?.map((r: any, i: number) => (
-                      <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-6 py-4 border-r font-black text-slate-700 text-center bg-slate-50/30">{r.grade}학년</td>
-                        <td className={cn("px-2 py-4 border-r text-center font-black", r.absent_unexcused > 0 ? "text-rose-600" : "text-slate-300")}>{r.absent_unexcused}</td>
-                        <td className={cn("px-2 py-4 border-r text-center font-bold", r.late_unexcused > 0 ? "text-rose-500" : "text-slate-300")}>{r.late_unexcused}</td>
-                        <td className={cn("px-2 py-4 border-r text-center font-bold", r.early_unexcused > 0 ? "text-rose-500" : "text-slate-300")}>{r.early_unexcused}</td>
-                        <td className={cn("px-2 py-4 border-r text-center font-bold", r.out_unexcused > 0 ? "text-rose-500" : "text-slate-300")}>{r.out_unexcused}</td>
-                        <td className={cn("px-2 py-4 border-r text-center", r.absent_disease > 0 ? "text-blue-600" : "text-slate-300")}>{r.absent_disease}</td>
-                        <td className={cn("px-2 py-4 border-r text-center", r.late_disease > 0 ? "text-blue-500" : "text-slate-300")}>{r.late_disease}</td>
-                        <td className={cn("px-2 py-4 border-r text-center", r.early_disease > 0 ? "text-blue-500" : "text-slate-300")}>{r.early_disease}</td>
-                        <td className={cn("px-2 py-4 text-center", r.out_disease > 0 ? "text-blue-500" : "text-slate-300")}>{r.out_disease}</td>
-                        <td className={cn("px-2 py-4 border-r text-center", r.absent_other > 0 ? "text-slate-600" : "text-slate-300")}>{r.absent_other}</td>
-                        <td className={cn("px-2 py-2 border-r text-center", r.late_other > 0 ? "text-slate-500" : "text-slate-300")}>{r.late_other}</td>
-                        <td className={cn("px-2 py-2 border-r text-center", r.early_other > 0 ? "text-slate-500" : "text-slate-300")}>{r.early_other}</td>
-                        <td className={cn("px-2 py-2 text-center", r.out_other > 0 ? "text-slate-500" : "text-slate-300")}>{r.out_other}</td>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {attendanceByGrade && attendanceByGrade.length > 0 ? (
+                      attendanceByGrade.map((r: any, i: number) => (
+                        <tr key={i} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="px-2.5 sm:px-4 py-2 sm:py-3 border-r font-black text-slate-800 text-center bg-slate-50/40 text-[11px] sm:text-xs whitespace-nowrap">{r.grade}학년</td>
+                          <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs", r.absent_unexcused > 0 ? "text-rose-600 font-black bg-rose-50/30" : "text-slate-300")}>{r.absent_unexcused}</td>
+                          <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs", r.late_unexcused > 0 ? "text-rose-500 font-black bg-rose-50/30" : "text-slate-300")}>{r.late_unexcused}</td>
+                          <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs", r.early_unexcused > 0 ? "text-rose-500 font-black bg-rose-50/30" : "text-slate-300")}>{r.early_unexcused}</td>
+                          <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs", r.out_unexcused > 0 ? "text-rose-500 font-black bg-rose-50/30" : "text-slate-300")}>{r.out_unexcused}</td>
+                          <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs", r.absent_disease > 0 ? "text-blue-600 font-bold bg-blue-50/20" : "text-slate-300")}>{r.absent_disease}</td>
+                          <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs", r.late_disease > 0 ? "text-blue-500 font-bold bg-blue-50/20" : "text-slate-300")}>{r.late_disease}</td>
+                          <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs", r.early_disease > 0 ? "text-blue-500 font-bold bg-blue-50/20" : "text-slate-300")}>{r.early_disease}</td>
+                          <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs", r.out_disease > 0 ? "text-blue-500 font-bold bg-blue-50/20" : "text-slate-300")}>{r.out_disease}</td>
+                          <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs", r.absent_other > 0 ? "text-slate-800 font-bold" : "text-slate-300")}>{r.absent_other}</td>
+                          <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs", r.late_other > 0 ? "text-slate-700 font-medium" : "text-slate-300")}>{r.late_other}</td>
+                          <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs", r.early_other > 0 ? "text-slate-700 font-medium" : "text-slate-300")}>{r.early_other}</td>
+                          <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 text-center text-[11px] sm:text-xs", r.out_other > 0 ? "text-slate-700 font-medium" : "text-slate-300")}>{r.out_other}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={13} className="py-10 text-center text-slate-400 italic text-xs">기록된 출결 데이터가 없습니다.</td>
                       </tr>
-                    ))}
+                    )}
+
+                    {/* 전체 누적 합계 행 */}
+                    {totalAttendance && attendanceByGrade && attendanceByGrade.length > 0 && (
+                      <tr className="bg-slate-50/90 font-black border-t-2 border-slate-200">
+                        <td className="px-2.5 sm:px-4 py-2 sm:py-3 border-r font-black text-slate-900 text-center bg-slate-100/80 text-[11px] sm:text-xs whitespace-nowrap">누적 합계</td>
+                        <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs font-black", totalAttendance.unexcused.absent > 0 ? "text-rose-600 bg-rose-100/40" : "text-slate-400")}>{totalAttendance.unexcused.absent}</td>
+                        <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs font-black", totalAttendance.unexcused.late > 0 ? "text-rose-600 bg-rose-100/40" : "text-slate-400")}>{totalAttendance.unexcused.late}</td>
+                        <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs font-black", totalAttendance.unexcused.early > 0 ? "text-rose-600 bg-rose-100/40" : "text-slate-400")}>{totalAttendance.unexcused.early}</td>
+                        <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs font-black", totalAttendance.unexcused.out > 0 ? "text-rose-600 bg-rose-100/40" : "text-slate-400")}>{totalAttendance.unexcused.out}</td>
+                        <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs font-black", totalAttendance.disease.absent > 0 ? "text-blue-600 bg-blue-100/30" : "text-slate-400")}>{totalAttendance.disease.absent}</td>
+                        <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs font-black", totalAttendance.disease.late > 0 ? "text-blue-600 bg-blue-100/30" : "text-slate-400")}>{totalAttendance.disease.late}</td>
+                        <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs font-black", totalAttendance.disease.early > 0 ? "text-blue-600 bg-blue-100/30" : "text-slate-400")}>{totalAttendance.disease.early}</td>
+                        <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs font-black", totalAttendance.disease.out > 0 ? "text-blue-600 bg-blue-100/30" : "text-slate-400")}>{totalAttendance.disease.out}</td>
+                        <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs font-black", totalAttendance.other.absent > 0 ? "text-slate-800" : "text-slate-400")}>{totalAttendance.other.absent}</td>
+                        <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs font-black", totalAttendance.other.late > 0 ? "text-slate-800" : "text-slate-400")}>{totalAttendance.other.late}</td>
+                        <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 border-r text-center text-[11px] sm:text-xs font-black", totalAttendance.other.early > 0 ? "text-slate-800" : "text-slate-400")}>{totalAttendance.other.early}</td>
+                        <td className={cn("px-1.5 sm:px-2 py-2 sm:py-3 text-center text-[11px] sm:text-xs font-black", totalAttendance.other.out > 0 ? "text-slate-800" : "text-slate-400")}>{totalAttendance.other.out}</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
             </div>
 
             {attendanceByGrade?.some((r: any) => r.remarks) && (
-              <div className="space-y-3">
-                <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">출결 특기사항</h4>
-                <div className="grid gap-3">
+              <div className="space-y-2 sm:space-y-3 pt-1">
+                <h4 className="text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest">출결 특기사항</h4>
+                <div className="grid gap-2 sm:gap-3">
                   {attendanceByGrade.filter((r: any) => r.remarks).map((r: any, i: number) => (
-                    <div key={i} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex gap-4 items-start">
-                      <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded-lg font-black shrink-0">{r.grade}학년</span>
-                      <p className="text-xs text-slate-600 leading-relaxed italic">"{r.remarks}"</p>
+                    <div key={i} className="bg-white p-2.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm flex gap-2.5 sm:gap-4 items-start">
+                      <span className="text-[9px] sm:text-[10px] bg-slate-100 text-slate-500 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg font-black shrink-0">{r.grade}학년</span>
+                      <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed italic">"{r.remarks}"</p>
                     </div>
                   ))}
                 </div>
