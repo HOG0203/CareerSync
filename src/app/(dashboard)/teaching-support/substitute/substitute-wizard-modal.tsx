@@ -147,32 +147,187 @@ export function SubstituteWizardModal({
   const vacation = React.useMemo(() => getVacationForDate(sourceDate, calendarConfig), [sourceDate, calendarConfig]);
   const examPeriod = React.useMemo(() => getExamPeriodForDate(sourceDate, calendarConfig), [sourceDate, calendarConfig]);
 
-  // 해당 일자/요일의 교사 수업 슬롯 목록 (학사일정 100% 반영)
+  // 해당 일자/요일의 교사 수업 슬롯 목록 (학사일정 및 기존 교체/보강 변동사항 100% 반영)
   const daySlots = React.useMemo(() => {
     if (!currentTeacher || !sourceDay || vacation) return [];
 
     const effectivePeriodOverride = specialDay?.periodOverrides || {};
     const shortenedPeriods = specialDay?.shortenedPeriods;
 
-    const list: { period: number; slot: TimetableSlot }[] = [];
+    // 해당 날짜(sourceDate)에 선택된 교사(selectedTeacherName)의 실시간 결보강 변경 내역 매핑
+    const activeApps = existingApplications.filter(app => app.status !== 'rejected');
+    const dayModifications: Record<number, {
+      type: 'exchange_out' | 'exchange_in' | 'absence_substitute' | 'teaching_substitute';
+      partnerTeacher: string;
+      originalTeacher?: string;
+      subjectName?: string;
+      classCode?: string;
+      deptName?: string;
+      status: 'approved' | 'submitted';
+      appNumber: string;
+    }> = {};
+
+    activeApps.forEach(app => {
+      const appStatus = app.status === 'approved' ? 'approved' : 'submitted';
+      app.items.forEach(it => {
+        // 1) 보강
+        if (it.type === 'substitute') {
+          if (it.originalTeacher === selectedTeacherName && it.sourceDate === sourceDate) {
+            dayModifications[it.sourcePeriod] = {
+              type: 'absence_substitute',
+              partnerTeacher: it.substituteTeacher || '보강교사',
+              originalTeacher: it.originalTeacher,
+              status: appStatus,
+              appNumber: app.applicationNumber,
+            };
+          }
+          if (it.substituteTeacher === selectedTeacherName && it.sourceDate === sourceDate) {
+            dayModifications[it.sourcePeriod] = {
+              type: 'teaching_substitute',
+              partnerTeacher: it.originalTeacher,
+              originalTeacher: it.originalTeacher,
+              subjectName: it.subjectName,
+              classCode: it.classCode,
+              deptName: it.deptName,
+              status: appStatus,
+              appNumber: app.applicationNumber,
+            };
+          }
+        }
+        // 2) 맞교환
+        if (it.type === 'exchange') {
+          // (a) 내가 신청자
+          if (app.applicantTeacher === selectedTeacherName) {
+            if (it.sourceDate === sourceDate) {
+              dayModifications[it.sourcePeriod] = {
+                type: 'exchange_out',
+                partnerTeacher: it.targetTeacher || '교체교사',
+                originalTeacher: it.originalTeacher,
+                status: appStatus,
+                appNumber: app.applicationNumber,
+              };
+            }
+            if (it.targetDate === sourceDate && it.targetPeriod) {
+              dayModifications[it.targetPeriod] = {
+                type: 'exchange_in',
+                partnerTeacher: it.targetTeacher || '교체교사',
+                originalTeacher: it.targetTeacher,
+                subjectName: it.targetSubject || it.subjectName,
+                classCode: it.classCode,
+                deptName: it.deptName,
+                status: appStatus,
+                appNumber: app.applicationNumber,
+              };
+            }
+          }
+          // (b) 내가 교체 대상자
+          if (it.targetTeacher === selectedTeacherName && app.applicantTeacher !== selectedTeacherName) {
+            if (it.targetDate === sourceDate && it.targetPeriod) {
+              dayModifications[it.targetPeriod] = {
+                type: 'exchange_out',
+                partnerTeacher: app.applicantTeacher,
+                originalTeacher: it.targetTeacher,
+                status: appStatus,
+                appNumber: app.applicationNumber,
+              };
+            }
+            if (it.sourceDate === sourceDate) {
+              dayModifications[it.sourcePeriod] = {
+                type: 'exchange_in',
+                partnerTeacher: app.applicantTeacher,
+                originalTeacher: app.applicantTeacher,
+                subjectName: it.subjectName,
+                classCode: it.classCode,
+                deptName: it.deptName,
+                status: appStatus,
+                appNumber: app.applicationNumber,
+              };
+            }
+          }
+        }
+      });
+    });
+
+    const list: {
+      period: number;
+      slot: TimetableSlot;
+      isExchangeIn?: boolean;
+      isExchangeOut?: boolean;
+      isTeachingSub?: boolean;
+      isAbsenceSub?: boolean;
+      partnerTeacher?: string;
+      isPending?: boolean;
+      effectiveStatus?: 'approved' | 'submitted';
+    }[] = [];
 
     for (let p = 1; p <= 7; p++) {
       if (shortenedPeriods && p > shortenedPeriods) continue;
 
       const targetPeriod = effectivePeriodOverride[p] ?? p;
       const key = `${sourceDay}_${targetPeriod}`;
-      const slot = currentTeacher.slots[key];
+      const regularSlot = currentTeacher.slots[key];
+      const mod = dayModifications[p];
 
-      if (slot && slot.subjectName && slot.subjectName.trim() !== '' && slot.subjectName !== '-' && slot.subjectName !== '공강') {
-        list.push({ period: p, slot });
+      // 1) 교체받아 들어온 수업이거나 내가 맡은 보강 수업 (새로운 유효 수업!)
+      if (mod && (mod.type === 'exchange_in' || mod.type === 'teaching_substitute')) {
+        const slot: TimetableSlot = {
+          id: `mod-${p}`,
+          teacherName: selectedTeacherName,
+          homeroomClass: currentTeacher.homeroomClass || '',
+          day: sourceDay,
+          period: p,
+          subjectName: mod.subjectName || regularSlot?.subjectName || '교체수업',
+          classCode: mod.classCode || regularSlot?.classCode || '',
+          deptName: mod.deptName || regularSlot?.deptName || '전체',
+          grade: 1,
+          classNum: 1,
+          weight: 1,
+          isActivity: false,
+          activityType: '수업',
+        };
+        list.push({
+          period: p,
+          slot,
+          isExchangeIn: mod.type === 'exchange_in',
+          isTeachingSub: mod.type === 'teaching_substitute',
+          partnerTeacher: mod.partnerTeacher,
+          effectiveStatus: mod.status,
+          isPending: mod.status === 'submitted',
+        });
+        continue;
+      }
+
+      // 2) 내가 다른 사람에게 넘겨준 수업 (교체 나감 또는 결강 처리됨)
+      if (mod && (mod.type === 'exchange_out' || mod.type === 'absence_substitute')) {
+        if (regularSlot && regularSlot.subjectName) {
+          list.push({
+            period: p,
+            slot: regularSlot,
+            isExchangeOut: mod.type === 'exchange_out',
+            isAbsenceSub: mod.type === 'absence_substitute',
+            partnerTeacher: mod.partnerTeacher,
+            effectiveStatus: mod.status,
+            isPending: mod.status === 'submitted',
+          });
+        }
+        continue;
+      }
+
+      // 3) 일반 정규 수업
+      if (regularSlot && regularSlot.subjectName && regularSlot.subjectName.trim() !== '' && regularSlot.subjectName !== '-' && regularSlot.subjectName !== '공강') {
+        list.push({
+          period: p,
+          slot: regularSlot,
+        });
       }
     }
 
     return list;
-  }, [currentTeacher, sourceDay, vacation, specialDay]);
+  }, [currentTeacher, sourceDay, vacation, specialDay, sourceDate, existingApplications, selectedTeacherName]);
 
   // 슬롯 선택/해제 토글
-  const toggleSlot = (period: number, slot: TimetableSlot) => {
+  const toggleSlot = (period: number, slot: TimetableSlot, isLocked?: boolean) => {
+    if (isLocked) return;
     const exists = items.some(it => it.sourcePeriod === period);
     if (exists) {
       setItems(prev => prev.filter(it => it.sourcePeriod !== period));
@@ -186,7 +341,7 @@ export function SubstituteWizardModal({
         classCode: slot.classCode || '',
         subjectName: slot.subjectName || '',
         originalTeacher: selectedTeacherName,
-        type: 'substitute', // 기본은 보강 모드
+        type: 'exchange', // 교체 편의를 위해 기본 exchange 모드
         substituteTeacher: '',
       };
       setItems(prev => [...prev, newItem].sort((a, b) => a.sourcePeriod - b.sourcePeriod));
@@ -408,35 +563,79 @@ export function SubstituteWizardModal({
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
-                {daySlots.map(({ period, slot }) => {
+                {daySlots.map(({ period, slot, isExchangeIn, isExchangeOut, isTeachingSub, isAbsenceSub, partnerTeacher, isPending, effectiveStatus }) => {
                   const isSelected = items.some(it => it.sourcePeriod === period);
+                  const isPassedToOther = isExchangeOut || isAbsenceSub;
+                  const isLocked = isPending;
+
                   return (
                     <button
                       key={period}
                       type="button"
-                      onClick={() => toggleSlot(period, slot)}
+                      disabled={isLocked}
+                      onClick={() => toggleSlot(period, slot, isLocked)}
+                      title={
+                        isPending
+                          ? `현재 결재 진행 중인 수업으로 결재 승인 전에는 변경이 불가합니다.`
+                          : isExchangeIn
+                          ? `(${partnerTeacher} 교체 수업) 클릭하여 다른 교사와 다시 재교체 신청 가능`
+                          : isExchangeOut
+                          ? `(${partnerTeacher} 교체 나감) 공강 슬롯으로 활용 가능`
+                          : undefined
+                      }
                       className={cn(
-                        "p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-between gap-1 shadow-2xs cursor-pointer",
-                        isSelected
-                          ? "bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-500/30 shadow-md scale-[1.02]"
-                          : "bg-white text-slate-800 border-slate-200 hover:bg-indigo-50/50 hover:border-indigo-300"
+                        "p-2.5 rounded-2xl border text-center transition-all flex flex-col items-center justify-between gap-1 shadow-2xs relative",
+                        isLocked && "cursor-not-allowed select-none border-dashed border-slate-300 bg-[repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9_6px,#e2e8f0_6px,#e2e8f0_12px)] opacity-90",
+                        !isLocked && isPassedToOther && "cursor-pointer border-dashed border-slate-300 bg-[repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9_6px,#e2e8f0_6px,#e2e8f0_12px)] hover:border-indigo-400",
+                        !isLocked && isExchangeIn && (isSelected ? "bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-500/30 shadow-md scale-[1.02]" : "bg-indigo-50/80 text-indigo-950 border-indigo-300 hover:bg-indigo-100/80"),
+                        !isLocked && isTeachingSub && (isSelected ? "bg-emerald-600 text-white border-emerald-600 ring-2 ring-emerald-500/30 shadow-md scale-[1.02]" : "bg-emerald-50/80 text-emerald-950 border-emerald-300 hover:bg-emerald-100/80"),
+                        !isLocked && !isPassedToOther && !isExchangeIn && !isTeachingSub && (
+                          isSelected
+                            ? "bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-500/30 shadow-md scale-[1.02]"
+                            : "bg-white text-slate-800 border-slate-200 hover:bg-indigo-50/50 hover:border-indigo-300"
+                        )
                       )}
                     >
+                      {/* 상태 뱃지 */}
+                      {(isExchangeIn || isExchangeOut || isTeachingSub || isAbsenceSub) && (
+                        <span className={cn(
+                          "absolute -top-1.5 -right-1 text-[8px] px-1 py-0.1 rounded-full font-black shadow-xs z-10 leading-tight ring-1 ring-white/60",
+                          isPending ? "bg-amber-500 text-white" : isExchangeIn ? "bg-indigo-600 text-white" : isTeachingSub ? "bg-emerald-600 text-white" : "bg-slate-700 text-white"
+                        )}>
+                          {isPending ? '⏳ 결재중' : isExchangeIn ? '🔄 교체수업' : isTeachingSub ? '✅ 보강' : '🔄 교체완료'}
+                        </span>
+                      )}
+
                       <span className={cn(
                         "text-[10px] font-black px-1.5 py-0.5 rounded-md",
                         isSelected ? "bg-indigo-700/80 text-white" : "bg-slate-100 text-slate-600"
                       )}>
                         {period}교시
                       </span>
-                      <strong className="text-xs font-black tracking-tight mt-0.5">
+
+                      <strong className={cn(
+                        "text-xs font-extrabold tracking-tight mt-0.5 truncate max-w-full",
+                        isPassedToOther ? "text-slate-700 line-through decoration-slate-400" : isSelected ? "text-white" : "text-slate-900"
+                      )}>
                         {slot.subjectName}
                       </strong>
-                      <span className={cn(
-                        "text-[10px] font-bold",
-                        isSelected ? "text-indigo-200" : "text-indigo-600"
-                      )}>
-                        {slot.classCode}
-                      </span>
+
+                      <div className="flex items-center gap-1">
+                        <span className={cn(
+                          "text-[9.5px] font-bold",
+                          isSelected ? "text-indigo-200" : isExchangeIn ? "text-indigo-700" : isPassedToOther ? "text-slate-600" : "text-indigo-600"
+                        )}>
+                          {slot.classCode}
+                        </span>
+                        {partnerTeacher && (
+                          <span className={cn(
+                            "text-[8px] font-bold truncate max-w-[50px]",
+                            isSelected ? "text-white/80" : isPassedToOther ? "text-slate-600" : "text-indigo-700"
+                          )}>
+                            ({partnerTeacher})
+                          </span>
+                        )}
+                      </div>
                     </button>
                   );
                 })}
