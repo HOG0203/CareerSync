@@ -124,7 +124,81 @@ export function generateSemesterWeeks(
 }
 
 /**
- * 특정 일자·교시의 결보강 충돌 여부 정밀 검증
+ * 특정 날짜 및 교시에 특정 교사가 실제로 '공강'인지 여부 정밀 판별
+ * - 정규 수업이 있더라도 이미 다른 교사에게 넘긴 경우(exchange_out or absence_substitute) -> 공강!
+ * - 정규 수업이 없더라도 다른 수업을 대신 맡기로 한 경우(exchange_in or teaching_substitute) -> 수업 중(공강 아님)!
+ */
+export function isTeacherFreeOnDateAndPeriod(
+  teacherName: string,
+  dateStr: string,
+  period: number,
+  timetableData: ParsedTimetableResult,
+  existingApplications: SubstituteApplication[],
+  currentApplicationId?: string
+): boolean {
+  const day = getDayOfWeekFromDate(dateStr);
+  const teacher = timetableData.teachers.find(t => t.teacherName === teacherName);
+  if (!teacher) return false;
+
+  // 1) 기본 정규 시간표상 수업 여부
+  const regularSlot = teacher.slots[`${day}_${period}`];
+  const hasRegularClass = Boolean(
+    regularSlot && 
+    regularSlot.subjectName && 
+    regularSlot.subjectName.trim() !== '' && 
+    regularSlot.subjectName !== '-' && 
+    regularSlot.subjectName !== '공강'
+  );
+
+  const activeApps = existingApplications.filter(
+    app => app.id !== currentApplicationId && app.status !== 'rejected'
+  );
+
+  // 2) 내 정규 수업을 다른 사람에게 넘겨주었는지 검사 (내가 빠져서 공강이 됨)
+  let isPassedOut = false;
+
+  // 3) 내가 다른 수업을 대신 맡아서 들어가기로 했는지 검사 (새로 수업이 생김)
+  let isTakenIn = false;
+
+  for (const app of activeApps) {
+    for (const it of app.items) {
+      // 2-a) 보강으로 내 수업을 다른 교사에게 넘김
+      if (it.type === 'substitute' && it.originalTeacher === teacherName && it.sourceDate === dateStr && it.sourcePeriod === period) {
+        isPassedOut = true;
+      }
+      // 2-b) 교체로 내 수업을 다른 교사에게 넘김 (내 source 시간)
+      if (it.type === 'exchange' && it.originalTeacher === teacherName && it.sourceDate === dateStr && it.sourcePeriod === period) {
+        isPassedOut = true;
+      }
+      // 2-c) 교체로 내 원래 target 수업을 넘겨줌 (내가 targetTeacher인 경우의 target 시간)
+      if (it.type === 'exchange' && it.targetTeacher === teacherName && it.targetDate === dateStr && it.targetPeriod === period) {
+        isPassedOut = true;
+      }
+
+      // 3-a) 내가 보강 담당 교사로 투입됨
+      if (it.type === 'substitute' && it.substituteTeacher === teacherName && it.sourceDate === dateStr && it.sourcePeriod === period) {
+        isTakenIn = true;
+      }
+      // 3-b) 내가 교체로 상대방 수업을 맡음 (신청자로서 상대방의 target 시간에 들어감)
+      if (it.type === 'exchange' && it.originalTeacher === teacherName && it.targetDate === dateStr && it.targetPeriod === period) {
+        isTakenIn = true;
+      }
+      // 3-c) 내가 교체로 신청자의 source 수업을 맡음 (대상자로서 신청자의 source 시간에 들어감)
+      if (it.type === 'exchange' && it.targetTeacher === teacherName && it.sourceDate === dateStr && it.sourcePeriod === period) {
+        isTakenIn = true;
+      }
+    }
+  }
+
+  // 최종 판단:
+  // 정규 수업이 있고 넘겨주지 않았거나, 새로 맡은 수업이 있다면 -> 수업 중 (공강 아님)
+  // 정규 수업을 넘겨주었거나 원래 수업이 없고 새로 맡은 것도 없다면 -> 공강!
+  const isActuallyTeaching = (hasRegularClass && !isPassedOut) || isTakenIn;
+  return !isActuallyTeaching;
+}
+
+/**
+ * 2. 개별 결보강 항목에 대한 실시간 충돌 검증
  */
 export function checkSubstituteItemConflict(
   item: SubstituteItem,
@@ -159,7 +233,7 @@ export function checkSubstituteItemConflict(
     }
   }
 
-  // 2. 수업 교체(exchange)인 경우의 충돌 검증 (1:1 맞교환 및 공강 교체 완벽 검증)
+  // 2. 수업 교체(exchange)인 경우의 충돌 검증 (1:1 맞교환 및 재교체 완벽 검증)
   if (item.type === 'exchange') {
     if (!item.targetDate || !item.targetPeriod || !item.targetTeacher) {
       return { hasConflict: true, message: '교체할 일자, 교시 및 교사를 모두 지정해야 합니다.' };
@@ -167,112 +241,51 @@ export function checkSubstituteItemConflict(
 
     const sourceDay = item.sourceDay || getDayOfWeekFromDate(item.sourceDate);
     const targetDay = item.targetDay || getDayOfWeekFromDate(item.targetDate);
-    const originalTeacherSummary = timetableData.teachers.find(t => t.teacherName === item.originalTeacher);
-    const targetTeacherSummary = timetableData.teachers.find(t => t.teacherName === item.targetTeacher);
 
-    // 2-1) 상대 교사(targetTeacher)가 원래 신청 시간(sourceDate, sourcePeriod)에 공강인지 검사
-    if (targetTeacherSummary) {
-      const sourceSlotOfTarget = targetTeacherSummary.slots[`${sourceDay}_${item.sourcePeriod}`];
-      if (sourceSlotOfTarget && (sourceSlotOfTarget.subjectName || sourceSlotOfTarget.classCode)) {
-        return {
-          hasConflict: true,
-          conflictType: 'TEACHER_BUSY',
-          message: `[교사 충돌] ${item.targetTeacher} 선생님은 원래 수업 시간(${item.sourceDate}(${sourceDay}) ${item.sourcePeriod}교시)에 이미 '${sourceSlotOfTarget.subjectName}(${sourceSlotOfTarget.classCode})' 정규 수업이 있어 수업을 맡을 수 없습니다.`,
-          details: {
-            date: item.sourceDate,
-            period: item.sourcePeriod,
-            teacherName: item.targetTeacher,
-            existingSubject: sourceSlotOfTarget.subjectName,
-            classCode: sourceSlotOfTarget.classCode
-          }
-        };
-      }
-    }
+    // 2-1) 상대 교사(targetTeacher)가 원래 신청 시간(sourceDate, sourcePeriod)에 실제로 공강인지 검사
+    const isTargetFreeAtSource = isTeacherFreeOnDateAndPeriod(
+      item.targetTeacher,
+      item.sourceDate,
+      item.sourcePeriod,
+      timetableData,
+      existingApplications,
+      currentApplicationId
+    );
 
-    // 상대 교사가 sourceDate, sourcePeriod에 이미 다른 결보강 배정이 있는지 검사
-    for (const app of otherApps) {
-      for (const it of app.items) {
-        const isTargetBusyAtSource = 
-          (it.type === 'substitute' && it.substituteTeacher === item.targetTeacher && it.sourceDate === item.sourceDate && it.sourcePeriod === item.sourcePeriod) ||
-          (it.type === 'exchange' && it.targetTeacher === item.targetTeacher && it.targetDate === item.sourceDate && it.targetPeriod === item.sourcePeriod);
-
-        if (isTargetBusyAtSource) {
-          return {
-            hasConflict: true,
-            conflictType: 'TEACHER_BUSY',
-            message: `[교사 충돌] ${item.targetTeacher} 선생님은 ${item.sourceDate} ${item.sourcePeriod}교시에 이미 다른 보강/교체 배정이 있습니다.`,
-            details: {
-              date: item.sourceDate,
-              period: item.sourcePeriod,
-              teacherName: item.targetTeacher
-            }
-          };
+    if (!isTargetFreeAtSource) {
+      return {
+        hasConflict: true,
+        conflictType: 'TEACHER_BUSY',
+        message: `[교사 충돌] ${item.targetTeacher} 선생님은 원래 수업 시간(${item.sourceDate}(${sourceDay}) ${item.sourcePeriod}교시)에 이미 다른 정규 수업 또는 보강/교체 배정이 있어 수업을 맡을 수 없습니다.`,
+        details: {
+          date: item.sourceDate,
+          period: item.sourcePeriod,
+          teacherName: item.targetTeacher
         }
-      }
+      };
     }
 
-    // 2-2) 본인(originalTeacher)이 교체 대상 시간(targetDate, targetPeriod)에 공강인지 검사
-    if (originalTeacherSummary) {
-      const targetSlotOfOriginal = originalTeacherSummary.slots[`${targetDay}_${item.targetPeriod}`];
-      if (targetSlotOfOriginal && (targetSlotOfOriginal.subjectName || targetSlotOfOriginal.classCode)) {
-        return {
-          hasConflict: true,
-          conflictType: 'TEACHER_BUSY',
-          message: `[본인 교사 충돌] ${item.originalTeacher} 선생님은 맞교환 대상 시간(${item.targetDate}(${targetDay}) ${item.targetPeriod}교시)에 이미 본인의 '${targetSlotOfOriginal.subjectName}(${targetSlotOfOriginal.classCode})' 정규 수업이 있습니다.`,
-          details: {
-            date: item.targetDate,
-            period: item.targetPeriod,
-            teacherName: item.originalTeacher,
-            existingSubject: targetSlotOfOriginal.subjectName,
-            classCode: targetSlotOfOriginal.classCode
-          }
-        };
-      }
-    }
+    // 2-2) 본인(originalTeacher)이 교체 대상 시간(targetDate, targetPeriod)에 실제로 공강인지 검사
+    const isOriginalFreeAtTarget = isTeacherFreeOnDateAndPeriod(
+      item.originalTeacher,
+      item.targetDate,
+      item.targetPeriod,
+      timetableData,
+      existingApplications,
+      currentApplicationId
+    );
 
-    // 본인이 targetDate, targetPeriod에 이미 다른 결보강 배정이 있는지 검사
-    for (const app of otherApps) {
-      for (const it of app.items) {
-        const isOriginalBusyAtTarget = 
-          (it.type === 'substitute' && it.substituteTeacher === item.originalTeacher && it.sourceDate === item.targetDate && it.sourcePeriod === item.targetPeriod) ||
-          (it.type === 'exchange' && it.targetTeacher === item.originalTeacher && it.targetDate === item.targetDate && it.targetPeriod === item.targetPeriod);
-
-        if (isOriginalBusyAtTarget) {
-          return {
-            hasConflict: true,
-            conflictType: 'TEACHER_BUSY',
-            message: `[본인 교사 충돌] ${item.originalTeacher} 선생님은 ${item.targetDate} ${item.targetPeriod}교시에 이미 다른 보강/교체 배정이 있습니다.`,
-            details: {
-              date: item.targetDate,
-              period: item.targetPeriod,
-              teacherName: item.originalTeacher
-            }
-          };
+    if (!isOriginalFreeAtTarget) {
+      return {
+        hasConflict: true,
+        conflictType: 'TEACHER_BUSY',
+        message: `[본인 교사 충돌] ${item.originalTeacher} 선생님은 맞교환 대상 시간(${item.targetDate}(${targetDay}) ${item.targetPeriod}교시)에 이미 본인의 수업 또는 다른 보강/교체 배정이 있습니다.`,
+        details: {
+          date: item.targetDate,
+          period: item.targetPeriod,
+          teacherName: item.originalTeacher
         }
-      }
-    }
-
-    // 2-3) 교체 대상 교사의 대상 일시 수업이 이미 다른 신청서에 선점되었는지 검사
-    for (const app of otherApps) {
-      for (const it of app.items) {
-        const isTargetSlotTaken = 
-          it.sourceDate === item.targetDate && 
-          it.sourcePeriod === item.targetPeriod && 
-          it.originalTeacher === item.targetTeacher;
-
-        if (isTargetSlotTaken) {
-          return {
-            hasConflict: true,
-            conflictType: 'ALREADY_MODIFIED',
-            message: `[교체 대상 충돌] ${item.targetTeacher} 선생님의 ${item.targetDate} ${item.targetPeriod}교시 수업은 이미 다른 신청서(${app.applicationNumber})에서 교체/보강 처리되었습니다.`,
-            details: {
-              date: item.targetDate,
-              period: item.targetPeriod,
-              teacherName: item.targetTeacher
-            }
-          };
-        }
-      }
+      };
     }
   }
 
@@ -283,26 +296,6 @@ export function checkSubstituteItemConflict(
     }
 
     const sourceDay = item.sourceDay || getDayOfWeekFromDate(item.sourceDate);
-    const subTeacherSummary = timetableData.teachers.find(t => t.teacherName === item.substituteTeacher);
-
-    // 3-1) 보강 교사의 정규 수업 유무 체크
-    if (subTeacherSummary) {
-      const regSlot = subTeacherSummary.slots[`${sourceDay}_${item.sourcePeriod}`];
-      if (regSlot && regSlot.subjectName) {
-        return {
-          hasConflict: true,
-          conflictType: 'TEACHER_BUSY',
-          message: `[보강 교사 불가] ${item.substituteTeacher} 선생님은 ${item.sourceDate}(${sourceDay}) ${item.sourcePeriod}교시에 이미 '${regSlot.subjectName}(${regSlot.classCode})' 정규 수업이 있습니다.`,
-          details: {
-            date: item.sourceDate,
-            period: item.sourcePeriod,
-            teacherName: item.substituteTeacher,
-            existingSubject: regSlot.subjectName,
-            classCode: regSlot.classCode
-          }
-        };
-      }
-    }
 
     // 3-2) 보강 교사가 해당 일시 다른 보강에 이미 배정되었는지 체크
     for (const app of otherApps) {
@@ -330,18 +323,152 @@ export function checkSubstituteItemConflict(
   return { hasConflict: false, message: '안전하게 등록 가능합니다.' };
 }
 
+// 제외할 비교 대상 외 활동/창체/비교과 과목 목록
+const NON_ACADEMIC_SUBJECTS = new Set([
+  '동아', '동아리', '자율', '진로', '성직', '봉사', '창체', '공강', '빈시간', '-', 
+  '스포츠', '클럽', '상담', '보충', '특활', '군1', '군2', '리더'
+]);
+
+/**
+ * 특정 교사의 순수 교과군(subjectGroup) 및 정규 교과목명 세트 추출 (창체/동아리/자율 등 제외)
+ */
+export function getTeacherSubjectInfo(teacher: TeacherTimetableSummary): {
+  subjectGroup: string;
+  subjects: Set<string>;
+} {
+  const subjects = new Set<string>();
+  Object.values(teacher.slots || {}).forEach(s => {
+    const sub = (s?.subjectName || '').trim();
+    if (sub && !NON_ACADEMIC_SUBJECTS.has(sub)) {
+      subjects.add(sub);
+    }
+  });
+
+  return {
+    subjectGroup: teacher.subjectGroup?.trim() || '',
+    subjects,
+  };
+}
+
+/**
+ * 두 교사 또는 기준 슬롯/신청 교사와 파트너 교사 간의 동일 교과 여부 정밀 판별
+ * - 1순위: subjectGroup 일치 (예: 과학 === 과학, 국어 === 국어 등)
+ * - 2순위: 순수 정규 교과목명 일치/계열 접두사 일치 (예: 과1/과2/과3, 수1/수2, 국1/국2 등)
+ */
+export function checkIsSameSubject(
+  targetSubjectName: string | undefined,
+  sourceTeacher: TeacherTimetableSummary | undefined,
+  partnerTeacher: TeacherTimetableSummary
+): boolean {
+  const partnerInfo = getTeacherSubjectInfo(partnerTeacher);
+
+  // 1. 교과군(subjectGroup) 일치 검사 (예: 과학 === 과학, 국어 === 국어, 수학 === 수학, 전기 === 전기 등)
+  if (
+    sourceTeacher?.subjectGroup &&
+    partnerTeacher.subjectGroup &&
+    sourceTeacher.subjectGroup.trim() !== '' &&
+    sourceTeacher.subjectGroup.trim() === partnerTeacher.subjectGroup.trim()
+  ) {
+    return true;
+  }
+
+  // 2. 기준 수업 과목명이 순수 정규 과목일 때 파트너 교사의 담당 과목과 대조
+  const cleanTarget = (targetSubjectName || '').trim();
+  if (cleanTarget && !NON_ACADEMIC_SUBJECTS.has(cleanTarget)) {
+    if (partnerInfo.subjects.has(cleanTarget)) {
+      return true;
+    }
+    // 접두사/계열 검사 (예: '과1' & '과2', '수1' & '수2', '국1' & '국2', '영1' & '영2')
+    for (const sub of partnerInfo.subjects) {
+      if (
+        (cleanTarget.startsWith('과') && sub.startsWith('과')) ||
+        (cleanTarget.startsWith('수') && sub.startsWith('수')) ||
+        (cleanTarget.startsWith('국') && sub.startsWith('국')) ||
+        (cleanTarget.startsWith('영') && sub.startsWith('영')) ||
+        (cleanTarget.startsWith('체') && sub.startsWith('체')) ||
+        (cleanTarget.startsWith('음') && sub.startsWith('음')) ||
+        (cleanTarget.startsWith('미') && sub.startsWith('미')) ||
+        (cleanTarget.startsWith('역') && sub.startsWith('역')) ||
+        (cleanTarget.startsWith('사') && sub.startsWith('사')) ||
+        (cleanTarget.startsWith('한') && sub.startsWith('한'))
+      ) {
+        return true;
+      }
+    }
+  }
+
+  // 3. 신청 교사의 순수 담당 과목과 파트너 교사의 순수 담당 과목 대조
+  if (sourceTeacher) {
+    const sourceInfo = getTeacherSubjectInfo(sourceTeacher);
+    for (const sSub of sourceInfo.subjects) {
+      if (partnerInfo.subjects.has(sSub)) {
+        return true;
+      }
+      for (const pSub of partnerInfo.subjects) {
+        if (
+          (sSub.startsWith('과') && pSub.startsWith('과')) ||
+          (sSub.startsWith('수') && pSub.startsWith('수')) ||
+          (sSub.startsWith('국') && pSub.startsWith('국')) ||
+          (sSub.startsWith('영') && pSub.startsWith('영'))
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * 기준 슬롯/신청 교사와 파트너 교사 간의 동일 학과 여부 정밀 판별
+ * - 보통교과(국영수사과체음미 등)는 특정 학과 전공이 아니므로 학과 매칭에서 제외
+ * - 전공 전문교과(기계, 전기, 화공, 공간, 자동차, 섬유 등) 교사만 학과와 매칭
+ */
+export function checkIsSameDept(
+  targetDeptName: string | undefined,
+  targetClassCode: string | undefined,
+  sourceTeacher: TeacherTimetableSummary | undefined,
+  partnerTeacher: TeacherTimetableSummary
+): boolean {
+  // 보통교과 교사는 특정 학과 소속이 아니므로 제외
+  const commonSubjectGroups = new Set(['국어', '수학', '영어', '과학', '사회', '역사', '도덕', '체육', '음악', '미술', '한문', '일본어', '진로']);
+  if (partnerTeacher.subjectGroup && commonSubjectGroups.has(partnerTeacher.subjectGroup.trim())) {
+    return false;
+  }
+
+  const targetDept = targetDeptName?.trim() || '';
+
+  // 전공 전문교과 교사의 교과군 또는 비고란과 대상 학과명 매칭
+  if (partnerTeacher.subjectGroup && targetDept && targetDept.includes(partnerTeacher.subjectGroup.trim())) {
+    return true;
+  }
+
+  if (partnerTeacher.remarks && targetDept && partnerTeacher.remarks.includes(targetDept)) {
+    return true;
+  }
+
+  return false;
+}
+
 /**
  * 특정 일자·교시에 수업이 없는 '실제 공강 교사' 추천 목록 추출
+ * 🌟 정렬 우선순위: 동일교과 > 동일학과 > 누적 보강 횟수 적은 순 > 교사명 가나다순
  */
 export function getAvailableTeachersForSlot(
   dateStr: string,
   period: number,
   timetableData: ParsedTimetableResult,
   existingApplications: SubstituteApplication[],
-  referenceDeptName?: string
+  referenceDeptName?: string,
+  applicantTeacherName?: string,
+  referenceSubjectName?: string,
+  referenceClassCode?: string
 ): AvailableTeacher[] {
   const day = getDayOfWeekFromDate(dateStr);
   if (!day) return [];
+
+  const sourceTeacher = applicantTeacherName ? timetableData.teachers.find(t => t.teacherName === applicantTeacherName) : undefined;
 
   // 1. 이번 학기 교사별 누적 보강 횟수 계산
   const subCountMap: Record<string, number> = {};
@@ -370,36 +497,43 @@ export function getAvailableTeachersForSlot(
     }
   });
 
-  // 3. 공강 교사 필터링
+  // 3. 공강 교사 필터링 (교체로 수업을 넘겨 비어있는 교사도 포함!)
   const available: AvailableTeacher[] = [];
 
   timetableData.teachers.forEach(teacher => {
-    // 3-1) 정규 시간표에서 해당 요일·교시가 비어있는지 확인
-    const slot = teacher.slots[`${day}_${period}`];
-    const hasRegularClass = Boolean(slot && (slot.subjectName || slot.classCode));
+    if (applicantTeacherName && teacher.teacherName === applicantTeacherName) return;
 
-    if (hasRegularClass) return;
-
-    // 3-2) 해당 날짜에 결보강 배정이 없는지 확인
-    if (busyTeachersOnDate.has(teacher.teacherName)) return;
-
-    // 같은 학과/교과군 여부 확인
-    const isSameDept = Boolean(
-      referenceDeptName && 
-      (teacher.remarks?.includes(referenceDeptName) || teacher.homeroomClass?.includes(referenceDeptName.charAt(0)))
+    // 해당 날짜/교시에 실제로 수업이 없고 공강인지 실시간 정밀 판별
+    const isFree = isTeacherFreeOnDateAndPeriod(
+      teacher.teacherName,
+      dateStr,
+      period,
+      timetableData,
+      existingApplications
     );
+
+    if (!isFree) return;
+
+    // 동일 교과 여부 판별 (최우선)
+    const isSameSubject = checkIsSameSubject(referenceSubjectName, sourceTeacher, teacher);
+
+    // 동일 학과 여부 판별 (차순위)
+    const isSameDept = checkIsSameDept(referenceDeptName, referenceClassCode, sourceTeacher, teacher);
 
     available.push({
       teacherName: teacher.teacherName,
       homeroomClass: teacher.homeroomClass,
       deptName: teacher.remarks || '',
+      isSameSubject,
       isSameDept,
       totalSubstitutesDone: subCountMap[teacher.teacherName] || 0
     });
   });
 
-  // 4. 정렬: 동일 학과 우선 -> 누적 보강 횟수 적은 순 -> 교사명 가나다순
+  // 4. 🌟 정렬: 동일 교과 우선(1순위) -> 동일 학과 우선(2순위) -> 누적 보강 횟수 적은 순(3순위) -> 교사명 가나다순
   available.sort((a, b) => {
+    if (a.isSameSubject && !b.isSameSubject) return -1;
+    if (!a.isSameSubject && b.isSameSubject) return 1;
     if (a.isSameDept && !b.isSameDept) return -1;
     if (!a.isSameDept && b.isSameDept) return 1;
     if (a.totalSubstitutesDone !== b.totalSubstitutesDone) {
@@ -415,6 +549,7 @@ export interface MultiSlotAvailableTeacher {
   teacherName: string;
   homeroomClass: string;
   deptName: string;
+  isSameSubject?: boolean;
   isSameDept: boolean;
   totalSubstitutesDone: number;
   isAllPeriodsFree: boolean;
@@ -425,15 +560,19 @@ export interface MultiSlotAvailableTeacher {
 /**
  * 여러 개의 수업 슬롯(예: 화 1, 2, 3, 4교시) 모두에 대해
  * '동시에 공강인 교사'를 정밀 분석하고 우선 추천
+ * 🌟 정렬: 전교시 공강 -> 공강 교시 수 -> 동일교과(1순위) -> 동일학과(2순위) -> 누적 보강 횟수 -> 가나다순
  */
 export function getAllPeriodsAvailableTeachers(
-  slots: { date: string; period: number; day?: string; deptName?: string }[],
+  slots: { date: string; period: number; day?: string; deptName?: string; subjectName?: string; classCode?: string }[],
   timetableData: ParsedTimetableResult,
   existingApplications: SubstituteApplication[],
   applicantTeacherName?: string,
   referenceDeptName?: string
 ): MultiSlotAvailableTeacher[] {
   if (slots.length === 0) return [];
+
+  const sourceTeacher = applicantTeacherName ? timetableData.teachers.find(t => t.teacherName === applicantTeacherName) : undefined;
+  const firstSlot = slots[0];
 
   // 각 슬롯별 공강 교사 집합 구하기
   const slotAvailableMap: Record<number, Set<string>> = {};
@@ -443,7 +582,10 @@ export function getAllPeriodsAvailableTeachers(
       s.period,
       timetableData,
       existingApplications,
-      s.deptName || referenceDeptName
+      s.deptName || referenceDeptName,
+      applicantTeacherName,
+      s.subjectName,
+      s.classCode
     );
     slotAvailableMap[idx] = new Set(avail.map(a => a.teacherName));
   });
@@ -464,7 +606,7 @@ export function getAllPeriodsAvailableTeachers(
   const results: MultiSlotAvailableTeacher[] = [];
 
   timetableData.teachers.forEach(teacher => {
-    if (teacher.teacherName === applicantTeacherName) return;
+    if (applicantTeacherName && teacher.teacherName === applicantTeacherName) return;
 
     let freeCount = 0;
     for (let i = 0; i < totalPeriodCount; i++) {
@@ -473,35 +615,31 @@ export function getAllPeriodsAvailableTeachers(
       }
     }
 
-    if (freeCount === 0) return; // 하나도 안 비어있으면 제외
+    if (freeCount > 0) {
+      const isSameSubject = checkIsSameSubject(firstSlot?.subjectName, sourceTeacher, teacher);
+      const isSameDept = checkIsSameDept(firstSlot?.deptName || referenceDeptName, firstSlot?.classCode, sourceTeacher, teacher);
 
-    const isSameDept = Boolean(
-      referenceDeptName && 
-      (teacher.remarks?.includes(referenceDeptName) || teacher.homeroomClass?.includes(referenceDeptName.charAt(0)))
-    );
-
-    results.push({
-      teacherName: teacher.teacherName,
-      homeroomClass: teacher.homeroomClass,
-      deptName: teacher.remarks || '',
-      isSameDept,
-      totalSubstitutesDone: subCountMap[teacher.teacherName] || 0,
-      isAllPeriodsFree: freeCount === totalPeriodCount,
-      freePeriodCount: freeCount,
-      totalPeriodCount,
-    });
+      results.push({
+        teacherName: teacher.teacherName,
+        homeroomClass: teacher.homeroomClass || '',
+        deptName: teacher.remarks || '',
+        isSameSubject,
+        isSameDept,
+        totalSubstitutesDone: subCountMap[teacher.teacherName] || 0,
+        isAllPeriodsFree: freeCount === totalPeriodCount,
+        freePeriodCount: freeCount,
+        totalPeriodCount,
+      });
+    }
   });
 
-  // 정렬:
-  // 1. 모든 교시 공강(isAllPeriodsFree) 우선
-  // 2. 공강 교시 수 많은 순
-  // 3. 동일 학과/교과군 우선
-  // 4. 누적 보강 횟수 적은 순
-  // 5. 교사명 가나다순
+  // 🌟 정렬: 전교시 공강 -> 공강 교시 많은 순 -> 동일교과(1순위) -> 동일학과(2순위) -> 누적 보강 적은 순 -> 가나다순
   results.sort((a, b) => {
     if (a.isAllPeriodsFree && !b.isAllPeriodsFree) return -1;
     if (!a.isAllPeriodsFree && b.isAllPeriodsFree) return 1;
     if (a.freePeriodCount !== b.freePeriodCount) return b.freePeriodCount - a.freePeriodCount;
+    if (a.isSameSubject && !b.isSameSubject) return -1;
+    if (!a.isSameSubject && b.isSameSubject) return 1;
     if (a.isSameDept && !b.isSameDept) return -1;
     if (!a.isSameDept && b.isSameDept) return 1;
     if (a.totalSubstitutesDone !== b.totalSubstitutesDone) {
@@ -517,6 +655,7 @@ export interface ExchangeRecommendation {
   partnerTeacher: string;
   homeroomClass?: string;
   deptName?: string;
+  isSameSubject?: boolean;
   isSameDept: boolean;
   targetDate: string;
   targetDay: string;
@@ -531,12 +670,6 @@ export interface ExchangeRecommendation {
   badgeColor: string;
 }
 
-/**
- * 수업 맞교환(Exchange) 인공지능 스마트 추천 엔진
- * 1. 동일 학반(SAME_CLASS) 수업 맞바꾸기 (학생 시간표 변동 없는 최우선 추천)
- * 2. 동일 교과군 맞교환
- * 3. 상호 완전 공강 맞교환
- */
 /**
  * 기준 일자와 동일한 주의 특정 요일(YYYY-MM-DD) 계산
  */
@@ -565,10 +698,7 @@ export function getDateForDayInSameWeek(referenceDateStr: string, targetDay: str
 
 /**
  * 수업 맞교환(Exchange) 인공지능 스마트 추천 엔진
- * 1. 동일 학반(SAME_CLASS) 수업 맞바꾸기 (학생 시간표 변동 없는 최우선 추천)
- * 2. 동일 교과군 맞교환
- * 3. 일반 수업 맞교환
- * 4. 상호 완전 공강 맞교환
+ * 🌟 추천 랭킹: 동일 교과(1순위) > 동일 학과(2순위) > 동일 학반 맞교환(SAME_CLASS)
  */
 export function getSmartExchangeRecommendations(
   sourceDate: string,
@@ -633,10 +763,11 @@ export function getSmartExchangeRecommendations(
     const partnerBusyAtSource = hasTeacherClassAt(partner.teacherName, sourceDay, sourcePeriod, validSourceDate);
     if (partnerBusyAtSource) return;
 
-    const isSameDept = Boolean(
-      sourceSlot.deptName &&
-      (partner.remarks?.includes(sourceSlot.deptName) || partner.homeroomClass?.includes(sourceSlot.deptName.charAt(0)))
-    );
+    // 동일 교과 여부 (1순위)
+    const isSameSubject = checkIsSameSubject(sourceSlot.subjectName, currentTeacher, partner);
+
+    // 동일 학과 여부 (2순위)
+    const isSameDept = checkIsSameDept(sourceSlot.deptName, sourceSlot.classCode, currentTeacher, partner);
 
     // 파트너 교사의 주간 슬롯 중 동일 학반 수업 탐색
     DAYS.forEach(d => {
@@ -663,10 +794,30 @@ export function getSmartExchangeRecommendations(
         // 동일 학반 맞교환 (오직 학생 시간표 변동 없이 동일 학급 내에서 과목만 1:1 맞교환하는 경우만 유효)
         if (hasPartnerClass && sourceSlot.classCode && partnerSlot?.classCode === sourceSlot.classCode) {
           const isImmediate = !partnerBusyAtSource;
+
+          // 🌟 점수 체계: 동일교과(+1000) > 동일학과(+500) > 기본 동일학반 맞교환(150/80)
+          const baseScore = isImmediate ? 150 : 80;
+          const score = baseScore + (isSameSubject ? 1000 : 0) + (isSameDept ? 500 : 0);
+
+          let badgeLabel = '★ 동일학반 즉시교체';
+          let badgeColor = 'bg-indigo-600 text-white';
+
+          if (isSameSubject) {
+            badgeLabel = '★ 동일교과 맞교환';
+            badgeColor = 'bg-blue-600 text-white';
+          } else if (isSameDept) {
+            badgeLabel = '★ 동일학과 맞교환';
+            badgeColor = 'bg-emerald-600 text-white';
+          } else if (!isImmediate) {
+            badgeLabel = '★ 동일학반 교과담당';
+            badgeColor = 'bg-purple-600 text-white';
+          }
+
           recommendations.push({
             partnerTeacher: partner.teacherName,
             homeroomClass: partner.homeroomClass,
             deptName: partner.remarks || '',
+            isSameSubject,
             isSameDept,
             targetDate,
             targetDay: d,
@@ -674,18 +825,24 @@ export function getSmartExchangeRecommendations(
             partnerSubjectName: partnerSlot.subjectName,
             partnerClassCode: partnerSlot.classCode,
             matchType: 'SAME_CLASS',
-            score: (isImmediate ? 150 : 80) + (isSameDept ? 10 : 0),
-            title: `${partner.teacherName} 선생님 [동일 학반: ${partnerSlot.classCode}]`,
+            score,
+            title: `${partner.teacherName} 선생님 [${isSameSubject ? '동일교과 · ' : isSameDept ? '동일학과 · ' : ''}${partnerSlot.classCode}]`,
             subtitle: `${d}요일 ${p}교시 '${partnerSlot.subjectName}' 맞교환 (${partnerSlot.classCode} 학급 내 스왑)`,
-            badgeLabel: isImmediate ? '★ 동일학반 즉시교체' : '★ 동일학반 교과담당',
-            badgeColor: isImmediate ? 'bg-indigo-600 text-white' : 'bg-purple-600 text-white',
+            badgeLabel,
+            badgeColor,
           });
         }
       }
     });
   });
 
-  // 점수 높은 순 정렬
-  return recommendations.sort((a, b) => b.score - a.score || a.partnerTeacher.localeCompare(b.partnerTeacher, 'ko'));
+  // 🌟 정렬: 동일 교과(1순위) -> 동일 학과(2순위) -> 점수 높은 순 -> 교사명 가나다순
+  return recommendations.sort((a, b) => {
+    if (a.isSameSubject && !b.isSameSubject) return -1;
+    if (!a.isSameSubject && b.isSameSubject) return 1;
+    if (a.isSameDept && !b.isSameDept) return -1;
+    if (!a.isSameDept && b.isSameDept) return 1;
+    return b.score - a.score || a.partnerTeacher.localeCompare(b.partnerTeacher, 'ko');
+  });
 }
 

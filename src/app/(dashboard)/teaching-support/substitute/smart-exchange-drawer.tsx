@@ -130,16 +130,19 @@ export function SmartExchangeDrawer({
     }
   }, [selectedSlotInfo, initialMode]);
 
-  // 실시간 공강 교사 목록 (선택한 날짜와 교시 기준)
+  // 실시간 공강 교사 목록 (선택한 날짜와 교시 기준, 🌟 동일교과 > 동일학과 순서 정렬)
   const availableTeachers = React.useMemo(() => {
     return getAvailableTeachersForSlot(
       sourceDate,
       sourcePeriod,
       timetableData,
       existingApplications,
-      slot.deptName
+      slot.deptName,
+      currentTeacherName,
+      slot.subjectName,
+      slot.classCode
     );
-  }, [sourceDate, sourcePeriod, timetableData, existingApplications, slot.deptName]);
+  }, [sourceDate, sourcePeriod, timetableData, existingApplications, slot.deptName, currentTeacherName, slot.subjectName, slot.classCode]);
 
   // 검색어 필터링된 공강 교사 목록
   const filteredAvailableTeachers = React.useMemo(() => {
@@ -345,7 +348,7 @@ export function SmartExchangeDrawer({
               수업 교체 / 보강 빠른 신청
             </h3>
             <p className="text-[11px] text-slate-300">
-              선택한 수업의 교체 및 대강을 10초 만에 설정합니다.
+              선택한 수업의 교체 및 수업보강을 10초 만에 설정합니다.
             </p>
           </div>
         </div>
@@ -519,14 +522,21 @@ export function SmartExchangeDrawer({
                       </div>
 
                       <div className="flex items-center gap-1.5">
-                        {t.isSameDept && (
+                        {t.isSameSubject ? (
                           <span className={cn(
-                            "text-[9.5px] px-1.5 py-0.5 rounded font-black",
-                            isSelected ? "bg-amber-400 text-slate-950" : "bg-amber-100 text-amber-900"
+                            "text-[9.5px] px-1.5 py-0.5 rounded font-black border",
+                            isSelected ? "bg-blue-200 text-blue-950 border-blue-300" : "bg-blue-100 text-blue-900 border-blue-200"
                           )}>
-                            동일교과군
+                            ★ 동일교과
                           </span>
-                        )}
+                        ) : t.isSameDept ? (
+                          <span className={cn(
+                            "text-[9.5px] px-1.5 py-0.5 rounded font-black border",
+                            isSelected ? "bg-emerald-200 text-emerald-950 border-emerald-300" : "bg-emerald-100 text-emerald-900 border-emerald-200"
+                          )}>
+                            동일학과
+                          </span>
+                        ) : null}
                         <span className={cn(
                           "text-[10px]",
                           isSelected ? "text-indigo-200" : "text-slate-400"
@@ -619,6 +629,7 @@ export function SmartExchangeDrawer({
               currentTeacherName={currentTeacherName}
               timetableData={timetableData}
               existingApplications={existingApplications}
+              calendarConfig={calendarConfig}
               selectedTargetDate={targetDate}
               selectedTargetPeriod={targetPeriod}
               onSelectSlot={(newTargetDate, newTargetDay, newTargetPeriod) => {

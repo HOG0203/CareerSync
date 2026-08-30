@@ -32,6 +32,7 @@ import {
   Check,
   ChevronDown,
   Search,
+  LayoutGrid,
   X
 } from 'lucide-react';
 import {
@@ -55,6 +56,7 @@ interface ClassTimetableViewProps {
   userAssignedGrade?: number;
   userAssignedClass?: string;
   currentUserFullName?: string;
+  tabSelector?: React.ReactNode;
 }
 
 export function ClassTimetableView({
@@ -63,6 +65,7 @@ export function ClassTimetableView({
   userAssignedGrade,
   userAssignedClass,
   currentUserFullName,
+  tabSelector,
 }: ClassTimetableViewProps) {
   const [selectedGrade, setSelectedGrade] = React.useState<number>(1);
   const [selectedDept, setSelectedDept] = React.useState<string>('자동화기계과');
@@ -84,7 +87,6 @@ export function ClassTimetableView({
   // 로그인 교사의 담임반이 있으면 해당 학년, 학과, 반으로 자동 기본 선택
   React.useEffect(() => {
     if (data.classes.length > 0) {
-      // 1) 로그인 교사 이름으로 담임 학급 매칭 (1순위)
       if (currentUserFullName) {
         const cleanName = currentUserFullName.trim();
         const matchedByTeacher = data.classes.find(c => 
@@ -102,7 +104,6 @@ export function ClassTimetableView({
         }
       }
 
-      // 2) 프로필의 assigned_class 또는 assigned_grade로 매칭 (2순위)
       if (userAssignedClass) {
         const cleanUserClass = userAssignedClass.trim();
         const matched = data.classes.find(c => 
@@ -118,7 +119,6 @@ export function ClassTimetableView({
         }
       }
 
-      // 3) 매칭되지 않는 경우 기본 첫 번째 학반
       if (!selectedClassCode || !data.classes.some(c => c.classCode === selectedClassCode)) {
         const firstClass = data.classes[0];
         setSelectedGrade(firstClass.grade);
@@ -130,7 +130,6 @@ export function ClassTimetableView({
 
   const [searchFilter, setSearchFilter] = React.useState<string>('');
 
-  // 학반 빠른 검색 (예: 축31, 조진연, 건31, 기22 등 입력 시 해당 학년/학과/반으로 자동 점프)
   const handleSearchChange = (query: string) => {
     setSearchFilter(query);
     if (!query.trim()) return;
@@ -154,7 +153,6 @@ export function ClassTimetableView({
     setSearchFilter('');
   };
 
-  // 학년 변경 핸들러
   const handleGradeChange = (gradeStr: string) => {
     const grade = parseInt(gradeStr);
     setSelectedGrade(grade);
@@ -169,7 +167,6 @@ export function ClassTimetableView({
     }
   };
 
-  // 학과 변경 핸들러
   const handleDeptChange = (dept: string) => {
     setSelectedDept(dept);
     const deptClasses = data.classes.filter(c => c.grade === selectedGrade && c.deptName === dept).sort((a, b) => a.classNum - b.classNum);
@@ -178,7 +175,6 @@ export function ClassTimetableView({
     }
   };
 
-  // 반 변경 핸들러
   const handleClassChange = (classCode: string) => {
     setSelectedClassCode(classCode);
   };
@@ -187,7 +183,6 @@ export function ClassTimetableView({
     return data.classes.find(c => c.classCode === selectedClassCode) || data.classes[0];
   }, [data, selectedClassCode]);
 
-  // 연속 수업(블록타임) rowSpan 셀 병합 계산
   const classDaySpans = React.useMemo(() => {
     const map: Record<string, Record<number, { shouldRender: boolean; rowSpan: number; slot?: TimetableSlot; isBlock: boolean; totalBlockPeriods: number }>> = {};
 
@@ -202,7 +197,6 @@ export function ClassTimetableView({
           continue;
         }
 
-        // 다음 교시들이 연속 수업인지 확인
         let count = 1;
         let nextP = p + 1;
         while (nextP <= d.periods) {
@@ -236,43 +230,25 @@ export function ClassTimetableView({
   const classDetail = selectedClass ? parseClassCode(selectedClass.classCode) : null;
 
   return (
-    <div className="space-y-4">
-      {/* 1. 학반 빠른 검색 + 학년/학과/반 3단 연동 드롭다운 필터 바 (인쇄 시 숨김) */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm print:hidden">
-        <div className="flex items-center gap-3 flex-wrap flex-1">
-          {/* 학반 / 담임교사 빠른 검색창 */}
-          <div className="relative w-full sm:w-[220px]">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="학반, 담임 검색 (예: 축31, 조진연)..."
-              value={searchFilter}
-              onChange={e => handleSearchChange(e.target.value)}
-              className="pl-9 pr-8 h-9 text-xs bg-slate-50/70 border-slate-200 rounded-xl"
-            />
-            {searchFilter && (
-              <button
-                type="button"
-                onClick={handleClearSearch}
-                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-700"
-                title="검색어 지우기"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
+    <div className="space-y-3">
+      {/* 1. 단일 통합 컨트롤 바 (탭 + 학년/학과/반 캡슐 + 검색 + 인쇄) */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 shadow-2xs print:hidden">
+        <div className="flex items-center flex-wrap gap-2 flex-1">
+          {/* 탭 전환기 */}
+          {tabSelector}
 
           <div className="h-5 w-[1px] bg-slate-200 hidden sm:block" />
 
-          {/* 1) 학년 선택 드롭다운 */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-black text-slate-500 whitespace-nowrap">학년:</span>
+          {/* 학년 선택 캡슐 */}
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 rounded-xl px-2.5 py-1">
+            <GraduationCap className="h-3.5 w-3.5 text-blue-600 shrink-0" />
             <Select value={String(selectedGrade)} onValueChange={handleGradeChange}>
-              <SelectTrigger className="w-[105px] h-9 text-xs font-black bg-indigo-50/60 border-indigo-200 text-indigo-950 rounded-xl">
-                <SelectValue />
+              <SelectTrigger className="w-[75px] h-7 text-xs font-bold border-none bg-transparent shadow-none focus:ring-0 px-0">
+                <SelectValue placeholder="학년 선택" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="rounded-xl shadow-lg border-slate-200">
                 {[1, 2, 3].map(g => (
-                  <SelectItem key={g} value={String(g)} className="text-xs font-bold">
+                  <SelectItem key={g} value={String(g)} className="text-xs font-medium py-1.5">
                     {g}학년
                   </SelectItem>
                 ))}
@@ -280,16 +256,16 @@ export function ClassTimetableView({
             </Select>
           </div>
 
-          {/* 2) 학과 선택 드롭다운 */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-black text-slate-500 whitespace-nowrap">학과:</span>
+          {/* 학과 선택 캡슐 */}
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 rounded-xl px-2.5 py-1">
+            <Building2 className="h-3.5 w-3.5 text-blue-600 shrink-0" />
             <Select value={selectedDept} onValueChange={handleDeptChange}>
-              <SelectTrigger className="w-[165px] h-9 text-xs font-black bg-slate-50 border-slate-200 text-slate-800 rounded-xl">
+              <SelectTrigger className="w-[130px] sm:w-[150px] h-7 text-xs font-bold border-none bg-transparent shadow-none focus:ring-0 px-0 truncate">
                 <SelectValue placeholder="학과 선택" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="rounded-xl shadow-lg border-slate-200">
                 {availableDepts.map(d => (
-                  <SelectItem key={d} value={d} className="text-xs font-bold">
+                  <SelectItem key={d} value={d} className="text-xs font-medium py-1.5">
                     {d}
                   </SelectItem>
                 ))}
@@ -297,21 +273,43 @@ export function ClassTimetableView({
             </Select>
           </div>
 
-          {/* 3) 반 선택 드롭다운 */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-black text-slate-500 whitespace-nowrap">반:</span>
+          {/* 반 선택 캡슐 */}
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 rounded-xl px-2.5 py-1">
+            <LayoutGrid className="h-3.5 w-3.5 text-blue-600 shrink-0" />
             <Select value={selectedClassCode} onValueChange={handleClassChange}>
-              <SelectTrigger className="w-[145px] h-9 text-xs font-black bg-indigo-50/60 border-indigo-200 text-indigo-950 rounded-xl">
+              <SelectTrigger className="w-[95px] h-7 text-xs font-bold border-none bg-transparent shadow-none focus:ring-0 px-0">
                 <SelectValue placeholder="반 선택" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="rounded-xl shadow-lg border-slate-200">
                 {availableClasses.map(c => (
-                  <SelectItem key={c.classCode} value={c.classCode} className="text-xs font-bold">
+                  <SelectItem key={c.classCode} value={c.classCode} className="text-xs font-medium py-1.5">
                     {c.classNum}반 ({c.classCode})
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* 학반/교사 검색 캡슐 */}
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 rounded-xl px-2.5 py-1 flex-1 max-w-xs">
+            <Search className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="학반, 담임 검색..."
+              value={searchFilter}
+              onChange={e => handleSearchChange(e.target.value)}
+              className="w-full h-7 text-xs bg-transparent border-none outline-none text-slate-800 placeholder:text-slate-400"
+            />
+            {searchFilter && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                className="text-slate-400 hover:text-slate-700"
+                title="검색어 지우기"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -320,60 +318,51 @@ export function ClassTimetableView({
           variant="outline"
           size="sm"
           onClick={handlePrint}
-          className="h-9 text-xs font-bold gap-1.5 border-slate-200 hover:bg-slate-50 text-slate-700 shadow-2xs self-end md:self-auto"
+          className="h-8 text-xs font-bold gap-1.5 rounded-xl border-slate-200/80 hover:bg-slate-50 text-slate-700 shadow-2xs shrink-0"
         >
-          <Printer className="h-4 w-4 text-slate-500" />
-          학반 시간표 A4 인쇄
+          <Printer className="h-3.5 w-3.5 text-slate-500" />
+          A4 인쇄
         </Button>
       </div>
 
-      {/* 2. 선택된 학반 헤더 배너 (인쇄 시에도 표시) */}
-      {selectedClass && (
-        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-5 rounded-2xl shadow-md border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-300 shadow-inner">
-              <Building2 className="h-6 w-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-lg sm:text-xl font-black text-white tracking-tight">
+      {/* 2. 메인 시간표 카드 (상단 인라인 학반 헤더 + 바둑판 테이블) */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden print:border-none print:shadow-none">
+        {/* 카드 상단 인라인 학반 헤더 바 */}
+        {selectedClass && (
+          <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <span className="text-base font-black text-slate-900">
                   {classDetail?.displayName || selectedClass.displayName}
-                </h3>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-indigo-500 text-white shadow-sm">
+                </span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   {selectedClass.classCode}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-1 flex items-center gap-2.5 flex-wrap">
-                <span>{data.academicYear}학년도 {data.semester}학기</span>
-                {data.effectiveDate && <span>({data.effectiveDate})</span>}
-                {selectedClass.homeroomTeacher ? (
-                  <span className="inline-flex items-center gap-1 text-indigo-300 font-bold bg-white/10 px-2 py-0.5 rounded-md">
-                    <User className="h-3 w-3 text-indigo-400" />
-                    담임교사: {selectedClass.homeroomTeacher} 선생님
-                  </span>
-                ) : (
-                  <span className="text-slate-500">담임교사 미지정</span>
-                )}
-              </p>
+
+              {selectedClass.homeroomTeacher ? (
+                <span className="inline-flex items-center gap-1 text-xs text-emerald-700 font-bold bg-emerald-50/80 px-2 py-0.5 rounded-md border border-emerald-100">
+                  <User className="h-3 w-3 text-emerald-600" />
+                  담임: {selectedClass.homeroomTeacher} 선생님
+                </span>
+              ) : (
+                <span className="text-xs text-slate-400">담임 미지정</span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 text-xs text-slate-600 bg-white px-3 py-1 rounded-xl border border-slate-200/80 shadow-2xs self-start sm:self-auto">
+              <Clock className="h-3.5 w-3.5 text-emerald-600" />
+              <span>주당 총 수업: <strong className="text-slate-900 font-black">{selectedClass.totalPeriods}교시</strong></span>
             </div>
           </div>
+        )}
 
-          <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl border border-white/15">
-            <Clock className="h-4 w-4 text-indigo-400" />
-            <div>
-              <span className="text-[10px] text-slate-300 font-bold block">주당 총 수업</span>
-              <span className="text-sm font-black text-white">{selectedClass.totalPeriods}교시</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 3. 메인 주간 5일 시간표 바둑판 테이블 (연속 수업 셀 병합) */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-3 sm:p-5 print:border-none print:shadow-none print:p-0">
-        <div className="w-full overflow-x-auto">
-          <table className="w-full border-collapse text-center min-w-[650px]">
-            <thead>
-              <tr className="bg-slate-100/90 text-slate-700 border-b-2 border-slate-200">
+        {/* 바둑판 테이블 영역 */}
+        <div className="p-3 sm:p-4 overflow-hidden">
+          <div className="w-full overflow-x-auto custom-scrollbar">
+            <table className="w-full border-collapse text-center min-w-[680px]">
+              <thead>
+              <tr className="bg-slate-100/80 text-slate-700 border-b-2 border-slate-200">
                 <th className="py-3 px-2 text-xs font-black w-14 text-slate-500 border-r border-slate-200">
                   교시
                 </th>
@@ -381,7 +370,9 @@ export function ClassTimetableView({
                   <th key={d.key} className="py-3 px-3 text-xs sm:text-sm font-black text-slate-800 border-r last:border-r-0 border-slate-200">
                     <div className="flex items-center justify-center gap-1.5">
                       <span>{d.name}</span>
-                      <span className="text-[10px] font-normal text-slate-400">({d.periods}교시)</span>
+                      <span className="text-[10px] font-bold text-slate-400 bg-slate-200/70 px-1.5 py-0.2 rounded-full">
+                        {d.periods}교시
+                      </span>
                     </div>
                   </th>
                 ))}
@@ -391,27 +382,28 @@ export function ClassTimetableView({
               {[1, 2, 3, 4, 5, 6, 7].map(period => (
                 <tr key={period} className="h-[64px] border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
                   {/* 교시 헤더 */}
-                  <td className="py-2 px-2 text-xs font-black text-slate-500 bg-slate-50/80 border-r border-slate-200 h-full align-middle">
-                    <span className="w-6 h-6 rounded-full bg-white border border-slate-200 shadow-2xs inline-flex items-center justify-center">
+                  <td className="py-2 px-2 text-xs font-black text-slate-600 bg-slate-50/80 border-r border-slate-200 h-full align-middle">
+                    <span className="w-7 h-7 rounded-full bg-white border border-slate-200/90 shadow-2xs inline-flex items-center justify-center font-black text-slate-700">
                       {period}
                     </span>
                   </td>
 
                   {/* 요일별 슬롯 카드 (연속수업 셀 병합 렌더링) */}
                   {DAYS_OF_WEEK.map(d => {
-                    if (period > d.periods) {
+                    const spanInfo = classDaySpans[d.key]?.[period];
+                    const hasActiveSlot = Boolean(spanInfo?.slot && (spanInfo.slot.subjectName || spanInfo.slot.teacherName));
+
+                    if (period > d.periods && !hasActiveSlot) {
                       return (
-                        <td key={d.key} className="p-1.5 border-r last:border-r-0 border-slate-200 bg-slate-50/40 h-full align-middle">
-                          <div className="h-full min-h-[52px] rounded-xl border border-dashed border-slate-200 flex items-center justify-center text-[10.5px] text-slate-300 italic">
+                        <td key={d.key} className="p-1.5 border-r last:border-r-0 border-slate-200/80 bg-slate-50/40 h-full align-middle">
+                          <div className="h-full min-h-[52px] rounded-2xl border border-dashed border-slate-200 flex items-center justify-center text-[10.5px] text-slate-300 italic">
                             -
                           </div>
                         </td>
                       );
                     }
 
-                    const spanInfo = classDaySpans[d.key]?.[period];
                     if (!spanInfo || !spanInfo.shouldRender) {
-                      // 이전 교시 셀에 병합되어 렌더링 생략
                       return null;
                     }
 
@@ -419,10 +411,10 @@ export function ClassTimetableView({
 
                     if (!slot || (!slot.subjectName && !slot.teacherName)) {
                       return (
-                        <td key={d.key} rowSpan={spanInfo.rowSpan} className="p-1.5 border-r last:border-r-0 border-slate-200 align-middle h-full">
+                        <td key={d.key} rowSpan={spanInfo.rowSpan} className="p-1.5 border-r last:border-r-0 border-slate-200/80 align-middle h-full">
                           <div 
                             style={{ minHeight: `${spanInfo.rowSpan * 64 - 12}px` }}
-                            className="h-full w-full rounded-xl border border-slate-100 bg-slate-50/30 flex items-center justify-center text-[11px] text-slate-300 font-medium"
+                            className="h-full w-full rounded-2xl border border-slate-100 bg-slate-50/40 flex items-center justify-center text-[11px] text-slate-300 font-medium"
                           >
                             공강
                           </div>
@@ -439,7 +431,7 @@ export function ClassTimetableView({
                       <td 
                         key={d.key} 
                         rowSpan={spanInfo.rowSpan} 
-                        className="p-1.5 border-r last:border-r-0 border-slate-200 align-middle h-full"
+                        className="p-1.5 border-r last:border-r-0 border-slate-200/80 align-middle h-full"
                       >
                         <TooltipProvider>
                           <Tooltip delayDuration={100}>
@@ -447,13 +439,13 @@ export function ClassTimetableView({
                               <div
                                 style={{ minHeight: `${spanInfo.rowSpan * 64 - 12}px` }}
                                 className={cn(
-                                  "w-full h-full p-2 rounded-xl border-[1.5px] transition-all flex flex-col items-center text-center shadow-xs cursor-pointer hover:shadow-md hover:scale-[1.01]",
+                                  "w-full h-full p-2 rounded-2xl border-[1.5px] transition-all flex flex-col items-center text-center shadow-2xs cursor-pointer hover:shadow-md hover:scale-[1.01]",
                                   isMergedBlock 
                                     ? "justify-center py-3 gap-2" 
                                     : "justify-between py-1.5 gap-1",
                                   actInfo.style.bg,
                                   actInfo.style.border,
-                                  isHomeroomTeacher && "ring-2 ring-indigo-600 ring-offset-1 font-bold border-indigo-500"
+                                  isHomeroomTeacher && "ring-2 ring-emerald-600 ring-offset-1 font-bold border-emerald-500"
                                 )}
                               >
                                 {/* 과목명 */}
@@ -467,10 +459,10 @@ export function ClassTimetableView({
                                 {slot.teacherName && (
                                   <div className="flex items-center justify-center gap-1 flex-wrap">
                                     <span className={cn(
-                                      "inline-flex items-center gap-0.5 rounded-md font-bold shadow-2xs",
+                                      "inline-flex items-center gap-0.5 rounded-lg font-bold shadow-2xs",
                                       isMergedBlock ? "text-xs px-2.5 py-1" : "text-[10.5px] px-2 py-0.5",
                                       isHomeroomTeacher 
-                                        ? "bg-indigo-600 text-white font-black" 
+                                        ? "bg-emerald-600 text-white font-black" 
                                         : "bg-slate-100 text-slate-700 border border-slate-200"
                                     )}>
                                       <User className="h-2.5 w-2.5 opacity-70" />
@@ -480,8 +472,8 @@ export function ClassTimetableView({
                                 )}
                               </div>
                             </TooltipTrigger>
-                            <TooltipContent side="top" className="bg-slate-900 text-white text-xs p-2.5 rounded-xl shadow-xl space-y-1">
-                              <p className="font-bold text-indigo-300 flex items-center gap-1">
+                            <TooltipContent side="top" className="bg-slate-900 text-white text-xs p-3 rounded-2xl shadow-xl space-y-1">
+                              <p className="font-bold text-emerald-300 flex items-center gap-1">
                                 <User className="h-3.5 w-3.5" />
                                 담당 교사: {slot.teacherName} 선생님
                               </p>
@@ -508,15 +500,15 @@ export function ClassTimetableView({
         </div>
 
         {/* 하단 안내 바 */}
-        <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 print:hidden">
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="font-bold text-slate-600 flex items-center gap-1">
-              <Info className="h-3.5 w-3.5 text-slate-400" /> 교사 뱃지 안내:
+        <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-[11px] text-slate-500 print:hidden">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="font-bold text-slate-700 flex items-center gap-1">
+              <Info className="h-3.5 w-3.5 text-emerald-600" /> 교사 뱃지 안내:
             </span>
-            <span className="inline-flex items-center gap-1 bg-indigo-600 text-white px-2 py-0.5 rounded-md font-bold text-[10px]">
-              담임 교사 수업 (인디고 뱃지)
+            <span className="inline-flex items-center gap-1 bg-emerald-600 text-white px-2 py-0.5 rounded-lg font-bold text-[10px]">
+              담임 교사 수업 (에메랄드 뱃지)
             </span>
-            <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-md font-bold text-[10px]">
+            <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-lg font-bold text-[10px]">
               교과 교사 수업
             </span>
           </div>
@@ -527,5 +519,6 @@ export function ClassTimetableView({
         </div>
       </div>
     </div>
+  </div>
   );
 }

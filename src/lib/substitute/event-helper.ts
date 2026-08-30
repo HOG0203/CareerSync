@@ -7,9 +7,76 @@ import {
   AcademicCalendarConfig, 
   SchoolEvent, 
   VacationPeriod, 
+  SpecialDaySchedule,
+  ExamPeriod,
   DEFAULT_ACADEMIC_CALENDAR_2026_2 
 } from './event-types';
 import { SemesterWeek } from './validator';
+
+/**
+ * 특정 일자가 지필평가/시험 기간에 속하는지 검사
+ */
+export function getExamPeriodForDate(
+  dateStr: string,
+  config: AcademicCalendarConfig = DEFAULT_ACADEMIC_CALENDAR_2026_2
+): ExamPeriod | null {
+  if (!dateStr || !config.examPeriods) return null;
+  return config.examPeriods.find(e => dateStr >= e.startDate && dateStr <= e.endDate) || null;
+}
+
+/**
+ * 특정 일자, 교시에 해당하는 시험 슬롯 상태 조회 (시험 진행 중 vs 시험 후 하교 vs 해당 없음)
+ * 일자별 개별 교시 설정(dailySchedules)이 있으면 해당 일자 전용 교시를 우선 적용합니다.
+ */
+export function getExamSlotInfo(
+  dateStr: string,
+  period: number,
+  classCode?: string,
+  config: AcademicCalendarConfig = DEFAULT_ACADEMIC_CALENDAR_2026_2
+): { isExamPeriod: boolean; isExamRunning: boolean; isDismissed: boolean; exam: ExamPeriod } | null {
+  const exam = getExamPeriodForDate(dateStr, config);
+  if (!exam) return null;
+
+  // 학반 학년 검사 (특정 학년만 시험인 경우)
+  let grade = 0;
+  if (classCode) {
+    const match = classCode.match(/\d/);
+    if (match) grade = parseInt(match[0], 10);
+  }
+
+  if (grade > 0 && exam.targetGrades && exam.targetGrades.length > 0) {
+    if (!exam.targetGrades.includes(grade)) {
+      return null;
+    }
+  }
+
+  // 🌟 일자별 개별 교시 설정 조회
+  const daily = exam.dailySchedules?.find(d => d.date === dateStr);
+  const effectivePeriods = daily?.examPeriods || exam.examPeriods || [1, 2, 3];
+  const effectiveAfternoonType = daily?.afternoonType || exam.afternoonType || 'dismiss';
+
+  const isExamRunning = effectivePeriods.includes(period);
+  const maxExamPeriod = effectivePeriods.length > 0 ? Math.max(...effectivePeriods) : 3;
+  const isDismissed = !isExamRunning && effectiveAfternoonType === 'dismiss' && period > maxExamPeriod;
+
+  return {
+    isExamPeriod: true,
+    isExamRunning,
+    isDismissed,
+    exam,
+  };
+}
+
+/**
+ * 특정 일자에 대체 요일 시간표가 설정되어 있는지 검사 (예: 9월 9일 수요일에 '월요일' 시간표 적용)
+ */
+export function getSpecialDaySchedule(
+  dateStr: string,
+  config: AcademicCalendarConfig = DEFAULT_ACADEMIC_CALENDAR_2026_2
+): SpecialDaySchedule | null {
+  if (!dateStr || !config.specialDaySchedules) return null;
+  return config.specialDaySchedules.find(s => s.date === dateStr) || null;
+}
 
 /**
  * 특정 일자가 방학 또는 휴업일에 속하는지 검사
@@ -51,12 +118,17 @@ export function getEventsForSlot(
     if (ev.date !== dateStr) return false;
     if (!ev.periods.includes(period)) return false;
 
-    // 2. 행사 담당 교사인지 검사
-    if (teacherName && ev.inChargeTeachers?.includes(teacherName)) {
-      return true;
+    // 2. 교사 개인 시간표 조회 시 (teacherName이 전달된 경우):
+    if (teacherName) {
+      // 해당 행사의 담당/인솔 교사 목록에 포함되어 있을 때만 해당 교사의 행사 수업으로 배정
+      if (ev.inChargeTeachers && ev.inChargeTeachers.length > 0) {
+        return ev.inChargeTeachers.includes(teacherName);
+      }
+      // 담당/인솔 교사가 지정되지 않은 행사는 어떤 교사에게도 개인 담당 수업으로 배정되지 않음
+      return false;
     }
 
-    // 3. 대상 범위(Scope) 검사
+    // 3. 학급 시간표 조회 시 (teacherName이 전달되지 않은 경우): 대상 범위(Scope) 검사
     if (ev.targetScope === 'all') return true;
 
     if (ev.targetScope === 'grade') {
@@ -66,6 +138,38 @@ export function getEventsForSlot(
     if (ev.targetScope === 'class') {
       if (classCode && ev.targetClasses?.includes(classCode)) return true;
     }
+
+    return false;
+  });
+}
+
+/**
+ * 특정 일자, 교시, 학급(classCode)의 학생들이 참여 중인 행사 조회 (교사 인솔 여부와 무관하게 학급 자체의 행사 여부 확인)
+ */
+export function getClassEventsForSlot(
+  dateStr: string,
+  period: number,
+  classCode?: string,
+  config: AcademicCalendarConfig = DEFAULT_ACADEMIC_CALENDAR_2026_2
+): SchoolEvent[] {
+  if (!dateStr || !config.events || !classCode) return [];
+
+  let grade = 0;
+  const match = classCode.match(/\d/);
+  if (match) {
+    const firstDigit = parseInt(match[0]);
+    if (firstDigit >= 1 && firstDigit <= 3) {
+      grade = firstDigit;
+    }
+  }
+
+  return config.events.filter(ev => {
+    if (ev.date !== dateStr) return false;
+    if (!ev.periods.includes(period)) return false;
+
+    if (ev.targetScope === 'all') return true;
+    if (ev.targetScope === 'grade' && grade > 0 && ev.targetGrades?.includes(grade)) return true;
+    if (ev.targetScope === 'class' && ev.targetClasses?.includes(classCode)) return true;
 
     return false;
   });

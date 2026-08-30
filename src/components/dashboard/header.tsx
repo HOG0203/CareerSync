@@ -60,7 +60,9 @@ const ROUTE_MAP: Record<string, { group: string; label: string }> = {
   '/student/certification': { group: '나의 학교생활', label: '옥저인재인증 평가표' },
   '/student/merit-demerit': { group: '나의 학교생활', label: '상벌점 내역 조회' },
   '/student-accounts': { group: '학생 및 생활지도', label: '학생 계정 관리' },
-
+  '/teaching-support/timetable': { group: '교수학습지원', label: '시간표 조회/관리' },
+  '/teaching-support/substitute': { group: '교수학습지원', label: '결보강 처리' },
+  '/teaching-support/substitute/admin': { group: '교수학습지원', label: '결보강 승인/관리' },
 };
 
 

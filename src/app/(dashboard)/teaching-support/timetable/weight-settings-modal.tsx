@@ -94,17 +94,17 @@ export function WeightSettingsModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md w-[95vw] rounded-2xl p-0 overflow-hidden shadow-2xl border-0">
-        <DialogHeader className="px-6 pt-6 pb-4 bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white">
+      <DialogContent className="max-w-md w-[95vw] rounded-3xl p-0 overflow-hidden shadow-2xl border-0">
+        <DialogHeader className="px-6 pt-6 pb-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-white/10 backdrop-blur-md rounded-xl text-indigo-300">
+            <div className="p-2.5 bg-indigo-600/40 border border-indigo-500/40 backdrop-blur-md rounded-2xl text-indigo-300 shadow-inner">
               <Scale className="h-5 w-5" />
             </div>
             <div>
               <DialogTitle className="text-lg font-black text-white flex items-center gap-2">
                 수업시수 가중치 설정
               </DialogTitle>
-              <DialogDescription className="text-indigo-200/80 text-xs mt-0.5">
+              <DialogDescription className="text-slate-300 text-xs mt-0.5">
                 활동별 1교시당 인정되는 시수 배율을 설정합니다.
               </DialogDescription>
             </div>
@@ -112,19 +112,19 @@ export function WeightSettingsModal({
         </DialogHeader>
 
         <div className="p-6 space-y-4 bg-slate-50/50">
-          <div className="p-3 bg-indigo-50/80 rounded-xl border border-indigo-100 text-xs text-indigo-900 flex items-start gap-2.5">
+          <div className="p-3.5 bg-indigo-50/80 rounded-2xl border border-indigo-100 text-xs text-indigo-900 flex items-start gap-2.5 shadow-2xs">
             <Sparkles className="h-4 w-4 text-indigo-600 shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <p className="font-bold">시수 가중치 계산 원리</p>
+              <p className="font-black text-indigo-950">시수 가중치 계산 원리</p>
               <p className="text-slate-600 leading-relaxed text-[11.5px]">
                 각 활동의 시간표 1교시당 아래 설정된 가중치를 곱하여 교사의 주당 <strong>[인정 시수]</strong>를 자동으로 계산합니다.
               </p>
             </div>
           </div>
 
-          <div className="space-y-3 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+          <div className="space-y-3 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
             {/* 자율활동 */}
-            <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-slate-100">
+            <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-100">
               <div>
                 <Label className="text-xs font-black text-slate-800 flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" />
@@ -140,14 +140,14 @@ export function WeightSettingsModal({
                   max="5"
                   value={weights['자율'] ?? 1.5}
                   onChange={e => handleChange('자율', e.target.value)}
-                  className="h-8 text-xs text-right font-black text-purple-700 bg-purple-50/50 border-purple-200"
+                  className="h-8 text-xs text-right font-black text-purple-700 bg-purple-50/60 border-purple-200 rounded-xl"
                 />
                 <span className="text-xs font-bold text-slate-500">배</span>
               </div>
             </div>
 
             {/* 동아리 */}
-            <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-slate-100">
+            <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-100">
               <div>
                 <Label className="text-xs font-black text-slate-800 flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
@@ -163,14 +163,14 @@ export function WeightSettingsModal({
                   max="5"
                   value={weights['동아'] ?? 0.5}
                   onChange={e => handleChange('동아', e.target.value)}
-                  className="h-8 text-xs text-right font-black text-amber-700 bg-amber-50/50 border-amber-200"
+                  className="h-8 text-xs text-right font-black text-amber-700 bg-amber-50/60 border-amber-200 rounded-xl"
                 />
                 <span className="text-xs font-bold text-slate-500">배</span>
               </div>
             </div>
 
             {/* 진로활동 */}
-            <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-slate-100">
+            <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-100">
               <div>
                 <Label className="text-xs font-black text-slate-800 flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
@@ -186,7 +186,7 @@ export function WeightSettingsModal({
                   max="5"
                   value={weights['진로'] ?? 1.0}
                   onChange={e => handleChange('진로', e.target.value)}
-                  className="h-8 text-xs text-right font-black text-emerald-700 bg-emerald-50/50 border-emerald-200"
+                  className="h-8 text-xs text-right font-black text-emerald-700 bg-emerald-50/60 border-emerald-200 rounded-xl"
                 />
                 <span className="text-xs font-bold text-slate-500">배</span>
               </div>
@@ -209,7 +209,7 @@ export function WeightSettingsModal({
                   max="5"
                   value={weights['성직'] ?? 1.0}
                   onChange={e => handleChange('성직', e.target.value)}
-                  className="h-8 text-xs text-right font-black text-cyan-700 bg-cyan-50/50 border-cyan-200"
+                  className="h-8 text-xs text-right font-black text-cyan-700 bg-cyan-50/60 border-cyan-200 rounded-xl"
                 />
                 <span className="text-xs font-bold text-slate-500">배</span>
               </div>
@@ -217,13 +217,13 @@ export function WeightSettingsModal({
           </div>
         </div>
 
-        <DialogFooter className="px-6 py-4 bg-slate-100/80 border-t flex items-center justify-between">
+        <DialogFooter className="px-6 py-4 bg-slate-50 border-t flex items-center justify-between">
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={handleReset}
-            className="text-xs text-slate-500 hover:text-slate-900 gap-1.5"
+            className="text-xs text-slate-500 hover:text-slate-900 gap-1.5 rounded-xl"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             기본값 복원
@@ -235,7 +235,7 @@ export function WeightSettingsModal({
               variant="outline"
               size="sm"
               onClick={onClose}
-              className="text-xs font-bold"
+              className="text-xs font-bold rounded-xl"
             >
               취소
             </Button>
@@ -244,7 +244,7 @@ export function WeightSettingsModal({
               size="sm"
               onClick={handleSave}
               disabled={isSaving}
-              className="text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 shadow-sm"
+              className="text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 shadow-sm rounded-xl"
             >
               <Check className="h-4 w-4" />
               {isSaving ? '저장 중...' : '설정 저장'}

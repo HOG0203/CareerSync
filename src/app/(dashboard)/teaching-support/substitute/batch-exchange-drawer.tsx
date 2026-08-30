@@ -22,7 +22,9 @@ import {
   MultiSlotAvailableTeacher,
   getSmartExchangeRecommendations,
   ExchangeRecommendation,
-  getDateForDayInSameWeek
+  getDateForDayInSameWeek,
+  checkIsSameSubject,
+  checkIsSameDept
 } from '@/lib/substitute/validator';
 import { SelectedSlotItem } from './interactive-teacher-timetable';
 import { Button } from '@/components/ui/button';
@@ -68,6 +70,10 @@ import {
   generateSemesterWeeksFromConfig, 
   findCurrentWeekNum,
   getEventsForSlot,
+  getClassEventsForSlot,
+  getSpecialDaySchedule,
+  getExamPeriodForDate,
+  getExamSlotInfo,
   getVacationForDate
 } from '@/lib/substitute/event-helper';
 import { SemesterWeek } from '@/lib/substitute/validator';
@@ -392,14 +398,14 @@ export function BatchExchangeDrawer({
   }, [items, currentTeacherName, timetableData, existingApplications]);
 
   // 다교시 일괄 맞교환 파트너 교사 정밀 판별 & 랭킹 (오직 동일 학반 SAME_CLASS 맞교환만 추천 및 허용!)
-  // [필수 조건 1]: 파트너 교사는 선택된 모든 신청 교시(예: 화 5교시)에 100% 동시에 공강이어야만 함!
-  // [필수 조건 2]: 파트너 교사는 신청자와 동일한 학반(SAME_CLASS) 수업을 실제로 보유하고 있어야만 함!
+  // 🌟 추천 순위: 동일교과(1순위) > 동일학과(2순위) > 동일학반 교체 가능 시수 많은 순
   const topPartnerRecommendations = React.useMemo(() => {
     if (items.length === 0) return [];
 
     const validPartners: {
       partnerTeacher: string;
       homeroomClass?: string;
+      isSameSubject: boolean;
       isSameDept: boolean;
       isFreeOnAllSource: boolean;
       totalScore: number;
@@ -410,6 +416,7 @@ export function BatchExchangeDrawer({
     }[] = [];
 
     const targetClassCodes = new Set(items.map(i => i.classCode).filter(Boolean));
+    const firstItem = items[0];
 
     timetableData.teachers.forEach(partner => {
       if (partner.teacherName === currentTeacherName) return;
@@ -463,16 +470,15 @@ export function BatchExchangeDrawer({
 
       // 동일 학반 수업을 실제로 교체 가능한 선생님만 추천 대상에 진입!
       if (sameClassCount > 0) {
-        const isSameDept = Boolean(
-          items[0]?.deptName &&
-          (partner.remarks?.includes(items[0].deptName) || partner.homeroomClass?.includes(items[0].deptName.charAt(0)))
-        );
+        const isSameSubject = checkIsSameSubject(firstItem?.subjectName, currentTeacher, partner);
+        const isSameDept = checkIsSameDept(firstItem?.deptName, firstItem?.classCode, currentTeacher, partner);
 
-        let partnerScore = sameClassCount * 10 + (isSameDept ? 5 : 0);
+        let partnerScore = sameClassCount * 10 + (isSameSubject ? 100 : 0) + (isSameDept ? 30 : 0);
 
         validPartners.push({
           partnerTeacher: partner.teacherName,
           homeroomClass: partner.homeroomClass,
+          isSameSubject,
           isSameDept,
           isFreeOnAllSource,
           totalScore: partnerScore,
@@ -484,8 +490,14 @@ export function BatchExchangeDrawer({
       }
     });
 
-    // 동일 학반 교체 가능 시수 많은 순 정렬
-    return validPartners.sort((a, b) => b.availableTargetSlotCount - a.availableTargetSlotCount || a.partnerTeacher.localeCompare(b.partnerTeacher, 'ko'));
+    // 🌟 정렬: 동일교과(1순위) -> 동일학과(2순위) -> 동일 학반 교체 가능 시수 많은 순 -> 가나다순
+    return validPartners.sort((a, b) => {
+      if (a.isSameSubject && !b.isSameSubject) return -1;
+      if (!a.isSameSubject && b.isSameSubject) return 1;
+      if (a.isSameDept && !b.isSameDept) return -1;
+      if (!a.isSameDept && b.isSameDept) return 1;
+      return b.availableTargetSlotCount - a.availableTargetSlotCount || a.partnerTeacher.localeCompare(b.partnerTeacher, 'ko');
+    });
   }, [items, timetableData.teachers, currentTeacher, busyTeachersOnDate, baseDate, currentTeacherName, existingApplications]);
 
   // 초기 파트너 교사 자동 세팅
@@ -757,10 +769,10 @@ export function BatchExchangeDrawer({
               </div>
             </div>
 
-            {/* AI 추천 파트너 칩 목록 */}
+            {/* AI 추천 교체 교사 칩 목록 */}
             {topPartnerRecommendations.length > 0 ? (
               <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-indigo-200/60">
-                <span className="text-[10.5px] font-bold text-slate-600 shrink-0">추천 파트너:</span>
+                <span className="text-[10.5px] font-bold text-slate-600 shrink-0">추천 교체 교사:</span>
                 <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
                   {topPartnerRecommendations.map((stat, idx) => (
                     <button
@@ -775,6 +787,21 @@ export function BatchExchangeDrawer({
                       )}
                     >
                       <span className="font-bold">{idx + 1}. {stat.partnerTeacher}</span>
+                      {stat.isSameSubject ? (
+                        <span className={cn(
+                          "text-[8.5px] px-1 py-0.2 rounded font-black",
+                          partnerTeacher === stat.partnerTeacher ? "bg-indigo-800 text-white" : "bg-blue-100 text-blue-800 border border-blue-200"
+                        )}>
+                          동일교과
+                        </span>
+                      ) : stat.isSameDept ? (
+                        <span className={cn(
+                          "text-[8.5px] px-1 py-0.2 rounded font-black",
+                          partnerTeacher === stat.partnerTeacher ? "bg-indigo-800 text-white" : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                        )}>
+                          동일학과
+                        </span>
+                      ) : null}
                       <span className={cn(
                         "text-[9.5px] font-bold px-1 py-0.2 rounded",
                         partnerTeacher === stat.partnerTeacher ? "bg-indigo-700/60 text-indigo-100" : "bg-indigo-50 text-indigo-700"
@@ -875,19 +902,32 @@ export function BatchExchangeDrawer({
                       {DAYS.map(day => {
                         const dayDate = selectedWeek.dates[day] || getDateForDayInSameWeek(baseDate, day);
                         const vacation = getVacationForDate(dayDate, calendarConfig);
+                        const exam = getExamPeriodForDate(dayDate, calendarConfig);
+                        const specialDay = getSpecialDaySchedule(dayDate, calendarConfig);
+
                         return (
                           <th key={day} className="py-1.5 px-1 border-r border-indigo-100 last:border-r-0 w-[19%]">
                             <div className="flex flex-col items-center leading-tight">
-                              <div className="flex items-center gap-1">
-                                <span>{day}요일</span>
+                              <div className="flex items-center gap-1 flex-wrap justify-center">
+                                <span>{specialDay && specialDay.targetDayOfWeek !== day ? `${day}(${specialDay.targetDayOfWeek})` : `${day}요일`}</span>
                                 {vacation && (
-                                  <span className="text-[8.5px] px-1 py-0.2 rounded bg-rose-100 text-rose-800 font-bold">
-                                    {vacation.name}
+                                  <span className="text-[8px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold">
+                                    🌴 {vacation.name}
+                                  </span>
+                                )}
+                                {exam && !vacation && (
+                                  <span className="text-[8px] px-1 py-0.2 rounded bg-rose-100 text-rose-800 font-bold">
+                                    📝 시험
+                                  </span>
+                                )}
+                                {specialDay && (
+                                  <span className="text-[8px] px-1 py-0.2 rounded bg-indigo-100 text-indigo-800 font-bold">
+                                    🔄 {specialDay.targetDayOfWeek !== day ? `${specialDay.targetDayOfWeek}수업` : '교시변형'}
                                   </span>
                                 )}
                               </div>
                               {dayDate && (
-                                <span className="text-[9px] font-medium text-indigo-600/80">
+                                <span className="text-[9px] font-mono text-indigo-600/80 font-bold">
                                   {dayDate.slice(5).replace('-', '/')}
                                 </span>
                               )}
@@ -908,6 +948,25 @@ export function BatchExchangeDrawer({
                             const targetDate = selectedWeek.dates[day] || getDateForDayInSameWeek(baseDate, day);
                             const vacation = getVacationForDate(targetDate, calendarConfig);
                             const isHoliday = Boolean(vacation);
+                            const specialDay = getSpecialDaySchedule(targetDate, calendarConfig);
+                            const effectiveDay = specialDay ? specialDay.targetDayOfWeek : day;
+                            const effectivePeriod = specialDay?.periodOverrides?.[period] ?? period;
+
+                            // 파트너 슬롯 상태 분석
+                            const pSlot = partnerTeacherSummary?.slots[`${effectiveDay}_${effectivePeriod}`];
+                            const pHasClass = Boolean(pSlot && pSlot.subjectName && pSlot.subjectName.trim() !== '' && pSlot.subjectName !== '-' && pSlot.subjectName !== '공강');
+
+                            // 지필평가 / 시험 기간 검사
+                            const examInfo = getExamSlotInfo(targetDate, period, pSlot?.classCode, calendarConfig);
+                            const isExamRunning = Boolean(examInfo?.isExamRunning);
+                            const isExamDismissed = Boolean(examInfo?.isDismissed);
+
+                            // 단축수업으로 인한 수업 없음 검사
+                            const isShortenedDismissed = Boolean(specialDay?.shortenedPeriods && period > specialDay.shortenedPeriods);
+
+                            // 학급 행사 검사
+                            const partnerClassEvents = pSlot?.classCode ? getClassEventsForSlot(targetDate, period, pSlot.classCode, calendarConfig) : [];
+                            const isClassEventRunning = partnerClassEvents.length > 0;
                             
                             // 이 슬롯이 현재 선택된 슬롯인지 확인
                             const matchedItemIdx = items.findIndex(it => 
@@ -916,10 +975,6 @@ export function BatchExchangeDrawer({
                               it.targetTeacher === partnerTeacher
                             );
                             const isSelected = matchedItemIdx !== -1;
-
-                            // 파트너 슬롯 상태 분석
-                            const pSlot = partnerTeacherSummary?.slots[`${day}_${period}`];
-                            const pHasClass = Boolean(pSlot && pSlot.subjectName && pSlot.subjectName.trim() !== '' && pSlot.subjectName !== '-' && pSlot.subjectName !== '공강');
 
                             // 학교 행사 / 학사일정 검사
                             const pEvents = getEventsForSlot(targetDate, period, pSlot?.classCode, partnerTeacher, calendarConfig);
@@ -937,13 +992,13 @@ export function BatchExchangeDrawer({
                             const isPartnerBusyWithApp = Boolean(pActiveApp);
 
                             // 내가 그 시간에 수업 / 일정 충돌이 있는지 검사
-                            const mySlot = currentTeacher?.slots[`${day}_${period}`];
+                            const mySlot = currentTeacher?.slots[`${effectiveDay}_${effectivePeriod}`];
                             const myHasClass = Boolean(mySlot && mySlot.subjectName && mySlot.subjectName.trim() !== '' && mySlot.subjectName !== '-' && mySlot.subjectName !== '공강');
                             const myIsBusy = busyTeachersOnDate.get(`${targetDate}_${period}`)?.has(currentTeacherName);
                             const myEvents = getEventsForSlot(targetDate, period, mySlot?.classCode, currentTeacherName, calendarConfig);
                             const myHasEvent = myEvents.length > 0;
                             
-                            const isConflict = myHasClass || myIsBusy || isPartnerBusyWithApp || isHoliday || myHasEvent;
+                            const isConflict = myHasClass || myIsBusy || isPartnerBusyWithApp || isHoliday || myHasEvent || isExamRunning || isExamDismissed || isClassEventRunning || isShortenedDismissed;
                             const isSameClass = pHasClass && items.some(i => i.classCode && pSlot?.classCode === i.classCode);
                             const isClickable = !isConflict && isSameClass;
 
@@ -963,6 +1018,12 @@ export function BatchExchangeDrawer({
                                       ? "bg-indigo-600 text-white border-indigo-600 font-bold ring-2 ring-indigo-600/40 shadow-xs z-10 cursor-pointer"
                                       : isHoliday
                                       ? "bg-rose-50/70 text-rose-700 border-rose-200 cursor-not-allowed opacity-60"
+                                      : isExamRunning
+                                      ? "bg-rose-50 text-rose-900 border-rose-200 cursor-not-allowed opacity-80"
+                                      : isExamDismissed
+                                      ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-50"
+                                      : isClassEventRunning
+                                      ? "bg-amber-50 text-amber-800 border-amber-200 cursor-not-allowed opacity-80"
                                       : isPartnerBusyWithApp
                                       ? "bg-amber-50 text-amber-900 border-amber-300 cursor-not-allowed opacity-75"
                                       : pHasEvent
@@ -976,8 +1037,14 @@ export function BatchExchangeDrawer({
                                   title={
                                     isHoliday
                                       ? `[휴업일/공휴일] ${vacation?.name || '휴업일'} - 교체 불가`
+                                      : isExamRunning
+                                      ? `[시험 진행] ${examInfo?.exam.name} - 교체 불가`
+                                      : isExamDismissed
+                                      ? `[시험 후 하교] 수업 없음 - 교체 불가`
+                                      : isClassEventRunning
+                                      ? `[학급 행사] ${partnerClassEvents[0]?.title} - 교체 불가`
                                       : isPartnerBusyWithApp
-                                      ? `[실시간 결보강 반영] ${partnerTeacher} 선생님이 해당 시간에 이미 ${pActiveApp?.it.type === 'substitute' ? '보강(대강)' : '교체'} 배정됨`
+                                      ? `[실시간 결보강 반영] ${partnerTeacher} 선생님이 해당 시간에 이미 ${pActiveApp?.it.type === 'substitute' ? '수업보강' : '교체'} 배정됨`
                                       : pHasEvent
                                       ? `[학교 행사] ${mainEvent.title} (${mainEvent.description || ''})`
                                       : isConflict
@@ -1233,19 +1300,32 @@ export function BatchExchangeDrawer({
                         {DAYS.map(day => {
                           const dayDate = selectedWeek.dates[day] || getDateForDayInSameWeek(baseDate, day);
                           const vacation = getVacationForDate(dayDate, calendarConfig);
+                          const exam = getExamPeriodForDate(dayDate, calendarConfig);
+                          const specialDay = getSpecialDaySchedule(dayDate, calendarConfig);
+
                           return (
                             <th key={day} className="py-1.5 px-1 border-r border-emerald-100 last:border-r-0 w-[19%]">
                               <div className="flex flex-col items-center leading-tight">
-                                <div className="flex items-center gap-1">
-                                  <span>{day}요일</span>
+                                <div className="flex items-center gap-1 flex-wrap justify-center">
+                                  <span>{specialDay && specialDay.targetDayOfWeek !== day ? `${day}(${specialDay.targetDayOfWeek})` : `${day}요일`}</span>
                                   {vacation && (
-                                    <span className="text-[8.5px] px-1 py-0.2 rounded bg-rose-100 text-rose-800 font-bold">
-                                      {vacation.name}
+                                    <span className="text-[8px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold">
+                                      🌴 {vacation.name}
+                                    </span>
+                                  )}
+                                  {exam && !vacation && (
+                                    <span className="text-[8px] px-1 py-0.2 rounded bg-rose-100 text-rose-800 font-bold">
+                                      📝 시험
+                                    </span>
+                                  )}
+                                  {specialDay && (
+                                    <span className="text-[8px] px-1 py-0.2 rounded bg-indigo-100 text-indigo-800 font-bold">
+                                      🔄 {specialDay.targetDayOfWeek !== day ? `${specialDay.targetDayOfWeek}수업` : '교시변형'}
                                     </span>
                                   )}
                                 </div>
                                 {dayDate && (
-                                  <span className="text-[9px] font-medium text-emerald-600/80">
+                                  <span className="text-[9px] font-medium text-emerald-600/80 font-bold">
                                     {dayDate.slice(5).replace('-', '/')}
                                   </span>
                                 )}
@@ -1266,14 +1346,29 @@ export function BatchExchangeDrawer({
                               const targetDate = selectedWeek.dates[day] || getDateForDayInSameWeek(baseDate, day);
                               const vacation = getVacationForDate(targetDate, calendarConfig);
                               const isHoliday = Boolean(vacation);
+                              const specialDay = getSpecialDaySchedule(targetDate, calendarConfig);
+                              const effectiveDay = specialDay ? specialDay.targetDayOfWeek : day;
+                              const effectivePeriod = specialDay?.periodOverrides?.[period] ?? period;
 
-                              const slot = substituteTeacherSummary?.slots[`${day}_${period}`];
+                              const slot = substituteTeacherSummary?.slots[`${effectiveDay}_${effectivePeriod}`];
                               const hasClass = Boolean(slot && slot.subjectName && slot.subjectName.trim() !== '' && slot.subjectName !== '-' && slot.subjectName !== '공강');
                               
+                              // 지필평가/시험 기간 검사
+                              const examInfo = getExamSlotInfo(targetDate, period, slot?.classCode, calendarConfig);
+                              const isExamRunning = Boolean(examInfo?.isExamRunning);
+                              const isExamDismissed = Boolean(examInfo?.isDismissed);
+
+                              // 단축수업으로 인한 수업 없음 검사
+                              const isShortenedDismissed = Boolean(specialDay?.shortenedPeriods && period > specialDay.shortenedPeriods);
+
                               // 학교 행사 검사
                               const subEvents = getEventsForSlot(targetDate, period, slot?.classCode, globalSubstituteTeacher, calendarConfig);
                               const subHasEvent = subEvents.length > 0;
                               const subMainEvent = subEvents[0];
+
+                              // 학급 행사 검사
+                              const subClassEvents = slot?.classCode ? getClassEventsForSlot(targetDate, period, slot.classCode, calendarConfig) : [];
+                              const isClassEventRunning = subClassEvents.length > 0;
 
                               // 실시간 결보강 배정 검사
                               const subActiveApp = existingApplications.flatMap(a => a.items.map(it => ({ app: a, it }))).find(x => 
@@ -1296,9 +1391,15 @@ export function BatchExchangeDrawer({
                                       isTargetSourceSlot
                                         ? "bg-emerald-600 text-white border-emerald-600 font-bold ring-2 ring-emerald-600/40 shadow-xs"
                                         : isHoliday
-                                        ? "bg-rose-50/70 text-rose-700 border-rose-200 opacity-60"
+                                        ? "bg-rose-50/70 text-rose-700 border-rose-200"
+                                        : isExamRunning
+                                        ? "bg-rose-50 text-rose-900 border-rose-200"
+                                        : isExamDismissed || isShortenedDismissed
+                                        ? "bg-slate-100 text-slate-400 border-slate-200"
+                                        : isClassEventRunning
+                                        ? "bg-amber-50 text-amber-800 border-amber-200"
                                         : isSubBusyWithApp
-                                        ? "bg-amber-50 text-amber-900 border-amber-300 opacity-75"
+                                        ? "bg-amber-50 text-amber-900 border-amber-300"
                                         : subHasEvent
                                         ? "bg-purple-50 text-purple-950 border-purple-300"
                                         : hasClass
@@ -1308,8 +1409,10 @@ export function BatchExchangeDrawer({
                                     title={
                                       isHoliday
                                         ? `[휴업일/공휴일] ${vacation?.name || '휴업일'}`
+                                        : isShortenedDismissed
+                                        ? `[단축수업] ${specialDay?.shortenedPeriods}교시 단축으로 수업 없음`
                                         : isSubBusyWithApp
-                                        ? `[실시간 결보강 배정됨] ${subActiveApp?.it.type === 'substitute' ? '보강(대강)' : '교체'} 투입됨`
+                                        ? `[실시간 결보강 배정됨] ${subActiveApp?.it.type === 'substitute' ? '수업보강' : '교체'} 투입됨`
                                         : subHasEvent
                                         ? `[학교 행사] ${subMainEvent.title} (${subMainEvent.description || ''})`
                                         : hasClass

@@ -175,36 +175,36 @@ export function TimetableImportModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl w-[95vw] rounded-2xl p-0 overflow-hidden shadow-2xl border-0">
-        <DialogHeader className="px-6 pt-6 pb-4 bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white">
+      <DialogContent className="max-w-2xl w-[95vw] rounded-3xl p-0 overflow-hidden shadow-2xl border-0">
+        <DialogHeader className="px-6 pt-6 pb-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-white/10 backdrop-blur-md rounded-xl text-blue-300">
+            <div className="p-2.5 bg-indigo-600/40 border border-indigo-500/40 backdrop-blur-md rounded-2xl text-indigo-300 shadow-inner">
               <FileSpreadsheet className="h-5 w-5" />
             </div>
             <div>
               <DialogTitle className="text-lg font-black text-white flex items-center gap-2">
                 전체 교사 시간표 엑셀 업로드
               </DialogTitle>
-              <DialogDescription className="text-blue-200/80 text-xs mt-0.5">
-                로컬의 전체교사시간표 엑셀 파일을 업로드하여 시간표 DB를 일괄 구축합니다.
+              <DialogDescription className="text-slate-300 text-xs mt-0.5">
+                로컬의 전체교사시간표 엑셀 파일을 업로드하여 시간표 DB를 스마트하게 구축합니다.
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        <div className="p-6 space-y-5 bg-slate-50/50 max-h-[75vh] overflow-y-auto">
+        <div className="p-6 space-y-5 bg-slate-50/50 max-h-[75vh] overflow-y-auto custom-scrollbar">
           {/* 학년도 및 학기 선택 */}
-          <div className="grid grid-cols-2 gap-3 p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
+          <div className="grid grid-cols-2 gap-3 p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
             <div className="space-y-1.5">
               <Label className="text-xs font-bold text-slate-700">대상 학년도</Label>
               <Select 
                 value={String(academicYear)} 
                 onValueChange={v => setAcademicYear(parseInt(v))}
               >
-                <SelectTrigger className="h-9 text-xs font-bold bg-slate-50 border-slate-200">
+                <SelectTrigger className="h-9 text-xs font-bold bg-slate-50 border-slate-200 rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-xl shadow-lg border-slate-200">
                   {[2024, 2025, 2026, 2027, 2028].map(y => (
                     <SelectItem key={y} value={String(y)} className="text-xs font-bold">
                       {y}학년도
@@ -220,10 +220,10 @@ export function TimetableImportModal({
                 value={String(semester)} 
                 onValueChange={v => setSemester(parseInt(v))}
               >
-                <SelectTrigger className="h-9 text-xs font-bold bg-slate-50 border-slate-200">
+                <SelectTrigger className="h-9 text-xs font-bold bg-slate-50 border-slate-200 rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-xl shadow-lg border-slate-200">
                   <SelectItem value="1" className="text-xs font-bold">1학기</SelectItem>
                   <SelectItem value="2" className="text-xs font-bold">2학기</SelectItem>
                 </SelectContent>
@@ -238,10 +238,10 @@ export function TimetableImportModal({
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
             className={cn(
-              "border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-3",
+              "border-2 border-dashed rounded-3xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-3",
               isDragging 
-                ? "border-blue-500 bg-blue-50/80 scale-[0.99]" 
-                : "border-slate-300 bg-white hover:bg-slate-50/80 hover:border-blue-400"
+                ? "border-indigo-500 bg-indigo-50/80 scale-[0.99]" 
+                : "border-slate-300 bg-white hover:bg-slate-50/80 hover:border-indigo-400 shadow-2xs"
             )}
           >
             <input
@@ -255,12 +255,12 @@ export function TimetableImportModal({
               }}
             />
 
-            <div className="p-3.5 bg-blue-50 text-blue-600 rounded-full">
+            <div className="p-3.5 bg-indigo-50 text-indigo-600 rounded-2xl">
               <UploadCloud className="h-6 w-6" />
             </div>
 
             <div className="space-y-1">
-              <p className="text-xs font-bold text-slate-700">
+              <p className="text-xs font-bold text-slate-800">
                 {selectedFile ? selectedFile.name : '시간표 엑셀 파일을 이곳에 끌어다 놓거나 클릭하여 선택하세요'}
               </p>
               <p className="text-[11px] text-slate-400">
@@ -271,43 +271,43 @@ export function TimetableImportModal({
 
           {/* 파싱 로딩 */}
           {isParsing && (
-            <div className="p-4 bg-blue-50/70 border border-blue-100 rounded-xl flex items-center justify-center gap-2 text-xs font-bold text-blue-700 animate-pulse">
-              <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-              <span>엑셀 시간표 구조를 분석하고 있습니다...</span>
+            <div className="p-4 bg-indigo-50/70 border border-indigo-100 rounded-2xl flex items-center justify-center gap-2 text-xs font-bold text-indigo-700 animate-pulse">
+              <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+              <span>엑셀 시간표 구조를 정밀하게 분석하고 있습니다...</span>
             </div>
           )}
 
           {/* 파싱 결과 미리보기 카드 */}
           {parsedPreview && (
-            <div className="space-y-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm animate-in fade-in">
+            <div className="space-y-3 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs animate-in fade-in">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
                   <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                   파싱 분석 통계 (정상 확인됨)
                 </span>
-                <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100">
                   {academicYear}학년도 {semester}학기
                 </span>
               </div>
 
               <div className="grid grid-cols-3 gap-2">
-                <div className="p-2.5 bg-slate-50 rounded-lg text-center border border-slate-100">
+                <div className="p-2.5 bg-slate-50 rounded-xl text-center border border-slate-100">
                   <span className="text-[10.5px] text-slate-500 font-bold block flex items-center justify-center gap-1">
                     <Users className="h-3 w-3 text-indigo-600" /> 등록 교사
                   </span>
                   <span className="text-sm font-black text-slate-900">{parsedPreview.totalTeachers}명</span>
                 </div>
 
-                <div className="p-2.5 bg-slate-50 rounded-lg text-center border border-slate-100">
+                <div className="p-2.5 bg-slate-50 rounded-xl text-center border border-slate-100">
                   <span className="text-[10.5px] text-slate-500 font-bold block flex items-center justify-center gap-1">
                     <Building2 className="h-3 w-3 text-emerald-600" /> 식별 학반
                   </span>
                   <span className="text-sm font-black text-slate-900">{parsedPreview.totalClasses}개 학반</span>
                 </div>
 
-                <div className="p-2.5 bg-slate-50 rounded-lg text-center border border-slate-100">
+                <div className="p-2.5 bg-slate-50 rounded-xl text-center border border-slate-100">
                   <span className="text-[10.5px] text-slate-500 font-bold block flex items-center justify-center gap-1">
-                    <Clock className="h-3 w-3 text-blue-600" /> 총 수업 슬롯
+                    <Clock className="h-3 w-3 text-indigo-600" /> 총 수업 슬롯
                   </span>
                   <span className="text-sm font-black text-slate-900">{parsedPreview.totalSlots}교시</span>
                 </div>
@@ -316,13 +316,13 @@ export function TimetableImportModal({
               {/* 샘플 교사 프리뷰 칩 */}
               <div className="space-y-1 pt-1">
                 <span className="text-[10.5px] text-slate-400 font-bold">포함된 교사 목록 (일부)</span>
-                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto p-1.5 bg-slate-50/80 rounded-lg border border-slate-100">
+                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto custom-scrollbar p-1.5 bg-slate-50/80 rounded-xl border border-slate-100">
                   {parsedPreview.teachers.slice(0, 30).map(t => (
                     <span 
                       key={t.teacherName} 
-                      className="text-[10.5px] font-bold px-1.5 py-0.5 bg-white border border-slate-200 rounded text-slate-700 shadow-2xs"
+                      className="text-[10.5px] font-bold px-2 py-0.5 bg-white border border-slate-200 rounded-lg text-slate-700 shadow-2xs"
                     >
-                      {t.teacherName} {t.homeroomClass && <span className="text-indigo-600">({t.homeroomClass})</span>}
+                      {t.teacherName} {t.homeroomClass && <span className="text-indigo-600 font-black">({t.homeroomClass})</span>}
                     </span>
                   ))}
                   {parsedPreview.teachers.length > 30 && (
@@ -336,13 +336,13 @@ export function TimetableImportModal({
           )}
         </div>
 
-        <DialogFooter className="px-6 py-4 bg-slate-100/80 border-t flex items-center justify-end gap-2">
+        <DialogFooter className="px-6 py-4 bg-slate-50 border-t flex items-center justify-end gap-2">
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={onClose}
-            className="text-xs font-bold"
+            className="text-xs font-bold rounded-xl"
           >
             취소
           </Button>
@@ -351,7 +351,7 @@ export function TimetableImportModal({
             size="sm"
             onClick={handleSubmit}
             disabled={!selectedFile || !parsedPreview || isUploading || isParsing}
-            className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-sm"
+            className="text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 shadow-sm rounded-xl"
           >
             {isUploading ? (
               <>

@@ -85,6 +85,7 @@ export interface AvailableTeacher {
   teacherName: string;
   homeroomClass?: string;
   deptName?: string;
-  isSameDept: boolean;
+  isSameSubject?: boolean; // 동일 교과군/과목 교사 여부 (최우선 추천)
+  isSameDept: boolean;     // 동일 학과 교사 여부 (차순위 추천)
   totalSubstitutesDone: number; // 이번 학기 누적 보강 횟수
 }

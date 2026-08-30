@@ -313,7 +313,7 @@ export function SubstituteStatsView({
           sourcePeriod: it.sourcePeriod,
           classCode: it.classCode,
           subjectName: it.subjectName,
-          type: isSub ? '보강/대강' : '수업교체',
+          type: isSub ? '수업보강' : '수업교체',
           targetInfo,
           status: app.status === 'approved' ? '승인완료' : app.status === 'submitted' ? '접수대기' : '반려됨',
           rawStatus: app.status,
@@ -676,12 +676,12 @@ export function SubstituteStatsView({
   // 1. 미인증 시 잠금 화면
   if (!isAuthenticated) {
     return (
-      <div className="max-w-md mx-auto my-12 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-5">
-        <div className="w-14 h-14 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center justify-center mx-auto text-indigo-600 shadow-xs">
-          <Lock className="h-7 w-7" />
+      <div className="max-w-md mx-auto my-12 bg-white p-6 sm:p-8 rounded-2xl border border-slate-200/80 shadow-2xs text-center space-y-4">
+        <div className="w-12 h-12 bg-blue-50 border border-blue-100 rounded-2xl flex items-center justify-center mx-auto text-blue-600 shadow-2xs">
+          <Lock className="h-6 w-6" />
         </div>
         <div>
-          <h2 className="text-lg font-black text-slate-900 tracking-tight">수업계 결보강 승인/관리 인증</h2>
+          <h2 className="text-lg font-bold text-slate-900 tracking-tight">수업계 결보강 승인/관리 인증</h2>
           <p className="text-xs text-slate-500 mt-1">
             수업계 담당 교사 전용 화면입니다. 인증 비밀번호를 입력해 주세요.
           </p>
@@ -693,7 +693,7 @@ export function SubstituteStatsView({
               placeholder="수업계 비밀번호 입력 (기본: 1234)"
               value={pinInput}
               onChange={e => setPinInput(e.target.value)}
-              className="h-10 text-center font-mono tracking-widest text-sm bg-slate-50 border-slate-300 rounded-xl"
+              className="h-10 text-center font-mono tracking-widest text-sm bg-slate-50 border-slate-200 rounded-xl"
               autoFocus
             />
             {pinError && (
@@ -706,7 +706,7 @@ export function SubstituteStatsView({
           <Button
             type="submit"
             disabled={isVerifying}
-            className="w-full h-10 text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md cursor-pointer"
+            className="w-full h-10 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-2xs cursor-pointer"
           >
             {isVerifying ? '인증 확인 중...' : '결보강 승인/관리 콘솔 접속'}
           </Button>
@@ -717,102 +717,108 @@ export function SubstituteStatsView({
 
   // 2. 인증 완료 시 수업계 메인 콘솔
   return (
-    <div className="space-y-4">
-      {/* 수업계 상단 헤더 & 컨트롤 바 */}
-      <div className="bg-slate-900 text-white p-4 sm:p-5 rounded-3xl shadow-md space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3.5">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300">
-              <ShieldCheck className="h-6 w-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-black text-base text-white">결보강 승인/관리 센터</h3>
-                <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-black bg-emerald-500 text-white">
-                  수업계 접속 중
-                </span>
-              </div>
-              <p className="text-xs text-slate-300 mt-0.5">
-                교사 제출 서류를 확인하고, <strong>나이스(NEIS) 시간표/결보강 등록 완료 후 승인</strong>으로 상태를 전환합니다.
-              </p>
-            </div>
+    <div className="flex flex-col gap-3 sm:gap-4 w-full pt-1">
+      {/* 1. 상단 타이틀 헤더 (class-management 스타일) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 px-1">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+              <ShieldCheck className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
+              결보강 승인 & 관리 센터
+            </h2>
+            <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hidden sm:inline-flex items-center gap-1">
+              <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+              수업계 접속 중
+            </span>
           </div>
+          <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed">
+            교사 제출 결보강 서류를 검토하고 나이스(NEIS) 등록 후 승인, 보강수당 집계 및 대장을 총괄 관리합니다.
+          </p>
+        </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            {onSaveCalendarConfig && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsCalendarModalOpen(true)}
-                className="h-8.5 text-xs font-black gap-1.5 border-slate-700 bg-slate-800 hover:bg-slate-700 text-indigo-300 rounded-xl cursor-pointer"
-              >
-                <Calendar className="h-3.5 w-3.5" />
-                학사일정 & 행사 설정
-              </Button>
-            )}
+        {/* 상단 우측 액션 버튼 그룹 */}
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          {onSaveCalendarConfig && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                setIsPinModalOpen(true);
-                setCurrPin('');
-                setNewPin('');
-                setConfirmPin('');
-                setPinModalError('');
-                setPinModalSuccess('');
-              }}
-              className="h-8.5 text-xs font-bold gap-1.5 border-slate-700 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-xl cursor-pointer"
+              onClick={() => setIsCalendarModalOpen(true)}
+              className="h-9 text-xs font-bold gap-1.5 rounded-xl border-slate-200/80 hover:bg-blue-50 hover:text-blue-800 hover:border-blue-200 text-slate-700 shadow-2xs"
             >
-              <KeyRound className="h-3.5 w-3.5 text-amber-400" />
-              비밀번호 변경
+              <Calendar className="h-3.5 w-3.5 text-blue-600" />
+              학사일정 & 행사 설정
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLock}
-              className="h-8.5 text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 gap-1 rounded-xl cursor-pointer"
-            >
-              <Lock className="h-3.5 w-3.5" />
-              잠금
-            </Button>
-          </div>
-        </div>
+          )}
 
-        {/* 4단 탭 네비게이션 */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setIsPinModalOpen(true);
+              setCurrPin('');
+              setNewPin('');
+              setConfirmPin('');
+              setPinModalError('');
+              setPinModalSuccess('');
+            }}
+            className="h-9 text-xs font-bold gap-1.5 rounded-xl border-slate-200/80 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-200 text-slate-700 shadow-2xs"
+          >
+            <KeyRound className="h-3.5 w-3.5 text-amber-600" />
+            비밀번호 변경
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleLock}
+            className="h-9 text-xs font-bold text-slate-400 hover:text-slate-700 hover:bg-slate-100 gap-1 rounded-xl"
+            title="콘솔 잠금"
+          >
+            <Lock className="h-3.5 w-3.5" />
+            잠금
+          </Button>
+        </div>
+      </div>
+
+      {/* 2. 세그먼트 탭 컨트롤 바 (class-management 스타일) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-xl flex-1 sm:flex-none overflow-x-auto">
           {/* 1. NEIS 등록 대기 탭 */}
           <button
             type="button"
             onClick={() => setActiveSubTab('pending')}
             className={cn(
-              "px-4 py-2 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer shrink-0",
+              "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0",
               activeSubTab === 'pending'
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                : "bg-slate-800/80 text-slate-300 hover:bg-slate-800"
+                ? "bg-white text-blue-900 font-black shadow-2xs border border-slate-200/60"
+                : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
             )}
           >
-            <Clock className="h-4 w-4" />
+            <Clock className="h-3.5 w-3.5 text-blue-600" />
             <span>NEIS 등록 및 승인 대기</span>
             {pendingApplications.length > 0 && (
-              <span className="px-2 py-0.2 rounded-full text-[11px] font-black bg-rose-500 text-white animate-pulse">
-                {pendingApplications.length}건
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse">
+                {pendingApplications.length}
               </span>
             )}
           </button>
 
-          {/* 2. 보강수당 지급 관리 탭 (NEW) */}
+          {/* 2. 보강수당 지급 관리 탭 */}
           <button
             type="button"
             onClick={() => setActiveSubTab('allowance')}
             className={cn(
-              "px-4 py-2 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer shrink-0",
+              "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0",
               activeSubTab === 'allowance'
-                ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30"
-                : "bg-slate-800/80 text-emerald-300 hover:bg-slate-800"
+                ? "bg-white text-emerald-900 font-black shadow-2xs border border-slate-200/60"
+                : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
             )}
           >
-            <Coins className="h-4 w-4 text-emerald-400" />
-            <span>보강수당 지급 관리 ({allowanceSummary.payableCount}건 / {allowanceSummary.totalAmount.toLocaleString()}원)</span>
+            <Coins className="h-3.5 w-3.5 text-emerald-600" />
+            <span>보강수당 지급 관리</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-100">
+              {allowanceSummary.payableCount}건
+            </span>
           </button>
 
           {/* 3. 결보강 관리 대장 탭 */}
@@ -820,14 +826,17 @@ export function SubstituteStatsView({
             type="button"
             onClick={() => setActiveSubTab('ledger')}
             className={cn(
-              "px-4 py-2 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer shrink-0",
+              "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0",
               activeSubTab === 'ledger'
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                : "bg-slate-800/80 text-slate-300 hover:bg-slate-800"
+                ? "bg-white text-indigo-900 font-black shadow-2xs border border-slate-200/60"
+                : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
             )}
           >
-            <FileSpreadsheet className="h-4 w-4" />
-            <span>결보강 관리 대장 ({allItems.length}건)</span>
+            <FileSpreadsheet className="h-3.5 w-3.5 text-indigo-600" />
+            <span>결보강 관리 대장</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-50 text-indigo-700 font-bold border border-indigo-100">
+              {allItems.length}
+            </span>
           </button>
 
           {/* 4. 교사별 누적 시수 통계 탭 */}
@@ -835,15 +844,19 @@ export function SubstituteStatsView({
             type="button"
             onClick={() => setActiveSubTab('teacherStats')}
             className={cn(
-              "px-4 py-2 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer shrink-0",
+              "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0",
               activeSubTab === 'teacherStats'
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                : "bg-slate-800/80 text-slate-300 hover:bg-slate-800"
+                ? "bg-white text-amber-900 font-black shadow-2xs border border-slate-200/60"
+                : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
             )}
           >
-            <Scale className="h-4 w-4" />
-            <span>교사별 보강 누적 시수 통계</span>
+            <Scale className="h-3.5 w-3.5 text-amber-600" />
+            <span>교사별 보강 누적 시수</span>
           </button>
+        </div>
+
+        <div className="hidden md:flex items-center gap-2 pr-2 text-xs text-slate-500">
+          <span className="font-semibold text-slate-700">{timetableData.title}</span>
         </div>
       </div>
 
@@ -955,22 +968,6 @@ export function SubstituteStatsView({
                     </div>
 
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleCopyNeisFormat(app)}
-                        className={cn(
-                          "h-8 px-2.5 text-xs font-bold gap-1 rounded-xl transition-all cursor-pointer",
-                          copiedId === app.id
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-300"
-                            : "border-slate-200 hover:bg-slate-50 text-slate-700"
-                        )}
-                      >
-                        {copiedId === app.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                        <span>{copiedId === app.id ? '나이스 양식 복사완료!' : '나이스 텍스트 복사'}</span>
-                      </Button>
-
                       {onViewOfficialForm && (
                         <Button
                           type="button"
@@ -1039,7 +1036,7 @@ export function SubstituteStatsView({
                                   "px-2 py-0.5 rounded-full text-[10.5px] font-black",
                                   isSub ? "bg-amber-100 text-amber-800" : "bg-indigo-100 text-indigo-800"
                                 )}>
-                                  {isSub ? '보강(대강)' : '수업교체'}
+                                  {isSub ? '수업보강' : '수업교체'}
                                 </span>
                               </td>
                               <td className="text-left font-bold text-slate-800 px-3">
@@ -1181,29 +1178,30 @@ export function SubstituteStatsView({
               <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="default"
                   onClick={handleSelectAllAllowance}
-                  className="h-8.5 px-3 text-xs font-bold text-slate-700 border-slate-200 hover:bg-slate-50 rounded-xl cursor-pointer"
+                  className="h-10 px-3.5 sm:px-4 text-xs sm:text-[13px] font-bold text-slate-700 border-slate-200/90 hover:bg-slate-50 rounded-xl shadow-2xs cursor-pointer gap-1.5"
                 >
-                  <CheckSquare className="h-3.5 w-3.5 text-emerald-600 mr-1" />
+                  <CheckSquare className="h-4 w-4 text-emerald-600" />
                   전체 선택 (전체 지급)
                 </Button>
+
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="default"
                   onClick={handleDeselectAllAllowance}
-                  className="h-8.5 px-3 text-xs font-bold text-slate-700 border-slate-200 hover:bg-slate-50 rounded-xl cursor-pointer"
+                  className="h-10 px-3.5 sm:px-4 text-xs sm:text-[13px] font-bold text-slate-700 border-slate-200/90 hover:bg-slate-50 rounded-xl shadow-2xs cursor-pointer gap-1.5"
                 >
-                  <Square className="h-3.5 w-3.5 text-rose-500 mr-1" />
+                  <Square className="h-4 w-4 text-rose-500" />
                   전체 해제 (전체 제외)
                 </Button>
+
                 <Button
-                  variant="outline"
-                  size="sm"
+                  size="default"
                   onClick={handleExportAllowanceExcel}
-                  className="h-8.5 px-3 text-xs font-black gap-1.5 bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 rounded-xl cursor-pointer shadow-2xs"
+                  className="h-10 px-4 sm:px-5 text-xs sm:text-[13px] font-black gap-2 bg-emerald-600 hover:bg-emerald-700 text-white border-none rounded-xl cursor-pointer shadow-xs"
                 >
-                  <Download className="h-3.5 w-3.5 text-emerald-700" />
+                  <Download className="h-4 w-4 text-white" />
                   보강수당 지급명세서 엑셀 다운로드
                 </Button>
               </div>
@@ -1563,8 +1561,8 @@ export function SubstituteStatsView({
                       </td>
                       <td className="border-r border-slate-100">
                         <span className={cn(
-                          "px-2 py-0.5 rounded-full text-[10px] font-black",
-                          item.type === '보강/대강' ? "bg-amber-100 text-amber-800" : "bg-rose-100 text-rose-800"
+                          "px-2 py-0.5 rounded-full text-[10px] font-black border",
+                          item.type === '수업보강' ? "bg-amber-50 text-amber-800 border-amber-200" : "bg-blue-50 text-blue-700 border-blue-200"
                         )}>
                           {item.type}
                         </span>
@@ -1647,7 +1645,7 @@ export function SubstituteStatsView({
                     결강 시수 (출장/연가)
                   </th>
                   <th className="py-2.5 px-3 w-32 border-r border-slate-200 text-indigo-700 bg-indigo-50/50">
-                    보강(대강) 진행 시수
+                    수업보강 진행 시수
                   </th>
                   <th className="py-2.5 px-3 w-28 border-r border-slate-200">
                     수업 교체 횟수

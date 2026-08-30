@@ -37,7 +37,8 @@ import {
   ChevronDown,
   ShieldCheck,
   Building,
-  UserPlus
+  UserPlus,
+  AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -253,33 +254,35 @@ export function SubstituteClient({
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
-      {/* 1. 상단 심플 교사 맞춤형 헤더 */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-5 sm:p-6 rounded-3xl shadow-lg border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 flex items-center gap-1">
-              <Sparkles className="h-3 w-3 text-indigo-400" />
+    <div className="flex flex-col gap-3 sm:gap-4 w-full pt-1">
+      {/* 1. 상단 타이틀 헤더 (class-management 스타일) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 px-1">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+              <ArrowLeftRight className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
+              수업 결보강 & 교체 관리
+            </h2>
+            <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-blue-50 text-blue-700 border border-blue-100 hidden sm:inline-flex items-center gap-1">
+              <Clock className="h-3 w-3 text-blue-600" />
               {timetableData.academicYear}학년도 {timetableData.semester}학기
             </span>
-            <span className="text-xs text-slate-400">교수학습지원</span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
-            <ArrowLeftRight className="h-6 w-6 text-indigo-400" />
-            수업 결보강 & 교체 신청
-          </h1>
-          <p className="text-xs text-slate-300 mt-1">
-            아래 시간표에서 <strong>변경할 수업을 클릭</strong>하면 스마트 공강 추천과 함께 공식 신청서가 즉시 생성됩니다.
+          <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed">
+            시간표에서 변경할 수업을 클릭하여 스마트 공강 추천과 함께 수업 교체 및 결보강을 신속하게 처리합니다.
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="bg-white/10 px-3.5 py-2 rounded-2xl border border-white/15 text-right">
-            <span className="text-[10.5px] text-slate-300 block font-medium">내 신청 건수</span>
-            <strong className="text-sm font-black text-indigo-300">{myApplications.length}건</strong>
+
+        {/* 상단 우측 정보 뱃지 */}
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-1.5 text-xs text-slate-700 shadow-2xs font-medium">
+            <FileText className="h-3.5 w-3.5 text-blue-600" />
+            <span>내 신청: <strong className="text-blue-600 font-black">{myApplications.length}건</strong></span>
           </div>
         </div>
       </div>
 
+      {/* 2. 대화형 교사 시간표 컴포넌트 */}
       <InteractiveTeacherTimetable
         timetableData={timetableData}
         selectedTeacherName={selectedTeacherName}
@@ -289,40 +292,55 @@ export function SubstituteClient({
         calendarConfig={calendarConfig}
       />
 
-      <div className="space-y-4 pt-2">
-        <div className="flex items-center gap-2 border-b border-slate-200 pb-1">
-          <button
-            type="button"
-            onClick={() => setBottomTab('myApps')}
-            className={cn(
-              "px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center gap-1.5 border",
-              bottomTab === 'myApps'
-                ? "bg-slate-900 text-white border-slate-900 shadow-sm"
-                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-            )}
-          >
-            <FileText className="h-4 w-4" />
-            내 신청 현황 ({myApplications.length}건)
-          </button>
-          <button
-            type="button"
-            onClick={() => setBottomTab('today')}
-            className={cn(
-              "px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center gap-1.5 border",
-              bottomTab === 'today'
-                ? "bg-slate-900 text-white border-slate-900 shadow-sm"
-                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-            )}
-          >
-            <Calendar className="h-4 w-4" />
-            오늘의 결보강 ({todayItems.length}건)
-          </button>
+      {/* 3. 하단 신청 내역 및 오늘의 결보강 탭 영역 */}
+      <div className="space-y-3 pt-1">
+        {/* 세그먼트 탭 컨트롤 바 */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setBottomTab('myApps')}
+              className={cn(
+                "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
+                bottomTab === 'myApps'
+                  ? "bg-white text-blue-900 font-black shadow-2xs border border-slate-200/60"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+              )}
+            >
+              <FileText className="h-3.5 w-3.5 text-blue-600" />
+              <span>내 신청 현황</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-100">
+                {myApplications.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setBottomTab('today')}
+              className={cn(
+                "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
+                bottomTab === 'today'
+                  ? "bg-white text-emerald-900 font-black shadow-2xs border border-slate-200/60"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+              )}
+            >
+              <Calendar className="h-3.5 w-3.5 text-emerald-600" />
+              <span>오늘의 결보강</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-100">
+                {todayItems.length}
+              </span>
+            </button>
+          </div>
+
+          <div className="text-xs text-slate-400 hidden sm:block">
+            ※ 승인 완료된 신청서는 A4 공식 서식으로 언제든지 인쇄할 수 있습니다.
+          </div>
         </div>
 
         {bottomTab === 'myApps' && (
           <div className="space-y-3">
             {myApplications.length === 0 ? (
-              <div className="bg-white rounded-3xl border border-slate-200 p-8 text-center text-slate-400 space-y-1">
+              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-8 text-center text-slate-400 space-y-1">
                 <p className="text-xs font-bold text-slate-600">
                   {selectedTeacherName} 선생님께서 신청하신 수업 교체 및 보강 내역이 없습니다.
                 </p>
@@ -334,14 +352,14 @@ export function SubstituteClient({
               <>
                 {/* 상단 다중 선택 및 일괄 출력 툴바 */}
                 {printableApps.length > 0 && (
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white p-3 sm:px-4 sm:py-2.5 rounded-2xl border border-slate-200 shadow-2xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white p-3 sm:px-4 sm:py-2.5 rounded-2xl border border-slate-200/80 shadow-2xs">
                     <div className="flex items-center gap-2.5">
                       <label className="flex items-center gap-2 text-xs font-black text-slate-800 cursor-pointer select-none">
                         <input
                           type="checkbox"
                           checked={selectedAppIds.length === printableApps.length && printableApps.length > 0}
                           onChange={handleToggleSelectAll}
-                          className="w-4 h-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                          className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer"
                         />
                         <span>
                           {selectedAppIds.length === printableApps.length
@@ -353,7 +371,7 @@ export function SubstituteClient({
 
                     <div className="flex items-center gap-2 flex-wrap">
                       {selectedAppIds.length > 0 && (
-                        <span className="text-xs font-black text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-xl border border-indigo-200">
+                        <span className="text-xs font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-xl border border-blue-200">
                           {selectedAppIds.length}건 선택됨
                         </span>
                       )}
@@ -368,10 +386,10 @@ export function SubstituteClient({
                           const selected = myApplications.filter(a => selectedAppIds.includes(a.id));
                           if (selected.length > 0) setViewingApps(selected);
                         }}
-                        className="h-9 px-3.5 text-xs font-black gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-xs cursor-pointer"
+                        className="h-8 px-3.5 text-xs font-bold gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-2xs cursor-pointer"
                       >
                         <Printer className="h-3.5 w-3.5" />
-                        일괄 출력
+                        일괄 A4 출력
                       </Button>
                       {selectedAppIds.length > 0 && (
                         <Button
@@ -379,7 +397,7 @@ export function SubstituteClient({
                           variant="outline"
                           size="sm"
                           onClick={() => setSelectedAppIds([])}
-                          className="h-9 px-3.5 text-xs font-black border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-xl shadow-2xs cursor-pointer"
+                          className="h-8 px-3 text-xs font-bold border-slate-200/80 bg-white text-slate-600 hover:bg-slate-50 rounded-xl shadow-2xs cursor-pointer"
                         >
                           선택 해제
                         </Button>
@@ -389,59 +407,65 @@ export function SubstituteClient({
                 )}
 
                 {/* 신청서 카드 그리드 */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {myApplications.map(app => {
                     const isSelected = selectedAppIds.includes(app.id);
+                    const isRejected = app.status === 'rejected';
                     return (
                       <div
                         key={app.id}
                         onClick={() => toggleSelectApp(app.id)}
                         className={cn(
-                          "bg-white p-4 rounded-2xl border transition-all space-y-3 cursor-pointer select-none",
+                          "p-3.5 sm:p-4 rounded-2xl border transition-all space-y-2.5 cursor-pointer select-none shadow-2xs",
                           isSelected
-                            ? "border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-50/10 shadow-sm"
-                            : "border-slate-200 hover:border-slate-300 hover:shadow-xs"
+                            ? "border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/10"
+                            : isRejected
+                            ? "bg-rose-50/15 border-rose-200/80 hover:border-rose-300"
+                            : "bg-white border-slate-200/80 hover:border-slate-300 hover:shadow-xs"
                         )}
                       >
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
+                          <div className="flex items-center gap-2">
                             <input
                               type="checkbox"
                               checked={isSelected}
+                              disabled={isRejected}
                               onClick={(e) => e.stopPropagation()}
                               onChange={() => toggleSelectApp(app.id)}
-                              className="w-4 h-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                              className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                             />
                             <span className="font-mono text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
                               {app.applicationNumber}
                             </span>
-                            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-black ${
+                            <span className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold ${
                               app.status === 'approved'
-                                ? 'bg-emerald-100 text-emerald-800'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                 : app.status === 'submitted'
-                                ? 'bg-indigo-100 text-indigo-800'
-                                : 'bg-slate-100 text-slate-700'
+                                ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                : 'bg-rose-50 text-rose-700 border border-rose-200'
                             }`}>
-                              {app.status === 'approved' ? '승인 완료' : '제출 접수됨'}
+                              {app.status === 'approved' ? '승인 완료' : app.status === 'submitted' ? '제출 접수됨' : '반려됨'}
                             </span>
                           </div>
                           <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setViewingApps([app])}
-                              className="h-8 text-xs font-bold gap-1 border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-2xs cursor-pointer"
-                            >
-                              <Printer className="h-3.5 w-3.5 text-indigo-600" />
-                              A4 출력
-                            </Button>
+                            {!isRejected && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setViewingApps([app])}
+                                className="h-7 px-2.5 text-xs font-bold gap-1 border-slate-200/80 text-slate-700 hover:bg-slate-50 shadow-2xs cursor-pointer"
+                              >
+                                <Printer className="h-3 w-3 text-slate-500" />
+                                A4 출력
+                              </Button>
+                            )}
                             {app.status !== 'approved' ? (
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleDeleteApplication(app.id)}
-                                title="신청서 삭제"
-                                className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl cursor-pointer"
+                                title={isRejected ? "반려된 신청서 삭제" : "신청서 취소/삭제"}
+                                className="h-7 w-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
@@ -452,17 +476,26 @@ export function SubstituteClient({
                             )}
                           </div>
                         </div>
+
+                        {/* 반려 안내 알림 배너 */}
+                        {isRejected && (
+                          <div className="flex items-center gap-1.5 p-2 rounded-xl bg-rose-50 border border-rose-200/80 text-[11px] text-rose-800 font-medium">
+                            <AlertCircle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
+                            <span>수업계에 의해 반려된 신청서입니다. 삭제 후 시간표에서 다시 신청해 주세요.</span>
+                          </div>
+                        )}
+
                         <div className="text-xs space-y-1">
                           <p className="text-slate-800">
                             <strong>사유:</strong> {app.reason}
                           </p>
-                          <div className="space-y-1 pt-1">
+                          <div className="space-y-1 pt-0.5">
                             {app.items.map(it => (
                               <div key={it.id} className="p-2 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-[11px]">
                                 <span className="font-bold text-slate-900">
                                   {it.sourceDate} {it.sourcePeriod}교시 {getItemClassCode(it, app.applicantTeacher)} ({getItemSubjectName(it, app.applicantTeacher)})
                                 </span>
-                                <span className="font-bold text-indigo-700">
+                                <span className="font-bold text-blue-700">
                                   ➔ {it.type === 'substitute' ? `보강: ${it.substituteTeacher} 선생님` : `교체: ${it.targetTeacher} 선생님`}
                                 </span>
                               </div>
@@ -481,8 +514,8 @@ export function SubstituteClient({
         {bottomTab === 'today' && (
           <div className="space-y-3">
             {todayItems.length === 0 ? (
-              <div className="bg-white rounded-3xl border border-slate-200 p-8 text-center text-slate-400 space-y-1">
-                <CheckCircle2 className="h-8 w-8 text-emerald-400 mx-auto opacity-70 mb-1" />
+              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-8 text-center text-slate-400 space-y-1">
+                <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto opacity-70 mb-1" />
                 <p className="text-xs font-bold text-slate-700">
                   오늘({todayStr})은 등록된 결강이나 수업 교체가 없습니다.
                 </p>
@@ -491,21 +524,21 @@ export function SubstituteClient({
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {todayItems.map(({ appId, appNumber, applicantTeacher, reason, item }, idx) => (
-                  <div key={`${appId}-${idx}`} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-2 text-xs">
+                  <div key={`${appId}-${idx}`} className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2 text-xs">
                     <div className="flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded-lg font-black bg-slate-900 text-white text-[11px]">
+                      <span className="px-2 py-0.5 rounded-md font-bold bg-slate-900 text-white text-[11px]">
                         {item.sourcePeriod}교시
                       </span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                        item.type === 'substitute' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                      <span className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold ${
+                        item.type === 'substitute' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-blue-50 text-blue-700 border border-blue-200'
                       }`}>
-                        {item.type === 'substitute' ? '보강 / 대강' : '수업 교체'}
+                        {item.type === 'substitute' ? '수업보강' : '수업교체'}
                       </span>
                     </div>
                     <p className="font-black text-slate-900">
                       {getItemClassCode(item, applicantTeacher)} ({getItemSubjectName(item, applicantTeacher)}) - {applicantTeacher} 선생님
                     </p>
-                    <p className="font-bold text-indigo-700 bg-indigo-50 p-2 rounded-xl border border-indigo-100">
+                    <p className="font-bold text-blue-700 bg-blue-50/70 p-2 rounded-xl border border-blue-100">
                       ➔ {item.type === 'substitute' ? `보강: ${item.substituteTeacher} 선생님` : `교체: ${item.targetTeacher} 선생님`}
                     </p>
                   </div>

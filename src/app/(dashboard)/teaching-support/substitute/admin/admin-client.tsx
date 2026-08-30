@@ -85,19 +85,7 @@ export function AdminClient({
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
-      {/* 최상단 네비게이션 바로가기 */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Link href="/teaching-support/substitute">
-            <Button variant="ghost" size="sm" className="h-8.5 text-xs font-bold gap-1 text-slate-500 hover:text-slate-900 rounded-xl cursor-pointer">
-              <ArrowLeft className="h-3.5 w-3.5" />
-              결보강 처리 (교사용 신청 화면) 바로가기
-            </Button>
-          </Link>
-        </div>
-      </div>
-
+    <div className="flex flex-col gap-3 sm:gap-4 w-full">
       {/* 수업계 전용 콘솔 뷰 */}
       <SubstituteStatsView
         applications={applications}

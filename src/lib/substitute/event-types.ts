@@ -15,6 +15,7 @@ export interface SchoolEvent {
   targetGrades: number[]; // [1] (1학년 전체)
   targetClasses?: string[]; // ["축31", "건31"]
   inChargeTeachers: string[]; // 행사 담당/인솔 교사명 목록 (예: ["조영남", "강태우"])
+  inChargeRoleLabel?: string; // 🌟 사용자에게 깔끔하게 보여줄 일괄 역할 라벨 (예: "1학년 담임교사 전체 (12명)", "전교생 담임교사 전체 (24명)")
   location?: string; // 장소 (예: "대강당", "시청각실", "체육관")
   description?: string; // 세부 안내
   color?: string; // 뱃지 색상 (기본: purple)
@@ -33,6 +34,35 @@ export interface SemesterPeriod {
   endDate: string; // YYYY-MM-DD
 }
 
+export interface ExamDailySchedule {
+  date: string; // YYYY-MM-DD (예: "2026-10-12")
+  dayNumber?: number; // 1 (1일차)
+  examPeriods: number[]; // [1, 2, 3] (해당 일자의 시험 진행 교시)
+  afternoonType: 'dismiss' | 'regular_class'; // 'dismiss'(시험 후 하교), 'regular_class'(오후 정상수업)
+}
+
+export interface ExamPeriod {
+  id: string;
+  name: string; // 고사명 (예: "1학기 1차 지필평가", "2학기 2차 지필평가 (기말고사)", "전국연합학력평가")
+  startDate: string; // YYYY-MM-DD (예: "2026-10-12")
+  endDate: string; // YYYY-MM-DD (예: "2026-10-15")
+  targetGrades: number[]; // [1, 2, 3] (전학년) 또는 [1], [2], [3]
+  examPeriods: number[]; // 기본 교시 (예: [1, 2, 3])
+  afternoonType: 'dismiss' | 'regular_class'; // 기본 오후 운영 형태
+  dailySchedules?: ExamDailySchedule[]; // 🌟 일자별 맞춤 교시 및 오후 일정 설정
+  description?: string;
+}
+
+export interface SpecialDaySchedule {
+  id: string;
+  date: string; // YYYY-MM-DD (예: "2026-09-09")
+  targetDayOfWeek: string; // "월", "화", "수", "목", "금" (적용할 요일 시간표)
+  originalDayOfWeek?: string; // "수" (원래 달력상 요일)
+  shortenedPeriods?: number; // 🌟 단축수업 운영 교시 수 (예: 4 -> 4교시까지만 수업하고 5~7교시는 수업 없음)
+  periodOverrides?: Record<number, number>; // 🌟 교시 매핑/복제 (예: { 6: 5 } -> 6교시에 5교시 수업을 진행)
+  description?: string; // 사유 (예: "월요일 결손시수 확보 대체수업", "개학식 4교시 단축수업")
+}
+
 export interface AcademicCalendarConfig {
   academicYear: number; // 2026
   semester: number; // 2
@@ -44,6 +74,8 @@ export interface AcademicCalendarConfig {
   };
   vacations: VacationPeriod[];
   events: SchoolEvent[];
+  specialDaySchedules?: SpecialDaySchedule[]; // 대체 요일 시간표 운영 목록
+  examPeriods?: ExamPeriod[]; // 지필평가 / 시험 기간 목록
   updatedAt?: string;
   updatedBy?: string;
 }

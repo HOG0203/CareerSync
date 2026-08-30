@@ -18,6 +18,18 @@ import {
   getAvailableTeachersForSlot, 
   getDayOfWeekFromDate 
 } from '@/lib/substitute/validator';
+import { 
+  AcademicCalendarConfig, 
+  DEFAULT_ACADEMIC_CALENDAR_2026_2 
+} from '@/lib/substitute/event-types';
+import { 
+  getVacationForDate,
+  getSpecialDaySchedule,
+  getExamPeriodForDate,
+  getExamSlotInfo,
+  getEventsForSlot,
+  getClassEventsForSlot
+} from '@/lib/substitute/event-helper';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -25,6 +37,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
@@ -46,8 +59,12 @@ import {
   FileText,
   Trash2,
   Layers,
-  Search
+  Search,
+  Palmtree,
+  FileEdit,
+  X
 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 interface SubstituteWizardModalProps {
@@ -56,6 +73,7 @@ interface SubstituteWizardModalProps {
   onSave: (app: SubstituteApplication, submitImmediately?: boolean) => Promise<void>;
   timetableData: ParsedTimetableResult;
   existingApplications: SubstituteApplication[];
+  calendarConfig?: AcademicCalendarConfig;
   currentTeacherName?: string;
 }
 
@@ -76,6 +94,7 @@ export function SubstituteWizardModal({
   onSave,
   timetableData,
   existingApplications,
+  calendarConfig = DEFAULT_ACADEMIC_CALENDAR_2026_2,
   currentTeacherName,
 }: SubstituteWizardModalProps) {
   // 신청 교사
@@ -114,65 +133,96 @@ export function SubstituteWizardModal({
     return timetableData.teachers.find(t => t.teacherName === selectedTeacherName) || timetableData.teachers[0];
   }, [timetableData, selectedTeacherName]);
 
-  const sourceDay = React.useMemo(() => getDayOfWeekFromDate(sourceDate), [sourceDate]);
+  const rawSourceDay = React.useMemo(() => getDayOfWeekFromDate(sourceDate), [sourceDate]);
+  
+  // 대체 요일 스케줄 검사
+  const specialDay = React.useMemo(() => {
+    return getSpecialDaySchedule(sourceDate, calendarConfig);
+  }, [sourceDate, calendarConfig]);
 
-  // 해당 일자/요일의 교사 수업 슬롯 목록
+  // 실제 적용되는 요일 (대체 요일이 있으면 대체 요일 시간표 적용)
+  const sourceDay = specialDay ? specialDay.targetDayOfWeek : rawSourceDay;
+
+  // 방학 및 시험 기간 검사
+  const vacation = React.useMemo(() => getVacationForDate(sourceDate, calendarConfig), [sourceDate, calendarConfig]);
+  const examPeriod = React.useMemo(() => getExamPeriodForDate(sourceDate, calendarConfig), [sourceDate, calendarConfig]);
+
+  // 해당 일자/요일의 교사 수업 슬롯 목록 (학사일정 100% 반영)
   const daySlots = React.useMemo(() => {
-    if (!currentTeacher || !sourceDay) return [];
+    if (!currentTeacher || !sourceDay || vacation) return [];
+
+    const effectivePeriodOverride = specialDay?.periodOverrides || {};
+    const shortenedPeriods = specialDay?.shortenedPeriods;
+
     const list: { period: number; slot: TimetableSlot }[] = [];
+
     for (let p = 1; p <= 7; p++) {
-      const slot = currentTeacher.slots[`${sourceDay}_${p}`];
-      if (slot && (slot.subjectName || slot.classCode)) {
+      if (shortenedPeriods && p > shortenedPeriods) continue;
+
+      const targetPeriod = effectivePeriodOverride[p] ?? p;
+      const key = `${sourceDay}_${targetPeriod}`;
+      const slot = currentTeacher.slots[key];
+
+      if (slot && slot.subjectName && slot.subjectName.trim() !== '' && slot.subjectName !== '-' && slot.subjectName !== '공강') {
         list.push({ period: p, slot });
       }
     }
-    return list;
-  }, [currentTeacher, sourceDay]);
 
-  // 수업 슬롯 토글 (선택/해제)
+    return list;
+  }, [currentTeacher, sourceDay, vacation, specialDay]);
+
+  // 슬롯 선택/해제 토글
   const toggleSlot = (period: number, slot: TimetableSlot) => {
-    const existingIndex = items.findIndex(it => it.sourcePeriod === period);
-    if (existingIndex >= 0) {
-      setItems(prev => prev.filter((_, idx) => idx !== existingIndex));
+    const exists = items.some(it => it.sourcePeriod === period);
+    if (exists) {
+      setItems(prev => prev.filter(it => it.sourcePeriod !== period));
     } else {
       const newItem: SubstituteItem = {
         id: `item-${Date.now()}-${period}`,
         sourceDate,
         sourceDay,
         sourcePeriod: period,
-        deptName: slot.deptName || currentTeacher?.remarks || '전문교과',
+        deptName: slot.deptName || '',
         classCode: slot.classCode || '',
         subjectName: slot.subjectName || '',
         originalTeacher: selectedTeacherName,
-        type: 'substitute', // 기본값: 보강
+        type: 'substitute', // 기본은 보강 모드
         substituteTeacher: '',
       };
       setItems(prev => [...prev, newItem].sort((a, b) => a.sourcePeriod - b.sourcePeriod));
     }
   };
 
-  // 개별 아이템 필드 변경 핸들러
+  // 특정 항목 업데이트
   const updateItem = (id: string, updates: Partial<SubstituteItem>) => {
     setItems(prev => prev.map(it => it.id === id ? { ...it, ...updates } : it));
   };
 
-  // 아이템 삭제
+  // 특정 항목 삭제
   const removeItem = (id: string) => {
     setItems(prev => prev.filter(it => it.id !== id));
   };
 
-  // 전체 충돌 검사
+  // 전체 항목에 대한 충돌 검증
   const conflicts = React.useMemo(() => {
-    return items.map(it => {
-      const res = checkSubstituteItemConflict(it, timetableData, existingApplications);
-      return { id: it.id, ...res };
+    return items.map(item => {
+      const result = checkSubstituteItemConflict(
+        item,
+        timetableData,
+        existingApplications
+      );
+      return { id: item.id, ...result };
     });
   }, [items, timetableData, existingApplications]);
 
   const hasAnyConflict = conflicts.some(c => c.hasConflict);
 
-  // 저장 및 제출 핸들러
-  const handleSave = async (submitImmediately = false) => {
+  // 저장 / 제출 핸들러
+  const handleSave = async (submitImmediately: boolean) => {
+    if (!selectedTeacherName) {
+      alert('신청 교사를 선택해 주세요.');
+      return;
+    }
     if (!reason.trim()) {
       alert('신청 사유를 입력해 주세요.');
       return;
@@ -181,34 +231,37 @@ export function SubstituteWizardModal({
       alert('교체 또는 보강할 수업 슬롯을 최소 1개 이상 선택해 주세요.');
       return;
     }
+
+    // 미입력 항목 검사
+    for (const it of items) {
+      if (it.type === 'substitute' && !it.substituteTeacher) {
+        alert(`${it.sourcePeriod}교시 보강 교사를 선택해 주세요.`);
+        return;
+      }
+      if (it.type === 'exchange') {
+        if (!it.targetDate || !it.targetPeriod || !it.targetTeacher) {
+          alert(`${it.sourcePeriod}교시 교체 대상 날짜, 교시, 교사를 모두 입력해 주세요.`);
+          return;
+        }
+      }
+    }
+
     if (hasAnyConflict) {
-      alert('충돌이 발생하는 수업이 포함되어 있습니다. 내용을 확인해 주세요.');
+      alert('시간표 충돌이 있는 교시가 있습니다. 충돌 내용을 확인하고 다시 시도해 주세요.');
       return;
     }
 
-    // 미입력 필드 검사
-    for (const it of items) {
-      if (it.type === 'substitute' && !it.substituteTeacher) {
-        alert(`${it.sourcePeriod}교시 보강 교사를 지정해 주세요.`);
-        return;
-      }
-      if (it.type === 'exchange' && (!it.targetDate || !it.targetPeriod || !it.targetTeacher)) {
-        alert(`${it.sourcePeriod}교시 교체할 일자, 교시 및 교사를 모두 지정해 주세요.`);
-        return;
-      }
-    }
-
+    setIsSaving(true);
     try {
-      setIsSaving(true);
       const app: SubstituteApplication = {
         id: `app-${Date.now()}`,
-        applicationNumber: '',
-        academicYear: timetableData.academicYear || 2026,
-        semester: timetableData.semester || 2,
+        applicationNumber: `SUB-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`,
+        academicYear: calendarConfig?.academicYear || 2026,
+        semester: calendarConfig?.semester || 2,
         applicantTeacher: selectedTeacherName,
         reason: reason.trim(),
-        periodStart: items[0]?.sourceDate || sourceDate,
-        periodEnd: items[items.length - 1]?.sourceDate || sourceDate,
+        periodStart: sourceDate,
+        periodEnd: sourceDate,
         applicationDate: todayStr,
         status: submitImmediately ? 'submitted' : 'draft',
         items,
@@ -228,97 +281,130 @@ export function SubstituteWizardModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-6 rounded-3xl border-slate-200">
-        <DialogHeader className="border-b border-slate-100 pb-4">
-          <DialogTitle className="text-xl font-black text-slate-900 flex items-center gap-2">
-            <ArrowLeftRight className="h-5 w-5 text-indigo-600" />
-            수업 교체 및 보강 신청
-          </DialogTitle>
-          <p className="text-xs text-slate-500 mt-1">
-            수업 결강 사유와 대상 슬롯을 선택하면 공강 교사가 자동 추천되며 실시간 충돌을 완벽 방지합니다.
-          </p>
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 border-none shadow-2xl rounded-2xl overflow-hidden bg-white">
+        {/* 1. 표준 모달 상단 헤더 */}
+        <DialogHeader className="p-4 sm:p-6 bg-white border-b border-slate-100 shrink-0 flex flex-row items-center justify-start text-left w-full">
+          <div className="flex items-center gap-3.5 text-left justify-start">
+            <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold shrink-0 shadow-sm">
+              <ArrowLeftRight className="h-6 w-6 sm:h-7 sm:w-7" />
+            </div>
+            <div className="flex flex-col items-start text-left">
+              <div className="flex items-center gap-2 text-left">
+                <DialogTitle className="text-lg sm:text-2xl font-extrabold text-slate-900 tracking-tight text-left">
+                  수업 결보강 & 교체 신청
+                </DialogTitle>
+                <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200/60 text-xs px-2.5 py-0.5 rounded-md font-bold">
+                  스마트 추천 시스템
+                </Badge>
+              </div>
+              <DialogDescription className="text-slate-500 text-xs sm:text-sm font-medium mt-1 text-left">
+                수업 결강 사유와 시간표 슬롯을 선택하면 동교과/동일학과 공강 교사가 자동 추천되며 실시간 충돌을 완벽 방지합니다.
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
-        <div className="space-y-6 py-2">
-          {/* 1. 신청 교사 & 사유 입력 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50/70 p-4 rounded-2xl border border-slate-200/80">
-            <div>
-              <label className="text-xs font-black text-slate-700 block mb-1.5 flex items-center gap-1">
-                <User className="h-3.5 w-3.5 text-indigo-600" />
-                신청 교사
-              </label>
-              <Select value={selectedTeacherName} onValueChange={setSelectedTeacherName}>
-                <SelectTrigger className="h-10 text-xs font-bold bg-white border-slate-200 rounded-xl">
-                  <SelectValue placeholder="교사 선택" />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {timetableData.teachers.map(t => (
-                    <SelectItem key={t.teacherName} value={t.teacherName} className="text-xs">
-                      <span className="font-bold">{t.teacherName}</span>
-                      {t.homeroomClass && <span className="text-indigo-600 font-bold ml-1">({t.homeroomClass})</span>}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        {/* 2. 모달 본체 (스크롤 가능 영역) */}
+        <div className="p-5 sm:p-6 space-y-5 bg-white flex-1 overflow-y-auto custom-scrollbar">
+          {/* 통일된 가이드 안내 카드 (attendance-import-modal 테마) */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5 shadow-xs text-slate-700">
+            <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl shrink-0 mt-0.5 border border-indigo-100">
+              <Sparkles className="h-5 w-5" />
             </div>
-
-            <div>
-              <label className="text-xs font-black text-slate-700 block mb-1.5 flex items-center gap-1">
-                <Calendar className="h-3.5 w-3.5 text-indigo-600" />
-                결강 / 변경 일자
-              </label>
-              <Input
-                type="date"
-                value={sourceDate}
-                onChange={e => {
-                  setSourceDate(e.target.value);
-                  setItems([]);
-                }}
-                className="h-10 text-xs font-bold bg-white border-slate-200 rounded-xl"
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="text-xs font-black text-slate-700 block mb-1.5 flex items-center gap-1">
-                <FileText className="h-3.5 w-3.5 text-indigo-600" />
-                신청 사유
-              </label>
-              <Input
-                placeholder="신청 사유를 입력하거나 아래 빠른 사유를 선택하세요..."
-                value={reason}
-                onChange={e => setReason(e.target.value)}
-                className="h-10 text-xs bg-white border-slate-200 rounded-xl mb-2"
-              />
-              <div className="flex flex-wrap gap-1.5">
-                {COMMON_REASONS.map(r => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setReason(r)}
-                    className="text-[11px] px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-50 border border-slate-200 text-slate-600 hover:text-indigo-700 hover:border-indigo-200 transition-all font-medium"
-                  >
-                    + {r}
-                  </button>
-                ))}
+            <div className="space-y-1">
+              <h5 className="text-sm font-extrabold text-slate-900">수업 결보강 & 교체 스마트 신청 가이드</h5>
+              <div className="text-xs leading-relaxed text-slate-600 space-y-0.5 font-medium">
+                <p>• 신청 교사와 결강 일자를 선택하면 해당 날짜의 <strong className="text-slate-900 font-bold">정규 수업 시간표</strong>가 자동 로드됩니다.</p>
+                <p>• 수업 슬롯 클릭 시 <strong className="text-slate-900 font-bold">[★ 동일교과 &gt; 동일학과]</strong> 순으로 해당 교시 공강 교사를 자동 추천합니다.</p>
+                <p>• 실시간 3중 충돌 검증을 통과한 후 <strong className="text-slate-900 font-bold">[수업계 결재 상신]</strong>을 진행하시면 전자결재 신청서가 생성됩니다.</p>
               </div>
             </div>
           </div>
 
-          {/* 2. 해당 일자의 시간표 수업 슬롯 선택 */}
-          <div>
-            <div className="flex items-center justify-between mb-2.5">
-              <h4 className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+          {/* 섹션 1: 신청 교사, 일자 & 사유 */}
+          <div className="bg-slate-50/50 p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3.5">
+            <h4 className="text-xs font-black text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
+              <User className="h-3.5 w-3.5 text-indigo-600" />
+              1. 기본 신청 정보
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div>
+                <label className="text-[11px] font-black text-slate-700 block mb-1">
+                  신청 교사
+                </label>
+                <Select value={selectedTeacherName} onValueChange={setSelectedTeacherName}>
+                  <SelectTrigger className="h-9.5 text-xs font-bold bg-white border-slate-200 rounded-xl">
+                    <SelectValue placeholder="교사 선택" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60 rounded-xl shadow-lg border-slate-200">
+                    {timetableData.teachers.map(t => (
+                      <SelectItem key={t.teacherName} value={t.teacherName} className="text-xs font-bold">
+                        <span>{t.teacherName} 선생님</span>
+                        {t.subjectGroup && <span className="text-slate-500 text-[10px] ml-1.5">[{t.subjectGroup}]</span>}
+                        {t.homeroomClass && <span className="text-indigo-600 text-[10px] ml-1">({t.homeroomClass})</span>}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-black text-slate-700 block mb-1">
+                  결강 / 변경 일자
+                </label>
+                <Input
+                  type="date"
+                  value={sourceDate}
+                  onChange={e => {
+                    setSourceDate(e.target.value);
+                    setItems([]);
+                  }}
+                  className="h-9.5 text-xs font-bold bg-white border-slate-200 rounded-xl"
+                />
+              </div>
+
+              <div className="sm:col-span-2 space-y-1.5">
+                <label className="text-[11px] font-black text-slate-700 block">
+                  신청 사유
+                </label>
+                <Input
+                  placeholder="신청 사유를 입력하거나 아래 빠른 사유를 선택하세요..."
+                  value={reason}
+                  onChange={e => setReason(e.target.value)}
+                  className="h-9.5 text-xs bg-white border-slate-200 rounded-xl"
+                />
+                <div className="flex flex-wrap gap-1 pt-0.5">
+                  {COMMON_REASONS.map(r => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setReason(r)}
+                      className="text-[10.5px] px-2 py-0.5 rounded-lg bg-white hover:bg-indigo-50 border border-slate-200 text-slate-600 hover:text-indigo-700 hover:border-indigo-200 transition-all font-medium cursor-pointer"
+                    >
+                      + {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 섹션 2: 해당 일자의 시간표 수업 슬롯 선택 */}
+          <div className="bg-slate-50/50 p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h4 className="text-xs font-black text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
                 <Clock className="h-3.5 w-3.5 text-indigo-600" />
-                {sourceDate} ({sourceDay}요일) 수업 슬롯 선택
+                2. 대상 수업 선택 ({sourceDate} · {sourceDay}요일)
               </h4>
               <span className="text-[11px] text-slate-500 font-medium">
-                클릭하여 교체/보강할 수업을 선택하세요.
+                교체 또는 보강할 수업 슬롯을 클릭하여 선택하세요
               </span>
             </div>
 
             {daySlots.length === 0 ? (
-              <div className="p-6 rounded-2xl bg-slate-50 text-center text-xs text-slate-400 border border-dashed border-slate-200">
-                선택하신 {sourceDate}({sourceDay}요일)에는 {selectedTeacherName} 선생님의 정규 수업이 없습니다.
+              <div className="py-8 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl bg-white">
+                선택하신 {sourceDate} ({sourceDay}요일)에는 {selectedTeacherName} 선생님의 정규 수업이 없습니다.
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
@@ -330,15 +416,15 @@ export function SubstituteWizardModal({
                       type="button"
                       onClick={() => toggleSlot(period, slot)}
                       className={cn(
-                        "p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-between gap-1 shadow-2xs",
+                        "p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-between gap-1 shadow-2xs cursor-pointer",
                         isSelected
-                          ? "bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-600 ring-offset-1 scale-[1.02]"
-                          : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50 hover:border-indigo-300"
+                          ? "bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-500/30 shadow-md scale-[1.02]"
+                          : "bg-white text-slate-800 border-slate-200 hover:bg-indigo-50/50 hover:border-indigo-300"
                       )}
                     >
                       <span className={cn(
-                        "text-[10.5px] font-black px-1.5 py-0.5 rounded-md",
-                        isSelected ? "bg-indigo-700 text-white" : "bg-slate-100 text-slate-600"
+                        "text-[10px] font-black px-1.5 py-0.5 rounded-md",
+                        isSelected ? "bg-indigo-700/80 text-white" : "bg-slate-100 text-slate-600"
                       )}>
                         {period}교시
                       </span>
@@ -346,7 +432,7 @@ export function SubstituteWizardModal({
                         {slot.subjectName}
                       </strong>
                       <span className={cn(
-                        "text-[11px] font-bold",
+                        "text-[10px] font-bold",
                         isSelected ? "text-indigo-200" : "text-indigo-600"
                       )}>
                         {slot.classCode}
@@ -358,231 +444,251 @@ export function SubstituteWizardModal({
             )}
           </div>
 
-          {/* 3. 선택된 수업의 교체 / 보강 세부 설정 카드 목록 */}
+          {/* 섹션 3: 선택된 수업의 교체 / 보강 세부 설정 카드 목록 */}
           {items.length > 0 && (
-            <div className="space-y-3">
-              <h4 className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+            <div className="bg-slate-50/50 p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3.5">
+              <h4 className="text-xs font-black text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
                 <Layers className="h-3.5 w-3.5 text-indigo-600" />
-                선택된 수업 상세 처리 ({items.length}건)
+                3. 선택된 수업 교체 및 보강 배정 ({items.length}건)
               </h4>
 
-              {items.map((item, idx) => {
-                const itemConflict = conflicts.find(c => c.id === item.id);
-                // 실시간 추천 공강 교사 목록 추출
-                const availableTeachers = getAvailableTeachersForSlot(
-                  item.sourceDate,
-                  item.sourcePeriod,
-                  timetableData,
-                  existingApplications,
-                  item.deptName
-                );
+              <div className="space-y-3">
+                {items.map((item) => {
+                  const itemConflict = conflicts.find(c => c.id === item.id);
+                  // 실시간 추천 공강 교사 목록 추출 (🌟 동일교과 > 동일학과 순서 정렬)
+                  const availableTeachers = getAvailableTeachersForSlot(
+                    item.sourceDate,
+                    item.sourcePeriod,
+                    timetableData,
+                    existingApplications,
+                    item.deptName,
+                    selectedTeacherName,
+                    item.subjectName,
+                    item.classCode
+                  );
 
-                return (
-                  <div 
-                    key={item.id} 
-                    className={cn(
-                      "p-4 rounded-2xl border transition-all space-y-3 bg-white",
-                      itemConflict?.hasConflict 
-                        ? "border-rose-300 bg-rose-50/30" 
-                        : "border-slate-200 shadow-2xs"
-                    )}
-                  >
-                    {/* 상단 헤더: 교시 정보 + 유형 탭 */}
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded-lg font-black text-xs bg-slate-900 text-white">
-                          {item.sourcePeriod}교시
-                        </span>
-                        <strong className="text-xs font-black text-slate-900">
-                          {item.subjectName} ({item.classCode})
-                        </strong>
-                        <span className="text-[11px] text-slate-500 font-medium">
-                          {item.deptName}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {/* 유형 선택 (수업교체 vs 보강) */}
-                        <div className="bg-slate-100 p-0.5 rounded-xl flex items-center text-xs font-bold">
-                          <button
-                            type="button"
-                            onClick={() => updateItem(item.id, { type: 'substitute' })}
-                            className={cn(
-                              "px-3 py-1 rounded-lg transition-all flex items-center gap-1",
-                              item.type === 'substitute' 
-                                ? "bg-white text-indigo-900 shadow-xs font-black" 
-                                : "text-slate-500 hover:text-slate-800"
-                            )}
-                          >
-                            <UserPlus className="h-3 w-3" />
-                            보강 / 대강
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => updateItem(item.id, { type: 'exchange' })}
-                            className={cn(
-                              "px-3 py-1 rounded-lg transition-all flex items-center gap-1",
-                              item.type === 'exchange' 
-                                ? "bg-white text-indigo-900 shadow-xs font-black" 
-                                : "text-slate-500 hover:text-slate-800"
-                            )}
-                          >
-                            <ArrowLeftRight className="h-3 w-3" />
-                            수업 교체
-                          </button>
+                  return (
+                    <div 
+                      key={item.id} 
+                      className={cn(
+                        "p-4 rounded-2xl border transition-all space-y-3 bg-white shadow-2xs",
+                        itemConflict?.hasConflict 
+                          ? "border-rose-300 bg-rose-50/20" 
+                          : "border-slate-200/90 hover:border-slate-300"
+                      )}
+                    >
+                      {/* 상단 헤더: 교시 정보 + 유형 탭 */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded-lg font-black text-xs bg-slate-900 text-white">
+                            {item.sourcePeriod}교시
+                          </span>
+                          <strong className="text-xs font-black text-slate-900">
+                            {item.subjectName} ({item.classCode})
+                          </strong>
+                          <span className="text-[11px] text-slate-500 font-medium">
+                            {item.deptName}
+                          </span>
                         </div>
 
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeItem(item.id)}
-                          className="h-8 w-8 text-slate-400 hover:text-rose-600 rounded-lg"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          {/* 유형 선택 (수업보강 vs 수업교체) */}
+                          <div className="bg-slate-100 p-0.5 rounded-xl flex items-center text-xs font-bold">
+                            <button
+                              type="button"
+                              onClick={() => updateItem(item.id, { type: 'substitute' })}
+                              className={cn(
+                                "px-3 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer",
+                                item.type === 'substitute' 
+                                  ? "bg-white text-indigo-900 shadow-2xs font-black" 
+                                  : "text-slate-500 hover:text-slate-800"
+                              )}
+                            >
+                              <UserPlus className="h-3 w-3" />
+                              보강
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateItem(item.id, { type: 'exchange' })}
+                              className={cn(
+                                "px-3 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer",
+                                item.type === 'exchange' 
+                                  ? "bg-white text-rose-900 shadow-2xs font-black" 
+                                  : "text-slate-500 hover:text-slate-800"
+                              )}
+                            >
+                              <ArrowLeftRight className="h-3 w-3" />
+                              교체
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => removeItem(item.id)}
+                            className="text-slate-400 hover:text-rose-600 p-1.5 transition-colors cursor-pointer rounded-lg hover:bg-rose-50"
+                            title="삭제"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
+
+                      {/* 세부 입력: 보강 vs 교체 */}
+                      {item.type === 'substitute' ? (
+                        <div className="bg-indigo-50/40 p-3.5 rounded-xl border border-indigo-100 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-black text-indigo-950 flex items-center gap-1">
+                              <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
+                              추천 공강 교사 선택 ({availableTeachers.length}명 공강)
+                            </label>
+                          </div>
+                          <Select 
+                            value={item.substituteTeacher} 
+                            onValueChange={val => updateItem(item.id, { substituteTeacher: val })}
+                          >
+                            <SelectTrigger className="h-9 text-xs font-bold bg-white border-indigo-200 rounded-xl text-slate-800">
+                              <SelectValue placeholder="보강 교사를 선택하세요..." />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-60 rounded-xl shadow-lg border-slate-200">
+                              {availableTeachers.map(t => (
+                                <SelectItem key={t.teacherName} value={t.teacherName} className="text-xs font-medium">
+                                  <span className="font-bold text-slate-900">{t.teacherName} 선생님</span>
+                                  {t.homeroomClass && <span className="ml-1 text-indigo-600 font-bold">({t.homeroomClass} 담임)</span>}
+                                  {t.isSameSubject ? (
+                                    <span className="ml-1.5 text-[10px] px-1.5 py-0.2 rounded bg-blue-100 text-blue-800 font-black border border-blue-200">★ 동일교과</span>
+                                  ) : t.isSameDept ? (
+                                    <span className="ml-1.5 text-[10px] px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-black border border-emerald-200">동일학과</span>
+                                  ) : null}
+                                  <span className="ml-auto text-[10px] text-slate-400"> (누적 보강 {t.totalSubstitutesDone}회)</span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : (
+                        <div className="bg-rose-50/40 p-3.5 rounded-xl border border-rose-100 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                          <div>
+                            <label className="text-[11px] font-black text-rose-950 block mb-1">
+                              교체 대상 날짜
+                            </label>
+                            <Input
+                              type="date"
+                              value={item.targetDate || ''}
+                              onChange={e => {
+                                const tDate = e.target.value;
+                                const tDay = getDayOfWeekFromDate(tDate);
+                                updateItem(item.id, { targetDate: tDate, targetDay: tDay });
+                              }}
+                              className="h-8.5 text-xs bg-white border-rose-200 rounded-xl font-bold"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[11px] font-black text-rose-950 block mb-1">
+                              교체 대상 교시
+                            </label>
+                            <Select
+                              value={item.targetPeriod ? String(item.targetPeriod) : ''}
+                              onValueChange={val => updateItem(item.id, { targetPeriod: parseInt(val) })}
+                            >
+                              <SelectTrigger className="h-8.5 text-xs bg-white border-rose-200 rounded-xl font-bold">
+                                <SelectValue placeholder="교시 선택" />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl shadow-lg border-slate-200">
+                                {[1, 2, 3, 4, 5, 6, 7].map(p => (
+                                  <SelectItem key={p} value={String(p)} className="text-xs font-bold">
+                                    {p}교시
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div>
+                            <label className="text-[11px] font-black text-rose-950 block mb-1">
+                              교체 대상 교사
+                            </label>
+                            <Select
+                              value={item.targetTeacher || ''}
+                              onValueChange={val => updateItem(item.id, { targetTeacher: val })}
+                            >
+                              <SelectTrigger className="h-8.5 text-xs bg-white border-rose-200 rounded-xl font-bold">
+                                <SelectValue placeholder="교사 선택" />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-60 rounded-xl shadow-lg border-slate-200">
+                                <SelectItem value={selectedTeacherName} className="text-xs font-bold text-indigo-700">
+                                  🔄 본인 수업 자체 이동 ({selectedTeacherName})
+                                </SelectItem>
+                                {timetableData.teachers.filter(t => t.teacherName !== selectedTeacherName).map(t => (
+                                  <SelectItem key={t.teacherName} value={t.teacherName} className="text-xs font-medium">
+                                    {t.teacherName} 선생님 {t.homeroomClass && `(${t.homeroomClass})`}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 충돌 상태 신호등 표시 */}
+                      {itemConflict?.hasConflict ? (
+                        <div className="flex items-center gap-1.5 text-rose-600 text-xs font-bold bg-rose-50 p-2.5 rounded-xl border border-rose-200">
+                          <AlertTriangle className="h-4 w-4 shrink-0" />
+                          <span>{itemConflict.message}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-emerald-700 text-xs font-bold bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-200">
+                          <CheckCircle2 className="h-4 w-4 shrink-0" />
+                          <span>안전: 시간표 겹침이나 교사 중복 없이 정상 배정 가능합니다.</span>
+                        </div>
+                      )}
                     </div>
-
-                    {/* 세부 입력: 보강 vs 교체 */}
-                    {item.type === 'substitute' ? (
-                      <div className="bg-indigo-50/40 p-3 rounded-xl border border-indigo-100/80 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <label className="text-[11px] font-black text-indigo-950 flex items-center gap-1">
-                            <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
-                            추천 공강 교사 선택 ({availableTeachers.length}명 공강)
-                          </label>
-                        </div>
-                        <Select 
-                          value={item.substituteTeacher} 
-                          onValueChange={val => updateItem(item.id, { substituteTeacher: val })}
-                        >
-                          <SelectTrigger className="h-9 text-xs font-bold bg-white border-indigo-200 rounded-xl text-slate-800">
-                            <SelectValue placeholder="보강 교사를 선택하세요..." />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-60">
-                            {availableTeachers.map(t => (
-                              <SelectItem key={t.teacherName} value={t.teacherName} className="text-xs">
-                                <span className="font-bold text-slate-900">{t.teacherName} 선생님</span>
-                                {t.homeroomClass && <span className="ml-1 text-indigo-600 font-bold">({t.homeroomClass} 담임)</span>}
-                                {t.isSameDept && <span className="ml-1.5 text-[10px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-bold">동일교과군</span>}
-                                <span className="ml-auto text-[10px] text-slate-400"> (누적 보강 {t.totalSubstitutesDone}회)</span>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ) : (
-                      <div className="bg-rose-50/40 p-3 rounded-xl border border-rose-100/80 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                        <div>
-                          <label className="text-[11px] font-black text-rose-950 block mb-1">
-                            교체 대상 날짜
-                          </label>
-                          <Input
-                            type="date"
-                            value={item.targetDate || ''}
-                            onChange={e => {
-                              const tDate = e.target.value;
-                              const tDay = getDayOfWeekFromDate(tDate);
-                              updateItem(item.id, { targetDate: tDate, targetDay: tDay });
-                            }}
-                            className="h-8 text-xs bg-white border-rose-200 rounded-lg"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[11px] font-black text-rose-950 block mb-1">
-                            교체 대상 교시
-                          </label>
-                          <Select
-                            value={item.targetPeriod ? String(item.targetPeriod) : ''}
-                            onValueChange={val => updateItem(item.id, { targetPeriod: parseInt(val) })}
-                          >
-                            <SelectTrigger className="h-8 text-xs bg-white border-rose-200 rounded-lg">
-                              <SelectValue placeholder="교시 선택" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {[1, 2, 3, 4, 5, 6, 7].map(p => (
-                                <SelectItem key={p} value={String(p)} className="text-xs font-bold">
-                                  {p}교시
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div>
-                          <label className="text-[11px] font-black text-rose-950 block mb-1">
-                            교체 대상 교사
-                          </label>
-                          <Select
-                            value={item.targetTeacher || ''}
-                            onValueChange={val => updateItem(item.id, { targetTeacher: val })}
-                          >
-                            <SelectTrigger className="h-8 text-xs bg-white border-rose-200 rounded-lg">
-                              <SelectValue placeholder="교사 선택" />
-                            </SelectTrigger>
-                            <SelectContent className="max-h-60">
-                              <SelectItem value={selectedTeacherName} className="text-xs font-bold text-indigo-700">
-                                🔄 본인 수업 자체 이동 ({selectedTeacherName})
-                              </SelectItem>
-                              {timetableData.teachers.filter(t => t.teacherName !== selectedTeacherName).map(t => (
-                                <SelectItem key={t.teacherName} value={t.teacherName} className="text-xs">
-                                  {t.teacherName} 선생님 {t.homeroomClass && `(${t.homeroomClass})`}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 충돌 상태 신호등 표시 */}
-                    {itemConflict?.hasConflict ? (
-                      <div className="flex items-center gap-1.5 text-rose-600 text-xs font-bold bg-rose-50 p-2 rounded-xl border border-rose-200">
-                        <AlertTriangle className="h-4 w-4 shrink-0" />
-                        <span>{itemConflict.message}</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5 text-emerald-700 text-xs font-bold bg-emerald-50/70 p-2 rounded-xl border border-emerald-200">
-                        <CheckCircle2 className="h-4 w-4 shrink-0" />
-                        <span>안전: 수업 겹침이나 교사 중복 없이 정상 배정 가능합니다.</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
 
-        <DialogFooter className="border-t border-slate-100 pt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
-          <Button
-            variant="ghost"
-            onClick={onClose}
-            className="h-10 text-xs font-bold text-slate-600"
-          >
-            취소
-          </Button>
+        {/* 3. 하단 모달 액션 바 (attendance-import-modal 테마) */}
+        <div className="p-4 sm:p-5 bg-white border-t border-slate-100 flex items-center justify-between shrink-0">
+          <div className="text-xs font-bold text-slate-500">
+            {items.length > 0 ? (
+              <span>선택된 수업 <strong className="text-indigo-600 font-black">{items.length}건</strong></span>
+            ) : (
+              <span>수업 슬롯을 선택해 주세요</span>
+            )}
+          </div>
 
           <div className="flex items-center gap-2">
             <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="h-9 px-4 text-xs font-bold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl cursor-pointer"
+            >
+              취소
+            </Button>
+            <Button
+              type="button"
               variant="outline"
               onClick={() => handleSave(false)}
               disabled={isSaving || hasAnyConflict || items.length === 0}
-              className="h-10 text-xs font-bold border-slate-200 text-slate-700 hover:bg-slate-50"
+              className="h-9 px-4 text-xs font-bold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl cursor-pointer"
             >
               임시 저장
             </Button>
             <Button
+              type="button"
               onClick={() => handleSave(true)}
               disabled={isSaving || hasAnyConflict || items.length === 0}
-              className="h-10 text-xs font-bold gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/20"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-9 px-5 rounded-xl text-xs gap-1.5 shadow-md shadow-indigo-100 cursor-pointer"
             >
-              <FileText className="h-4 w-4" />
-              수업계 공식 제출 & 신청서 생성
+              <FileText className="h-3.5 w-3.5" />
+              수업계 결재 상신 (신청 완료)
             </Button>
           </div>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

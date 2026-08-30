@@ -13,6 +13,8 @@ import {
 import { SubstituteClient } from './substitute-client';
 import { ParsedTimetableResult } from '@/lib/timetable/parser';
 import { Loader2 } from 'lucide-react';
+import { checkTeachingSupportPermission } from '@/lib/permissions';
+import { redirect } from 'next/navigation';
 
 export const metadata = {
   title: '수업 결보강 및 교체 관리 | 교수학습지원',
@@ -33,6 +35,11 @@ const fallbackTimetableData: ParsedTimetableResult = {
 };
 
 export default async function SubstitutePage() {
+  const hasAccess = await checkTeachingSupportPermission('/teaching-support/substitute');
+  if (!hasAccess) {
+    redirect('/dashboard');
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -62,10 +69,10 @@ export default async function SubstitutePage() {
   const initialCalendarConfig = calendarRes.success ? calendarRes.data : undefined;
 
   return (
-    <div className="min-h-full bg-slate-50/50 pb-16">
+    <div className="flex flex-col gap-4 sm:gap-5 w-full pb-20 sm:pb-16 min-h-full">
       <Suspense fallback={
         <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
         </div>
       }>
         <SubstituteClient
