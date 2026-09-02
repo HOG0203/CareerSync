@@ -1240,17 +1240,19 @@ export async function deleteStudentEvaluationItemAction(
 
 export interface MyImportedStudentItem {
   studentId: string;
+  rowKey: string; // 항목별 고유 키 (studentId + 항목 식별자), 테이블 row key로 사용
   studentName: string;
   grade?: number;
   classInfo: string;
   major: string;
   studentNumber: string;
-  summary: string[];
+  summary: string[]; // 단일 항목 요약 (1개짜리 배열)
   registeredAt?: string;
   registeredByName?: string;
   canDelete: boolean;
   rawVocationalDetails?: any;
   rawVolunteerHours?: { school: number; outside: number };
+  rawItemData?: any; // 해당 row의 원본 데이터 (수정 폼 초기값 세팅에 사용)
 }
 
 /**
@@ -1287,200 +1289,224 @@ export async function getMyImportedRecordsAction(
     const student = studentMap.get(studentId);
     if (!student) continue;
 
-    const summaryList: string[] = [];
-    let registeredAt: string | undefined;
-    let registeredByName: string | undefined;
-    let hasMyItem = false;
+    const gradYear = student.graduation_year;
+    const grade = gradYear ? (baseYear + 4 - gradYear) : undefined;
+    const rawClass = String(student.class_info || '').trim();
+    const classInfo = rawClass ? (rawClass.endsWith('반') ? rawClass : `${rawClass}반`) : '';
+
+    // 학생 기본 정보 (모든 항목 행에 공통)
+    const base = {
+      studentId,
+      studentName: student.student_name,
+      grade,
+      classInfo,
+      major: student.major,
+      studentNumber: student.student_number,
+      canDelete: true,
+      rawVocationalDetails: evalData.vocational_details,
+      rawVolunteerHours: {
+        school: Number(evalData.volunteer_school_hours || 0),
+        outside: Number(evalData.volunteer_outside_hours || 0),
+      },
+    };
 
     if (category === 'volunteer') {
+      // 봉사활동: 학생당 1행
       const vMeta = evalData.volunteer_meta;
-      const hours = (Number(evalData.volunteer_school_hours || 0) + Number(evalData.volunteer_outside_hours || 0));
-      if (hours > 0) {
-        if (isAdmin || vMeta?.userId === currentUserId || (!vMeta && profile.role === 'teacher')) {
-          hasMyItem = true;
-          totalItemCount++;
-          summaryList.push(`봉사활동 총 ${hours}시간 (교내 ${evalData.volunteer_school_hours || 0}h / 교외 ${evalData.volunteer_outside_hours || 0}h)`);
-          if (vMeta) {
-            registeredAt = vMeta.at;
-            registeredByName = vMeta.userName;
-          }
-        }
+      const school = Number(evalData.volunteer_school_hours || 0);
+      const outside = Number(evalData.volunteer_outside_hours || 0);
+      const hours = school + outside;
+      if (hours > 0 && (isAdmin || vMeta?.userId === currentUserId || (!vMeta && profile.role === 'teacher'))) {
+        totalItemCount++;
+        result.push({
+          ...base,
+          rowKey: `${studentId}_volunteer`,
+          summary: [`봉사활동 총 ${hours}시간 (교내 ${school}h / 교외 ${outside}h)`],
+          registeredAt: vMeta?.at,
+          registeredByName: vMeta?.userName,
+        });
       }
+
     } else if (category === 'vocational') {
+      // 직업기초능력: 학년(grade)별로 1행씩
       const vDetails = evalData.vocational_details || {};
       for (const gradeKey of ['grade1', 'grade2', 'grade3', 'mock'] as const) {
         const gData = vDetails[gradeKey];
-        if (gData && gData.isCompleted) {
+        if (gData?.isCompleted) {
           const gMeta = gData.created_by;
           if (isAdmin || gMeta?.userId === currentUserId || (!gMeta && profile.role === 'teacher')) {
-            hasMyItem = true;
             totalItemCount++;
             const label = gradeKey === 'mock' ? '3학년 모의평가' : `${gradeKey.replace('grade', '')}학년`;
-            summaryList.push(`${label} 등급합: ${gData.gradeSum}등급 (국${gData.korean || 5}, 영${gData.english || 5}, 수${gData.math || 5}, 문${gData.problem || 5})`);
-            if (gMeta) {
-              registeredAt = gMeta.at;
-              registeredByName = gMeta.userName;
-            }
+            result.push({
+              ...base,
+              rowKey: `${studentId}_vocational_${gradeKey}`,
+              summary: [`${label} 등급합: ${gData.gradeSum}등급 (국${gData.korean || 5}, 영${gData.english || 5}, 수${gData.math || 5}, 문${gData.problem || 5})`],
+              registeredAt: gMeta?.at,
+              registeredByName: gMeta?.userName,
+            });
           }
         }
       }
+
     } else if (category === 'employment') {
+      // 취업역량: 세부 항목별로 각각 1행
       const eDetails = evalData.employment_details || {};
-      
-      // 1. 산학교육
-      (eDetails.industry_edu_list || []).forEach(item => {
+
+      // 1. 산학교육 (배열 → 항목 하나당 1행)
+      (eDetails.industry_edu_list || []).forEach((item: any, idx: number) => {
         if (isAdmin || item.created_by?.userId === currentUserId || (!item.created_by && profile.role === 'teacher')) {
-          hasMyItem = true;
           totalItemCount++;
-          summaryList.push(`산학교육: ${item.title}${item.dateOrTerm ? ` (${item.dateOrTerm})` : ''}`);
-          if (item.created_by) {
-            registeredAt = item.created_by.at;
-            registeredByName = item.created_by.userName;
-          }
+          result.push({
+            ...base,
+            rowKey: `${studentId}_industry_edu_${idx}`,
+            summary: [`산학교육: ${item.title}${item.dateOrTerm ? ` (${item.dateOrTerm})` : ''}`],
+            registeredAt: item.created_by?.at,
+            registeredByName: item.created_by?.userName,
+            rawItemData: { type: 'industry_edu', title: item.title || '', dateOrTerm: item.dateOrTerm || '', idx },
+          });
         }
       });
 
-      // 2. 취업코스
+      // 2. 취업코스 (학기별 1행)
       Object.entries(eDetails.career_courses || {}).forEach(([term, course]) => {
         const meta = eDetails.career_courses_meta?.[term];
         if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
-          hasMyItem = true;
           totalItemCount++;
-          summaryList.push(`취업코스: ${term}학기 [${course}]`);
-          if (meta) {
-            registeredAt = meta.at;
-            registeredByName = meta.userName;
-          }
+          result.push({
+            ...base,
+            rowKey: `${studentId}_career_courses_${term}`,
+            summary: [`취업코스: ${term}학기 [${course}]`],
+            registeredAt: meta?.at,
+            registeredByName: meta?.userName,
+            rawItemData: { type: 'career_courses', course: String(course || ''), term },
+          });
         }
       });
 
-      // 3. 전공동아리
-      Object.entries(eDetails.major_clubs || {}).forEach(([grade, club]) => {
-        const meta = eDetails.major_clubs_meta?.[grade];
+      // 3. 심화동아리 (학년별 1행)
+      Object.entries(eDetails.major_clubs || {}).forEach(([g, club]) => {
+        const meta = eDetails.major_clubs_meta?.[g];
         if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
-          hasMyItem = true;
           totalItemCount++;
-          summaryList.push(`심화동아리: ${grade}학년 [${club}]`);
-          if (meta) {
-            registeredAt = meta.at;
-            registeredByName = meta.userName;
-          }
+          result.push({
+            ...base,
+            rowKey: `${studentId}_major_clubs_${g}`,
+            summary: [`심화동아리: ${g}학년 [${club}]`],
+            registeredAt: meta?.at,
+            registeredByName: meta?.userName,
+            rawItemData: { type: 'major_clubs', club: String(club || ''), grade: g },
+          });
         }
       });
 
-      // 4. 기능경기대회
+      // 4. 기능경기대회 (1행)
       if (eDetails.skills_contest?.name) {
         const meta = eDetails.skills_contest.created_by;
         if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
-          hasMyItem = true;
           totalItemCount++;
-          summaryList.push(`기능대회: ${eDetails.skills_contest.name} (${eDetails.skills_contest.level === 'national' ? '전국' : '지방'})`);
-          if (meta) {
-            registeredAt = meta.at;
-            registeredByName = meta.userName;
-          }
+          result.push({
+            ...base,
+            rowKey: `${studentId}_skills_contest`,
+            summary: [`기능대회: ${eDetails.skills_contest.name} (${eDetails.skills_contest.level === 'national' ? '전국' : '지방'})`],
+            registeredAt: meta?.at,
+            registeredByName: meta?.userName,
+            rawItemData: { type: 'skills_contest', name: eDetails.skills_contest.name || '', level: eDetails.skills_contest.level || 'local' },
+          });
         }
       }
 
-      // 5. 현장실습 / 도제 / 조기취업
+      // 5. 현장실습 (1행)
       if (eDetails.field_training?.company) {
         const meta = eDetails.field_training.created_by;
         if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
-          hasMyItem = true;
           totalItemCount++;
-          summaryList.push(`현장실습: ${eDetails.field_training.company}`);
-          if (meta) {
-            registeredAt = meta.at;
-            registeredByName = meta.userName;
-          }
+          result.push({
+            ...base,
+            rowKey: `${studentId}_field_training`,
+            summary: [`현장실습: ${eDetails.field_training.company}`],
+            registeredAt: meta?.at,
+            registeredByName: meta?.userName,
+            rawItemData: { type: 'field_training', company: eDetails.field_training.company || '' },
+          });
         }
       }
 
+      // 6. 도제 OJT (학기별 1행)
       Object.entries(eDetails.apprenticeship || {}).forEach(([term, comp]) => {
         const meta = eDetails.apprenticeship_meta?.[term];
         if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
-          hasMyItem = true;
           totalItemCount++;
-          summaryList.push(`도제 OJT: ${term} [${comp}]`);
-          if (meta) {
-            registeredAt = meta.at;
-            registeredByName = meta.userName;
-          }
+          result.push({
+            ...base,
+            rowKey: `${studentId}_apprenticeship_${term}`,
+            summary: [`도제 OJT: ${term} [${comp}]`],
+            registeredAt: meta?.at,
+            registeredByName: meta?.userName,
+            rawItemData: { type: 'apprenticeship', company: String(comp || ''), term },
+          });
         }
       });
 
+      // 7. 조기취업 (1행)
       if (eDetails.employed_early?.company) {
         const meta = eDetails.employed_early.created_by;
         if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
-          hasMyItem = true;
           totalItemCount++;
-          summaryList.push(`조기취업: ${eDetails.employed_early.company}`);
-          if (meta) {
-            registeredAt = meta.at;
-            registeredByName = meta.userName;
-          }
+          result.push({
+            ...base,
+            rowKey: `${studentId}_employed_early`,
+            summary: [`조기취업: ${eDetails.employed_early.company}`],
+            registeredAt: meta?.at,
+            registeredByName: meta?.userName,
+            rawItemData: { type: 'employed_early', company: eDetails.employed_early.company || '' },
+          });
         }
       }
 
     } else if (category === 'arts_contest') {
+      // 예체능/대회: 항목별 1행
       const aDetails = evalData.arts_contest_details || {};
 
-      // 1. 대회 실적
-      (aDetails.contest_list || []).forEach(item => {
+      // 1. 대회 실적 (배열 → 항목 하나당 1행)
+      (aDetails.contest_list || []).forEach((item: any, idx: number) => {
         if (isAdmin || item.created_by?.userId === currentUserId || (!item.created_by && profile.role === 'teacher')) {
-          hasMyItem = true;
           totalItemCount++;
-          summaryList.push(`대회 실적: [${item.category || '교내'}] ${item.title} (${item.type === 'award' ? `입상 - ${item.award || '1점'}` : '참가 - 0.5점'})`);
-          if (item.created_by) {
-            registeredAt = item.created_by.at;
-            registeredByName = item.created_by.userName;
-          }
+          result.push({
+            ...base,
+            rowKey: `${studentId}_contest_${idx}`,
+            summary: [`대회 실적: [${item.category || '교내'}] ${item.title} (${item.type === 'award' ? `입상 - ${item.award || '1점'}` : '참가 - 0.5점'})`],
+            registeredAt: item.created_by?.at,
+            registeredByName: item.created_by?.userName,
+            rawItemData: { type: 'contest', category: item.category || '교내', title: item.title || '', contestType: item.type || 'award', award: item.award || '1점', idx },
+          });
         }
       });
 
-      // 2. 운동부 / 관악부
+      // 2. 운동부/관악부 (학기별 1행)
       Object.entries(aDetails.arts_sports || {}).forEach(([term, dept]) => {
         const meta = aDetails.arts_sports_meta?.[term];
         if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
-          hasMyItem = true;
           totalItemCount++;
-          summaryList.push(`예체능: ${term}학기 [${dept}]`);
-          if (meta) {
-            registeredAt = meta.at;
-            registeredByName = meta.userName;
-          }
+          result.push({
+            ...base,
+            rowKey: `${studentId}_arts_sports_${term}`,
+            summary: [`예체능: ${term}학기 [${dept}]`],
+            registeredAt: meta?.at,
+            registeredByName: meta?.userName,
+            rawItemData: { type: 'arts_sports', dept: String(dept || ''), term },
+          });
         }
       });
     }
 
-    if (hasMyItem) {
-      const gradYear = student.graduation_year;
-      const grade = gradYear ? (baseYear + 4 - gradYear) : undefined;
-      const rawClass = String(student.class_info || '').trim();
-      const classInfo = rawClass ? (rawClass.endsWith('반') ? rawClass : `${rawClass}반`) : '';
-
-      result.push({
-        studentId,
-        studentName: student.student_name,
-        grade,
-        classInfo,
-        major: student.major,
-        studentNumber: student.student_number,
-        summary: summaryList,
-        registeredAt,
-        registeredByName,
-        canDelete: true,
-        rawVocationalDetails: evalData.vocational_details,
-        rawVolunteerHours: {
-          school: Number(evalData.volunteer_school_hours || 0),
-          outside: Number(evalData.volunteer_outside_hours || 0)
-        }
-      });
-    }
   }
 
-  // 학년순(내림차순) -> 반순 -> 번호순 정렬
+  // 등록 일시 내림차순 정렬 (최근 등록 순)
   result.sort((a, b) => {
+    const dateA = a.registeredAt ? new Date(a.registeredAt).getTime() : 0;
+    const dateB = b.registeredAt ? new Date(b.registeredAt).getTime() : 0;
+    if (dateB !== dateA) return dateB - dateA;
+    // 같은 시각이면 학년 > 반 > 번호 순
     if ((b.grade || 0) !== (a.grade || 0)) return (b.grade || 0) - (a.grade || 0);
     if (a.classInfo !== b.classInfo) return a.classInfo.localeCompare(b.classInfo);
     return Number(a.studentNumber) - Number(b.studentNumber);
@@ -1570,6 +1596,73 @@ export async function updateSingleImportedRecordAction(
       volunteer_meta: auditMeta,
       updated_by: auditMeta,
     };
+  } else if (category === 'employment') {
+    // rowKey로 어떤 세부 항목인지 파악 후 해당 필드만 수정
+    const rowKey: string = data.rowKey || '';
+    const eDetails = { ...(prev.employment_details || {}) };
+
+    if (rowKey.includes('_industry_edu_')) {
+      const idx = parseInt(rowKey.split('_industry_edu_')[1]);
+      const list = [...(eDetails.industry_edu_list || [])];
+      if (list[idx]) {
+        list[idx] = { ...list[idx], title: data.title || list[idx].title, dateOrTerm: data.dateOrTerm ?? list[idx].dateOrTerm };
+        eDetails.industry_edu_list = list;
+      }
+    } else if (rowKey.includes('_career_courses_')) {
+      const term = rowKey.split('_career_courses_')[1];
+      eDetails.career_courses = { ...(eDetails.career_courses || {}), [term]: data.course };
+    } else if (rowKey.includes('_major_clubs_')) {
+      const grade = rowKey.split('_major_clubs_')[1];
+      eDetails.major_clubs = { ...(eDetails.major_clubs || {}), [grade]: data.club };
+    } else if (rowKey.includes('_skills_contest')) {
+      eDetails.skills_contest = { ...(eDetails.skills_contest || {}), name: data.name, level: data.level, created_by: eDetails.skills_contest?.created_by || auditMeta };
+    } else if (rowKey.includes('_field_training')) {
+      const existing = eDetails.field_training;
+      eDetails.field_training = {
+        completed: existing?.completed ?? false,
+        company: data.company,
+        period: existing?.period,
+        created_by: existing?.created_by || auditMeta,
+      };
+    } else if (rowKey.includes('_apprenticeship_')) {
+      const term = rowKey.split('_apprenticeship_')[1];
+      eDetails.apprenticeship = { ...(eDetails.apprenticeship || {}), [term]: data.company };
+    } else if (rowKey.includes('_employed_early')) {
+      const existing = eDetails.employed_early;
+      eDetails.employed_early = {
+        confirmed: existing?.confirmed ?? false,
+        company: data.company,
+        date: existing?.date,
+        created_by: existing?.created_by || auditMeta,
+      };
+    }
+
+    currentStore[studentId] = { ...prev, student_id: studentId, academic_year: baseYear, employment_details: eDetails, updated_by: auditMeta };
+
+  } else if (category === 'arts_contest') {
+    // rowKey로 어떤 세부 항목인지 파악 후 해당 필드만 수정
+    const rowKey: string = data.rowKey || '';
+    const aDetails = { ...(prev.arts_contest_details || {}) };
+
+    if (rowKey.includes('_contest_')) {
+      const idx = parseInt(rowKey.split('_contest_')[1]);
+      const list = [...(aDetails.contest_list || [])];
+      if (list[idx]) {
+        list[idx] = {
+          ...list[idx],
+          category: data.category || list[idx].category,
+          title: data.title || list[idx].title,
+          type: data.contestType || list[idx].type,
+          award: data.contestType === 'award' ? (data.award || list[idx].award) : undefined,
+        };
+        aDetails.contest_list = list;
+      }
+    } else if (rowKey.includes('_arts_sports_')) {
+      const term = rowKey.split('_arts_sports_')[1];
+      aDetails.arts_sports = { ...(aDetails.arts_sports || {}), [term]: data.dept };
+    }
+
+    currentStore[studentId] = { ...prev, student_id: studentId, academic_year: baseYear, arts_contest_details: aDetails, updated_by: auditMeta };
   }
 
   const { error: saveErr } = await supabase
