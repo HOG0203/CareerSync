@@ -40,6 +40,8 @@ export const ALL_SYSTEM_MENU_GROUPS = [
       { href: '/company-info', label: '업체정보', description: '협약/실습/취업 기업체 및 구인 관리' },
       { href: '/students', label: '취업상세데이터', description: '학생별 상세 취업 데이터 스프레드시트' },
       { href: '/labor-education', label: '노동인권교육', description: '노동인권교육 이수 현황 그리드' },
+      { href: '/employment/grade', label: '내신등급 계산', description: '맞춤형 내신등급 산출 및 기업별 지원자 선별' },
+      { href: '/employment/recommendation', label: '학교장 추천 선발', description: 'NCS, 성적, 인증점수, 면접 종합 추천 대상자 심사' },
     ],
   },
   {
@@ -97,13 +99,13 @@ export function getDefaultRoutesForUser(profile: any, subAdminList: string[] = [
       return ALL_SYSTEM_MENU_GROUPS.flatMap(g => g.items.map(i => i.href));
     }
     if (isSubAdmin) {
-      // 서브관리자는 기본 권한에서 '로그인 및 활동 이력', '작업 이력 관리', '교수학습지원'을 제외 (시스템 설정 및 사용자 관리는 포함)
+      // 서브관리자는 기본 권한에서 '로그인 및 활동 이력', '작업 이력 관리'를 제외 (시스템 설정, 사용자 관리, 교수학습지원 등 포함)
       return ALL_SYSTEM_MENU_GROUPS.flatMap(g => g.items.map(i => i.href))
-        .filter(href => href !== '/admin/login-history' && href !== '/admin/audit-logs' && !href.startsWith('/teaching-support'));
+        .filter(href => href !== '/admin/login-history' && href !== '/admin/audit-logs');
     }
-    // 일반 관리자는 기본 권한에서 로그인 및 활동 이력, 작업 이력 관리, 시스템 설정, 교수학습지원 제외
+    // 일반 관리자는 기본 권한에서 로그인 및 활동 이력, 작업 이력 관리, 시스템 설정 제외 (교수학습지원 등 포함)
     return ALL_SYSTEM_MENU_GROUPS.flatMap(g => g.items.map(i => i.href))
-      .filter(href => href !== '/admin/login-history' && href !== '/admin/audit-logs' && href !== '/admin/settings' && !href.startsWith('/teaching-support'));
+      .filter(href => href !== '/admin/login-history' && href !== '/admin/audit-logs' && href !== '/admin/settings');
   }
   if (profile?.role === 'student') {
     return ['/student/certification', '/student/merit-demerit'];
@@ -123,6 +125,9 @@ export function getDefaultRoutesForUser(profile: any, subAdminList: string[] = [
     '/admin/certification/attendance',
     '/admin/certification/certificates',
     '/admin/certification/import',
+    '/teaching-support/timetable',
+    '/teaching-support/substitute',
+    '/teaching-support/substitute/admin',
   ];
 
   if (isGrade3) {
@@ -133,8 +138,7 @@ export function getDefaultRoutesForUser(profile: any, subAdminList: string[] = [
     routes.push('/class-management', '/student-accounts');
   }
 
-  // 🌟 교수학습지원 메뉴(/teaching-support)는 메인관리자(이호중)를 제외한 모든 사용자에게 기본 비공개(비활성화)
-  // 관리자가 사용자 관리 모달에서 권한을 수동 부여(체크)했을 때만 접근 가능
+  // 🌟 교수학습지원 메뉴(/teaching-support)는 모든 교직원/관리자 사용자에게 기본 공개 (접근 허용)
 
   return routes;
 }

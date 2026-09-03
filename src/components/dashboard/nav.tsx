@@ -45,7 +45,10 @@ import {
   Scale,
   BookOpen,
   CalendarDays,
-  ArrowLeftRight
+  ArrowLeftRight,
+  Plane,
+  Trophy,
+  Calculator
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { handleClientLogout } from '@/lib/auth-helpers';
@@ -134,19 +137,20 @@ export default function Nav({
         { href: '/company-info', label: '업체정보', icon: Factory },
         ...(canView3rdGradeDetailMenus ? [{ href: '/students', label: '취업상세데이터', icon: ClipboardList }] : []),
         ...(canView3rdGradeDetailMenus ? [{ href: '/labor-education', label: '노동인권교육', icon: ShieldAlert }] : []),
+        ...(isAdmin ? [
+          { href: '/employment/grade', label: '내신등급 계산', icon: Calculator },
+          { href: '/employment/recommendation', label: '학교장 추천 선발', icon: Trophy },
+        ] : []),
       ]
     },
-    ...(isMasterAdmin ? [
-      {
-        title: "교수학습지원",
-        icon: BookOpen,
-        items: [
-          { href: '/teaching-support/timetable', label: '시간표 조회/관리', icon: CalendarDays },
-          { href: '/teaching-support/substitute', label: '결보강 처리', icon: ArrowLeftRight },
-          { href: '/teaching-support/substitute/admin', label: '결보강 승인/관리', icon: ShieldCheck },
-        ]
-      }
-    ] : []),
+    {
+      title: "교수학습지원",
+      icon: BookOpen,
+      items: [
+        { href: '/teaching-support/timetable', label: '시간표 조회/관리', icon: CalendarDays },
+        { href: '/teaching-support/substitute', label: '결보강 처리', icon: ArrowLeftRight },
+      ]
+    },
     {
       title: "학생 및 생활지도",
       icon: GraduationCap,
@@ -197,6 +201,8 @@ export default function Nav({
         { href: '/company-info', label: '업체정보', icon: Factory },
         { href: '/students', label: '취업상세데이터', icon: ClipboardList },
         { href: '/labor-education', label: '노동인권교육', icon: ShieldAlert },
+        { href: '/employment/grade', label: '내신등급 계산', icon: Calculator },
+        { href: '/employment/recommendation', label: '학교장 추천 선발', icon: Trophy },
       ]
     },
     {
@@ -205,7 +211,6 @@ export default function Nav({
       items: [
         { href: '/teaching-support/timetable', label: '시간표 조회/관리', icon: CalendarDays },
         { href: '/teaching-support/substitute', label: '결보강 처리', icon: ArrowLeftRight },
-        { href: '/teaching-support/substitute/admin', label: '결보강 승인/관리', icon: ShieldCheck },
       ]
     },
     {

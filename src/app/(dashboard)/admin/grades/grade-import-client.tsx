@@ -389,15 +389,11 @@ export function GradeImportClient({ onSuccess }: { onSuccess?: () => void }) {
             studentEntries.push(entry);
           }
 
-          // 4) 과목별 평균/표준편차 및 석차등급(9등급제 vs 5등급제) 산출 매핑 테이블
-          const targetGraduationYear = fileYear + (4 - fileGrade);
-          const is9Tier = targetGraduationYear === 2027; // 2027학년도 졸업생만 9등급제, 2028년 이후는 5등급제
-
+          // 4) 과목별 평균 및 표준편차 산출
           interface SubjectStats {
             average: number;
             stdDev: number;
             count: number;
-            scoreRankMap: Map<number, string>;
           }
 
           const subjectStatsMap: Record<string, SubjectStats> = {};
@@ -406,7 +402,7 @@ export function GradeImportClient({ onSuccess }: { onSuccess?: () => void }) {
             const scores = subjectScoresMap[sc.subjectName] || [];
             const N = scores.length;
             if (N === 0) {
-              subjectStatsMap[sc.subjectName] = { average: 0, stdDev: 0, count: 0, scoreRankMap: new Map() };
+              subjectStatsMap[sc.subjectName] = { average: 0, stdDev: 0, count: 0 };
               return;
             }
 
@@ -415,46 +411,10 @@ export function GradeImportClient({ onSuccess }: { onSuccess?: () => void }) {
             const variance = scores.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / N;
             const stdDev = parseFloat(Math.sqrt(variance).toFixed(1));
 
-            // NEIS 표준 중간석차 및 누적 백분율 공식 적용
-            const sortedScores = [...scores].sort((a, b) => b - a);
-            const scoreRankMap = new Map<number, string>();
-            const uniqueScores = Array.from(new Set(sortedScores));
-
-            uniqueScores.forEach(score => {
-              const sameCount = sortedScores.filter(s => s === score).length;
-              const firstRank = sortedScores.findIndex(s => s === score) + 1;
-              const midRank = firstRank + (sameCount - 1) / 2;
-              const cumPct = (midRank / N) * 100;
-
-              let rankGrade = '1';
-              if (is9Tier) {
-                // 9등급제 (2027 졸업생)
-                if (cumPct <= 4) rankGrade = '1';
-                else if (cumPct <= 11) rankGrade = '2';
-                else if (cumPct <= 23) rankGrade = '3';
-                else if (cumPct <= 40) rankGrade = '4';
-                else if (cumPct <= 60) rankGrade = '5';
-                else if (cumPct <= 77) rankGrade = '6';
-                else if (cumPct <= 89) rankGrade = '7';
-                else if (cumPct <= 96) rankGrade = '8';
-                else rankGrade = '9';
-              } else {
-                // 5등급제 (2028 이후 졸업생)
-                if (cumPct <= 10) rankGrade = '1';
-                else if (cumPct <= 34) rankGrade = '2';
-                else if (cumPct <= 66) rankGrade = '3';
-                else if (cumPct <= 90) rankGrade = '4';
-                else rankGrade = '5';
-              }
-
-              scoreRankMap.set(score, rankGrade);
-            });
-
             subjectStatsMap[sc.subjectName] = {
               average: avg,
               stdDev,
               count: N,
-              scoreRankMap
             };
           });
 
@@ -472,7 +432,9 @@ export function GradeImportClient({ onSuccess }: { onSuccess?: () => void }) {
               else if (score >= 60) achievement = 'D';
 
               const sStats = subjectStatsMap[sc.subjectName];
-              const rankGrade = sStats?.scoreRankMap.get(score) || null;
+
+              // [중요 지침] 가로형 성적 일람표는 원점수/성취도만 기록하며, 석차등급은 임의 계산하지 않음 (세로형 NEIS 교과학습발달상황 업로드 시에만 공식 석차등급 기입)
+              const rankGrade = null;
 
               rawStudents.push({
                 studentName: st.studentName,
@@ -494,8 +456,8 @@ export function GradeImportClient({ onSuccess }: { onSuccess?: () => void }) {
           });
 
           setDetectedFileInfo({
-            major: `전과목 성적 일람표 (${is9Tier ? '9등급제' : '5등급제'})`,
-            classInfo: `${fileGrade}학년 ${fileSemester}학기 (과목 ${subjectCols.length}개, 총 ${studentEntries.length}명)`
+            major: '전과목 성적 일람표 (원점수/성취도)',
+            classInfo: `${fileGrade}학년 ${fileSemester}학기 (과목 ${subjectCols.length}개, 총 ${studentEntries.length}명, 석차등급 미기입)`
           });
 
         } else {
@@ -809,8 +771,8 @@ export function GradeImportClient({ onSuccess }: { onSuccess?: () => void }) {
         <div className="space-y-1.5">
           <h5 className="text-sm sm:text-base font-extrabold text-slate-900">NEIS 성적 엑셀 파일 업로드 가이드 (2가지 양식 모두 지원)</h5>
           <div className="text-xs sm:text-sm leading-relaxed text-slate-700 space-y-1 font-medium">
-            <p>• <strong className="text-slate-900 font-bold">[양식 1] NEIS 교과학습발달상황 서식</strong>: NEIS &gt; 학생부 &gt; 교과학습발달상황 &gt; XLS data 다운 엑셀</p>
-            <p>• <strong className="text-slate-900 font-bold">[양식 2] 전과목 성적 일람표 서식</strong>: NEIS &gt; 성적 &gt; 전과목 성적 일람표 가로형 엑셀 (과목평균, 표준편차, 성취도, 석차등급 5/9등급제 자동 산출)</p>
+            <p>• <strong className="text-slate-900 font-bold">[양식 1] NEIS 교과학습발달상황 서식 (세로형)</strong>: NEIS &gt; 학생부 &gt; 교과학습발달상황 엑셀 (공식 석차등급 자동 기입)</p>
+            <p>• <strong className="text-slate-900 font-bold">[양식 2] 전과목 성적 일람표 서식 (가로형)</strong>: NEIS &gt; 성적 &gt; 전과목 성적 일람표 엑셀 (과목평균, 표준편차, 성취도 기입. 석차등급은 세로형 양식에서만 기입)</p>
             <p>• 엑셀 파일을 선택하거나 드래그하여 분석 후 <strong className="text-slate-900 font-bold">[대기 리스트 전체 DB 반영하기]</strong>로 저장합니다.</p>
           </div>
         </div>

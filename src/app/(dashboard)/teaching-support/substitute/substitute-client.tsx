@@ -20,8 +20,16 @@ import { InteractiveTeacherTimetable, SelectedSlotItem } from './interactive-tea
 import { BatchExchangeDrawer } from './batch-exchange-drawer';
 import { useSearchParams } from 'next/navigation';
 import { SubstituteOfficialForm } from './substitute-official-form';
-import { SubstituteStatsView } from './substitute-stats-view';
 import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { 
   ArrowLeftRight, 
   Sparkles, 
@@ -35,12 +43,16 @@ import {
   Eye, 
   Layers,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ShieldCheck,
   Building,
+  User,
   UserPlus,
   AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { generateSemesterWeeksFromConfig, findCurrentWeekNum } from '@/lib/substitute/event-helper';
 
 interface SubstituteClientProps {
   initialApplications: SubstituteApplication[];
@@ -69,6 +81,34 @@ export function SubstituteClient({
   }, [timetableData.teachers, currentUserFullName, currentUsername]);
 
   const [selectedTeacherName, setSelectedTeacherName] = React.useState<string>(defaultTeacherName);
+
+  // 학기 주차 목록 생성 (설정된 학사일정 기반 동적 계산)
+  const semesterWeeks = React.useMemo(() => {
+    return generateSemesterWeeksFromConfig(calendarConfig);
+  }, [calendarConfig]);
+
+  // 현재 주차 자동 계산 (오늘 날짜 및 주말 완벽 대응)
+  const defaultWeekNum = React.useMemo(() => {
+    return findCurrentWeekNum(semesterWeeks);
+  }, [semesterWeeks]);
+
+  const [selectedWeekNum, setSelectedWeekNum] = React.useState<number>(defaultWeekNum);
+
+  React.useEffect(() => {
+    setSelectedWeekNum(defaultWeekNum);
+  }, [defaultWeekNum]);
+
+  const handlePrevWeek = () => {
+    if (selectedWeekNum > 1) {
+      setSelectedWeekNum(prev => prev - 1);
+    }
+  };
+
+  const handleNextWeek = () => {
+    if (selectedWeekNum < semesterWeeks.length) {
+      setSelectedWeekNum(prev => prev + 1);
+    }
+  };
 
   // 통합 신청 서랍 상태 (1개 슬롯 및 다교시 슬롯 모두 동일 서랍과 통일된 로직 사용)
   const [batchSlots, setBatchSlots] = React.useState<SelectedSlotItem[]>([]);
@@ -218,18 +258,6 @@ export function SubstituteClient({
     return list.sort((a, b) => a.item.sourcePeriod - b.item.sourcePeriod);
   }, [applications, todayStr]);
 
-  // 공식 양식 보기 중인 경우 (단일 또는 다중)
-  if (viewingApps && viewingApps.length > 0) {
-    return (
-      <div className="p-4 sm:p-6 max-w-7xl mx-auto">
-        <SubstituteOfficialForm
-          applications={viewingApps}
-          onBack={() => setViewingApps(null)}
-        />
-      </div>
-    );
-  }
-
   const getItemSubjectName = (it: { sourceDate?: string; sourcePeriod?: number; classCode?: string; subjectName?: string; originalTeacher?: string }, applicantTeacher?: string) => {
     if (calendarConfig && it.sourceDate && it.sourcePeriod) {
       const evs = getEventsForSlot(it.sourceDate, it.sourcePeriod, it.classCode || '', applicantTeacher || it.originalTeacher || '', calendarConfig);
@@ -253,36 +281,258 @@ export function SubstituteClient({
     return it.classCode || '';
   };
 
+  // 5. 핵심 요약 통계 계산 (모든 훅은 조기 반환문 이전에 항상 실행되어야 함)
+  const summaryStats = React.useMemo(() => {
+    const myTotal = myApplications.length;
+    const myApproved = myApplications.filter(a => a.status === 'approved').length;
+    const mySubmitted = myApplications.filter(a => a.status === 'submitted').length;
+
+    const todayTotal = todayItems.length;
+    const todaySub = todayItems.filter(x => x.item.type === 'substitute').length;
+    const todayExchange = todayItems.filter(x => x.item.type === 'exchange').length;
+
+    const totalApproved = applications.filter(a => a.status === 'approved').length;
+    const totalApps = applications.length;
+
+    let totalExchangeItems = 0;
+    applications.forEach(a => {
+      if (a.status !== 'rejected') {
+        a.items.forEach(it => {
+          if (it.type === 'exchange') totalExchangeItems++;
+        });
+      }
+    });
+
+    return {
+      myTotal,
+      myApproved,
+      mySubmitted,
+      todayTotal,
+      todaySub,
+      todayExchange,
+      totalApproved,
+      totalApps,
+      totalExchangeItems,
+    };
+  }, [myApplications, todayItems, applications]);
+
+  // 공식 양식 보기 중인 경우 (단일 또는 다중)
+  if (viewingApps && viewingApps.length > 0) {
+    return (
+      <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+        <SubstituteOfficialForm
+          applications={viewingApps}
+          onBack={() => setViewingApps(null)}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-3 sm:gap-4 w-full pt-1">
-      {/* 1. 상단 타이틀 헤더 (class-management 스타일) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 px-1">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-              <ArrowLeftRight className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
-              수업 결보강 & 교체 관리
-            </h2>
-            <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-blue-50 text-blue-700 border border-blue-100 hidden sm:inline-flex items-center gap-1">
-              <Clock className="h-3 w-3 text-blue-600" />
+    <div className="flex flex-col gap-4 sm:gap-5 w-full pt-1">
+      {/* 1. 제목줄: 상단 타이틀 헤더 (표준 모던 스타일) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between shrink-0 px-1 gap-2.5">
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 flex items-center gap-2.5 whitespace-nowrap">
+            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-100 shrink-0">
+              <ArrowLeftRight className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
+            </div>
+            <span>수업 결보강 & 교체 관리</span>
+            <span className="text-[11px] bg-blue-600 text-white px-2.5 py-0.5 rounded-full font-black whitespace-nowrap">
               {timetableData.academicYear}학년도 {timetableData.semester}학기
             </span>
-          </div>
-          <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed">
+          </h2>
+          <p className="text-slate-500 text-xs font-medium">
             시간표에서 변경할 수업을 클릭하여 스마트 공강 추천과 함께 수업 교체 및 결보강을 신속하게 처리합니다.
           </p>
         </div>
 
-        {/* 상단 우측 정보 뱃지 */}
-        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-1.5 text-xs text-slate-700 shadow-2xs font-medium">
-            <FileText className="h-3.5 w-3.5 text-blue-600" />
-            <span>내 신청: <strong className="text-blue-600 font-black">{myApplications.length}건</strong></span>
-          </div>
+        {/* 상단 우측 관리자 바로가기 버튼 */}
+        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+          <Link
+            href="/teaching-support/substitute/admin"
+            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-2xs transition-all"
+          >
+            <ShieldCheck className="h-3.5 w-3.5 text-blue-400" />
+            <span>수업계 관리자</span>
+          </Link>
         </div>
       </div>
 
-      {/* 2. 대화형 교사 시간표 컴포넌트 */}
+      {/* 2. 통계: 핵심 요약 통계 카드 4종 */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 animate-in fade-in duration-200">
+        {/* 카드 1: 내 결보강 신청 */}
+        <Card className="border-slate-200/80 shadow-2xs hover:shadow-sm transition-all rounded-2xl bg-white">
+          <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-[11px] sm:text-xs font-bold text-slate-500">내 결보강 신청</p>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-black text-blue-600">{summaryStats.myTotal}</span>
+                <span className="text-xs font-bold text-slate-400">건</span>
+              </div>
+              <p className="text-[10.5px] text-slate-500 font-medium">
+                승인 <strong className="text-emerald-600">{summaryStats.myApproved}</strong> · 대기 <strong className="text-blue-600">{summaryStats.mySubmitted}</strong>
+              </p>
+            </div>
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100 shrink-0">
+              <FileText className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 카드 2: 오늘의 결보강 */}
+        <Card className="border-slate-200/80 shadow-2xs hover:shadow-sm transition-all rounded-2xl bg-white">
+          <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-[11px] sm:text-xs font-bold text-slate-500">오늘의 결보강</p>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-black text-emerald-600">{summaryStats.todayTotal}</span>
+                <span className="text-xs font-bold text-slate-400">건</span>
+              </div>
+              <p className="text-[10.5px] text-slate-500 font-medium">
+                보강 <strong className="text-amber-600">{summaryStats.todaySub}</strong> · 교체 <strong className="text-blue-600">{summaryStats.todayExchange}</strong>
+              </p>
+            </div>
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 shrink-0">
+              <Calendar className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 카드 3: 이번 학기 누적 승인 */}
+        <Card className="border-slate-200/80 shadow-2xs hover:shadow-sm transition-all rounded-2xl bg-white">
+          <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-[11px] sm:text-xs font-bold text-slate-500">이번 학기 누적 승인</p>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-black text-indigo-600">{summaryStats.totalApproved}</span>
+                <span className="text-xs font-bold text-slate-400">건</span>
+              </div>
+              <p className="text-[10.5px] text-slate-500 font-medium">
+                전체 신청 {summaryStats.totalApps}건 중 완료
+              </p>
+            </div>
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 shrink-0">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 카드 4: 스마트 수업 맞교환 */}
+        <Card className="border-slate-200/80 shadow-2xs hover:shadow-sm transition-all rounded-2xl bg-white">
+          <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-[11px] sm:text-xs font-bold text-slate-500">스마트 수업 맞교환</p>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-black text-amber-600">{summaryStats.totalExchangeItems}</span>
+                <span className="text-xs font-bold text-slate-400">건</span>
+              </div>
+              <p className="text-[10.5px] text-slate-500 font-medium">
+                시수 결손 없는 상호 교환
+              </p>
+            </div>
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 border border-amber-100 shrink-0">
+              <ArrowLeftRight className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 3. 필터: 통합 필터 툴바 */}
+      <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl shrink-0">
+        <CardContent className="p-3 sm:p-3.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          {/* 좌측: 교사 선택 & 주차 선택 */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* 교사 선택 */}
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 rounded-xl px-2.5 py-1">
+              <User className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+              <span className="text-xs font-bold text-slate-500 shrink-0">교사:</span>
+              <Select value={selectedTeacherName} onValueChange={setSelectedTeacherName}>
+                <SelectTrigger className="w-[140px] sm:w-[160px] h-7 text-xs font-bold border-none bg-transparent shadow-none focus:ring-0 px-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-60 rounded-xl shadow-lg border-slate-200">
+                  {timetableData.teachers.map(t => (
+                    <SelectItem key={t.teacherName} value={t.teacherName} className="text-xs font-medium py-1.5">
+                      <span className="font-bold text-slate-800">{t.teacherName}</span>
+                      {t.homeroomClass && (
+                        <span className="ml-1 text-[11px] text-blue-600 font-bold bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">
+                          {t.homeroomClass}
+                        </span>
+                      )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* 주차 선택 네비게이션 */}
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/80 rounded-xl px-1.5 py-0.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={selectedWeekNum <= 1}
+                onClick={handlePrevWeek}
+                className="h-6 w-6 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-white"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+
+              <Calendar className="h-3.5 w-3.5 text-blue-600 shrink-0 ml-0.5" />
+
+              <Select
+                value={String(selectedWeekNum)}
+                onValueChange={val => setSelectedWeekNum(parseInt(val))}
+              >
+                <SelectTrigger className="h-7 border-none bg-transparent shadow-none focus:ring-0 text-xs font-bold text-slate-800 w-[180px] sm:w-[200px] px-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-64 rounded-xl shadow-lg border-slate-200">
+                  {semesterWeeks.map(w => (
+                    <SelectItem key={w.weekNum} value={String(w.weekNum)} className="text-xs font-medium py-1.5">
+                      <span className="font-bold text-slate-800">{w.shortLabel}</span>
+                      <span className="ml-1 text-slate-400 font-mono text-[11px]">({w.dateRangeLabel})</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={selectedWeekNum >= semesterWeeks.length}
+                onClick={handleNextWeek}
+                className="h-6 w-6 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-white"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+
+            {/* 내 시간표 바로가기 버튼 */}
+            {selectedTeacherName !== defaultTeacherName && defaultTeacherName && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedTeacherName(defaultTeacherName)}
+                className="h-8 px-2.5 text-xs font-bold text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100 rounded-xl"
+              >
+                내 시간표 보기
+              </Button>
+            )}
+          </div>
+
+          {/* 우측 안내 팁 */}
+          <div className="flex items-center gap-1.5 text-[11.5px] font-medium text-slate-500">
+            <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+            <span>시간표의 수업 슬롯을 클릭하여 결보강 또는 맞교환을 신청하세요</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 4. 내용: 주간 대화형 시간표 & 하단 신청내역 */}
       <InteractiveTeacherTimetable
         timetableData={timetableData}
         selectedTeacherName={selectedTeacherName}
@@ -290,6 +540,9 @@ export function SubstituteClient({
         onOpenDrawer={handleOpenDrawer}
         applications={applications}
         calendarConfig={calendarConfig}
+        selectedWeekNum={selectedWeekNum}
+        onSelectWeekNum={setSelectedWeekNum}
+        hideTopControlBar={true}
       />
 
       {/* 3. 하단 신청 내역 및 오늘의 결보강 탭 영역 */}

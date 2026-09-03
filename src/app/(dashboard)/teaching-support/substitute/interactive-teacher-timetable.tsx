@@ -65,6 +65,9 @@ interface InteractiveTeacherTimetableProps {
   onOpenDrawer: (slots: SelectedSlotItem[], initialMode?: 'exchange' | 'substitute') => void;
   applications: SubstituteApplication[];
   calendarConfig: AcademicCalendarConfig;
+  selectedWeekNum?: number;
+  onSelectWeekNum?: (weekNum: number) => void;
+  hideTopControlBar?: boolean;
 }
 
 export function InteractiveTeacherTimetable({
@@ -74,6 +77,9 @@ export function InteractiveTeacherTimetable({
   onOpenDrawer,
   applications,
   calendarConfig = DEFAULT_ACADEMIC_CALENDAR_2026_2,
+  selectedWeekNum: propSelectedWeekNum,
+  onSelectWeekNum: propOnSelectWeekNum,
+  hideTopControlBar = false,
 }: InteractiveTeacherTimetableProps) {
   const [selectedSlots, setSelectedSlots] = React.useState<SelectedSlotItem[]>([]);
 
@@ -87,12 +93,26 @@ export function InteractiveTeacherTimetable({
     return findCurrentWeekNum(semesterWeeks);
   }, [semesterWeeks]);
 
-  const [selectedWeekNum, setSelectedWeekNum] = React.useState<number>(defaultWeekNum);
+  const [internalWeekNum, setInternalWeekNum] = React.useState<number>(defaultWeekNum);
+
+  const selectedWeekNum = propSelectedWeekNum !== undefined ? propSelectedWeekNum : internalWeekNum;
+  const setSelectedWeekNum = (val: number | ((prev: number) => number)) => {
+    if (typeof val === 'function') {
+      const nextVal = val(selectedWeekNum);
+      if (propOnSelectWeekNum) propOnSelectWeekNum(nextVal);
+      else setInternalWeekNum(nextVal);
+    } else {
+      if (propOnSelectWeekNum) propOnSelectWeekNum(val);
+      else setInternalWeekNum(val);
+    }
+  };
 
   // 주차 데이터가 로드되거나 변경될 때 현재 주차로 동기화
   React.useEffect(() => {
-    setSelectedWeekNum(defaultWeekNum);
-  }, [defaultWeekNum]);
+    if (propSelectedWeekNum === undefined) {
+      setInternalWeekNum(defaultWeekNum);
+    }
+  }, [defaultWeekNum, propSelectedWeekNum]);
 
   const selectedWeek: SemesterWeek = React.useMemo(() => {
     return semesterWeeks.find(w => w.weekNum === selectedWeekNum) || semesterWeeks[0] || {
@@ -287,75 +307,77 @@ export function InteractiveTeacherTimetable({
   return (
     <div className="space-y-3">
       {/* 1. 상단 캡슐형 컨트롤 바 (AdminClassSelector 패턴) */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
-        <div className="flex items-center flex-wrap gap-2 flex-1">
-          {/* 교사 선택 캡슐 */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 rounded-xl px-2.5 py-1">
-            <User className="h-3.5 w-3.5 text-blue-600 shrink-0" />
-            <Select value={selectedTeacherName} onValueChange={onSelectTeacherName}>
-              <SelectTrigger className="w-[140px] sm:w-[160px] h-7 text-xs font-bold border-none bg-transparent shadow-none focus:ring-0 px-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="max-h-60 rounded-xl shadow-lg border-slate-200">
-                {timetableData.teachers.map(t => (
-                  <SelectItem key={t.teacherName} value={t.teacherName} className="text-xs font-medium py-1.5">
-                    <span className="font-bold text-slate-800">{t.teacherName}</span>
-                    {t.homeroomClass && (
-                      <span className="ml-1 text-[11px] text-blue-600 font-bold bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">
-                        {t.homeroomClass}
-                      </span>
-                    )}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      {!hideTopControlBar && (
+        <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
+          <div className="flex items-center flex-wrap gap-2 flex-1">
+            {/* 교사 선택 캡슐 */}
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 rounded-xl px-2.5 py-1">
+              <User className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+              <Select value={selectedTeacherName} onValueChange={onSelectTeacherName}>
+                <SelectTrigger className="w-[140px] sm:w-[160px] h-7 text-xs font-bold border-none bg-transparent shadow-none focus:ring-0 px-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-60 rounded-xl shadow-lg border-slate-200">
+                  {timetableData.teachers.map(t => (
+                    <SelectItem key={t.teacherName} value={t.teacherName} className="text-xs font-medium py-1.5">
+                      <span className="font-bold text-slate-800">{t.teacherName}</span>
+                      {t.homeroomClass && (
+                        <span className="ml-1 text-[11px] text-blue-600 font-bold bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">
+                          {t.homeroomClass}
+                        </span>
+                      )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          {/* 주차 선택 캡슐 & 이전/다음 버튼 */}
-          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/80 rounded-xl px-1.5 py-0.5">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              disabled={selectedWeekNum <= 1}
-              onClick={handlePrevWeek}
-              className="h-6 w-6 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-white"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </Button>
+            {/* 주차 선택 캡슐 & 이전/다음 버튼 */}
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/80 rounded-xl px-1.5 py-0.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={selectedWeekNum <= 1}
+                onClick={handlePrevWeek}
+                className="h-6 w-6 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-white"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
 
-            <Calendar className="h-3.5 w-3.5 text-blue-600 shrink-0 ml-0.5" />
+              <Calendar className="h-3.5 w-3.5 text-blue-600 shrink-0 ml-0.5" />
 
-            <Select
-              value={String(selectedWeekNum)}
-              onValueChange={val => setSelectedWeekNum(parseInt(val))}
-            >
-              <SelectTrigger className="h-7 border-none bg-transparent shadow-none focus:ring-0 text-xs font-bold text-slate-800 w-[180px] sm:w-[200px] px-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="max-h-64 rounded-xl shadow-lg border-slate-200">
-                {semesterWeeks.map(w => (
-                  <SelectItem key={w.weekNum} value={String(w.weekNum)} className="text-xs font-medium py-1.5">
-                    <span className="font-bold text-slate-800">{w.shortLabel}</span>
-                    <span className="ml-1 text-slate-400 font-mono text-[11px]">({w.dateRangeLabel})</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select
+                value={String(selectedWeekNum)}
+                onValueChange={val => setSelectedWeekNum(parseInt(val))}
+              >
+                <SelectTrigger className="h-7 border-none bg-transparent shadow-none focus:ring-0 text-xs font-bold text-slate-800 w-[180px] sm:w-[200px] px-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-64 rounded-xl shadow-lg border-slate-200">
+                  {semesterWeeks.map(w => (
+                    <SelectItem key={w.weekNum} value={String(w.weekNum)} className="text-xs font-medium py-1.5">
+                      <span className="font-bold text-slate-800">{w.shortLabel}</span>
+                      <span className="ml-1 text-slate-400 font-mono text-[11px]">({w.dateRangeLabel})</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              disabled={selectedWeekNum >= semesterWeeks.length}
-              onClick={handleNextWeek}
-              className="h-6 w-6 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-white"
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={selectedWeekNum >= semesterWeeks.length}
+                onClick={handleNextWeek}
+                className="h-6 w-6 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-white"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* 2. 메인 주간 인터랙티브 시간표 카드 */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden relative">
