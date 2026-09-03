@@ -120,11 +120,44 @@ function SingleApplicationSheet({
   const totalRows = Math.max(15, sortedItems.length);
   const rows = Array.from({ length: totalRows }, (_, i) => sortedItems[i] || null);
 
+  // 교체수업인지 보강수업인지에 따라 신청 문구 동적 선택 (교체 / 보강 중 하나만 선택 출력)
+  const actionTypeLabel = React.useMemo(() => {
+    // 1. 교체 항목 존재 여부 (type === 'exchange' 이거나 대상 교사가 유효하게 지정된 경우)
+    const hasExchange = sortedItems.some(it => {
+      if (!it) return false;
+      if (it.type === 'exchange') return true;
+      if (it.type === 'substitute') return false;
+      return Boolean(it.targetTeacher && it.targetTeacher.trim() !== '' && it.targetTeacher !== it.originalTeacher);
+    });
+
+    // 2. 보강 항목 존재 여부 (type === 'substitute' 이거나 보강 교사가 유효하게 지정된 경우)
+    const hasSubstitute = sortedItems.some(it => {
+      if (!it) return false;
+      if (it.type === 'substitute') return true;
+      if (it.type === 'exchange') return false;
+      return Boolean(it.substituteTeacher && it.substituteTeacher.trim() !== '');
+    });
+
+    if (hasExchange && !hasSubstitute) {
+      return '교체수업';
+    }
+    if (!hasExchange && hasSubstitute) {
+      return '보강수업';
+    }
+    if (hasExchange && hasSubstitute) {
+      return '교체수업 및 보강수업';
+    }
+    return '교체수업';
+  }, [sortedItems]);
+
   return (
-    <div className={cn(
-      'bg-white p-8 sm:p-12 max-w-[850px] mx-auto border border-slate-200 shadow-md text-black font-sans print:shadow-none print:border-none print:p-0 print:m-0 print:w-full print:max-w-none print:block',
-      !isLast ? 'mb-10 print:mb-0 print:break-after-page' : ''
-    )}>
+    <div
+      className={cn(
+        'bg-white p-8 sm:p-12 max-w-[850px] mx-auto border border-slate-200 shadow-md text-black font-sans print:shadow-none print:border-none print:p-0 print:m-0 print:w-full print:max-w-none print:block',
+        !isLast ? 'mb-10 print:mb-0 sub-official-sheet-break' : 'sub-official-sheet-last'
+      )}
+      style={!isLast ? { breakAfter: 'page', pageBreakAfter: 'always' } : undefined}
+    >
       {/* 1. 문서 제목 (상단 중앙 박스 형태) */}
       <div className='flex justify-center mb-5 pt-2'>
         <div className='inline-block px-7 py-2 bg-slate-200/80 rounded-md shadow-xs'>
@@ -163,7 +196,7 @@ function SingleApplicationSheet({
           <span className='font-bold'>{reason}</span>
         </p>
         <p className='text-center pt-2 font-medium'>
-          위와 같은 사유에 의해 다음과 같이 <strong>(교체수업 / 보강수업)</strong>을 신청하오니 허가 바랍니다.
+          위와 같은 사유에 의해 다음과 같이 <strong>{actionTypeLabel}</strong>을 신청하오니 허가 바랍니다.
         </p>
         <div className='text-right pr-6 pt-1 space-y-1'>
           <p className='text-xs'>
@@ -391,21 +424,63 @@ export function SubstituteOfficialForm({
   }, [appList]);
 
   return (
-    <div className='space-y-4'>
-      {/* 인쇄 시 레이아웃, 헤더, 사이드바, 네비게이션 숨김 및 파스텔 배경색 강제 적용 CSS */}
+    <div className='space-y-4 print:space-y-0 print:block'>
+      {/* 인쇄 시 레이아웃, 헤더, 사이드바, 네비게이션 숨김 및 A4 페이지 분할 강제 적용 CSS */}
       <style dangerouslySetInnerHTML={{
         __html: `
           @media print {
-            body {
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
+            html, body {
+              height: auto !important;
+              min-height: auto !important;
+              overflow: visible !important;
               background: white !important;
               margin: 0 !important;
               padding: 0 !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            /* Reset ancestor overflow and heights that break multi-page pagination in Chromium */
+            body * {
+              overflow: visible !important;
+            }
+            #__next, main, [data-sidebar-provider], .custom-scrollbar {
+              height: auto !important;
+              max-height: none !important;
+              overflow: visible !important;
+              display: block !important;
             }
             @page {
               size: A4 portrait;
               margin: 10mm 15mm;
+            }
+            /* A4 페이지 분할 강제 적용 */
+            .sub-official-sheet-break {
+              break-after: page !important;
+              page-break-after: always !important;
+              break-inside: avoid !important;
+              page-break-inside: avoid !important;
+              display: block !important;
+              clear: both !important;
+              margin: 0 !important;
+              margin-bottom: 0 !important;
+              padding: 0 !important;
+              width: 100% !important;
+              max-width: none !important;
+              box-shadow: none !important;
+              border: none !important;
+            }
+            .sub-official-sheet-last {
+              break-after: auto !important;
+              page-break-after: auto !important;
+              break-inside: avoid !important;
+              page-break-inside: avoid !important;
+              display: block !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              width: 100% !important;
+              max-width: none !important;
+              box-shadow: none !important;
+              border: none !important;
             }
             /* 상단 대공커리어싱크 프로필, 헤더, 사이드바, 모바일바, 풋터 등 레이아웃 전체 완전 숨김 */
             header,
@@ -509,7 +584,7 @@ export function SubstituteOfficialForm({
         />
       ) : (
         /* 2) 신청서별 각각 A4 시트 (다건인 경우 page-break로 연속 인쇄) */
-        <div>
+        <div className='print:block print:w-full'>
           {appList.map((app, idx) => {
             const startDay = app.items[0]?.sourceDay || '';
             const endDay = app.items[app.items.length - 1]?.sourceDay || '';

@@ -705,10 +705,15 @@ export function EmploymentStatusGrid({
                       ? getLowerGradeAspirationVariant(student.career_aspiration)
                       : getCompanyTypeVariant(student.company_type, student.business_type, student.career_aspiration);
 
+                    // 시스템(teacherProfiles)에 배정된 담임교사와 학생 데이터 동기화
+                    const syncedStudent = teacherName 
+                      ? { ...student, teacher_name: teacherName }
+                      : student;
+
                     return (
                       <StudentGridCell 
                         key={student.id}
-                        student={student}
+                        student={syncedStudent}
                         idx={idx}
                         variant={cellVariant}
                         rankingSummary={rankingMap[student.id]}
@@ -720,6 +725,7 @@ export function EmploymentStatusGrid({
                         isLowerGrade={isLowerGrade}
                         wishCourseFilter={wishCourseFilter}
                         currentCourseFilter={currentCourseFilter}
+                        homeroomTeacher={teacherName}
                       />
                     );
                   })}

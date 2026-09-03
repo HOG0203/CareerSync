@@ -16,26 +16,28 @@ export const metadata = {
   description: '기업별·공고별 맞춤형 고등학교 내신등급(전과목 및 국영수) 자동 산출, 지원 조건 실시간 시뮬레이션 및 프리셋 관리',
 };
 
-export const dynamic = 'force-dynamic';
-
 export default async function GradePage() {
-  const [userProfile, customPermMap] = await Promise.all([
-    getCurrentUserProfile(),
-    getUserCustomPermissionsMapAction(),
-  ]);
+  const userProfile = await getCurrentUserProfile();
 
   if (!userProfile) {
     redirect('/login');
   }
 
   const isAdmin = userProfile.role === 'admin';
-  const hasExplicitPerm = userProfile.id && customPermMap[userProfile.id]?.includes('/employment/grade');
+  let hasExplicitPerm = false;
+
+  // 비관리자 교직원인 경우에만 사용자 권한 맵 추가 조회
+  if (!isAdmin) {
+    const customPermMap = await getUserCustomPermissionsMapAction();
+    hasExplicitPerm = Boolean(userProfile.id && customPermMap[userProfile.id]?.includes('/employment/grade'));
+  }
 
   // 관리자(admin)이거나 사용자 관리에서 명시적 권한을 부여받은 교직원만 접근 허용
   if (!isAdmin && !hasExplicitPerm) {
     redirect('/dashboard');
   }
 
+  // 병렬 캐시 패칭 (캐시 적중 시 0ms 즉각 반환)
   const [presets, studentsRes] = await Promise.all([
     getGpaPresets(),
     getGradeStudents(),

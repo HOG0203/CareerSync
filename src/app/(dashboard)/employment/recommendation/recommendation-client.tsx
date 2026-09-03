@@ -58,7 +58,6 @@ import {
   Plus,
   Trash2,
   Download,
-  Printer,
   Search,
   CheckCircle2,
   AlertCircle,
@@ -380,11 +379,6 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
     } finally {
       setIsExporting(false);
     }
-  };
-
-  // 공식 심사표 인쇄 핸들러
-  const handlePrint = () => {
-    window.print();
   };
 
   // 학생 추가 모달 열기
@@ -894,17 +888,6 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
                       ● 변경사항 저장 필요
                     </span>
                   )}
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handlePrint}
-                    className="h-9 px-3 text-xs font-bold gap-1.5 rounded-xl border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs cursor-pointer whitespace-nowrap shrink-0"
-                  >
-                    <Printer className="h-3.5 w-3.5 text-slate-500" />
-                    <span>심사표 A4 인쇄</span>
-                  </Button>
 
                   <Button
                     type="button"

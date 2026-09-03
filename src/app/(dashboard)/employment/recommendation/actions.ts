@@ -7,11 +7,12 @@
 // (성적 기준: 9등급제/5등급제 선택, 기존 석차등급 우선 적용, 예체능/외국어 제외)
 // ==============================================================================
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/server';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { getCachedCertificationSummaryList } from '@/app/(dashboard)/admin/certification/actions';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 // 🎯 성적 산출 제외/반영 규칙 프리셋 인터페이스
 export interface GradeExclusionRules {
@@ -242,24 +243,31 @@ export async function batchCalculateStudentSchoolScores(
 }
 
 /**
- * 추천 선발 세션 목록 조회
+ * 추천 선발 세션 목록 조회 (unstable_cache 적용)
  */
-export async function getRecommendationSessions(): Promise<RecommendationSession[]> {
-  try {
-    const supabase = createAdminClient();
-    const { data } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', SESSIONS_STORE_KEY)
-      .maybeSingle();
+export const getRecommendationSessions = unstable_cache(
+  async (): Promise<RecommendationSession[]> => {
+    try {
+      const supabase = createAdminClient();
+      const { data } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', SESSIONS_STORE_KEY)
+        .maybeSingle();
 
-    const sessions = (data?.value as RecommendationSession[]) || [];
-    return Array.isArray(sessions) ? sessions : [];
-  } catch (err) {
-    console.error('getRecommendationSessions error:', err);
-    return [];
+      const sessions = (data?.value as RecommendationSession[]) || [];
+      return Array.isArray(sessions) ? sessions : [];
+    } catch (err) {
+      console.error('getRecommendationSessions error:', err);
+      return [];
+    }
+  },
+  ['recommendation_sessions_cache'],
+  {
+    tags: ['recommendation_sessions_cache'],
+    revalidate: 86400,
   }
-}
+);
 
 /**
  * 추천 선발 세션 생성 또는 수정 (성적 규칙 변경 시 후보자 성적 자동 재계산)
@@ -340,6 +348,7 @@ export async function saveRecommendationSession(
       return { success: false, error: error.message };
     }
 
+    revalidateTag('recommendation_sessions_cache');
     revalidatePath('/employment/recommendation');
     return { success: true, session: targetSession };
   } catch (err: any) {
@@ -369,6 +378,7 @@ export async function deleteRecommendationSession(
       return { success: false, error: error.message };
     }
 
+    revalidateTag('recommendation_sessions_cache');
     revalidatePath('/employment/recommendation');
     return { success: true };
   } catch (err: any) {
@@ -378,34 +388,41 @@ export async function deleteRecommendationSession(
 }
 
 /**
- * 대상 학년 학생 목록 조회 (후보자 추가 모달용)
+ * 대상 학년 학생 목록 조회 (후보자 추가 모달용, unstable_cache 적용)
  */
-export async function getAvailableStudentsForRecommendation(targetGrade: number = 3) {
-  try {
-    const supabase = createAdminClient();
-    const settings = await getSystemSettings();
-    const baseYear = settings.baseYear || 2026;
-    const targetGradYear = baseYear + (4 - targetGrade);
+export const getAvailableStudentsForRecommendation = unstable_cache(
+  async (targetGrade: number = 3) => {
+    try {
+      const supabase = createAdminClient();
+      const settings = await getSystemSettings();
+      const baseYear = settings.baseYear || 2026;
+      const targetGradYear = baseYear + (4 - targetGrade);
 
-    const { data: students, error } = await supabase
-      .from('students')
-      .select('id, student_name, student_number, class_info, major, graduation_year')
-      .eq('graduation_year', targetGradYear)
-      .order('major', { ascending: true })
-      .order('class_info', { ascending: true })
-      .order('student_number', { ascending: true });
+      const { data: students, error } = await supabase
+        .from('students')
+        .select('id, student_name, student_number, class_info, major, graduation_year')
+        .eq('graduation_year', targetGradYear)
+        .order('major', { ascending: true })
+        .order('class_info', { ascending: true })
+        .order('student_number', { ascending: true });
 
-    if (error) {
-      console.error('getAvailableStudents error:', error);
+      if (error) {
+        console.error('getAvailableStudents error:', error);
+        return [];
+      }
+
+      return students || [];
+    } catch (err) {
+      console.error('getAvailableStudents error:', err);
       return [];
     }
-
-    return students || [];
-  } catch (err) {
-    console.error('getAvailableStudents error:', err);
-    return [];
+  },
+  ['available_students_recommendation_cache'],
+  {
+    tags: ['students'],
+    revalidate: 86400,
   }
-}
+);
 
 /**
  * 학생들의 기존 [성적(30점 만점, 규칙 적용)] 및 [옥저인재인증(30점 만점)] 점수 자동 계산 조회
@@ -528,6 +545,7 @@ export async function addCandidatesToSession(
       return { success: false, error: error.message };
     }
 
+    revalidateTag('recommendation_sessions_cache');
     revalidatePath('/employment/recommendation');
     return { success: true, session };
   } catch (err: any) {
@@ -566,6 +584,7 @@ export async function removeCandidateFromSession(
       return { success: false, error: error.message };
     }
 
+    revalidateTag('recommendation_sessions_cache');
     revalidatePath('/employment/recommendation');
     return { success: true, session };
   } catch (err: any) {
@@ -626,6 +645,7 @@ export async function bulkSaveCandidateScores(
       return { success: false, error: error.message };
     }
 
+    revalidateTag('recommendation_sessions_cache');
     revalidatePath('/employment/recommendation');
     return { success: true, session };
   } catch (err: any) {
@@ -683,6 +703,7 @@ export async function recalculateSessionScoresAction(
       return { success: false, error: error.message };
     }
 
+    revalidateTag('recommendation_sessions_cache');
     revalidatePath('/employment/recommendation');
     return { success: true, session };
   } catch (err: any) {
@@ -692,7 +713,7 @@ export async function recalculateSessionScoresAction(
 }
 
 /**
- * 공식 심사 결과표 엑셀 내보내기 (.xlsx base64)
+ * 공식 심사 결과표 엑셀 내보내기 (ExcelJS 기반 고품질 셀 서식 적용)
  */
 export async function exportRecommendationExcelAction(
   sessionId: string
@@ -708,73 +729,308 @@ export async function exportRecommendationExcelAction(
       const tA = a.totalScore ?? -1;
       const tB = b.totalScore ?? -1;
       if (tB !== tA) return tB - tA;
-      return (b.ncsScore || 0) - (a.ncsScore || 0);
+
+      const nA = a.ncsScore ?? -1;
+      const nB = b.ncsScore ?? -1;
+      if (nB !== nA) return nB - nA;
+
+      const sA = a.schoolScoreConverted ?? -1;
+      const sB = b.schoolScoreConverted ?? -1;
+      if (sB !== sA) return sB - sA;
+
+      const cA = a.certScoreConverted ?? -1;
+      const cB = b.certScoreConverted ?? -1;
+      return cB - cA;
     });
 
     const quota = session.recommendationQuota || 5;
     const rules = session.gradeRules || DEFAULT_GRADE_RULES;
     const scaleName = rules.gradeScale === '5_scale' ? '5등급제' : '9등급제';
 
-    // 워크시트 데이터 생성
+    const wb = new ExcelJS.Workbook();
+    wb.creator = '대구공업고등학교 산학취업부';
+    wb.lastModifiedBy = '대구공업고등학교';
+    wb.created = new Date();
+    wb.modified = new Date();
+
+    const ws = wb.addWorksheet('학교장추천심사결과', {
+      views: [{ showGridLines: true }],
+      pageSetup: {
+        orientation: 'landscape',
+        paperSize: 9, // A4
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+      }
+    });
+
+    // 1. 대제목 (행 2)
+    ws.addRow([]); // 빈 1행 (여백)
+    ws.getRow(1).height = 12;
+
+    const titleRow = ws.addRow(['대구공업고등학교 학교장 추천 대상자 심사 평가 결과표']);
+    titleRow.height = 38;
+    ws.mergeCells('A2:M2');
+    const titleCell = ws.getCell('A2');
+    titleCell.font = { name: '맑은 고딕', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } }; // Deep Navy
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    titleCell.border = {
+      top: { style: 'medium', color: { argb: 'FF1E293B' } },
+      bottom: { style: 'medium', color: { argb: 'FF1E293B' } },
+      left: { style: 'medium', color: { argb: 'FF1E293B' } },
+      right: { style: 'medium', color: { argb: 'FF1E293B' } },
+    };
+
+    // 2. 공고 및 배점 안내 서브헤더 (행 3~4)
+    const subTitleRow1 = ws.addRow([`■ 선발 공고: ${session.title}   |   추천 선발 정원: ${quota}명 (총 지원 희망자 ${candidates.length}명)`]);
+    subTitleRow1.height = 24;
+    ws.mergeCells('A3:M3');
+    const subCell1 = ws.getCell('A3');
+    subCell1.font = { name: '맑은 고딕', size: 10.5, bold: true, color: { argb: 'FF1E293B' } };
+    subCell1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+    subCell1.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+    subCell1.border = {
+      left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+      right: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+      bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+    };
+
+    const subTitleRow2 = ws.addRow([
+      `■ 성적 반영 기준: ${scaleName} (${rules.preferRankGrade ? '기존 석차등급 우선 적용' : '성취도 환산'})   |   배점: NCS 시험 30점 + 교과성적 30점 + 옥저인재인증 30점 + 면접 10점 (총 100점 만점)`
+    ]);
+    subTitleRow2.height = 22;
+    ws.mergeCells('A4:M4');
+    const subCell2 = ws.getCell('A4');
+    subCell2.font = { name: '맑은 고딕', size: 9.5, color: { argb: 'FF475569' } };
+    subCell2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+    subCell2.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+    subCell2.border = {
+      left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+      right: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+      bottom: { style: 'medium', color: { argb: 'FF64748B' } },
+    };
+
+    ws.addRow([]); // 빈 행 (여백)
+    ws.getRow(5).height = 10;
+
+    // 3. 테이블 헤더 (행 6)
     const headers = [
-      ['순위', '선발상태', '성명', '학과', '반', '번호', '평균등급', '교과성적환산 (30점)', 'NCS점수 (30점)', '옥저인재인증환산 (30점)', '면접점수 (10점)', '종합점수 (100점)', '비고']
+      '순위',
+      '선발 상태',
+      '성명',
+      '학과',
+      '반',
+      '번호',
+      '교과 평균등급',
+      '교과성적 (30점)',
+      'NCS점수 (30점)',
+      '옥저인증 (30점)',
+      '면접점수 (10점)',
+      '종합점수 (100점)',
+      '비고'
     ];
 
-    const rows = candidates.map((c, idx) => {
+    const headerRow = ws.addRow(headers);
+    headerRow.height = 30;
+
+    headerRow.eachCell((cell) => {
+      cell.font = { name: '맑은 고딕', size: 10.5, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E40AF' } }; // Classic Blue
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.border = {
+        top: { style: 'medium', color: { argb: 'FF1E3A8A' } },
+        bottom: { style: 'medium', color: { argb: 'FF1E3A8A' } },
+        left: { style: 'thin', color: { argb: 'FF93C5FD' } },
+        right: { style: 'thin', color: { argb: 'FF93C5FD' } },
+      };
+    });
+
+    // 4. 데이터 행 생성
+    const thinBorder = {
+      top: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
+      bottom: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
+      left: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
+      right: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
+    };
+
+    let selectedTotalSum = 0;
+    let selectedCount = 0;
+
+    candidates.forEach((c, idx) => {
       const rank = idx + 1;
-      const status = rank <= quota ? '추천 확정' : '후보';
-      return [
-        rank,
-        status,
+      const isSelected = rank <= quota;
+
+      let rankDisplay = `${rank}위`;
+      if (rank === 1) rankDisplay = '🥇 1위';
+      else if (rank === 2) rankDisplay = '🥈 2위';
+      else if (rank === 3) rankDisplay = '🥉 3위';
+
+      const statusDisplay = isSelected ? '추천 선발' : '대기 후보';
+
+      const schoolGradeDisplay = c.schoolAverageGrade ? `${c.schoolAverageGrade.toFixed(2)}등급` : '-';
+      const schoolScoreVal = c.schoolScoreConverted !== null ? Number(c.schoolScoreConverted.toFixed(2)) : null;
+      const ncsScoreVal = c.ncsScore !== null ? Number(c.ncsScore.toFixed(2)) : null;
+      const certScoreVal = c.certScoreConverted !== null ? Number(c.certScoreConverted.toFixed(2)) : null;
+      const interviewScoreVal = c.interviewScore !== null ? Number(c.interviewScore.toFixed(2)) : null;
+      const totalScoreVal = c.totalScore !== null ? Number(c.totalScore.toFixed(2)) : null;
+
+      if (isSelected && totalScoreVal !== null) {
+        selectedTotalSum += totalScoreVal;
+        selectedCount++;
+      }
+
+      const rowValues = [
+        rankDisplay,
+        statusDisplay,
         c.studentName,
         c.major,
         c.classInfo,
         c.studentNumber,
-        c.schoolAverageGrade ? `${c.schoolAverageGrade.toFixed(2)}등급` : '-',
-        c.schoolScoreConverted !== null ? c.schoolScoreConverted : '-',
-        c.ncsScore !== null ? c.ncsScore : '-',
-        c.certScoreConverted !== null ? c.certScoreConverted : '-',
-        c.interviewScore !== null ? c.interviewScore : '-',
-        c.totalScore !== null ? c.totalScore : '-',
+        schoolGradeDisplay,
+        schoolScoreVal !== null ? schoolScoreVal : '-',
+        ncsScoreVal !== null ? ncsScoreVal : '-',
+        certScoreVal !== null ? certScoreVal : '-',
+        interviewScoreVal !== null ? interviewScoreVal : '-',
+        totalScoreVal !== null ? totalScoreVal : '-',
         c.remarks || ''
       ];
+
+      const row = ws.addRow(rowValues);
+      row.height = 24;
+
+      // 추천 선발자는 부드러운 에메랄드 배경(#F0FDF4), 대기 후보는 교차 흰색/연회색
+      const rowBgColor = isSelected
+        ? 'FFF0FDF4'
+        : (idx % 2 === 0 ? 'FFFFFFFF' : 'FFF8FAFC');
+
+      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBgColor } };
+        cell.border = thinBorder;
+        cell.font = { name: '맑은 고딕', size: 10, color: { argb: 'FF1E293B' } };
+
+        if (colNumber === 1) {
+          // 순위
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.font = {
+            name: '맑은 고딕',
+            size: 10,
+            bold: isSelected,
+            color: { argb: rank === 1 ? 'FFB45309' : rank === 2 ? 'FF475569' : rank === 3 ? 'FF9A3412' : isSelected ? 'FF15803D' : 'FF475569' }
+          };
+        } else if (colNumber === 2) {
+          // 선발 상태
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.font = {
+            name: '맑은 고딕',
+            size: 10,
+            bold: isSelected,
+            color: { argb: isSelected ? 'FF15803D' : 'FF64748B' }
+          };
+        } else if (colNumber === 3) {
+          // 성명
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.font = { name: '맑은 고딕', size: 10.5, bold: true, color: { argb: 'FF0F172A' } };
+        } else if (colNumber >= 4 && colNumber <= 6) {
+          // 학과, 반, 번호
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        } else if (colNumber === 7) {
+          // 교과 평균등급
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          if (c.schoolAverageGrade) {
+            cell.font = { name: '맑은 고딕', size: 10, color: { argb: 'FF2563EB' } };
+          }
+        } else if (colNumber >= 8 && colNumber <= 11) {
+          // 점수 영역 (교과, NCS, 옥저, 면접)
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          if (typeof cell.value === 'number') {
+            cell.numFmt = '#,##0.00';
+          }
+        } else if (colNumber === 12) {
+          // 종합점수 (100점)
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          cell.font = {
+            name: '맑은 고딕',
+            size: 11,
+            bold: true,
+            color: { argb: isSelected ? 'FF15803D' : 'FF1E293B' }
+          };
+          if (typeof cell.value === 'number') {
+            cell.numFmt = '#,##0.00';
+          }
+        } else if (colNumber === 13) {
+          // 비고
+          cell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+        }
+      });
     });
 
-    const ws = XLSX.utils.aoa_to_sheet([
-      [`대구공업고등학교 학교장 추천 대상자 심사 평가 결과표`],
-      [`선발 공고: ${session.title}`],
-      [`추천 선발 정원: ${quota}명 (총 지원 희망자 ${candidates.length}명) | 성적 기준: ${scaleName} (${rules.preferRankGrade ? '석차등급 우선' : '성취도 환산'}) | 총 100점 만점`],
-      [],
-      ...headers,
-      ...rows
-    ]);
+    // 5. 통계 요약 행
+    const summaryRowNumber = ws.rowCount + 1;
+    const selectedAvg = selectedCount > 0 ? Number((selectedTotalSum / selectedCount).toFixed(2)) : null;
 
-    // 열 너비 설정
-    ws['!cols'] = [
-      { wch: 6 },  // 순위
-      { wch: 12 }, // 선발상태
-      { wch: 10 }, // 성명
-      { wch: 16 }, // 학과
-      { wch: 6 },  // 반
-      { wch: 6 },  // 번호
-      { wch: 12 }, // 평균등급
-      { wch: 18 }, // 교과성적
-      { wch: 14 }, // NCS
-      { wch: 20 }, // 옥저인증
-      { wch: 14 }, // 면접
-      { wch: 16 }, // 종합점수
-      { wch: 20 }  // 비고
+    const summaryRow = ws.addRow([
+      `선발 요약: 추천 선발 정원 ${quota}명  /  총 ${candidates.length}명 신청`,
+      '', '', '', '', '',
+      '추천 선발 대상자 평균 종합점수',
+      '', '', '', '',
+      selectedAvg !== null ? selectedAvg : '-',
+      ''
+    ]);
+    summaryRow.height = 28;
+
+    ws.mergeCells(`A${summaryRowNumber}:F${summaryRowNumber}`);
+    ws.mergeCells(`G${summaryRowNumber}:K${summaryRowNumber}`);
+
+    const thickSummaryBorder = {
+      top: { style: 'double' as const, color: { argb: 'FF64748B' } },
+      bottom: { style: 'medium' as const, color: { argb: 'FF334155' } },
+      left: { style: 'thin' as const, color: { argb: 'FFCBD5E1' } },
+      right: { style: 'thin' as const, color: { argb: 'FFCBD5E1' } },
+    };
+
+    summaryRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      cell.border = thickSummaryBorder;
+      cell.font = { name: '맑은 고딕', size: 10, bold: true, color: { argb: 'FF1E293B' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      if (colNumber === 12) {
+        // 평균 종합점수 셀
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } }; // Soft Green
+        cell.font = { name: '맑은 고딕', size: 11, bold: true, color: { argb: 'FF15803D' } };
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+        if (typeof cell.value === 'number') {
+          cell.numFmt = '#,##0.00';
+        }
+      }
+    });
+
+    // 6. 열 너비 지정
+    ws.columns = [
+      { width: 10 }, // A: 순위
+      { width: 15 }, // B: 선발 상태
+      { width: 13 }, // C: 성명
+      { width: 20 }, // D: 학과
+      { width: 8 },  // E: 반
+      { width: 8 },  // F: 번호
+      { width: 16 }, // G: 교과 평균등급
+      { width: 18 }, // H: 교과성적환산 (30점)
+      { width: 16 }, // I: NCS시험 (30점)
+      { width: 20 }, // J: 옥저인증환산 (30점)
+      { width: 16 }, // K: 면접점수 (10점)
+      { width: 20 }, // L: 종합점수 (100점)
+      { width: 26 }, // M: 비고
     ];
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '학교장추천심사결과');
-
-    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+    const buffer = await wb.xlsx.writeBuffer();
+    const base64 = Buffer.from(buffer).toString('base64');
     const fileName = `${session.title.replace(/[\/\\?%*:|"<>]/g, '_')}_심사결과.xlsx`;
 
-    return { success: true, base64: wbout, fileName };
+    return { success: true, base64, fileName };
   } catch (err: any) {
     console.error('exportRecommendationExcelAction error:', err);
     return { success: false, error: err.message };
   }
 }
+

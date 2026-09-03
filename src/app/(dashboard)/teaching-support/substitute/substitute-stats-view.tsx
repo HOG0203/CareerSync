@@ -36,7 +36,8 @@ import {
   CheckSquare,
   Square,
   Filter,
-  X
+  X,
+  Loader2,
 } from 'lucide-react';
 import * as xlsx from 'xlsx';
 import { AcademicCalendarConfig, DEFAULT_ACADEMIC_CALENDAR_2026_2 } from '@/lib/substitute/event-types';
@@ -46,8 +47,10 @@ import {
   verifySubstituteAdminPin, 
   changeSubstituteAdminPin,
   getSubstituteAllowanceConfig,
-  saveSubstituteAllowanceConfig
+  saveSubstituteAllowanceConfig,
+  exportMonthlySubstituteLedgerExcelAction
 } from './actions';
+import { formatDeptFullName } from '@/lib/substitute/utils';
 import { cn } from '@/lib/utils';
 
 interface SubstituteStatsViewProps {
@@ -85,13 +88,16 @@ export function SubstituteStatsView({
   currentUserFullName = '수업계',
   selectedTeacherName,
 }: SubstituteStatsViewProps) {
-  // 수업계 잠금 인증 상태 (기본 1234 또는 세션 저장)
-  const [isAuthenticated, setIsAuthenticated] = React.useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return sessionStorage.getItem('substitute_admin_auth') === 'true';
+  // 수업계 잠금 인증 상태 (SSR 하이드레이션 불일치 방지)
+  const [isMounted, setIsMounted] = React.useState<boolean>(false);
+  const [isAuthenticated, setIsAuthenticated] = React.useState<boolean>(false);
+
+  React.useEffect(() => {
+    setIsMounted(true);
+    if (typeof window !== 'undefined' && sessionStorage.getItem('substitute_admin_auth') === 'true') {
+      setIsAuthenticated(true);
     }
-    return false;
-  });
+  }, []);
   const [pinInput, setPinInput] = React.useState<string>('');
   const [pinError, setPinError] = React.useState<string>('');
 
@@ -99,6 +105,8 @@ export function SubstituteStatsView({
   const [activeSubTab, setActiveSubTab] = React.useState<'pending' | 'allowance' | 'ledger' | 'teacherStats'>('pending');
   const [searchTerm, setSearchTerm] = React.useState<string>('');
   const [ledgerStatusFilter, setLedgerStatusFilter] = React.useState<'all' | 'approved' | 'submitted' | 'rejected'>('all');
+  const [ledgerMonthFilter, setLedgerMonthFilter] = React.useState<string>('all');
+  const [isExportingExcel, setIsExportingExcel] = React.useState<boolean>(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = React.useState<boolean>(false);
 
   // 다중 승인 선택 ID 목록
@@ -286,6 +294,8 @@ export function SubstituteStatsView({
       sourceDate: string;
       sourceDay: string;
       sourcePeriod: number;
+      deptName: string;
+      gradeClass: string;
       classCode: string;
       subjectName: string;
       type: string;
@@ -303,6 +313,9 @@ export function SubstituteStatsView({
           ? `보강: ${it.substituteTeacher || '미지정'}`
           : `교체: ${it.targetTeacher || '미지정'} (${it.targetDate || ''} ${it.targetPeriod ? `${it.targetPeriod}교시` : ''})`;
 
+        const deptName = formatDeptFullName(it.deptName, it.classCode);
+        const gradeClass = formatClassGradeAndRoom(it.classCode);
+
         list.push({
           appId: app.id,
           appNumber: app.applicationNumber,
@@ -311,6 +324,8 @@ export function SubstituteStatsView({
           sourceDate: it.sourceDate,
           sourceDay: it.sourceDay,
           sourcePeriod: it.sourcePeriod,
+          deptName,
+          gradeClass,
           classCode: it.classCode,
           subjectName: it.subjectName,
           type: isSub ? '수업보강' : '수업교체',
@@ -330,11 +345,36 @@ export function SubstituteStatsView({
     });
   }, [applications]);
 
-  // 대장 필터링
+  // 대장용 등록 월 목록 (예: 2026-08, 2026-09)
+  const availableMonths = React.useMemo(() => {
+    const monthsSet = new Set<string>();
+    allItems.forEach(item => {
+      if (item.sourceDate && item.sourceDate.length >= 7) {
+        monthsSet.add(item.sourceDate.slice(0, 7)); // 'YYYY-MM'
+      }
+    });
+    return Array.from(monthsSet).sort().map(m => {
+      const parts = m.split('-');
+      const yearStr = parts[0];
+      const monthNum = parseInt(parts[1], 10);
+      return {
+        value: m,
+        monthNum,
+        label: `${yearStr}년 ${monthNum}월`,
+      };
+    });
+  }, [allItems]);
+
+  // 대장 필터링 (상태 + 월별 + 검색어)
   const filteredItems = React.useMemo(() => {
     return allItems.filter(item => {
       if (ledgerStatusFilter !== 'all' && item.rawStatus !== ledgerStatusFilter) {
         return false;
+      }
+      if (ledgerMonthFilter !== 'all') {
+        if (!item.sourceDate || !item.sourceDate.startsWith(ledgerMonthFilter)) {
+          return false;
+        }
       }
       if (!searchTerm.trim()) return true;
       const term = searchTerm.toLowerCase();
@@ -347,7 +387,7 @@ export function SubstituteStatsView({
         item.reason.toLowerCase().includes(term)
       );
     });
-  }, [allItems, ledgerStatusFilter, searchTerm]);
+  }, [allItems, ledgerStatusFilter, ledgerMonthFilter, searchTerm]);
 
   // 2. 보강수당 지급 관리용 아이템 리스트 (승인 완료된 보강 수업)
   const substituteAllowanceList = React.useMemo(() => {
@@ -590,7 +630,50 @@ export function SubstituteStatsView({
     return Array.from(map.values()).sort((a, b) => b.substituteHours - a.substituteHours || b.absenceHours - a.absenceHours);
   }, [applications, timetableData.teachers, excludedAllowanceIds]);
 
-  // 대장 엑셀 다운로드
+  // [내부결재용] 공식 결보강 관리 대장 엑셀 다운로드 (5단 결재선 + 공문서 규격)
+  const handleExportOfficialInternalApprovalLedger = async () => {
+    try {
+      setIsExportingExcel(true);
+      const res = await exportMonthlySubstituteLedgerExcelAction({
+        year: 2026,
+        semester: 2,
+        month: ledgerMonthFilter === 'all' ? null : ledgerMonthFilter,
+        statusFilter: ledgerStatusFilter,
+      });
+
+      if (!res.success || !res.data) {
+        alert(res.error || '내부결재용 엑셀 파일 생성에 실패했습니다.');
+        return;
+      }
+
+      // Base64 to Blob & Download
+      const byteCharacters = atob(res.data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = res.fileName || '결보강관리대장_내부결재용.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      console.error(err);
+      alert('엑셀 다운로드 중 오류가 발생했습니다.');
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
+
+  // 일반 대장 엑셀 다운로드
   const handleExportLedger = () => {
     const data = filteredItems.map((item, idx) => ({
       '순번': idx + 1,
@@ -598,7 +681,8 @@ export function SubstituteStatsView({
       '결강일자': item.sourceDate,
       '요일': item.sourceDay,
       '교시': item.sourcePeriod,
-      '학반': item.classCode,
+      '학과': item.deptName,
+      '학반': item.gradeClass,
       '교과목': item.subjectName,
       '결강교사': item.applicantTeacher,
       '결강사유': item.reason,
@@ -672,6 +756,16 @@ export function SubstituteStatsView({
     const todayStr = new Date().toISOString().slice(0, 10);
     xlsx.writeFile(wb, `보강수당_지급명세서_${todayStr}.xlsx`);
   };
+
+  // 0. 마운트 전 로딩 상태 (SSR 및 클라이언트 하이드레이션 불일치 방지)
+  if (!isMounted) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[360px] gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        <p className="text-xs text-slate-400 font-bold">수업계 콘솔을 불러오는 중입니다...</p>
+      </div>
+    );
+  }
 
   // 1. 미인증 시 잠금 화면
   if (!isAuthenticated) {
@@ -1449,17 +1543,17 @@ export function SubstituteStatsView({
       {/* ========================================================================= */}
       {activeSubTab === 'ledger' && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3.5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold text-slate-500">상태 필터:</span>
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="text-xs font-bold text-slate-500">상태:</span>
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs h-10">
                 {(['all', 'approved', 'submitted', 'rejected'] as const).map(st => (
                   <button
                     key={st}
                     type="button"
                     onClick={() => setLedgerStatusFilter(st)}
                     className={cn(
-                      "px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer",
+                      "px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer h-8.5 flex items-center",
                       ledgerStatusFilter === st
                         ? "bg-white text-indigo-700 shadow-2xs font-black"
                         : "text-slate-500 hover:text-slate-900"
@@ -1469,36 +1563,82 @@ export function SubstituteStatsView({
                   </button>
                 ))}
               </div>
+
+              {/* 기간 / 월별 필터 드롭다운 */}
+              <span className="text-xs font-bold text-slate-500 ml-1">기간:</span>
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={ledgerMonthFilter}
+                  onChange={e => setLedgerMonthFilter(e.target.value)}
+                  className="h-10 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer shadow-2xs"
+                >
+                  <option value="all">전체 기간</option>
+                  {availableMonths.map(m => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+
+                {ledgerMonthFilter !== 'all' && (
+                  <button
+                    type="button"
+                    onClick={() => setLedgerMonthFilter('all')}
+                    className="h-10 px-2.5 text-xs font-bold text-slate-500 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+                    title="전체 기간으로 초기화"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    필터 해제
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <div className="relative w-full sm:w-56">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                 <Input
                   type="text"
                   placeholder="교사명 / 과목 / 학반 / 사유 검색"
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
-                  className="pl-8.5 h-8.5 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                  className="pl-9 h-10 text-xs sm:text-sm bg-slate-50 border-slate-200 rounded-xl"
                 />
               </div>
 
+              {/* 1. 내부결재용 공식 엑셀 다운로드 (2단 결재란 + 고품격 공문서 규격) */}
               <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportLedger}
-                className="h-8.5 text-xs font-bold gap-1.5 border-slate-200 hover:bg-slate-50 text-slate-700 shadow-2xs rounded-xl cursor-pointer"
+                onClick={handleExportOfficialInternalApprovalLedger}
+                disabled={isExportingExcel}
+                className="h-10 px-4 text-xs sm:text-sm font-black gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-xs rounded-xl cursor-pointer"
+                title="공식 2단 결재란(수업계, 부장)과 통계 요약이 포함된 내부결재 기안용 엑셀 파일을 다운로드합니다."
               >
-                <Download className="h-3.5 w-3.5 text-slate-500" />
-                대장 엑셀
+                {isExportingExcel ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileSpreadsheet className="h-4 w-4" />
+                )}
+                {ledgerMonthFilter !== 'all' 
+                  ? `${parseInt(ledgerMonthFilter.split('-')[1], 10)}월 내부결재용 엑셀` 
+                  : '내부결재용 엑셀'}
               </Button>
+
+              {/* 2. 일반 대장 엑셀 */}
               <Button
                 variant="outline"
-                size="sm"
-                onClick={() => window.print()}
-                className="h-8.5 text-xs font-bold gap-1.5 border-slate-200 hover:bg-slate-50 text-slate-700 shadow-2xs rounded-xl cursor-pointer"
+                onClick={handleExportLedger}
+                className="h-10 px-3.5 text-xs sm:text-sm font-bold gap-1.5 border-slate-200 hover:bg-slate-50 text-slate-700 shadow-2xs rounded-xl cursor-pointer"
+                title="현재 화면 표의 데이터를 엑셀 시트로 백업 저장합니다."
               >
-                <Printer className="h-3.5 w-3.5 text-slate-500" />
+                <Download className="h-4 w-4 text-slate-500" />
+                일반 대장
+              </Button>
+
+              {/* 3. 인쇄 */}
+              <Button
+                variant="outline"
+                onClick={() => window.print()}
+                className="h-10 px-3.5 text-xs sm:text-sm font-bold gap-1.5 border-slate-200 hover:bg-slate-50 text-slate-700 shadow-2xs rounded-xl cursor-pointer"
+              >
+                <Printer className="h-4 w-4 text-slate-500" />
                 인쇄
               </Button>
             </div>
@@ -1513,7 +1653,8 @@ export function SubstituteStatsView({
                   <th className="py-2.5 px-2.5 w-24 border-r border-slate-200">신청번호</th>
                   <th className="py-2.5 px-2.5 w-24 border-r border-slate-200">결강일자</th>
                   <th className="py-2.5 px-1.5 w-12 border-r border-slate-200">교시</th>
-                  <th className="py-2.5 px-2 w-16 border-r border-slate-200">학반</th>
+                  <th className="py-2.5 px-2 w-28 border-r border-slate-200">학과</th>
+                  <th className="py-2.5 px-2 w-14 border-r border-slate-200">학반</th>
                   <th className="py-2.5 px-2 w-20 border-r border-slate-200">교과목</th>
                   <th className="py-2.5 px-2.5 w-24 border-r border-slate-200">결강교사</th>
                   <th className="py-2.5 px-3 border-r border-slate-200 text-left">사유</th>
@@ -1526,7 +1667,7 @@ export function SubstituteStatsView({
               <tbody className="divide-y divide-slate-100">
                 {filteredItems.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="py-12 text-slate-400 text-xs font-medium">
+                    <td colSpan={13} className="py-12 text-slate-400 text-xs font-medium">
                       해당하는 결보강 내역이 없습니다.
                     </td>
                   </tr>
@@ -1545,9 +1686,12 @@ export function SubstituteStatsView({
                       <td className="border-r border-slate-100 font-black text-indigo-700">
                         {item.sourcePeriod}교시
                       </td>
-                      <td className="border-r border-slate-100 font-bold text-slate-800">
-                        <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-800 text-[10.5px]">
-                          {item.classCode}
+                      <td className="border-r border-slate-100 font-bold text-slate-700 text-xs">
+                        {item.deptName}
+                      </td>
+                      <td className="border-r border-slate-100 font-black text-slate-900 text-xs">
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 font-mono font-bold text-[11px]">
+                          {item.gradeClass}
                         </span>
                       </td>
                       <td className="border-r border-slate-100 font-bold text-slate-900">

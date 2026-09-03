@@ -319,7 +319,7 @@ export function SubstituteClient({
   // 공식 양식 보기 중인 경우 (단일 또는 다중)
   if (viewingApps && viewingApps.length > 0) {
     return (
-      <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+      <div className="p-4 sm:p-6 max-w-7xl mx-auto print:p-0 print:m-0 print:max-w-none print:w-full print:block">
         <SubstituteOfficialForm
           applications={viewingApps}
           onBack={() => setViewingApps(null)}

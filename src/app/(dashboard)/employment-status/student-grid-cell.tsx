@@ -20,9 +20,24 @@ interface StudentGridCellProps {
   // 2학년 진로코스 필터
   wishCourseFilter?: string;
   currentCourseFilter?: string;
+  homeroomTeacher?: string;
 }
 
-export const StudentGridCell = React.memo(function StudentGridCell({ student, idx, variant, rankingSummary, isRankingsLoading, userProfile, searchQuery, customRule, baseYear, isLowerGrade, wishCourseFilter, currentCourseFilter }: StudentGridCellProps) {
+export const StudentGridCell = React.memo(function StudentGridCell({ 
+  student, 
+  idx, 
+  variant, 
+  rankingSummary, 
+  isRankingsLoading, 
+  userProfile, 
+  searchQuery, 
+  customRule, 
+  baseYear, 
+  isLowerGrade, 
+  wishCourseFilter, 
+  currentCourseFilter,
+  homeroomTeacher
+}: StudentGridCellProps) {
   // 1. 커스텀 동적 조합 매칭 평가 (AND / OR)
   const isCustomRuleMatched = React.useMemo(() => {
 
@@ -211,6 +226,7 @@ export const StudentGridCell = React.memo(function StudentGridCell({ student, id
       isRankingsLoading={isRankingsLoading}
       userProfile={userProfile}
       baseYear={baseYear}
+      homeroomTeacher={homeroomTeacher}
     >
       <div
         className={cn(

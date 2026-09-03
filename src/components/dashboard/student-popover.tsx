@@ -47,6 +47,7 @@ interface StudentPopoverProps {
   align?: 'start' | 'center' | 'end';
   baseYear?: number;
   isLowerGrade?: boolean;
+  homeroomTeacher?: string;
 }
 
 export function StudentPopover({ 
@@ -58,7 +59,8 @@ export function StudentPopover({
   side,
   align,
   baseYear,
-  isLowerGrade: propIsLowerGrade
+  isLowerGrade: propIsLowerGrade,
+  homeroomTeacher
 }: StudentPopoverProps) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
@@ -221,9 +223,9 @@ export function StudentPopover({
         <div className="flex flex-col gap-0.5 min-w-0">
           <div className="flex items-center gap-1.5 min-w-0">
             <span className="font-bold text-[15px] text-blue-900">{student.student_name}</span>
-            {student.teacher_name && (
+            {(homeroomTeacher || student.teacher_name) && (
               <span className="text-[10px] text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 font-bold shrink-0">
-                {student.teacher_name}T
+                {homeroomTeacher || student.teacher_name}T
               </span>
             )}
           </div>

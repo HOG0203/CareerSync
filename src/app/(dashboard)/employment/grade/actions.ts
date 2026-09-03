@@ -6,7 +6,7 @@
 // (사용자 맞춤형 조건 설정, 나만의 프리셋 저장/관리, 학생별 성적 데이터 제공)
 // ==============================================================================
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/server';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
@@ -144,28 +144,35 @@ const SYSTEM_DEFAULT_PRESETS: GpaCalculationPreset[] = [
 ];
 
 /**
- * 저장된 프리셋 목록 조회 (시스템 기본 프리셋 + 사용자 정의 프리셋)
+ * 저장된 프리셋 목록 조회 (시스템 기본 프리셋 + 사용자 정의 프리셋, unstable_cache 적용)
  */
-export async function getGpaPresets(): Promise<GpaCalculationPreset[]> {
-  try {
-    const supabase = createAdminClient();
-    const { data } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', PRESETS_STORE_KEY)
-      .maybeSingle();
+export const getGpaPresets = unstable_cache(
+  async (): Promise<GpaCalculationPreset[]> => {
+    try {
+      const supabase = createAdminClient();
+      const { data } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', PRESETS_STORE_KEY)
+        .maybeSingle();
 
-    const userPresets = (data?.value as GpaCalculationPreset[]) || [];
-    const validUserPresets = Array.isArray(userPresets)
-      ? userPresets.filter(p => !p.isSystemDefault)
-      : [];
+      const userPresets = (data?.value as GpaCalculationPreset[]) || [];
+      const validUserPresets = Array.isArray(userPresets)
+        ? userPresets.filter(p => !p.isSystemDefault)
+        : [];
 
-    return [...SYSTEM_DEFAULT_PRESETS, ...validUserPresets];
-  } catch (err) {
-    console.error('getGpaPresets error:', err);
-    return SYSTEM_DEFAULT_PRESETS;
+      return [...SYSTEM_DEFAULT_PRESETS, ...validUserPresets];
+    } catch (err) {
+      console.error('getGpaPresets error:', err);
+      return SYSTEM_DEFAULT_PRESETS;
+    }
+  },
+  ['gpa_presets_cache'],
+  {
+    tags: ['gpa_presets_cache'],
+    revalidate: 86400,
   }
-}
+);
 
 /**
  * 프리셋 저장 (신규 등록 또는 기존 사용자 프리셋 수정)
@@ -229,6 +236,7 @@ export async function saveGpaPreset(
       return { success: false, error: error.message };
     }
 
+    revalidateTag('gpa_presets_cache');
     revalidatePath('/employment/grade');
     return { success: true, preset: targetPreset };
   } catch (err: any) {
@@ -262,6 +270,7 @@ export async function deleteGpaPreset(
       return { success: false, error: error.message };
     }
 
+    revalidateTag('gpa_presets_cache');
     revalidatePath('/employment/grade');
     return { success: true };
   } catch (err: any) {
@@ -271,80 +280,87 @@ export async function deleteGpaPreset(
 }
 
 /**
- * 3학년 학생 목록 및 성적 원본 데이터 조회 (클라이언트에서 실시간 고속 연산 가능)
+ * 3학년 학생 목록 및 성적 원본 데이터 조회 (unstable_cache 적용)
  */
-export async function getGradeStudents(
-  gradYear?: number
-): Promise<{ success: boolean; data: GradeStudentListItem[]; error?: string }> {
-  try {
-    const supabase = createAdminClient();
+export const getGradeStudents = unstable_cache(
+  async (
+    gradYear?: number
+  ): Promise<{ success: boolean; data: GradeStudentListItem[]; error?: string }> => {
+    try {
+      const supabase = createAdminClient();
 
-    let targetYear = gradYear;
-    if (!targetYear) {
-      const { data: setting } = await supabase
-        .from('system_settings')
-        .select('value')
-        .eq('key', 'general')
-        .maybeSingle();
-      const baseYear = setting?.value?.baseYear ? Number(setting.value.baseYear) : 2026;
-      targetYear = baseYear + 1; // 2026년 기준 3학년은 2027년 2월 졸업
-    }
+      let targetYear = gradYear;
+      if (!targetYear) {
+        const { data: setting } = await supabase
+          .from('system_settings')
+          .select('value')
+          .eq('key', 'general')
+          .maybeSingle();
+        const baseYear = setting?.value?.baseYear ? Number(setting.value.baseYear) : 2026;
+        targetYear = baseYear + 1; // 2026년 기준 3학년은 2027년 2월 졸업
+      }
 
-    const { data: students, error } = await supabase
-      .from('students')
-      .select('id, student_name, student_number, class_info, major, graduation_year')
-      .eq('graduation_year', targetYear)
-      .order('major', { ascending: true })
-      .order('class_info', { ascending: true })
-      .order('student_number', { ascending: true });
+      const { data: students, error } = await supabase
+        .from('students')
+        .select('id, student_name, student_number, class_info, major, graduation_year')
+        .eq('graduation_year', targetYear)
+        .order('major', { ascending: true })
+        .order('class_info', { ascending: true })
+        .order('student_number', { ascending: true });
 
-    if (error || !students) {
-      return { success: false, data: [], error: error?.message || '학생 목록을 불러올 수 없습니다.' };
-    }
+      if (error || !students) {
+        return { success: false, data: [], error: error?.message || '학생 목록을 불러올 수 없습니다.' };
+      }
 
-    // 학생들의 성적 데이터 청크(15명 단위) 조회
-    const studentIds = students.map(s => s.id);
-    const chunkSize = 15;
-    const chunks: string[][] = [];
-    for (let i = 0; i < studentIds.length; i += chunkSize) {
-      chunks.push(studentIds.slice(i, i + chunkSize));
-    }
+      // 학생들의 성적 데이터 청크(18명 최적 단위) 조회
+      const studentIds = students.map(s => s.id);
+      const chunkSize = 18;
+      const chunks: string[][] = [];
+      for (let i = 0; i < studentIds.length; i += chunkSize) {
+        chunks.push(studentIds.slice(i, i + chunkSize));
+      }
 
-    const scorePromises = chunks.map(chunk =>
-      supabase
-        .from('student_scores')
-        .select('student_id, grade, semester, subject, credits, achievement, rank_grade')
-        .in('student_id', chunk)
-    );
+      const scorePromises = chunks.map(chunk =>
+        supabase
+          .from('student_scores')
+          .select('student_id, grade, semester, subject, credits, achievement, rank_grade')
+          .in('student_id', chunk)
+      );
 
-    const scoreResults = await Promise.all(scorePromises);
-    const scoresByStudent: Record<string, RawScoreItem[]> = {};
+      const scoreResults = await Promise.all(scorePromises);
+      const scoresByStudent: Record<string, RawScoreItem[]> = {};
 
-    scoreResults.forEach(r => {
-      (r.data || []).forEach((sc: any) => {
-        if (!scoresByStudent[sc.student_id]) scoresByStudent[sc.student_id] = [];
-        scoresByStudent[sc.student_id].push({
-          grade: sc.grade,
-          semester: sc.semester,
-          subject: sc.subject,
-          credits: sc.credits,
-          achievement: sc.achievement,
-          rank_grade: sc.rank_grade,
+      scoreResults.forEach(r => {
+        (r.data || []).forEach((sc: any) => {
+          if (!scoresByStudent[sc.student_id]) scoresByStudent[sc.student_id] = [];
+          scoresByStudent[sc.student_id].push({
+            grade: sc.grade,
+            semester: sc.semester,
+            subject: sc.subject,
+            credits: sc.credits,
+            achievement: sc.achievement,
+            rank_grade: sc.rank_grade,
+          });
         });
       });
-    });
 
-    const studentsWithScores: GradeStudentListItem[] = students.map(st => ({
-      ...st,
-      rawScores: scoresByStudent[st.id] || [],
-    }));
+      const studentsWithScores: GradeStudentListItem[] = students.map(st => ({
+        ...st,
+        rawScores: scoresByStudent[st.id] || [],
+      }));
 
-    return { success: true, data: studentsWithScores };
-  } catch (err: any) {
-    console.error('getGradeStudents error:', err);
-    return { success: false, data: [], error: err.message };
+      return { success: true, data: studentsWithScores };
+    } catch (err: any) {
+      console.error('getGradeStudents error:', err);
+      return { success: false, data: [], error: err.message };
+    }
+  },
+  ['employment_grade_students_cache'],
+  {
+    tags: ['students', 'student_scores', 'employment_grade_cache'],
+    revalidate: 86400, // 24시간 캐시 (성적 수정 시 revalidateTag로 자동 갱신)
   }
-}
+);
 
 /**
  * 공식 내신등급 계산 결과표 엑셀 내보내기 (.xlsx base64)

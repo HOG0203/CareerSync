@@ -72,7 +72,7 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
   return (
     <SidebarProvider>
       <PageViewTracker />
-      <div className="h-screen w-full flex bg-background overflow-hidden">
+      <div className="h-screen w-full flex bg-background overflow-hidden print:h-auto print:overflow-visible print:block">
         {/* Desktop Sidebar */}
         <div className="hidden lg:block print:hidden">
           <Sidebar>

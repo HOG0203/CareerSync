@@ -139,7 +139,7 @@ export async function getFilteredStudentData(graduationYear: string, baseYear?: 
       : Promise.resolve({ data: [] as any[], error: null }),
     supabase
       .from('profiles')
-      .select('username, full_name, assigned_grade, assigned_major, assigned_class')
+      .select('username, full_name, assigned_grade, assigned_major, assigned_class, assigned_year')
       .not('assigned_major', 'is', null)
   ]);
 
@@ -158,28 +158,24 @@ export async function getFilteredStudentData(graduationYear: string, baseYear?: 
     const latestTraining = studentTrainings[0];
     const hist = historyData.find(h => h.student_id === s.id);
 
-    let teacherName = hist?.teacher_name;
-    if (!teacherName) {
-      const studentMajor = hist?.major || s.major;
-      const studentClass = hist?.class_info || s.class_info;
-      const studentGrade = hist?.grade || (baseYear ? (4 - (s.graduation_year - baseYear)) : 3);
-      
-      const cleanM = (studentMajor || '').replace(/과|공업계/g, '').trim();
-      const cleanC = (studentClass || '').replace(/반|학년/g, '').trim();
+    const studentMajor = hist?.major || s.major;
+    const studentClass = hist?.class_info || s.class_info;
+    const studentGrade = hist?.grade || (baseYear ? (4 - (s.graduation_year - baseYear)) : 3);
+    
+    const cleanM = (studentMajor || '').replace(/과|공업계/g, '').trim();
+    const cleanC = (studentClass || '').replace(/반|학년/g, '').trim();
 
-      const matchedT = teachers.find(t => {
-        const tMajor = (t.assigned_major || '').replace(/과|공업계/g, '').trim();
-        const tClass = (t.assigned_class || '').replace(/반|학년/g, '').trim();
-        const isM = tMajor === cleanM || cleanM.includes(tMajor) || tMajor.includes(cleanM);
-        const isC = tClass === cleanC;
-        const isG = !t.assigned_grade || t.assigned_grade === studentGrade;
-        return isM && isC && isG;
-      });
+    const matchedT = teachers.find(t => {
+      const tMajor = (t.assigned_major || '').replace(/과|공업계/g, '').trim();
+      const tClass = (t.assigned_class || '').replace(/반|학년/g, '').trim();
+      const isM = tMajor === cleanM || cleanM.includes(tMajor) || tMajor.includes(cleanM);
+      const isC = tClass === cleanC;
+      const isG = t.assigned_grade ? t.assigned_grade === studentGrade : (t.assigned_year ? t.assigned_year === ((baseYear || 2026) + (4 - studentGrade)) : true);
+      return isM && isC && isG;
+    });
 
-      if (matchedT) {
-        teacherName = matchedT.username || matchedT.full_name;
-      }
-    }
+    // 시스템(profiles)에 등록된 담임교사가 있으면 최우선 반영하여 실시간 동기화
+    const teacherName = (matchedT ? (matchedT.username || matchedT.full_name) : null) || hist?.teacher_name || (s as any).teacher_name || undefined;
 
     return {
       ...studentBase,
@@ -189,10 +185,10 @@ export async function getFilteredStudentData(graduationYear: string, baseYear?: 
         major: hist.major,
         class_info: hist.class_info,
         student_number: hist.student_number,
-        teacher_name: teacherName || hist.teacher_name,
+        teacher_name: teacherName,
         grade: hist.grade
       } : {
-        teacher_name: teacherName || undefined
+        teacher_name: teacherName
       }),
       id: s.id, // ID 유지 보장
       training_records: studentTrainings,
@@ -228,7 +224,7 @@ export async function getCachedFilteredStudentData(graduationYear: string, baseY
       [`filtered-student-data-${cacheKey}`],
       {
         revalidate: 86400,
-        tags: [`emp-status-${graduationYear}`, 'students']
+        tags: [`emp-status-${graduationYear}`, 'students', 'teachers']
       }
     );
     filteredStudentDataCacheMap.set(cacheKey, cachedFn);

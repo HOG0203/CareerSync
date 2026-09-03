@@ -13,7 +13,13 @@ export async function generateMetadata({
   searchParams: Promise<{ year?: string; ay?: string; grade?: string }>;
 }): Promise<Metadata> {
   const params = await searchParams;
-  const grade = params.grade ? parseInt(params.grade) : 3;
+  let grade = params.grade ? parseInt(params.grade) : 3;
+  if (!params.grade) {
+    const userProfile = await getCurrentUserProfile();
+    if (userProfile?.assigned_grade && userProfile.assigned_grade >= 1 && userProfile.assigned_grade <= 3) {
+      grade = userProfile.assigned_grade;
+    }
+  }
   const title = grade === 1 || grade === 2 ? '진로상세현황' : '취업상세현황';
   return {
     title: `${title} | CareerSync`,
@@ -37,22 +43,36 @@ async function EmploymentStatusPageContent({
 }) {
   const params = searchParams;
 
-  // 1. 학사학년도(AY)와 학년(Grade) 기반 졸업연도 사전 계산
-  const ay = params.ay ? parseInt(params.ay) : 2026;
-  const grade = params.grade ? parseInt(params.grade) : 3;
+  // 1. 기반 설정, 졸업연도, 프로필, 교사 정보를 1차 병렬 로드
+  const [graduationYears, settings, userProfile, teacherProfiles] = await Promise.all([
+    getCachedGraduationYears(),
+    getSystemSettings(),
+    getCurrentUserProfile(),
+    getCachedTeacherProfiles(),
+  ]);
+
+  const ay = params.ay ? parseInt(params.ay) : (settings.baseYear || 2026);
+
+  // 2. 담당교사 프로필의 담당학년(assigned_grade)을 기본값으로 동적 판별
+  let defaultGrade = 3;
+  if (userProfile?.assigned_grade && userProfile.assigned_grade >= 1 && userProfile.assigned_grade <= 3) {
+    defaultGrade = userProfile.assigned_grade;
+  } else if (userProfile?.assigned_year && settings.baseYear) {
+    const calcG = 4 - (userProfile.assigned_year - settings.baseYear);
+    if (calcG >= 1 && calcG <= 3) {
+      defaultGrade = calcG;
+    }
+  }
+
+  // URL 쿼리에 지정된 학년이 있으면 우선 적용, 없으면 교사의 담당학년 기본 적용
+  const grade = params.grade ? parseInt(params.grade) : defaultGrade;
   const defaultGradYear = (ay + (4 - grade)).toString();
   const selectedYear = params.grade 
     ? (ay + (4 - grade)).toString() 
     : (params.year || defaultGradYear);
 
-  // 2. 기반 설정, 졸업연도, 프로필, 교사 정보, 학생 데이터를 완전한 1회 병렬(Promise.all)로 동시 패칭
-  const [graduationYears, settings, userProfile, teacherProfiles, allData] = await Promise.all([
-    getCachedGraduationYears(),
-    getSystemSettings(),
-    getCurrentUserProfile(),
-    getCachedTeacherProfiles(),
-    getCachedFilteredStudentData(selectedYear, ay)
-  ]);
+  // 3. 결정된 졸업연도와 학사학년도 기준 학생 데이터 패칭
+  const allData = await getCachedFilteredStudentData(selectedYear, ay);
 
   // 학사학년도 목록 산출
   const academicYears = Array.from(

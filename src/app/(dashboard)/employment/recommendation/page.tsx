@@ -15,30 +15,31 @@ export const metadata: Metadata = {
   description: 'NCS 30점, 교과성적 30점, 옥저인재인증 30점, 면접 10점 기준 학교장추천대상자 심사 및 선발 시스템',
 };
 
-export const dynamic = 'force-dynamic';
-
 export default async function RecommendationPage() {
-  const [userProfile, customPermMap] = await Promise.all([
-    getCurrentUserProfile(),
-    getUserCustomPermissionsMapAction(),
-  ]);
+  const userProfile = await getCurrentUserProfile();
 
   if (!userProfile) {
     redirect('/login');
   }
 
   const isAdmin = userProfile.role === 'admin';
-  const hasExplicitPerm = userProfile.id && customPermMap[userProfile.id]?.includes('/employment/recommendation');
+  let hasExplicitPerm = false;
+
+  if (!isAdmin) {
+    const customPermMap = await getUserCustomPermissionsMapAction();
+    hasExplicitPerm = Boolean(userProfile.id && customPermMap[userProfile.id]?.includes('/employment/recommendation'));
+  }
 
   // 관리자(admin)이거나 사용자 관리에서 명시적 권한을 부여받은 교직원만 접근 허용
   if (!isAdmin && !hasExplicitPerm) {
     redirect('/dashboard');
   }
 
+  // 캐시된 세션 목록 즉시 조회 (0ms)
   const sessions = await getRecommendationSessions();
 
   return (
-    <div className="p-3 sm:p-5 lg:p-6 w-full min-w-0 max-w-none">
+    <div className="p-3 sm:p-5 lg:p-6 w-full min-w-0 max-w-none pb-20 sm:pb-16 min-h-full">
       <RecommendationClient initialSessions={sessions} />
     </div>
   );

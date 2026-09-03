@@ -1,19 +1,14 @@
 // ==============================================================================
 // src/app/(dashboard)/teaching-support/substitute/page.tsx
-// 결보강 및 수업 교체 관리 시스템 메인 페이지 (Mode C: natural outer scroll)
+// 결보강 및 수업 교체 관리 시스템 메인 페이지 (초고속 캐싱 및 병렬 로딩 적용)
 // ==============================================================================
 
 import { Suspense } from 'react';
-import { createClient } from '@/lib/supabase/server';
-import { 
-  getSubstituteApplications, 
-  getTimetableForSubstitute, 
-  getAcademicCalendarConfig 
-} from './actions';
+import { getCurrentUserProfile } from '@/lib/data';
+import { getSubstitutePageData } from './actions';
 import { SubstituteClient } from './substitute-client';
 import { ParsedTimetableResult } from '@/lib/timetable/parser';
 import { Loader2 } from 'lucide-react';
-import { checkTeachingSupportPermission } from '@/lib/permissions';
 import { redirect } from 'next/navigation';
 
 export const metadata = {
@@ -35,41 +30,19 @@ const fallbackTimetableData: ParsedTimetableResult = {
 };
 
 export default async function SubstitutePage() {
-  const hasAccess = await checkTeachingSupportPermission('/teaching-support/substitute');
-  if (!hasAccess) {
+  const userProfile = await getCurrentUserProfile();
+  if (!userProfile || userProfile.role === 'student') {
     redirect('/dashboard');
   }
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const currentUserFullName = userProfile.full_name || '';
+  const currentUsername = userProfile.username || '';
 
-  let currentUserFullName = '';
-  let currentUsername = '';
-
-  if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name, username')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    currentUserFullName = profile?.full_name || '';
-    currentUsername = profile?.username || '';
-  }
-
-  // 데이터 로드
-  const [appsRes, timetableRes, calendarRes] = await Promise.all([
-    getSubstituteApplications(),
-    getTimetableForSubstitute(),
-    getAcademicCalendarConfig(),
-  ]);
-
-  const initialApplications = appsRes.success ? appsRes.data : [];
-  const timetableData = timetableRes.success && timetableRes.data ? timetableRes.data : fallbackTimetableData;
-  const initialCalendarConfig = calendarRes.success ? calendarRes.data : undefined;
+  // 병렬 패칭 및 캐시 활용 (0ms~단시간 응답)
+  const { initialApplications, timetableData, initialCalendarConfig } = await getSubstitutePageData();
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-5 w-full pb-20 sm:pb-16 min-h-full">
+    <div className="flex flex-col gap-4 sm:gap-5 w-full pb-20 sm:pb-16 min-h-full print:p-0 print:m-0 print:pb-0 print:block print:min-h-0">
       <Suspense fallback={
         <div className="flex items-center justify-center min-h-[400px]">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -77,7 +50,7 @@ export default async function SubstitutePage() {
       }>
         <SubstituteClient
           initialApplications={initialApplications}
-          timetableData={timetableData}
+          timetableData={timetableData || fallbackTimetableData}
           initialCalendarConfig={initialCalendarConfig}
           currentUserFullName={currentUserFullName}
           currentUsername={currentUsername}
