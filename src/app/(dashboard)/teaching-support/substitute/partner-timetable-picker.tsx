@@ -16,6 +16,15 @@ import {
   checkIsSameDept
 } from '@/lib/substitute/validator';
 import { 
+  DAYS_OF_WEEK, 
+  parseClassCode, 
+  getActivityInfo, 
+  ActivityWeightConfig, 
+  DEFAULT_ACTIVITY_WEIGHTS,
+  DEPARTMENT_CODE_MAP,
+  getClassDeptBadgeStyle
+} from '@/lib/timetable/constants';
+import { 
   AcademicCalendarConfig, 
   DEFAULT_ACADEMIC_CALENDAR_2026_2 
 } from '@/lib/substitute/event-types';
@@ -70,6 +79,151 @@ export interface PartnerTimetablePickerProps {
   compact?: boolean;
 }
 
+// 특정 교사의 특정 날짜/교시 실시간 유효 수업 정보 (교체/보강 변동사항 100% 반영)
+function getEffectiveTeacherSlot(
+  teacher: TeacherTimetableSummary | undefined,
+  dateStr: string,
+  period: number,
+  dayOfWeek: string,
+  existingApplications: SubstituteApplication[],
+  calendarConfig?: AcademicCalendarConfig
+): {
+  hasClass: boolean;
+  subjectName?: string;
+  classCode?: string;
+  deptName?: string;
+  isExchangeIn?: boolean;
+  isExchangeOut?: boolean;
+  isTeachingSub?: boolean;
+  isAbsenceSub?: boolean;
+  partnerTeacher?: string;
+  status?: 'approved' | 'submitted';
+} {
+  if (!teacher) return { hasClass: false };
+
+  const specialDay = calendarConfig ? getSpecialDaySchedule(dateStr, calendarConfig) : null;
+  const effectiveDayKey = specialDay ? specialDay.targetDayOfWeek : dayOfWeek;
+  const effectivePeriod = specialDay?.periodOverrides?.[period] ?? period;
+
+  const regularSlot = teacher.slots[`${effectiveDayKey}_${effectivePeriod}`];
+  const hasRegularClass = Boolean(
+    regularSlot && regularSlot.subjectName && regularSlot.subjectName.trim() !== '' && regularSlot.subjectName !== '-' && regularSlot.subjectName !== '공강'
+  );
+
+  const teacherName = teacher.teacherName;
+  const activeApps = existingApplications.filter(app => app.status !== 'rejected');
+
+  let modification: {
+    type: 'exchange_out' | 'exchange_in' | 'absence_substitute' | 'teaching_substitute';
+    partnerTeacher: string;
+    subjectName?: string;
+    classCode?: string;
+    deptName?: string;
+    status: 'approved' | 'submitted';
+  } | null = null;
+
+  for (const app of activeApps) {
+    const appStatus = app.status === 'approved' ? 'approved' : 'submitted';
+    for (const it of app.items) {
+      if (it.type === 'substitute') {
+        if (it.originalTeacher === teacherName && it.sourceDate === dateStr && it.sourcePeriod === period) {
+          modification = {
+            type: 'absence_substitute',
+            partnerTeacher: it.substituteTeacher || '보강교사',
+            status: appStatus,
+          };
+        }
+        if (it.substituteTeacher === teacherName && it.sourceDate === dateStr && it.sourcePeriod === period) {
+          modification = {
+            type: 'teaching_substitute',
+            partnerTeacher: it.originalTeacher,
+            subjectName: it.subjectName,
+            classCode: it.classCode,
+            deptName: it.deptName,
+            status: appStatus,
+          };
+        }
+      }
+      if (it.type === 'exchange') {
+        if (app.applicantTeacher === teacherName) {
+          if (it.sourceDate === dateStr && it.sourcePeriod === period) {
+            modification = {
+              type: 'exchange_out',
+              partnerTeacher: it.targetTeacher || '교체교사',
+              status: appStatus,
+            };
+          }
+          if (it.targetDate === dateStr && it.targetPeriod === period) {
+            modification = {
+              type: 'exchange_in',
+              partnerTeacher: it.targetTeacher || '교체교사',
+              subjectName: it.targetSubject || it.subjectName,
+              classCode: it.classCode,
+              deptName: it.deptName,
+              status: appStatus,
+            };
+          }
+        }
+        if (it.targetTeacher === teacherName && app.applicantTeacher !== teacherName) {
+          if (it.targetDate === dateStr && it.targetPeriod === period) {
+            modification = {
+              type: 'exchange_out',
+              partnerTeacher: app.applicantTeacher,
+              status: appStatus,
+            };
+          }
+          if (it.sourceDate === dateStr && it.sourcePeriod === period) {
+            modification = {
+              type: 'exchange_in',
+              partnerTeacher: app.applicantTeacher,
+              subjectName: it.subjectName,
+              classCode: it.classCode,
+              deptName: it.deptName,
+              status: appStatus,
+            };
+          }
+        }
+      }
+    }
+  }
+
+  // 1) 교체받아 들어온 수업이거나 보강 수업 -> 수업 있음!
+  if (modification && (modification.type === 'exchange_in' || modification.type === 'teaching_substitute')) {
+    return {
+      hasClass: true,
+      subjectName: modification.subjectName || regularSlot?.subjectName || '교체수업',
+      classCode: modification.classCode || regularSlot?.classCode || '',
+      deptName: modification.deptName || regularSlot?.deptName || '',
+      isExchangeIn: modification.type === 'exchange_in',
+      isTeachingSub: modification.type === 'teaching_substitute',
+      partnerTeacher: modification.partnerTeacher,
+      status: modification.status,
+    };
+  }
+
+  // 2) 교체 나간 수업 또는 결강 수업 -> 실제로 수업 없음(공강)!
+  if (modification && (modification.type === 'exchange_out' || modification.type === 'absence_substitute')) {
+    return {
+      hasClass: false,
+      subjectName: regularSlot?.subjectName,
+      classCode: regularSlot?.classCode,
+      deptName: regularSlot?.deptName,
+      isExchangeOut: modification.type === 'exchange_out',
+      isAbsenceSub: modification.type === 'absence_substitute',
+      partnerTeacher: modification.partnerTeacher,
+      status: modification.status,
+    };
+  }
+
+  // 3) 일반 정규 수업
+  return {
+    hasClass: hasRegularClass,
+    subjectName: regularSlot?.subjectName,
+    classCode: regularSlot?.classCode,
+    deptName: regularSlot?.deptName,
+  };
+}
+
 export function PartnerTimetablePicker({
   partnerTeacherName,
   onSelectPartnerTeacher,
@@ -97,28 +251,6 @@ export function PartnerTimetablePicker({
   const validSourceDate = sourceDate || getUpcomingDateForDay(sourceDay || '월');
   const actualSourceDay = sourceDay || getDayOfWeekFromDate(validSourceDate) || '월';
 
-  // 날짜별 바쁜 교사 목록 수집
-  const busyTeachersOnDate = React.useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    existingApplications.forEach(app => {
-      if (app.status !== 'rejected') {
-        app.items.forEach(it => {
-          if (it.type === 'substitute' && it.substituteTeacher) {
-            const key = `${it.sourceDate}_${it.sourcePeriod}`;
-            if (!map.has(key)) map.set(key, new Set());
-            map.get(key)!.add(it.substituteTeacher);
-          }
-          if (it.type === 'exchange' && it.targetTeacher && it.targetDate && it.targetPeriod) {
-            const key = `${it.targetDate}_${it.targetPeriod}`;
-            if (!map.has(key)) map.set(key, new Set());
-            map.get(key)!.add(it.targetTeacher);
-          }
-        });
-      }
-    });
-    return map;
-  }, [existingApplications]);
-
   // 파트너 추천 교사 목록 정렬: 동일교과(1순위) -> 동일학과(2순위) -> 신청시간 공강 교사 -> 가나다순
   const sortedTeachers = React.useMemo(() => {
     const list = timetableData.teachers
@@ -126,10 +258,10 @@ export function PartnerTimetablePicker({
       .map(t => {
         const isSameSubject = checkIsSameSubject(sourceSlot.subjectName, currentTeacher, t);
         const isSameDept = checkIsSameDept(sourceSlot.deptName, sourceSlot.classCode, currentTeacher, t);
-        const slot = t.slots[`${actualSourceDay}_${sourcePeriod}`];
-        const hasClass = Boolean(slot && slot.subjectName && slot.subjectName.trim() !== '' && slot.subjectName !== '-' && slot.subjectName !== '공강');
-        const isBusy = busyTeachersOnDate.get(`${validSourceDate}_${sourcePeriod}`)?.has(t.teacherName);
-        const isFreeAtSource = !hasClass && !isBusy;
+        
+        // 실시간 공강 판별
+        const effective = getEffectiveTeacherSlot(t, validSourceDate, sourcePeriod, actualSourceDay, existingApplications, calendarConfig);
+        const isFreeAtSource = !effective.hasClass;
 
         return {
           ...t,
@@ -148,18 +280,16 @@ export function PartnerTimetablePicker({
       if (!a.isFreeAtSource && b.isFreeAtSource) return 1;
       return a.teacherName.localeCompare(b.teacherName, 'ko');
     });
-  }, [timetableData.teachers, currentTeacherName, currentTeacher, sourceSlot, actualSourceDay, sourcePeriod, validSourceDate, busyTeachersOnDate]);
+  }, [timetableData.teachers, currentTeacherName, currentTeacher, sourceSlot, actualSourceDay, sourcePeriod, validSourceDate, existingApplications, calendarConfig]);
 
-  // 상대 교사가 신청 시간(sourceDay, sourcePeriod)에 공강인지 여부
+  // 상대 교사가 신청 시간(sourceDay, sourcePeriod)에 실제로 공강인지 여부
   const isPartnerFreeAtSource = React.useMemo(() => {
     if (!partnerTeacher) return false;
-    const slot = partnerTeacher.slots[`${actualSourceDay}_${sourcePeriod}`];
-    const hasClass = Boolean(slot && slot.subjectName && slot.subjectName.trim() !== '' && slot.subjectName !== '-' && slot.subjectName !== '공강');
-    const isBusy = busyTeachersOnDate.get(`${validSourceDate}_${sourcePeriod}`)?.has(partnerTeacherName);
-    return !hasClass && !isBusy;
-  }, [partnerTeacher, actualSourceDay, sourcePeriod, partnerTeacherName, validSourceDate, busyTeachersOnDate]);
+    const effective = getEffectiveTeacherSlot(partnerTeacher, validSourceDate, sourcePeriod, actualSourceDay, existingApplications, calendarConfig);
+    return !effective.hasClass;
+  }, [partnerTeacher, validSourceDate, sourcePeriod, actualSourceDay, existingApplications, calendarConfig]);
 
-  // 슬롯 상태 판별 함수 (학사일정: 방학, 시험, 행사, 대체 요일 100% 반영)
+  // 슬롯 상태 판별 함수 (학사일정 및 실시간 교체/보강 100% 반영)
   const getSlotState = React.useCallback((day: string, period: number) => {
     if (!partnerTeacher || !currentTeacher) {
       return { type: 'DISABLED', label: '교사 미선택', reason: '교사를 선택해 주세요' };
@@ -194,12 +324,8 @@ export function PartnerTimetablePicker({
       };
     }
 
-    // [학사일정 3] 대체 요일 및 교시 변형 시간표 검사 (예: 수요일이지만 월요일 시간표 또는 6교시=5교시 수업)
+    // [학사일정 3] 단축수업 검사
     const specialDay = getSpecialDaySchedule(targetDate, calendarConfig);
-    const effectiveDayKey = specialDay ? specialDay.targetDayOfWeek : day;
-    const effectivePeriod = specialDay?.periodOverrides?.[period] ?? period;
-
-    // 단축수업 검사 (예: 4교시 단축수업 시 5~7교시 선택 불가)
     if (specialDay?.shortenedPeriods && period > specialDay.shortenedPeriods) {
       return {
         type: 'DISABLED',
@@ -218,17 +344,15 @@ export function PartnerTimetablePicker({
       return { 
         type: 'DISABLED', 
         label: '상대 교사 수업 중', 
-        reason: `${partnerTeacherName} 선생님이 ${actualSourceDay}요일 ${sourcePeriod}교시에 이미 정규 수업이 있습니다` 
+        reason: `${partnerTeacherName} 선생님이 ${actualSourceDay}요일 ${sourcePeriod}교시에 이미 수업이 있습니다` 
       };
     }
 
-    // 3) 내가 해당 요일/교시에 정규 수업 또는 행사가 있는지 확인
-    const mySlot = currentTeacher.slots[`${effectiveDayKey}_${effectivePeriod}`];
-    const myHasClass = Boolean(mySlot && mySlot.subjectName && mySlot.subjectName.trim() !== '' && mySlot.subjectName !== '-' && mySlot.subjectName !== '공강');
-    const myIsBusy = busyTeachersOnDate.get(`${targetDate}_${period}`)?.has(currentTeacherName);
+    // 3) 내가 해당 요일/교시에 실시간 수업 또는 행사가 있는지 확인
+    const myEffective = getEffectiveTeacherSlot(currentTeacher, targetDate, period, day, existingApplications, calendarConfig);
 
     // 내 행사 검사
-    const myEvents = getEventsForSlot(targetDate, period, mySlot?.classCode, currentTeacherName, calendarConfig);
+    const myEvents = getEventsForSlot(targetDate, period, myEffective.classCode || sourceSlot.classCode, currentTeacherName, calendarConfig);
     if (myEvents.length > 0) {
       return {
         type: 'MY_BUSY',
@@ -237,22 +361,21 @@ export function PartnerTimetablePicker({
       };
     }
 
-    if (myHasClass || myIsBusy) {
+    if (myEffective.hasClass) {
       return { 
         type: 'MY_BUSY', 
         label: '본인 수업 있음', 
-        reason: `내가 ${day}요일 ${period}교시에 '${mySlot?.subjectName || '수업'}'(${mySlot?.classCode || ''}) 수업이 있습니다`,
-        mySubject: mySlot?.subjectName,
-        myClass: mySlot?.classCode
+        reason: `내가 ${day}요일 ${period}교시에 '${myEffective.subjectName || '수업'}'(${myEffective.classCode || ''}) 수업이 있습니다`,
+        mySubject: myEffective.subjectName,
+        myClass: myEffective.classCode
       };
     }
 
-    // 4) 상대 교사의 해당 요일/교시 슬롯 정보 및 행사 검사
-    const partnerSlot = partnerTeacher.slots[`${effectiveDayKey}_${effectivePeriod}`];
-    const partnerHasClass = Boolean(partnerSlot && partnerSlot.subjectName && partnerSlot.subjectName.trim() !== '' && partnerSlot.subjectName !== '-' && partnerSlot.subjectName !== '공강');
+    // 4) 상대 교사의 해당 요일/교시 실시간 슬롯 정보 및 행사 검사
+    const partnerEffective = getEffectiveTeacherSlot(partnerTeacher, targetDate, period, day, existingApplications, calendarConfig);
 
     // 상대 교사 행사 검사
-    const partnerEvents = getEventsForSlot(targetDate, period, partnerSlot?.classCode, partnerTeacherName, calendarConfig);
+    const partnerEvents = getEventsForSlot(targetDate, period, partnerEffective.classCode, partnerTeacherName, calendarConfig);
     if (partnerEvents.length > 0) {
       return {
         type: 'DISABLED',
@@ -262,34 +385,37 @@ export function PartnerTimetablePicker({
     }
 
     // 상대 학급 행사 검사
-    const partnerClassEvents = partnerSlot?.classCode ? getClassEventsForSlot(targetDate, period, partnerSlot.classCode, calendarConfig) : [];
+    const partnerClassEvents = partnerEffective.classCode ? getClassEventsForSlot(targetDate, period, partnerEffective.classCode, calendarConfig) : [];
     if (partnerClassEvents.length > 0) {
       return {
         type: 'DISABLED',
-        label: `학급 행사중 (${partnerClassEvents[0].title})`,
-        reason: `${partnerSlot?.classCode} 학급이 '${partnerClassEvents[0].title}' 행사 진행 중입니다`,
+        label: `학급 행사 (${partnerClassEvents[0].title})`,
+        reason: `${partnerEffective.classCode} 학급이 '${partnerClassEvents[0].title}' 행사 진행 중입니다`,
+        partnerSubject: `🎭 ${partnerClassEvents[0].title}`,
+        partnerClass: partnerEffective.classCode,
       };
     }
 
     // Case 1: 동일 학반 수업 (최우선 추천 ★★★★★)
-    if (partnerHasClass && sourceSlot.classCode && partnerSlot?.classCode === sourceSlot.classCode) {
+    if (partnerEffective.hasClass && sourceSlot.classCode && partnerEffective.classCode === sourceSlot.classCode) {
       return {
         type: 'RECOMMENDED_SAME_CLASS',
-        label: '★ 동일학반 최우선 맞교환',
-        partnerSubject: partnerSlot.subjectName,
-        partnerClass: partnerSlot.classCode,
+        label: partnerEffective.isExchangeIn ? '★ 동일학반 재교체 추천' : '★ 동일학반 최우선 맞교환',
+        partnerSubject: partnerEffective.subjectName,
+        partnerClass: partnerEffective.classCode,
+        isExchangeIn: partnerEffective.isExchangeIn,
         targetDate,
       };
     }
 
     // Case 2: 상대 교사의 다른 수업 (학반 불일치 ➔ 학생 시간표 충돌로 맞교환 불가)
-    if (partnerHasClass) {
+    if (partnerEffective.hasClass) {
       return {
         type: 'DISABLED',
         label: '학반 불일치 (교체 불가)',
-        reason: `${partnerTeacherName} 선생님이 '${partnerSlot?.subjectName}'(${partnerSlot?.classCode}) 수업 중이나, 내 학반(${sourceSlot.classCode || '원래 학반'})과 달라 맞교환이 불가능합니다`,
-        partnerSubject: partnerSlot?.subjectName,
-        partnerClass: partnerSlot?.classCode,
+        reason: `${partnerTeacherName} 선생님이 '${partnerEffective.subjectName}'(${partnerEffective.classCode}) 수업 중이나, 내 학반(${sourceSlot.classCode || '원래 학반'})과 달라 맞교환이 불가능합니다`,
+        partnerSubject: partnerEffective.subjectName,
+        partnerClass: partnerEffective.classCode,
       };
     }
 
@@ -297,11 +423,11 @@ export function PartnerTimetablePicker({
     return {
       type: 'DISABLED',
       label: '공강 (교체 불가)',
-      reason: '수업 교체는 공강과 교체할 수 없습니다 (동일 학반 정규 수업만 맞교환 가능)',
+      reason: '수업 교체는 공강과 교체할 수 없습니다 (동일 학반 수업만 맞교환 가능)',
       partnerSubject: '공강',
       targetDate,
     };
-  }, [partnerTeacher, currentTeacher, validSourceDate, actualSourceDay, sourcePeriod, isPartnerFreeAtSource, partnerTeacherName, currentTeacherName, busyTeachersOnDate, sourceSlot, calendarConfig]);
+  }, [partnerTeacher, currentTeacher, validSourceDate, actualSourceDay, sourcePeriod, isPartnerFreeAtSource, partnerTeacherName, currentTeacherName, existingApplications, sourceSlot, calendarConfig]);
 
   return (
     <div className="space-y-2.5 bg-gradient-to-b from-slate-50 to-indigo-50/30 p-3.5 rounded-2xl border border-indigo-200/70 shadow-2xs">
@@ -497,8 +623,8 @@ export function PartnerTimetablePicker({
                           <div className="flex items-center justify-between w-full text-[9px] leading-tight">
                             {state.partnerClass ? (
                               <span className={cn(
-                                "px-1 py-0.2 rounded font-black",
-                                isSelected ? "bg-white/20 text-white" : state.type === 'RECOMMENDED_SAME_CLASS' ? "bg-indigo-200 text-indigo-900" : "bg-slate-200 text-slate-800"
+                                "px-1.5 py-0.2 rounded font-black truncate max-w-[44px]",
+                                isSelected ? "bg-white/20 text-white" : getClassDeptBadgeStyle(state.partnerClass).pill
                               )}>
                                 {state.partnerClass}
                               </span>

@@ -140,9 +140,10 @@ export function SmartExchangeDrawer({
       slot.deptName,
       currentTeacherName,
       slot.subjectName,
-      slot.classCode
+      slot.classCode,
+      calendarConfig
     );
-  }, [sourceDate, sourcePeriod, timetableData, existingApplications, slot.deptName, currentTeacherName, slot.subjectName, slot.classCode]);
+  }, [sourceDate, sourcePeriod, timetableData, existingApplications, slot.deptName, currentTeacherName, slot.subjectName, slot.classCode, calendarConfig]);
 
   // 검색어 필터링된 공강 교사 목록
   const filteredAvailableTeachers = React.useMemo(() => {
@@ -274,8 +275,8 @@ export function SmartExchangeDrawer({
   ]);
 
   const conflictCheck = React.useMemo(() => {
-    return checkSubstituteItemConflict(currentItem, timetableData, existingApplications);
-  }, [currentItem, timetableData, existingApplications]);
+    return checkSubstituteItemConflict(currentItem, timetableData, existingApplications, undefined, calendarConfig);
+  }, [currentItem, timetableData, existingApplications, calendarConfig]);
 
   // 최종 저장 & 제출 핸들러
   const handleSubmit = async (submitImmediately = true) => {

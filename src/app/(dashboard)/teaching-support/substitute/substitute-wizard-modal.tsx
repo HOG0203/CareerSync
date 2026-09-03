@@ -19,6 +19,15 @@ import {
   getDayOfWeekFromDate 
 } from '@/lib/substitute/validator';
 import { 
+  DAYS_OF_WEEK, 
+  parseClassCode, 
+  getActivityInfo, 
+  ActivityWeightConfig, 
+  DEFAULT_ACTIVITY_WEIGHTS,
+  DEPARTMENT_CODE_MAP,
+  getClassDeptBadgeStyle
+} from '@/lib/timetable/constants';
+import { 
   AcademicCalendarConfig, 
   DEFAULT_ACADEMIC_CALENDAR_2026_2 
 } from '@/lib/substitute/event-types';
@@ -313,7 +322,39 @@ export function SubstituteWizardModal({
         continue;
       }
 
-      // 3) 일반 정규 수업
+      // 3) 교사 인솔 행사 검사
+      const teacherEvents = getEventsForSlot(sourceDate, p, undefined, selectedTeacherName, calendarConfig);
+      if (teacherEvents.length > 0) {
+        list.push({
+          period: p,
+          slot: {
+            id: `event-${p}`,
+            teacherName: selectedTeacherName,
+            homeroomClass: currentTeacher.homeroomClass || '',
+            day: sourceDay,
+            period: p,
+            subjectName: `[행사] ${teacherEvents[0].title}`,
+            classCode: '전체',
+            deptName: '전체',
+            grade: 1,
+            classNum: 1,
+            weight: 1,
+            isActivity: true,
+            activityType: '행사',
+          }
+        });
+        continue;
+      }
+
+      // 4) 비인솔 교사의 수업 학급 학생들이 행사에 참여하여 수업이 없어진 경우 -> 수업 없음(공강!)
+      if (regularSlot?.classCode) {
+        const classEvents = getClassEventsForSlot(sourceDate, p, regularSlot.classCode, calendarConfig);
+        if (classEvents.length > 0) {
+          continue; // 학생들이 행사에 가서 수업이 취소되었으므로 신청 목록에서 제외(공강)
+        }
+      }
+
+      // 5) 일반 정규 수업
       if (regularSlot && regularSlot.subjectName && regularSlot.subjectName.trim() !== '' && regularSlot.subjectName !== '-' && regularSlot.subjectName !== '공강') {
         list.push({
           period: p,
@@ -364,11 +405,13 @@ export function SubstituteWizardModal({
       const result = checkSubstituteItemConflict(
         item,
         timetableData,
-        existingApplications
+        existingApplications,
+        undefined,
+        calendarConfig
       );
       return { id: item.id, ...result };
     });
-  }, [items, timetableData, existingApplications]);
+  }, [items, timetableData, existingApplications, calendarConfig]);
 
   const hasAnyConflict = conflicts.some(c => c.hasConflict);
 
@@ -566,7 +609,7 @@ export function SubstituteWizardModal({
                 {daySlots.map(({ period, slot, isExchangeIn, isExchangeOut, isTeachingSub, isAbsenceSub, partnerTeacher, isPending, effectiveStatus }) => {
                   const isSelected = items.some(it => it.sourcePeriod === period);
                   const isPassedToOther = isExchangeOut || isAbsenceSub;
-                  const isLocked = isPending;
+                  const isLocked = isPassedToOther || isPending;
 
                   return (
                     <button
@@ -577,22 +620,23 @@ export function SubstituteWizardModal({
                       title={
                         isPending
                           ? `현재 결재 진행 중인 수업으로 결재 승인 전에는 변경이 불가합니다.`
+                          : isExchangeOut
+                          ? `이미 ${partnerTeacher} 선생님과 교체 완료된 수업입니다. (선택 불가)`
+                          : isAbsenceSub
+                          ? `이미 ${partnerTeacher} 선생님께 보강 배정된 수업입니다. (선택 불가)`
                           : isExchangeIn
                           ? `(${partnerTeacher} 교체 수업) 클릭하여 다른 교사와 다시 재교체 신청 가능`
-                          : isExchangeOut
-                          ? `(${partnerTeacher} 교체 나감) 공강 슬롯으로 활용 가능`
                           : undefined
                       }
                       className={cn(
                         "p-2.5 rounded-2xl border text-center transition-all flex flex-col items-center justify-between gap-1 shadow-2xs relative",
                         isLocked && "cursor-not-allowed select-none border-dashed border-slate-300 bg-[repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9_6px,#e2e8f0_6px,#e2e8f0_12px)] opacity-90",
-                        !isLocked && isPassedToOther && "cursor-pointer border-dashed border-slate-300 bg-[repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9_6px,#e2e8f0_6px,#e2e8f0_12px)] hover:border-indigo-400",
-                        !isLocked && isExchangeIn && (isSelected ? "bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-500/30 shadow-md scale-[1.02]" : "bg-indigo-50/80 text-indigo-950 border-indigo-300 hover:bg-indigo-100/80"),
-                        !isLocked && isTeachingSub && (isSelected ? "bg-emerald-600 text-white border-emerald-600 ring-2 ring-emerald-500/30 shadow-md scale-[1.02]" : "bg-emerald-50/80 text-emerald-950 border-emerald-300 hover:bg-emerald-100/80"),
+                        !isLocked && isExchangeIn && (isSelected ? "bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-500/30 shadow-md scale-[1.02]" : "bg-indigo-50/80 text-indigo-950 border-indigo-300 hover:bg-indigo-100/80 cursor-pointer"),
+                        !isLocked && isTeachingSub && (isSelected ? "bg-emerald-600 text-white border-emerald-600 ring-2 ring-emerald-500/30 shadow-md scale-[1.02]" : "bg-emerald-50/80 text-emerald-950 border-emerald-300 hover:bg-emerald-100/80 cursor-pointer"),
                         !isLocked && !isPassedToOther && !isExchangeIn && !isTeachingSub && (
                           isSelected
                             ? "bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-500/30 shadow-md scale-[1.02]"
-                            : "bg-white text-slate-800 border-slate-200 hover:bg-indigo-50/50 hover:border-indigo-300"
+                            : "bg-white text-slate-800 border-slate-200 hover:bg-indigo-50/50 hover:border-indigo-300 cursor-pointer"
                         )
                       )}
                     >
@@ -622,8 +666,8 @@ export function SubstituteWizardModal({
 
                       <div className="flex items-center gap-1">
                         <span className={cn(
-                          "text-[9.5px] font-bold",
-                          isSelected ? "text-indigo-200" : isExchangeIn ? "text-indigo-700" : isPassedToOther ? "text-slate-600" : "text-indigo-600"
+                          "text-[9.5px] px-1.5 py-0.2 rounded font-black",
+                          isSelected ? "bg-white/20 text-white" : isPassedToOther ? "text-slate-600 bg-slate-200" : getClassDeptBadgeStyle(slot.classCode).pill
                         )}>
                           {slot.classCode}
                         </span>
@@ -663,7 +707,8 @@ export function SubstituteWizardModal({
                     item.deptName,
                     selectedTeacherName,
                     item.subjectName,
-                    item.classCode
+                    item.classCode,
+                    calendarConfig
                   );
 
                   return (

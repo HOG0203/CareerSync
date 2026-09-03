@@ -144,6 +144,115 @@ export function parseClassCode(classCode: string) {
 }
 
 /**
+ * 학반 코드(예: 화11, 기13, 전12, 공11, 자21, 섬11 등)별 학과 대표 테마 색상 뱃지 스타일 반환
+ */
+export function getClassDeptBadgeStyle(classCode?: string): {
+  bg: string;
+  text: string;
+  border: string;
+  badge: string;
+  pill: string;
+} {
+  if (!classCode || typeof classCode !== 'string') {
+    return {
+      bg: 'bg-slate-100',
+      text: 'text-slate-700',
+      border: 'border-slate-200',
+      badge: 'bg-slate-100 text-slate-700 border border-slate-200',
+      pill: 'bg-slate-100 text-slate-700 font-bold',
+    };
+  }
+
+  const clean = classCode.trim();
+  const firstChar = clean.charAt(0);
+
+  // 1. 기계 (기11, 기12, 기13, 도31 등) -> 블루 테마
+  if (firstChar === '기' || clean.startsWith('도')) {
+    return {
+      bg: 'bg-blue-50',
+      text: 'text-blue-700',
+      border: 'border-blue-200',
+      badge: 'bg-blue-50 text-blue-800 border border-blue-200/80 font-black',
+      pill: 'bg-blue-100 text-blue-900 font-black',
+    };
+  }
+
+  // 2. 화학/바이오화학 (화11, 화12 등) -> 로즈/핑크 테마
+  if (firstChar === '화') {
+    return {
+      bg: 'bg-rose-50',
+      text: 'text-rose-700',
+      border: 'border-rose-200',
+      badge: 'bg-rose-50 text-rose-800 border border-rose-200/80 font-black',
+      pill: 'bg-rose-100 text-rose-900 font-black',
+    };
+  }
+
+  // 3. 전기 (전11, 전12 등) -> 인디고/보라 테마
+  if (firstChar === '전') {
+    return {
+      bg: 'bg-indigo-50',
+      text: 'text-indigo-700',
+      border: 'border-indigo-200',
+      badge: 'bg-indigo-50 text-indigo-800 border border-indigo-200/80 font-black',
+      pill: 'bg-indigo-100 text-indigo-900 font-black',
+    };
+  }
+
+  // 4. 자동차 (자11, 자12, 차11 등) -> 에메랄드/그린 테마
+  if (firstChar === '자' || firstChar === '차') {
+    return {
+      bg: 'bg-emerald-50',
+      text: 'text-emerald-700',
+      border: 'border-emerald-200',
+      badge: 'bg-emerald-50 text-emerald-800 border border-emerald-200/80 font-black',
+      pill: 'bg-emerald-100 text-emerald-900 font-black',
+    };
+  }
+
+  // 5. 공간/건축/건설 (공11, 공12, 건11, 건12, 축11 등) -> 앰버/오렌지 테마
+  if (firstChar === '공' || firstChar === '건' || firstChar === '축') {
+    return {
+      bg: 'bg-amber-50',
+      text: 'text-amber-800',
+      border: 'border-amber-200',
+      badge: 'bg-amber-50 text-amber-900 border border-amber-200/80 font-black',
+      pill: 'bg-amber-100 text-amber-900 font-black',
+    };
+  }
+
+  // 6. 섬유 (섬11, 섬12 등) -> 퍼플/바이올렛 테마
+  if (firstChar === '섬') {
+    return {
+      bg: 'bg-purple-50',
+      text: 'text-purple-700',
+      border: 'border-purple-200',
+      badge: 'bg-purple-50 text-purple-800 border border-purple-200/80 font-black',
+      pill: 'bg-purple-100 text-purple-900 font-black',
+    };
+  }
+
+  // 7. 디자인 (디11, 디12 등) -> 스카이 테마
+  if (firstChar === '디') {
+    return {
+      bg: 'bg-sky-50',
+      text: 'text-sky-700',
+      border: 'border-sky-200',
+      badge: 'bg-sky-50 text-sky-800 border border-sky-200/80 font-black',
+      pill: 'bg-sky-100 text-sky-900 font-black',
+    };
+  }
+
+  return {
+    bg: 'bg-slate-50',
+    text: 'text-slate-700',
+    border: 'border-slate-200',
+    badge: 'bg-slate-100 text-slate-700 border border-slate-200 font-bold',
+    pill: 'bg-slate-100 text-slate-700 font-bold',
+  };
+}
+
+/**
  * 과목명/활동명 기반 특별활동 판별 및 스타일링
  */
 export function getActivityInfo(subjectName: string, customWeights?: ActivityWeightConfig) {

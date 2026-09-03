@@ -7,7 +7,7 @@
 
 import * as React from 'react';
 import { ParsedTimetableResult, TeacherTimetableSummary, TimetableSlot } from '@/lib/timetable/parser';
-import { DAYS_OF_WEEK, parseClassCode, getActivityInfo } from '@/lib/timetable/constants';
+import { DAYS_OF_WEEK, parseClassCode, getActivityInfo, getClassDeptBadgeStyle } from '@/lib/timetable/constants';
 import { SubstituteApplication } from '@/lib/substitute/types';
 import { 
   AcademicCalendarConfig, 
@@ -33,6 +33,7 @@ import {
   ArrowLeftRight, 
   Clock, 
   CheckCircle2,
+  Check,
   X,
   SendHorizontal,
   ChevronLeft,
@@ -542,15 +543,30 @@ export function InteractiveTeacherTimetable({
                     );
                   }
 
-                  // 행사가 있는 경우 (클릭하여 행사 수업도 교체/보강 신청 가능)
+                  // 1) 교사가 직접 인솔/담당하는 행사가 있는 경우 (행사 수업 진행)
                   if (hasEvent) {
-                    const eventClassCode = mainEvent.targetScope === 'all'
-                      ? '전교생'
-                      : mainEvent.targetScope === 'grade'
-                      ? `${mainEvent.targetGrades?.join(',') || '1'}학년`
-                      : mainEvent.targetScope === 'class'
-                      ? (mainEvent.targetClasses?.join(',') || selectedTeacher?.homeroomClass || slot?.classCode || '해당학급')
-                      : (selectedTeacher?.homeroomClass || slot?.classCode || '전체');
+                    const teacherHomeroom = selectedTeacher?.homeroomClass?.trim();
+
+                    // 🌟 행사 시 담당 교사의 학반 우선 결정:
+                    // 1순위: 담당 교사의 담임 학반 (예: 기11, 섬31, 화12 등)
+                    // 2순위: 행사에 특정 학반(targetClasses)이 지정되어 있는 경우
+                    // 3순위: 해당 시간표 슬롯의 원래 학반 (slot?.classCode)
+                    // 4순위: 학년별 행사 표기 (예: '1학년')
+                    // 5순위: 전교생 표기 ('전교생')
+                    let eventClassCode = '';
+                    if (teacherHomeroom) {
+                      eventClassCode = teacherHomeroom;
+                    } else if (mainEvent.targetScope === 'class' && mainEvent.targetClasses && mainEvent.targetClasses.length > 0) {
+                      eventClassCode = mainEvent.targetClasses.join(',');
+                    } else if (slot?.classCode && slot.classCode.trim() !== '') {
+                      eventClassCode = slot.classCode;
+                    } else if (mainEvent.targetScope === 'grade') {
+                      eventClassCode = `${mainEvent.targetGrades?.join(',') || '1'}학년`;
+                    } else if (mainEvent.targetScope === 'all') {
+                      eventClassCode = '전교생';
+                    } else {
+                      eventClassCode = '전체';
+                    }
 
                     const eventSlot: TimetableSlot = {
                       id: `event-${mainEvent.id}-${d.key}-${period}`,
@@ -560,9 +576,13 @@ export function InteractiveTeacherTimetable({
                       period,
                       subjectName: `[행사] ${mainEvent.title}`,
                       classCode: eventClassCode,
-                      deptName: slot?.deptName || '전체',
-                      grade: mainEvent.targetScope === 'all' ? 1 : selectedTeacher?.homeroomClass ? (parseInt(selectedTeacher.homeroomClass.match(/\d/)?.[0] || '1', 10)) : (mainEvent.targetGrades?.[0] || slot?.grade || 1),
-                      classNum: slot?.classNum || 1,
+                      deptName: slot?.deptName || selectedTeacher?.remarks || '전체',
+                      grade: teacherHomeroom
+                        ? parseInt(teacherHomeroom.match(/\d/)?.[0] || '1', 10)
+                        : (mainEvent.targetGrades?.[0] || slot?.grade || 1),
+                      classNum: teacherHomeroom
+                        ? parseInt(teacherHomeroom.match(/\d+/)?.[0]?.slice(1) || '1', 10)
+                        : (slot?.classNum || 1),
                       weight: 1,
                       isActivity: true,
                       activityType: '행사',
@@ -608,6 +628,25 @@ export function InteractiveTeacherTimetable({
                     );
                   }
 
+                  // 2) 교사는 인솔자가 아니나, 해당 학급 학생들이 행사에 참여하여 수업이 없어진 경우 (수업 취소 / 공강!)
+                  if (hasClassEvent) {
+                    return (
+                      <td key={d.key} className="p-1 border-r last:border-r-0 border-slate-200 h-14">
+                        <div 
+                          className="w-full h-full min-h-[48px] max-h-[48px] p-1 rounded-xl border border-dashed border-slate-300 bg-slate-50/80 flex flex-col items-center justify-center text-center shadow-2xs select-none"
+                          title={`${slot?.classCode || '학급'} 학생들이 '${mainClassEvent.title}' 행사에 참여하여 수업이 없습니다 (공강)`}
+                        >
+                          <span className="font-bold text-[10px] text-slate-500 truncate max-w-full line-through decoration-slate-400">
+                            {slot?.subjectName} ({slot?.classCode})
+                          </span>
+                          <span className="text-[8.5px] font-black text-amber-700 bg-amber-100/80 px-1.5 py-0.2 rounded-full border border-amber-200 mt-0.5 shadow-2xs">
+                            공강 ({mainClassEvent.title})
+                          </span>
+                        </div>
+                      </td>
+                    );
+                  }
+
                   // 3. 결보강 / 교체 승인 또는 신청된 변동 슬롯이 존재하는 경우
                   if (effectiveInfo) {
                     const isApproved = effectiveInfo.status === 'approved';
@@ -635,8 +674,8 @@ export function InteractiveTeacherTimetable({
 
                     // 교체 나간 수업 또는 결강 수업 (내가 수업하지 않음)
                     const isPassedToOther = isAbsenceSub || isExchangeOut;
-                    // 오직 결재 대기 중(미승인)인 슬롯만 결재 완료 전까지 잠금
-                    const isLocked = isPending;
+                    // 교체 나간 수업, 결강 수업, 또는 아직 결재 대기 중(교체중/보강중)인 슬롯은 추가 선택 불가 (완전 잠금)
+                    const isLocked = isPassedToOther || isPending;
                     // 선택 상태 판별
                     const isCellSelected = isSelected && !isLocked;
 
@@ -652,11 +691,11 @@ export function InteractiveTeacherTimetable({
                           }}
                           title={
                             isPending
-                              ? `현재 결재 진행 중(${isExchangeIn || isExchangeOut ? '교체중' : isTeachingSub ? '보강중' : '결강중'})인 수업입니다. 결재 승인 완료 후 재교체나 추가 변경이 가능합니다.`
+                              ? `현재 결재 진행 중(${isExchangeIn || isExchangeOut ? '교체중' : isTeachingSub ? '보강중' : '결강중'})인 수업입니다. 결재 승인 전에는 추가 변경이 불가능합니다.`
                               : isAbsenceSub
-                              ? `(${effectiveInfo.partnerTeacher} 보강 배정됨) 클릭하여 필요 시 재교체/보강 신청 가능`
+                              ? `이미 ${effectiveInfo.partnerTeacher} 선생님께 보강 배정된 결강 수업입니다. (선택 불가)`
                               : isExchangeOut
-                              ? `(${effectiveInfo.partnerTeacher} 교체 완료되어 공강 상태) 클릭하여 이 시간에 다른 수업 교체/보강 배정 가능`
+                              ? `이미 ${effectiveInfo.partnerTeacher} 선생님과 교체 완료된 수업입니다. (선택 불가)`
                               : isTeachingSub
                               ? `(${effectiveInfo.originalTeacher} 결강 보강 수업) 클릭하여 필요 시 재교체/보강 신청 가능`
                               : isExchangeIn
@@ -665,11 +704,8 @@ export function InteractiveTeacherTimetable({
                           }
                           className={cn(
                             "w-full h-full min-h-[48px] max-h-[48px] p-1 sm:p-1.5 rounded-xl border-[1.5px] transition-all flex flex-col items-center justify-center text-center relative group shadow-2xs",
-                            // 1) 내가 넘겨준 수업 (교체 나감 / 결강): 한눈에 식별되는 선명한 회색 빗살무늬 패턴 (승인 완료 시 클릭하여 공강 활용 가능)
-                            isPassedToOther && cn(
-                              "border-dashed border-slate-300 bg-[repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9_6px,#e2e8f0_6px,#e2e8f0_12px)] opacity-95",
-                              isLocked ? "cursor-not-allowed select-none" : "cursor-pointer hover:border-indigo-400 hover:shadow-xs"
-                            ),
+                            // 1) 내가 넘겨준 수업 (교체 나감 / 결강): 선택 불가(잠금) 빗살무늬 패턴
+                            isPassedToOther && "cursor-not-allowed select-none border-dashed border-slate-300 bg-[repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9_6px,#e2e8f0_6px,#e2e8f0_12px)] opacity-95",
                             // 2) 내가 수업하는 보강 수업
                             !isPassedToOther && isTeachingSub && (isApproved ? "border-emerald-400 bg-emerald-50/95 text-emerald-950 ring-1 ring-emerald-400/40 hover:bg-emerald-100/90 cursor-pointer" : "border-emerald-300 bg-emerald-50/80 text-emerald-950 cursor-not-allowed"),
                             // 3) 내가 수업하는 교체 들어온 수업 (재교체 가능)
@@ -682,8 +718,8 @@ export function InteractiveTeacherTimetable({
                         >
                           {/* 선택 체크마크 (오직 유효 선택 슬롯만) */}
                           {isCellSelected && (
-                            <div className="absolute -top-1.5 -left-1.5 w-4.5 h-4.5 rounded-full bg-white text-indigo-600 flex items-center justify-center shadow-xs text-[10px] font-black ring-1 ring-indigo-600 z-20">
-                              ✓
+                            <div className="absolute -top-2 -left-2 w-5.5 h-5.5 rounded-full bg-white flex items-center justify-center shadow-md border-2 border-indigo-600 z-20 shrink-0 aspect-square">
+                              <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" strokeWidth={3.5} />
                             </div>
                           )}
 
@@ -732,7 +768,7 @@ export function InteractiveTeacherTimetable({
                                   ? "bg-emerald-200/90 text-emerald-900 font-black" 
                                   : isExchangeIn 
                                   ? "bg-indigo-200/90 text-indigo-900 font-black" 
-                                  : "bg-slate-200 text-slate-700"
+                                  : getClassDeptBadgeStyle(effectiveInfo.classCode).pill
                               )}>
                                 {effectiveInfo.classCode}
                               </span>
@@ -776,36 +812,25 @@ export function InteractiveTeacherTimetable({
                     <td key={d.key} className="p-1 border-r last:border-r-0 border-slate-200 h-14">
                       <button
                         type="button"
-                        disabled={hasClassEvent}
                         onClick={() => handleSlotClick(d.key, period, slot!)}
                         className={cn(
                           "w-full h-full min-h-[48px] max-h-[48px] p-1 sm:p-1.5 rounded-xl border-[1.5px] transition-all flex flex-col items-center justify-center text-center relative group shadow-2xs",
-                          hasClassEvent
-                            ? "bg-[repeating-linear-gradient(45deg,#fffdf5,#fffdf5_6px,#fef9c3_6px,#fef9c3_12px)] border-amber-300/80 cursor-not-allowed opacity-90 select-none"
-                            : isNormalSelected
-                              ? "border-indigo-600 bg-indigo-600 text-white ring-2 ring-indigo-600 ring-offset-2 scale-[1.03] shadow-md z-10 cursor-pointer"
-                              : "border-slate-200/90 bg-white hover:border-indigo-400 hover:bg-indigo-50/30 hover:scale-[1.01] hover:shadow-sm cursor-pointer"
+                          isNormalSelected
+                            ? "border-indigo-600 bg-indigo-600 text-white ring-2 ring-indigo-600 ring-offset-2 scale-[1.03] shadow-md z-10 cursor-pointer"
+                            : "border-slate-200/90 bg-white hover:border-indigo-400 hover:bg-indigo-50/30 hover:scale-[1.01] hover:shadow-sm cursor-pointer"
                         )}
-                        title={hasClassEvent ? "해당 학급이 행사 진행 중이므로 수업 교체를 신청할 수 없습니다." : undefined}
                       >
                         {/* 선택 체크마크 뱃지 */}
                         {isNormalSelected && (
-                          <div className="absolute -top-1.5 -left-1.5 w-4.5 h-4.5 rounded-full bg-white text-indigo-600 flex items-center justify-center shadow-xs text-[10px] font-black ring-1 ring-indigo-600 z-20">
-                            ✓
+                          <div className="absolute -top-2 -left-2 w-5.5 h-5.5 rounded-full bg-white flex items-center justify-center shadow-md border-2 border-indigo-600 z-20 shrink-0 aspect-square">
+                            <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" strokeWidth={3.5} />
                           </div>
                         )}
 
                         {/* 교시 복제/변형 운영 뱃지 */}
-                        {!isNormalSelected && !hasClassEvent && isPeriodOverridden && (
+                        {!isNormalSelected && isPeriodOverridden && (
                           <span className="absolute -top-1.5 -left-1 text-[8px] px-1 py-0.1 rounded-full font-black bg-indigo-600 text-white shadow-xs z-20 leading-tight ring-1 ring-white/50">
                             🔄 {targetPeriod}교시
-                          </span>
-                        )}
-
-                        {/* 학급 행사 진행 중 안내 뱃지 (최상위 레이어 z-20) */}
-                        {!isNormalSelected && hasClassEvent && (
-                          <span className="absolute -top-1.5 -right-1 text-[8.5px] px-1.5 py-0.2 rounded-full font-black bg-amber-600 text-white shadow-xs z-20 leading-tight ring-1 ring-white/50">
-                            📢 행사중
                           </span>
                         )}
 
@@ -814,31 +839,22 @@ export function InteractiveTeacherTimetable({
                           "font-bold text-[11.5px] tracking-tight truncate max-w-full leading-tight",
                           isNormalSelected 
                             ? "text-white" 
-                            : hasClassEvent 
-                              ? "text-slate-600 font-bold line-through decoration-amber-500 decoration-[1.5px]" 
-                              : "text-slate-900 font-extrabold"
+                            : "text-slate-900 font-extrabold"
                         )}>
                           {slot?.subjectName}
                         </span>
 
-                        {/* 하단: 학반 뱃지 및 행사 안내 (한 줄 인라인 콤팩트 배치) */}
+                        {/* 하단: 학반 뱃지 (학과별 고유 테마 컬러 적용) */}
                         {slot?.classCode && classInfo && (
                           <div className="flex items-center justify-center gap-1 mt-0.5 max-w-full overflow-hidden">
                             <span className={cn(
-                              "text-[9px] px-1 py-0 rounded font-black truncate shrink-0",
+                              "text-[9px] px-1.5 py-0.2 rounded font-black truncate shrink-0 transition-colors shadow-2xs",
                               isNormalSelected 
                                 ? "bg-white/20 text-white" 
-                                : hasClassEvent 
-                                  ? "bg-amber-100 text-amber-900" 
-                                  : "bg-slate-100 text-slate-700 font-bold"
+                                : getClassDeptBadgeStyle(slot.classCode).pill
                             )}>
                               {slot.classCode}
                             </span>
-                            {hasClassEvent && (
-                              <span className="text-[8.5px] font-bold text-amber-800 truncate max-w-[85px]">
-                                ({mainClassEvent.title})
-                              </span>
-                            )}
                           </div>
                         )}
                       </button>

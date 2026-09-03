@@ -24,9 +24,12 @@ import {
   ExchangeRecommendation,
   getDateForDayInSameWeek,
   checkIsSameSubject,
-  checkIsSameDept
+  checkIsSameDept,
+  isTeacherFreeOnDateAndPeriod,
+  getEffectiveSlotForTeacher
 } from '@/lib/substitute/validator';
 import { SelectedSlotItem } from './interactive-teacher-timetable';
+import { getClassDeptBadgeStyle } from '@/lib/timetable/constants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
@@ -136,7 +139,7 @@ export function BatchExchangeDrawer({
     setSelectedWeekNum(defaultWeekNum);
   }, [defaultWeekNum]);
 
-  // 보강 모드에서는 신청 주차로 100% 고정, 교체 모드에서는 선택된 주차 적용
+  // 🌟 보강 모드에서는 신청 주차(defaultWeekNum)로 자동 고정, 교체 모드에서는 선택 주차 적용
   const activeWeekNum = batchMode === 'substitute' ? defaultWeekNum : selectedWeekNum;
 
   const selectedWeek: SemesterWeek = React.useMemo(() => {
@@ -172,7 +175,32 @@ export function BatchExchangeDrawer({
   // 개별 아이템 리스트 상태
   const [items, setItems] = React.useState<SubstituteItem[]>([]);
 
-  // 초기 아이템 생성
+  // 주차 변경 핸들러
+  const handleChangeWeekNum = (newWeekNum: number) => {
+    const clamped = Math.max(1, Math.min(semesterWeeks.length, newWeekNum));
+    setSelectedWeekNum(clamped);
+    const targetW = semesterWeeks.find(w => w.weekNum === clamped);
+    if (targetW) {
+      if (batchMode === 'substitute') {
+        // 🌟 보강 모드: 주차를 변경하면 보강 신청 대상 일자(sourceDate)가 선택된 주차의 요일 날짜로 동기화됨
+        setItems(prev => prev.map(item => ({
+          ...item,
+          sourceDate: targetW.dates[item.sourceDay] || item.sourceDate,
+        })));
+      } else {
+        // 🌟 교체 모드: 신청자의 원래 수업 일자(sourceDate)는 고정하고, 상대방 교체 매칭만 초기화
+        setItems(prev => prev.map(item => ({
+          ...item,
+          targetDate: undefined,
+          targetDay: undefined,
+          targetPeriod: undefined,
+          targetSubject: undefined,
+          targetClass: undefined,
+          targetTeacher: undefined,
+        })));
+      }
+    }
+  };
   React.useEffect(() => {
     const curMode = initialMode || 'exchange';
     setBatchMode(curMode);
@@ -184,7 +212,11 @@ export function BatchExchangeDrawer({
         s.period,
         timetableData,
         existingApplications,
-        s.slot.deptName
+        s.slot.deptName,
+        undefined,
+        undefined,
+        undefined,
+        calendarConfig
       );
       return {
         id: `batch-${Date.now()}-${s.day}-${s.period}-${Math.random().toString(36).slice(2, 6)}`,
@@ -267,15 +299,22 @@ export function BatchExchangeDrawer({
     timetableData.teachers.forEach(t => {
       if (t.teacherName === currentTeacherName) return;
 
-      // 1. 신청 교시 중 공강(보강 가능) 교시 수 카운트
+      // 1. 신청 교시 중 공강(보강 가능) 교시 수 카운트 (학교 행사·학사일정·결보강 100% 반영)
       const availableCoverCount = items.filter(it => {
-        const slot = t.slots[`${it.sourceDay}_${it.sourcePeriod}`];
-        const hasClass = Boolean(slot && slot.subjectName && slot.subjectName.trim() !== '' && slot.subjectName !== '-' && slot.subjectName !== '공강');
-        const isBusy = busyTeachersOnDate.get(`${it.sourceDate}_${it.sourcePeriod}`)?.has(t.teacherName);
-        return !hasClass && !isBusy;
+        return isTeacherFreeOnDateAndPeriod(
+          t.teacherName,
+          it.sourceDate,
+          it.sourcePeriod,
+          timetableData,
+          existingApplications,
+          undefined,
+          calendarConfig
+        );
       }).length;
 
-      if (availableCoverCount === 0) return;
+      // 🌟 [핵심] 신청된 모든 교시에 수업/행사 충돌 없이 100% 공강인 교사만 추천!
+      // (단 1교시라도 수업불가/충돌이 있으면 추천 보강 교사 목록에서 완전히 배제)
+      if (availableCoverCount < items.length) return;
 
       // 2. 동교과(subjectGroup 일치) 및 동일 학과/계열 여부 판별
       const isSameSubject = Boolean(
@@ -335,7 +374,7 @@ export function BatchExchangeDrawer({
       b.score - a.score || 
       a.weeklyClassCount - b.weeklyClassCount
     );
-  }, [items, timetableData.teachers, currentTeacher, currentTeacherName, busyTeachersOnDate]);
+  }, [items, timetableData, currentTeacher, currentTeacherName, existingApplications, calendarConfig]);
 
   // 보강 담당 교사 요약
   const substituteTeacherSummary = React.useMemo(() => {
@@ -344,18 +383,28 @@ export function BatchExchangeDrawer({
 
   // 현재 선택된 보강 교사의 보강 가능 교시 수
   const currentSubAvailableCount = React.useMemo(() => {
-    if (!substituteTeacherSummary) return 0;
+    if (!substituteTeacherSummary || !globalSubstituteTeacher) return 0;
     return items.filter(it => {
-      const slot = substituteTeacherSummary.slots[`${it.sourceDay}_${it.sourcePeriod}`];
-      const hasClass = Boolean(slot && slot.subjectName && slot.subjectName.trim() !== '' && slot.subjectName !== '-' && slot.subjectName !== '공강');
-      const isBusy = busyTeachersOnDate.get(`${it.sourceDate}_${it.sourcePeriod}`)?.has(globalSubstituteTeacher);
-      return !hasClass && !isBusy;
+      return isTeacherFreeOnDateAndPeriod(
+        globalSubstituteTeacher,
+        it.sourceDate,
+        it.sourcePeriod,
+        timetableData,
+        existingApplications,
+        undefined,
+        calendarConfig
+      );
     }).length;
-  }, [items, substituteTeacherSummary, busyTeachersOnDate, globalSubstituteTeacher]);
+  }, [items, substituteTeacherSummary, globalSubstituteTeacher, timetableData, existingApplications, calendarConfig]);
 
   const handleSelectSubstituteTeacher = (name: string) => {
     setGlobalSubstituteTeacher(name);
     setItems(prev => prev.map(it => ({ ...it, type: 'substitute', substituteTeacher: name })));
+  };
+
+  const handleClearSubstituteTeacher = () => {
+    setGlobalSubstituteTeacher('');
+    setItems(prev => prev.map(it => ({ ...it, type: 'substitute', substituteTeacher: '' })));
   };
 
   // 검색 필터링된 파트너 교사 목록
@@ -369,16 +418,17 @@ export function BatchExchangeDrawer({
     );
   }, [timetableData.teachers, currentTeacherName, partnerSearchQuery]);
 
-  // 선택된 모든 교시 슬롯에 대해 동시 공강 교사 계산
+  // 선택된 모든 교시 슬롯에 대해 동시 공강 교사 계산 (학사일정·휴업일·행사 100% 반영)
   const allSlotCandidates = React.useMemo(() => {
     return getAllPeriodsAvailableTeachers(
       items.map(it => ({ date: it.sourceDate, period: it.sourcePeriod, day: it.sourceDay, deptName: it.deptName })),
       timetableData,
       existingApplications,
       currentTeacherName,
-      items[0]?.deptName
+      items[0]?.deptName,
+      calendarConfig
     );
-  }, [items, timetableData, existingApplications, currentTeacherName]);
+  }, [items, timetableData, existingApplications, currentTeacherName, calendarConfig]);
 
   // 각 아이템별 스마트 맞교환 추천 맵
   const itemRecommendationsMap = React.useMemo(() => {
@@ -390,15 +440,16 @@ export function BatchExchangeDrawer({
         { classCode: it.classCode, subjectName: it.subjectName, deptName: it.deptName, sourceDay: it.sourceDay },
         currentTeacherName,
         timetableData,
-        existingApplications
+        existingApplications,
+        calendarConfig
       );
       map.set(it.id, recs);
     });
     return map;
-  }, [items, currentTeacherName, timetableData, existingApplications]);
+  }, [items, currentTeacherName, timetableData, existingApplications, calendarConfig]);
 
   // 다교시 일괄 맞교환 파트너 교사 정밀 판별 & 랭킹 (오직 동일 학반 SAME_CLASS 맞교환만 추천 및 허용!)
-  // 🌟 추천 순위: 동일교과(1순위) > 동일학과(2순위) > 동일학반 교체 가능 시수 많은 순
+  // 🌟 추천 순위: 동일교과(1순위) > 동일학과(2순위) > 동일학반 교체 가능 시수 많은 순 (선택된 주차 학사일정·결보강 100% 반영)
   const topPartnerRecommendations = React.useMemo(() => {
     if (items.length === 0) return [];
 
@@ -421,12 +472,17 @@ export function BatchExchangeDrawer({
     timetableData.teachers.forEach(partner => {
       if (partner.teacherName === currentTeacherName) return;
 
-      // [필수 조건 1]: 파트너 교사는 신청자의 원래 수업 시간(예: 화 5교시)에 100% 공강이어야만 함!
+      // [필수 조건 1]: 파트너 교사는 신청자의 원래 수업 시간(선택된 주차 기준)에 100% 실시간 공강이어야만 함!
       const isFreeOnAllSource = items.every(it => {
-        const slot = partner.slots[`${it.sourceDay}_${it.sourcePeriod}`];
-        const hasClass = Boolean(slot && slot.subjectName && slot.subjectName.trim() !== '' && slot.subjectName !== '-' && slot.subjectName !== '공강');
-        const isBusy = busyTeachersOnDate.get(`${it.sourceDate}_${it.sourcePeriod}`)?.has(partner.teacherName);
-        return !hasClass && !isBusy;
+        return isTeacherFreeOnDateAndPeriod(
+          partner.teacherName,
+          it.sourceDate,
+          it.sourcePeriod,
+          timetableData,
+          existingApplications,
+          undefined,
+          calendarConfig
+        );
       });
 
       if (!isFreeOnAllSource) return;
@@ -435,35 +491,46 @@ export function BatchExchangeDrawer({
       let bestClass: string | undefined;
 
       DAYS.forEach(d => {
-        const targetDate = getDateForDayInSameWeek(baseDate, d);
+        const targetDate = selectedWeek.dates[d] || getDateForDayInSameWeek(baseDate, d);
+
+        // 🌟 1. 공휴일 / 재량휴업일 / 방학 등 휴업일인 경우 수업이 없으므로 교체 불가
+        const vacation = getVacationForDate(targetDate, calendarConfig);
+        if (vacation) return;
+
         for (let p = 1; p <= 7; p++) {
-          // 내가 targetDate, d, p에 공강인지 검사
-          const mySlot = currentTeacher?.slots[`${d}_${p}`];
-          const myHasClass = Boolean(mySlot && mySlot.subjectName && mySlot.subjectName.trim() !== '' && mySlot.subjectName !== '-' && mySlot.subjectName !== '공강');
-          const myIsBusy = busyTeachersOnDate.get(`${targetDate}_${p}`)?.has(currentTeacherName);
-
-          if (myHasClass || myIsBusy) continue;
-
-          // 파트너 교사의 해당 시간 슬롯
-          const pSlot = partner.slots[`${d}_${p}`];
-          const pHasClass = Boolean(pSlot && pSlot.subjectName && pSlot.subjectName.trim() !== '' && pSlot.subjectName !== '-' && pSlot.subjectName !== '공강');
-          if (!pHasClass) continue;
-
-          // 실시간 결보강 배정 검사
-          const pActiveApp = existingApplications.flatMap(a => a.items.map(it => ({ app: a, it }))).find(x => 
-            x.app.status !== 'rejected' && (
-              (x.it.type === 'substitute' && x.it.substituteTeacher === partner.teacherName && x.it.sourceDate === targetDate && x.it.sourcePeriod === p) ||
-              (x.it.type === 'exchange' && x.it.targetTeacher === partner.teacherName && x.it.targetDate === targetDate && x.it.targetPeriod === p) ||
-              (x.it.originalTeacher === partner.teacherName && x.it.sourceDate === targetDate && x.it.sourcePeriod === p)
-            )
+          // 🌟 2. 내가 targetDate, d, p에 실시간 공강인지 검사 (학사일정·행사·결보강 100% 반영)
+          const isCurrentFree = isTeacherFreeOnDateAndPeriod(
+            currentTeacherName,
+            targetDate,
+            p,
+            timetableData,
+            existingApplications,
+            undefined,
+            calendarConfig
           );
-          if (pActiveApp) continue;
+          if (!isCurrentFree) continue;
+
+          // 🌟 3. 파트너 교사의 해당 시간 유효 수업 상태 (학사일정·행사·결보강 100% 반영)
+          const pEff = getEffectiveSlotForTeacher(
+            partner.teacherName,
+            targetDate,
+            p,
+            timetableData,
+            existingApplications,
+            calendarConfig
+          );
+          // 수업이 없거나, 교사 직접 인솔 행사 중이거나, 학생 행사로 수업이 없어진 경우 교체 불가!
+          if (!pEff.hasClass || pEff.isTeacherEvent || pEff.isClassEventFree) continue;
+
+          // 🌟 4. 지필평가/시험 중이거나 시험 후 하교인 경우 교체 불가
+          const examInfo = getExamSlotInfo(targetDate, p, pEff.classCode, calendarConfig);
+          if (examInfo?.isExamRunning || examInfo?.isDismissed) continue;
 
           // [필수 조건 2]: 오직 동일 학반 수업만 카운트! (타 학반 및 공강은 교체 불가)
-          const isSameClass = targetClassCodes.has(pSlot?.classCode || '');
+          const isSameClass = targetClassCodes.has(pEff.classCode || '');
           if (isSameClass) {
             sameClassCount++;
-            if (!bestClass) bestClass = pSlot?.classCode;
+            if (!bestClass) bestClass = pEff.classCode;
           }
         }
       });
@@ -498,22 +565,16 @@ export function BatchExchangeDrawer({
       if (!a.isSameDept && b.isSameDept) return 1;
       return b.availableTargetSlotCount - a.availableTargetSlotCount || a.partnerTeacher.localeCompare(b.partnerTeacher, 'ko');
     });
-  }, [items, timetableData.teachers, currentTeacher, busyTeachersOnDate, baseDate, currentTeacherName, existingApplications]);
-
-  // 초기 파트너 교사 자동 세팅
-  React.useEffect(() => {
-    if (batchMode === 'exchange' && !partnerTeacher && topPartnerRecommendations.length > 0) {
-      setPartnerTeacher(topPartnerRecommendations[0].partnerTeacher);
-    }
-  }, [batchMode, partnerTeacher, topPartnerRecommendations]);
+  }, [items, timetableData.teachers, currentTeacher, selectedWeek, selectedWeekNum, currentTeacherName, existingApplications, calendarConfig]);
 
   // 파트너 교사 변경 핸들러
   const handleSelectPartner = (teacherName: string) => {
     setPartnerTeacher(teacherName);
   };
 
-  // 선택된 모든 교체 슬롯 초기화 / 선택 해제
+  // 선택된 모든 교체 슬롯 및 교사 선택 초기화 / 선택 해제
   const handleClearAllSelectedSlots = () => {
+    setPartnerTeacher('');
     setItems(prev => prev.map(it => ({
       ...it,
       targetDate: undefined,
@@ -521,6 +582,7 @@ export function BatchExchangeDrawer({
       targetPeriod: undefined,
       targetSubject: undefined,
       targetClass: undefined,
+      targetTeacher: undefined,
     })));
   };
 
@@ -575,10 +637,10 @@ export function BatchExchangeDrawer({
   // 충돌 검사
   const conflicts = React.useMemo(() => {
     return items.map(it => {
-      const res = checkSubstituteItemConflict(it, timetableData, existingApplications);
+      const res = checkSubstituteItemConflict(it, timetableData, existingApplications, undefined, calendarConfig);
       return { id: it.id, ...res };
     });
-  }, [items, timetableData, existingApplications]);
+  }, [items, timetableData, existingApplications, calendarConfig]);
 
   const hasAnyConflict = conflicts.some(c => c.hasConflict);
 
@@ -734,14 +796,14 @@ export function BatchExchangeDrawer({
         {/* 2) 수업 교체 모드: 상대 교사 선택 & 시간표 그리드 매트릭스 */}
         {batchMode === 'exchange' ? (
           <div className="space-y-3 bg-gradient-to-b from-indigo-50/70 to-purple-50/40 p-4 rounded-2xl border border-indigo-200/80 shadow-2xs">
-            {/* 상단 컨트롤: 상대 교사 선택 & 빠른 AI 매칭 버튼 */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2">
+            {/* 상단 컨트롤: 상대 교사 선택 & 주차 선택기 & 선택 해제 버튼 (한 줄 1열 완벽 배치) */}
+            <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 sm:pb-0">
+              <div className="flex items-center gap-2 shrink-0">
                 <label className="text-xs font-black text-indigo-950 shrink-0">
                   교체할 상대 선생님:
                 </label>
                 <Select value={partnerTeacher} onValueChange={handleSelectPartner}>
-                  <SelectTrigger className="h-8.5 text-xs font-black bg-white border-indigo-300 rounded-xl text-slate-900 min-w-[150px]">
+                  <SelectTrigger className="h-8.5 text-xs font-black bg-white border-indigo-300 rounded-xl text-slate-900 w-[140px] shrink-0">
                     <SelectValue placeholder="선생님 선택..." />
                   </SelectTrigger>
                   <SelectContent className="max-h-60">
@@ -753,6 +815,42 @@ export function BatchExchangeDrawer({
                     ))}
                   </SelectContent>
                 </Select>
+
+                {/* 주차 네비게이터 & 선택기 (드롭다운과 선택해제 사이) */}
+                <div className="flex items-center gap-0.5 bg-white px-1.5 py-0.5 rounded-xl border border-indigo-200 shadow-2xs h-8.5 shrink-0">
+                  <button
+                    type="button"
+                    disabled={selectedWeekNum <= 1}
+                    onClick={() => handleChangeWeekNum(selectedWeekNum - 1)}
+                    className="p-1 rounded-lg hover:bg-slate-100 disabled:opacity-30 cursor-pointer text-indigo-700"
+                    title="이전 주차"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </button>
+
+                  <Select value={String(selectedWeekNum)} onValueChange={v => handleChangeWeekNum(Number(v))}>
+                    <SelectTrigger className="h-6.5 text-[11px] font-black border-none shadow-none bg-transparent text-indigo-950 px-1 min-w-[130px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {semesterWeeks.map(w => (
+                        <SelectItem key={w.weekNum} value={String(w.weekNum)} className="text-xs font-bold">
+                          {w.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <button
+                    type="button"
+                    disabled={selectedWeekNum >= semesterWeeks.length}
+                    onClick={() => handleChangeWeekNum(selectedWeekNum + 1)}
+                    className="p-1 rounded-lg hover:bg-slate-100 disabled:opacity-30 cursor-pointer text-indigo-700"
+                    title="다음 주차"
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
 
               {/* 선택 해제 버튼 */}
@@ -760,7 +858,7 @@ export function BatchExchangeDrawer({
                 <button
                   type="button"
                   onClick={handleClearAllSelectedSlots}
-                  className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-[11px] flex items-center gap-1 border border-slate-300 shadow-2xs transition-all cursor-pointer"
+                  className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-[11px] flex items-center gap-1 border border-slate-300 shadow-2xs transition-all cursor-pointer h-8.5 shrink-0"
                   title="선택된 모든 교체 슬롯 초기화"
                 >
                   <RotateCcw className="h-3.5 w-3.5 text-slate-500" />
@@ -826,72 +924,29 @@ export function BatchExchangeDrawer({
             )}
 
             {/* 3) 상대 선생님의 실제 5일 x 7교시 주간 시간표 매트릭스 그리드 */}
-            <div className="space-y-1.5 pt-1">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11.5px] font-black text-indigo-950 flex items-center gap-1">
-                    <Calendar className="h-3.5 w-3.5 text-indigo-600" />
-                    {partnerTeacher} 선생님 시간표:
-                  </span>
-
-                  {/* 주차 네비게이터 & 선택기 */}
-                  <div className="flex items-center gap-0.5 bg-white px-1.5 py-0.5 rounded-xl border border-indigo-200 shadow-2xs">
-                    <button
-                      type="button"
-                      disabled={selectedWeekNum <= 1}
-                      onClick={() => setSelectedWeekNum(prev => Math.max(1, prev - 1))}
-                      className="p-1 rounded-lg hover:bg-slate-100 disabled:opacity-30 cursor-pointer text-indigo-700"
-                      title="이전 주차"
-                    >
-                      <ChevronLeft className="h-3.5 w-3.5" />
-                    </button>
-
-                    <Select value={String(selectedWeekNum)} onValueChange={v => setSelectedWeekNum(Number(v))}>
-                      <SelectTrigger className="h-6.5 text-[11px] font-black border-none shadow-none bg-transparent text-indigo-950 px-1 min-w-[130px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-60">
-                        {semesterWeeks.map(w => (
-                          <SelectItem key={w.weekNum} value={String(w.weekNum)} className="text-xs font-bold">
-                            {w.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    <button
-                      type="button"
-                      disabled={selectedWeekNum >= semesterWeeks.length}
-                      onClick={() => setSelectedWeekNum(prev => Math.min(semesterWeeks.length, prev + 1))}
-                      className="p-1 rounded-lg hover:bg-slate-100 disabled:opacity-30 cursor-pointer text-indigo-700"
-                      title="다음 주차"
-                    >
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-
-                  <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    실시간 결보강 반영됨
-                  </span>
-                </div>
-
-                {/* 범례 안내 */}
-                <div className="flex items-center gap-2 text-[9.5px] font-bold text-slate-500">
-                  <span className="flex items-center gap-1 text-indigo-700">
-                    <span className="w-2 h-2 rounded bg-indigo-200 border border-indigo-400" />
-                    ★동일학반(교체가능)
-                  </span>
-                  <span className="flex items-center gap-1 text-amber-700">
-                    <span className="w-2 h-2 rounded bg-amber-200 border border-amber-400" />
-                    보강/교체중
-                  </span>
-                  <span className="flex items-center gap-1 text-slate-400">
-                    <span className="w-2 h-2 rounded bg-slate-200" />
-                    불가(공강/타학반/충돌)
-                  </span>
-                </div>
+            {!partnerTeacher ? (
+              <div className="p-6 rounded-2xl border border-dashed border-indigo-300 bg-white/80 text-center text-xs font-bold text-indigo-800 flex flex-col items-center justify-center gap-2 shadow-2xs py-8">
+                <ArrowLeftRight className="h-7 w-7 text-indigo-600 animate-pulse" />
+                <span className="text-sm font-black text-slate-900">교체 대상 선생님을 선택해 주세요</span>
+                <span className="text-[11px] text-slate-500 font-medium max-w-sm">
+                  위 추천 교사 칩을 클릭하거나 드롭다운/검색에서 선생님을 선택하시면 시간표와 맞교환 가능 슬롯이 표시됩니다.
+                </span>
               </div>
+            ) : (
+              <div className="space-y-1.5 pt-1">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[11.5px] font-black text-indigo-950 flex items-center gap-1">
+                      <Calendar className="h-3.5 w-3.5 text-indigo-600" />
+                      {partnerTeacher} 선생님 시간표 ({selectedWeek.label}):
+                    </span>
+
+                    <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      실시간 결보강 반영됨
+                    </span>
+                  </div>
+                </div>
 
               {/* 시간표 테이블 */}
               <div className="overflow-x-auto rounded-xl border border-indigo-200/90 bg-white shadow-2xs">
@@ -952,22 +1007,25 @@ export function BatchExchangeDrawer({
                             const effectiveDay = specialDay ? specialDay.targetDayOfWeek : day;
                             const effectivePeriod = specialDay?.periodOverrides?.[period] ?? period;
 
-                            // 파트너 슬롯 상태 분석
-                            const pSlot = partnerTeacherSummary?.slots[`${effectiveDay}_${effectivePeriod}`];
-                            const pHasClass = Boolean(pSlot && pSlot.subjectName && pSlot.subjectName.trim() !== '' && pSlot.subjectName !== '-' && pSlot.subjectName !== '공강');
+                            // 1) 파트너 교사의 실시간 유효 슬롯 분석 (교체/보강 및 학사일정 100% 반영)
+                            const pEffective = getEffectiveSlotForTeacher(
+                              partnerTeacher,
+                              targetDate,
+                              period,
+                              timetableData,
+                              existingApplications,
+                              calendarConfig
+                            );
+                            const pHasClass = pEffective.hasClass;
 
                             // 지필평가 / 시험 기간 검사
-                            const examInfo = getExamSlotInfo(targetDate, period, pSlot?.classCode, calendarConfig);
+                            const examInfo = getExamSlotInfo(targetDate, period, pEffective?.classCode, calendarConfig);
                             const isExamRunning = Boolean(examInfo?.isExamRunning);
                             const isExamDismissed = Boolean(examInfo?.isDismissed);
 
                             // 단축수업으로 인한 수업 없음 검사
                             const isShortenedDismissed = Boolean(specialDay?.shortenedPeriods && period > specialDay.shortenedPeriods);
 
-                            // 학급 행사 검사
-                            const partnerClassEvents = pSlot?.classCode ? getClassEventsForSlot(targetDate, period, pSlot.classCode, calendarConfig) : [];
-                            const isClassEventRunning = partnerClassEvents.length > 0;
-                            
                             // 이 슬롯이 현재 선택된 슬롯인지 확인
                             const matchedItemIdx = items.findIndex(it => 
                               it.targetDate === targetDate && 
@@ -976,31 +1034,28 @@ export function BatchExchangeDrawer({
                             );
                             const isSelected = matchedItemIdx !== -1;
 
-                            // 학교 행사 / 학사일정 검사
-                            const pEvents = getEventsForSlot(targetDate, period, pSlot?.classCode, partnerTeacher, calendarConfig);
-                            const pHasEvent = pEvents.length > 0;
-                            const mainEvent = pEvents[0];
+                            // 학교 행사 / 학사일정 검사 (교사가 직접 인솔하는 행사만 pHasTeacherEvent)
+                            const pTeacherEvents = getEventsForSlot(targetDate, period, pEffective?.classCode, partnerTeacher, calendarConfig);
+                            const pHasTeacherEvent = pTeacherEvents.length > 0;
+                            const mainTeacherEvent = pTeacherEvents[0];
 
-                            // 실시간 결보강 신청 이력 검사 (파트너 교사가 해당 날짜/교시에 보강 또는 교체 투입된 경우)
-                            const pActiveApp = existingApplications.flatMap(a => a.items.map(it => ({ app: a, it }))).find(x => 
-                              x.app.status !== 'rejected' && (
-                                (x.it.type === 'substitute' && x.it.substituteTeacher === partnerTeacher && x.it.sourceDate === targetDate && x.it.sourcePeriod === period) ||
-                                (x.it.type === 'exchange' && x.it.targetTeacher === partnerTeacher && x.it.targetDate === targetDate && x.it.targetPeriod === period) ||
-                                (x.it.originalTeacher === partnerTeacher && x.it.sourceDate === targetDate && x.it.sourcePeriod === period)
-                              )
+                            // 2) 신청자 본인이 해당 targetDate, period에 실제로 공강인지 검사
+                            const isMyFreeAtTarget = isTeacherFreeOnDateAndPeriod(
+                              currentTeacherName,
+                              targetDate,
+                              period,
+                              timetableData,
+                              existingApplications,
+                              undefined,
+                              calendarConfig
                             );
-                            const isPartnerBusyWithApp = Boolean(pActiveApp);
-
-                            // 내가 그 시간에 수업 / 일정 충돌이 있는지 검사
-                            const mySlot = currentTeacher?.slots[`${effectiveDay}_${effectivePeriod}`];
-                            const myHasClass = Boolean(mySlot && mySlot.subjectName && mySlot.subjectName.trim() !== '' && mySlot.subjectName !== '-' && mySlot.subjectName !== '공강');
-                            const myIsBusy = busyTeachersOnDate.get(`${targetDate}_${period}`)?.has(currentTeacherName);
-                            const myEvents = getEventsForSlot(targetDate, period, mySlot?.classCode, currentTeacherName, calendarConfig);
+                            const myHasConflict = !isMyFreeAtTarget;
+                            const myEvents = getEventsForSlot(targetDate, period, undefined, currentTeacherName, calendarConfig);
                             const myHasEvent = myEvents.length > 0;
                             
-                            const isConflict = myHasClass || myIsBusy || isPartnerBusyWithApp || isHoliday || myHasEvent || isExamRunning || isExamDismissed || isClassEventRunning || isShortenedDismissed;
-                            const isSameClass = pHasClass && items.some(i => i.classCode && pSlot?.classCode === i.classCode);
-                            const isClickable = !isConflict && isSameClass;
+                            const isCalendarBlocked = isHoliday || myHasEvent || isExamRunning || isExamDismissed || isShortenedDismissed;
+                            const isSameClass = pHasClass && items.some(i => i.classCode && pEffective?.classCode === i.classCode);
+                            const isClickable = !myHasConflict && !isCalendarBlocked && isSameClass;
 
                             return (
                               <td key={`${day}_${period}`} className="p-0.5 border-r border-slate-100 last:border-r-0 align-middle">
@@ -1009,7 +1064,7 @@ export function BatchExchangeDrawer({
                                   disabled={!isClickable && !isSelected}
                                   onClick={() => {
                                     if (isClickable || isSelected) {
-                                      handleGridSlotClick(targetDate, day, period, pSlot?.subjectName, pSlot?.classCode);
+                                      handleGridSlotClick(targetDate, day, period, pEffective?.subjectName, pEffective?.classCode);
                                     }
                                   }}
                                   className={cn(
@@ -1022,13 +1077,11 @@ export function BatchExchangeDrawer({
                                       ? "bg-rose-50 text-rose-900 border-rose-200 cursor-not-allowed opacity-80"
                                       : isExamDismissed
                                       ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-50"
-                                      : isClassEventRunning
-                                      ? "bg-amber-50 text-amber-800 border-amber-200 cursor-not-allowed opacity-80"
-                                      : isPartnerBusyWithApp
-                                      ? "bg-amber-50 text-amber-900 border-amber-300 cursor-not-allowed opacity-75"
-                                      : pHasEvent
+                                      : pHasTeacherEvent
                                       ? "bg-purple-50 text-purple-950 border-purple-300 hover:border-purple-500 shadow-2xs cursor-pointer"
-                                      : isConflict
+                                      : pEffective.isClassEventFree
+                                      ? "bg-amber-50/60 text-amber-800 border-amber-200 border-dashed cursor-not-allowed opacity-75"
+                                      : myHasConflict
                                       ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-40"
                                       : isSameClass
                                       ? "bg-indigo-50 text-indigo-950 border-indigo-300 hover:border-indigo-500 hover:bg-indigo-100 shadow-2xs cursor-pointer font-bold"
@@ -1041,19 +1094,17 @@ export function BatchExchangeDrawer({
                                       ? `[시험 진행] ${examInfo?.exam.name} - 교체 불가`
                                       : isExamDismissed
                                       ? `[시험 후 하교] 수업 없음 - 교체 불가`
-                                      : isClassEventRunning
-                                      ? `[학급 행사] ${partnerClassEvents[0]?.title} - 교체 불가`
-                                      : isPartnerBusyWithApp
-                                      ? `[실시간 결보강 반영] ${partnerTeacher} 선생님이 해당 시간에 이미 ${pActiveApp?.it.type === 'substitute' ? '수업보강' : '교체'} 배정됨`
-                                      : pHasEvent
-                                      ? `[학교 행사] ${mainEvent.title} (${mainEvent.description || ''})`
-                                      : isConflict
-                                      ? `본인 수업 있음 (${mySlot?.subjectName || '수업중'}) - 맞교환 불가`
+                                      : pHasTeacherEvent
+                                      ? `[행사 진행] ${mainTeacherEvent?.title} (${mainTeacherEvent?.description || '학사일정 행사 인솔'})`
+                                      : pEffective.isClassEventFree
+                                      ? `[학급 행사로 수업 없음] ${pEffective.classCode} 학급 학생들이 '${pEffective.eventTitle}' 행사에 참여하여 수업이 없습니다 (공강)`
+                                      : myHasConflict
+                                      ? `본인 수업 있음 - 맞교환 불가`
                                       : isSameClass
-                                      ? `★ 동일학반 (${pSlot?.classCode}) 맞교환 가능`
+                                      ? (pEffective.isExchangeIn ? `★ 동일학반 (${pEffective.classCode}) 재교체 가능` : `★ 동일학반 (${pEffective.classCode}) 맞교환 가능`)
                                       : !pHasClass
                                       ? '공강 (수업 교체는 공강과 맞바꿀 수 없음 - 보강 모드를 이용하세요)'
-                                      : `학반 불일치 (${pSlot?.classCode} 수업 - 동일학반(${items[0]?.classCode || ''})만 교체 가능)`
+                                      : `학반 불일치 (${pEffective?.classCode} 수업 - 동일학반(${items[0]?.classCode || ''})만 교체 가능)`
                                   }
                                 >
                                   {/* 상단: 과목 / 선택 번호 뱃지 */}
@@ -1064,45 +1115,57 @@ export function BatchExchangeDrawer({
                                         ? "text-white" 
                                         : isHoliday
                                         ? "text-rose-700"
-                                        : isPartnerBusyWithApp 
-                                        ? "text-amber-800" 
-                                        : pHasEvent
+                                        : pHasTeacherEvent
                                         ? "text-purple-900"
+                                        : pEffective.isClassEventFree
+                                        ? "text-amber-800"
                                         : ""
                                     )}>
                                       {isHoliday
                                         ? `[${vacation?.name || '휴업일'}]`
-                                        : isPartnerBusyWithApp 
-                                        ? (pActiveApp?.it.originalTeacher === partnerTeacher ? '[결강신청]' : `[${pActiveApp?.it.type === 'substitute' ? '보강투입' : '교체배정'}]`)
-                                        : pHasEvent
-                                        ? `🎭 ${mainEvent.title}`
-                                        : pSlot?.subjectName || '공강'}
+                                        : pHasTeacherEvent
+                                        ? `🎭 ${mainTeacherEvent?.title}`
+                                        : pEffective.isExchangeIn
+                                        ? `🔄 ${pEffective.subjectName}`
+                                        : pEffective.isClassEventFree
+                                        ? `공강 (${pEffective.eventTitle})`
+                                        : pEffective.subjectName || '공강'}
                                     </span>
 
+                                    {/* 매칭된 아이템 순번 뱃지 */}
                                     {isSelected && (
-                                      <span className="w-4 h-4 rounded-full bg-white text-indigo-700 font-black text-[9px] flex items-center justify-center shrink-0 shadow-2xs">
+                                      <span className="w-3.5 h-3.5 rounded-full bg-white text-indigo-700 text-[9px] font-black flex items-center justify-center shrink-0">
                                         {matchedItemIdx + 1}
                                       </span>
                                     )}
                                   </div>
 
-                                  {/* 하단: 학반 / 추천 뱃지 */}
+                                  {/* 하단: 학반 뱃지 또는 추천 태그 */}
                                   <div className="flex items-center justify-between w-full text-[9px] leading-tight">
-                                    {pSlot?.classCode ? (
+                                    {pEffective.classCode ? (
                                       <span className={cn(
                                         "px-1 py-0.2 rounded font-black",
-                                        isSelected ? "bg-white/20 text-white" : isSameClass ? "bg-indigo-200 text-indigo-900" : "bg-slate-200 text-slate-800"
+                                        isSelected 
+                                          ? "bg-white/20 text-white" 
+                                          : isSameClass 
+                                          ? "bg-indigo-200 text-indigo-900" 
+                                          : "bg-slate-200 text-slate-800"
                                       )}>
-                                        {pSlot.classCode}
+                                        {pEffective.classCode}
                                       </span>
                                     ) : (
-                                      <span className={cn("text-[8.5px]", isSelected ? "text-indigo-200" : isHoliday ? "text-rose-500 font-bold" : "text-slate-400")}>
-                                        {isHoliday ? '휴업' : !pHasClass ? '공강' : '-'}
+                                      <span className={cn(
+                                        "text-[8.5px]",
+                                        isSelected ? "text-indigo-200" : "text-slate-400"
+                                      )}>
+                                        -
                                       </span>
                                     )}
 
-                                    {isSameClass && !isSelected && !isHoliday && (
-                                      <span className="text-[8.5px] font-black text-indigo-700">★동일학반</span>
+                                    {isSameClass && !isSelected && (
+                                      <span className="text-[8.5px] font-black text-indigo-700">
+                                        {pEffective.isExchangeIn ? '★재교체' : '★추천'}
+                                      </span>
                                     )}
                                   </div>
                                 </button>
@@ -1116,6 +1179,7 @@ export function BatchExchangeDrawer({
                 </table>
               </div>
             </div>
+          )}
 
             {/* 4) 선택된 매칭 결과 요약 바 (Before ➔ After 매핑) */}
             <div className="space-y-1.5 pt-2 border-t border-indigo-200/80">
@@ -1200,15 +1264,18 @@ export function BatchExchangeDrawer({
                 </Select>
               </div>
 
-              {/* 보강 가능 시수 안내 뱃지 */}
-              {substituteTeacherSummary && (
-                <span className="text-[11px] font-bold text-emerald-800 bg-white px-2.5 py-1 rounded-xl border border-emerald-200 shadow-2xs shrink-0">
-                  보강 가능: <strong className="text-emerald-950 font-black">{currentSubAvailableCount} / {items.length}시간</strong>
-                  {currentSubAvailableCount === items.length && (
-                    <span className="ml-1 text-[10px] text-emerald-600 font-bold">(전체 가능)</span>
-                  )}
-                </span>
-              )}
+              {/* 보강 교사 선택 해제 버튼 */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleClearSubstituteTeacher}
+                  className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-[11px] flex items-center gap-1 border border-slate-300 shadow-2xs transition-all cursor-pointer"
+                  title="선택된 보강 교사 초기화"
+                >
+                  <RotateCcw className="h-3.5 w-3.5 text-slate-500" />
+                  <span>선택 해제</span>
+                </button>
+              </div>
             </div>
 
             {/* 추천 보강 교사 칩 목록 */}
@@ -1229,17 +1296,17 @@ export function BatchExchangeDrawer({
                       )}
                     >
                       <span className="font-bold">{idx + 1}. {stat.teacherName}</span>
-                      {stat.isSameSubject && stat.subjectGroup ? (
+                      {stat.isSameSubject ? (
                         <span className={cn(
                           "text-[8.5px] px-1.5 py-0.2 rounded font-black",
-                          globalSubstituteTeacher === stat.teacherName ? "bg-emerald-700 text-white" : "bg-emerald-100 text-emerald-800"
+                          globalSubstituteTeacher === stat.teacherName ? "bg-emerald-700 text-white" : "bg-blue-100 text-blue-800 border border-blue-200"
                         )}>
-                          ★동교과({stat.subjectGroup})
+                          동일교과
                         </span>
                       ) : stat.isSameDept ? (
                         <span className={cn(
-                          "text-[8.5px] px-1 py-0.2 rounded font-black",
-                          globalSubstituteTeacher === stat.teacherName ? "bg-emerald-700 text-white" : "bg-emerald-50 text-emerald-700"
+                          "text-[8.5px] px-1.5 py-0.2 rounded font-black",
+                          globalSubstituteTeacher === stat.teacherName ? "bg-emerald-700 text-white" : "bg-emerald-100 text-emerald-800 border border-emerald-200"
                         )}>
                           동일학과
                         </span>
@@ -1262,31 +1329,22 @@ export function BatchExchangeDrawer({
             ) : (
               <div className="space-y-1.5 pt-1">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[11.5px] font-black text-emerald-950 flex items-center gap-1">
                       <Calendar className="h-3.5 w-3.5 text-emerald-600" />
                       {globalSubstituteTeacher} 선생님 시간표:
                     </span>
 
-                    {/* 보강 모드: 신청 주차 고정 배지 (주차 선택 불필요) */}
-                    <span className="text-[11px] font-black text-emerald-950 bg-white px-2.5 py-1 rounded-xl border border-emerald-200 shadow-2xs flex items-center gap-1.5">
-                      📅 신청 주차: <strong className="text-emerald-700">{selectedWeek.label}</strong>
-                    </span>
-                  </div>
+                    {/* 신청 주차 뱃지 (이미지 디자인 적용) */}
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-emerald-300 text-emerald-950 text-xs font-bold shadow-2xs">
+                      <span>🗓️</span>
+                      <span className="font-extrabold">신청 주차:</span>
+                      <span className="font-black text-emerald-900">{selectedWeek.label}</span>
+                    </div>
 
-                  {/* 범례 안내 */}
-                  <div className="flex items-center gap-2 text-[9.5px] font-bold text-slate-500">
-                    <span className="flex items-center gap-1 text-emerald-700">
-                      <span className="w-2 h-2 rounded bg-emerald-500" />
-                      ★보강투입
-                    </span>
-                    <span className="flex items-center gap-1 text-purple-700">
-                      <span className="w-2 h-2 rounded bg-purple-300" />
-                      행사
-                    </span>
-                    <span className="flex items-center gap-1 text-slate-600">
-                      <span className="w-2 h-2 rounded bg-slate-200" />
-                      본인수업
+                    <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-100/70 px-1.5 py-0.5 rounded border border-emerald-300 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      실시간 결보강 반영됨
                     </span>
                   </div>
                 </div>
@@ -1380,15 +1438,26 @@ export function BatchExchangeDrawer({
                               );
                               const isSubBusyWithApp = Boolean(subActiveApp);
 
-                              // 이 슬롯이 신청된 보강 대상 슬롯인지 확인
-                              const isTargetSourceSlot = items.some(it => it.sourceDay === day && it.sourcePeriod === period && it.sourceDate === targetDate);
+                              // 이 슬롯이 신청된 보강 대상 슬롯인지 확인 (보강 교사 선택 시 해당 요일/교시 강조)
+                              const isTargetSourceSlot = Boolean(globalSubstituteTeacher) && items.some(it => 
+                                it.sourceDay === day && 
+                                it.sourcePeriod === period && 
+                                (it.sourceDate === targetDate || !it.sourceDate || !targetDate)
+                              );
+
+                              // 보강 대상 슬롯인데 행사/수업/결보강으로 충돌(불가)인지 확인
+                              const isTargetSlotConflict = isTargetSourceSlot && (
+                                isHoliday || isExamRunning || isSubBusyWithApp || subHasEvent || (hasClass && !isShortenedDismissed)
+                              );
 
                               return (
                                 <td key={`${day}_${period}`} className="p-0.5 border-r border-slate-100 last:border-r-0 align-middle">
                                   <div
                                     className={cn(
                                       "w-full h-11 p-1 rounded-lg border text-left flex flex-col justify-between select-none relative",
-                                      isTargetSourceSlot
+                                      isTargetSlotConflict
+                                        ? "bg-rose-600 text-white border-rose-700 font-bold ring-2 ring-rose-500/40 shadow-xs"
+                                        : isTargetSourceSlot
                                         ? "bg-emerald-600 text-white border-emerald-600 font-bold ring-2 ring-emerald-600/40 shadow-xs"
                                         : isHoliday
                                         ? "bg-rose-50/70 text-rose-700 border-rose-200"
@@ -1407,7 +1476,9 @@ export function BatchExchangeDrawer({
                                         : "bg-slate-50/50 text-slate-400 border-slate-100"
                                     )}
                                     title={
-                                      isHoliday
+                                      isTargetSlotConflict
+                                        ? `[보강 불가(충돌)] ${subHasEvent ? `학교 행사(${subMainEvent.title})` : hasClass ? `정규 수업(${slot?.subjectName})` : isSubBusyWithApp ? '기존 결보강 배정' : '시험/휴업'}으로 인해 보강 불가`
+                                        : isHoliday
                                         ? `[휴업일/공휴일] ${vacation?.name || '휴업일'}`
                                         : isShortenedDismissed
                                         ? `[단축수업] ${specialDay?.shortenedPeriods}교시 단축으로 수업 없음`
@@ -1423,7 +1494,7 @@ export function BatchExchangeDrawer({
                                     <div className="flex items-center justify-between w-full">
                                       <span className={cn(
                                         "text-[10px] font-black truncate max-w-[65px] leading-tight",
-                                        isTargetSourceSlot 
+                                        (isTargetSourceSlot || isTargetSlotConflict)
                                           ? "text-white" 
                                           : isHoliday
                                           ? "text-rose-700"
@@ -1433,7 +1504,9 @@ export function BatchExchangeDrawer({
                                           ? "text-purple-900"
                                           : ""
                                       )}>
-                                        {isTargetSourceSlot 
+                                        {isTargetSlotConflict
+                                          ? `⚠️불가(${subHasEvent ? '행사' : hasClass ? '수업' : '충돌'})`
+                                          : isTargetSourceSlot 
                                           ? '★보강투입' 
                                           : isHoliday
                                           ? `[${vacation?.name || '휴업'}]`
@@ -1447,13 +1520,13 @@ export function BatchExchangeDrawer({
                                     <div className="flex items-center justify-between w-full text-[9px]">
                                       <span className={cn(
                                         "font-medium truncate max-w-[45px]",
-                                        isTargetSourceSlot ? "text-emerald-100 font-bold" : "text-slate-500"
+                                        (isTargetSourceSlot || isTargetSlotConflict) ? "text-white/90 font-bold" : "text-slate-500"
                                       )}>
                                         {isTargetSourceSlot 
                                           ? items.find(it => it.sourceDay === day && it.sourcePeriod === period)?.classCode 
                                           : isHoliday
                                           ? '휴업'
-                                          : slot?.classCode || '-'}
+                                          : (slot?.classCode || (subHasEvent ? (substituteTeacherSummary?.homeroomClass || '-') : '-'))}
                                       </span>
                                     </div>
                                   </div>
