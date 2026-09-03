@@ -20,6 +20,15 @@ const nextConfig: NextConfig = {
       static: 180,
     },
   },
+  async redirects() {
+    return [
+      {
+        source: '/employment/kai-grade',
+        destination: '/employment/grade',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

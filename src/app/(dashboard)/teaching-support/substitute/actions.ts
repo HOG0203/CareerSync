@@ -6,7 +6,7 @@
 // ==============================================================================
 
 import { createClient, createAdminClient } from '@/lib/supabase/server';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, unstable_cache, revalidateTag } from 'next/cache';
 import { SubstituteApplication, ApplicationStatus } from '@/lib/substitute/types';
 import { ParsedTimetableResult } from '@/lib/timetable/parser';
 
@@ -223,31 +223,38 @@ export async function deleteSubstituteApplication(
 }
 
 /**
- * 5. 시간표 데이터 가져오기 (결보강 등록 및 추천용)
+ * 5. 시간표 데이터 가져오기 (결보강 등록 및 추천용, unstable_cache 적용)
  */
-export async function getTimetableForSubstitute(
-  year = DEFAULT_YEAR,
-  semester = DEFAULT_SEMESTER
-): Promise<{ success: boolean; data?: ParsedTimetableResult; error?: string }> {
-  try {
-    const supabase = await createClient();
-    const timetableKey = getTimetableKey(year, semester);
+export const getTimetableForSubstitute = unstable_cache(
+  async (
+    year = DEFAULT_YEAR,
+    semester = DEFAULT_SEMESTER
+  ): Promise<{ success: boolean; data?: ParsedTimetableResult; error?: string }> => {
+    try {
+      const supabase = createAdminClient();
+      const timetableKey = getTimetableKey(year, semester);
 
-    const { data, error } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', timetableKey)
-      .maybeSingle();
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', timetableKey)
+        .maybeSingle();
 
-    if (error || !data?.value) {
-      return { success: false, error: '시간표 데이터를 찾을 수 없습니다.' };
+      if (error || !data?.value) {
+        return { success: false, error: '시간표 데이터를 찾을 수 없습니다.' };
+      }
+
+      return { success: true, data: data.value as ParsedTimetableResult };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
-
-    return { success: true, data: data.value as ParsedTimetableResult };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  },
+  ['substitute_timetable_cache'],
+  {
+    tags: ['timetable_cache'],
+    revalidate: 86400,
   }
-}
+);
 
 import { 
   AcademicCalendarConfig, 

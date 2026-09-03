@@ -1,12 +1,7 @@
 import { Metadata } from 'next';
 import { getCurrentUserProfile } from '@/lib/data';
-import { 
-  getTimetableData, 
-  getSchedulesList, 
-  getWeightSettings 
-} from './actions';
+import { getCachedTimetablePageData } from './actions';
 import { TimetableClient } from './timetable-client';
-import { checkTeachingSupportPermission } from '@/lib/permissions';
 import { redirect } from 'next/navigation';
 
 export const metadata: Metadata = {
@@ -15,26 +10,22 @@ export const metadata: Metadata = {
 };
 
 export default async function TimetablePage() {
-  const hasAccess = await checkTeachingSupportPermission('/teaching-support/timetable');
-  if (!hasAccess) {
+  const userProfile = await getCurrentUserProfile();
+  if (!userProfile || userProfile.role === 'student') {
     redirect('/dashboard');
   }
 
-  const userProfile = await getCurrentUserProfile();
-  const isAdmin = userProfile?.role === 'admin';
+  const isAdmin = userProfile.role === 'admin';
 
-  const [schedulesList, initialWeights, timetableResult] = await Promise.all([
-    getSchedulesList(),
-    getWeightSettings(),
-    getTimetableData(),
-  ]);
+  // 단 1회의 서버 캐시 호출로 시간표 마스터 데이터 즉각 패칭 (캐시 적중 시 0ms)
+  const { schedulesList, weights, timetableData } = await getCachedTimetablePageData();
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5 w-full pb-20 sm:pb-16 min-h-full">
       <TimetableClient
-        initialData={timetableResult.data}
+        initialData={timetableData}
         schedulesList={schedulesList}
-        initialWeights={initialWeights}
+        initialWeights={weights}
         userProfile={userProfile}
         isAdmin={isAdmin}
       />
