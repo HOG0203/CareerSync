@@ -56,79 +56,67 @@ export interface StudentMeritDemeritSummary {
 }
 
 /**
- * 상벌점 레코드 전체 스토어 조회 (DB Key: merit_demerit_records_store)
+ * 특정 학생 ID 목록의 상벌점 기록을 merit_demerit_records 테이블에서 조회하여
+ * student_id 별로 그룹화합니다.
  */
-export async function getMeritDemeritRecordsStore(): Promise<Record<string, MeritDemeritRecord[]>> {
+async function fetchRecordsByStudentIds(
+  studentIds: string[],
+  academicYear: number
+): Promise<Record<string, MeritDemeritRecord[]>> {
+  if (studentIds.length === 0) return {};
   const supabase = createAdminClient();
-  try {
-    const { data, error } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'merit_demerit_records_store')
-      .maybeSingle();
+  const { data } = await supabase
+    .from('merit_demerit_records')
+    .select('*')
+    .in('student_id', studentIds)
+    .eq('academic_year', academicYear)
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    if (data?.value && typeof data.value === 'object') {
-      return data.value as Record<string, MeritDemeritRecord[]>;
-    }
-    return {};
-  } catch (error) {
-    console.error('Error fetching merit_demerit_records_store:', error);
-    return {};
+  const grouped: Record<string, MeritDemeritRecord[]> = {};
+  for (const r of data || []) {
+    if (!grouped[r.student_id]) grouped[r.student_id] = [];
+    grouped[r.student_id].push(r as MeritDemeritRecord);
   }
+  return grouped;
 }
 
 /**
- * [캐싱] 상벌점 레코드 전체 스토어 메모리 캐시 (0.001초 응답)
+ * @deprecated merit_demerit_records 테이블 마이그레이션 후 사용 중단.
+ * student/merit-demerit/page.tsx 등 외부 호출부는 getStudentMeritDemeritHistory 로 교체하세요.
  */
 export async function getCachedMeritDemeritRecordsStore(): Promise<Record<string, MeritDemeritRecord[]>> {
-  return unstable_cache(
-    async () => getMeritDemeritRecordsStore(),
-    ['merit-demerit-records-store-cache'],
-    {
-      revalidate: 86400,
-      tags: ['merit-demerit', 'merit-records-store']
-    }
-  )();
+  return {};
 }
 
 async function fetchMeritDemeritSummaryList(
-  gradeNum: number, 
-  baseYear: number,
-  customStore?: Record<string, MeritDemeritRecord[]>
+  gradeNum: number,
+  baseYear: number
 ): Promise<StudentMeritDemeritSummary[]> {
   const supabase = createAdminClient();
   const targetGradYear = baseYear + (4 - gradeNum);
 
-  const [studentsRes, store] = await Promise.all([
-    supabase
-      .from('students')
-      .select('id, student_name, student_number, major, class_info, graduation_year')
-      .eq('graduation_year', targetGradYear)
-      .order('major', { ascending: true })
-      .order('class_info', { ascending: true })
-      .order('student_number', { ascending: true }),
-    customStore ? Promise.resolve(customStore) : getCachedMeritDemeritRecordsStore()
-  ]);
+  const { data: students } = await supabase
+    .from('students')
+    .select('id, student_name, student_number, major, class_info, graduation_year')
+    .eq('graduation_year', targetGradYear)
+    .order('major', { ascending: true })
+    .order('class_info', { ascending: true })
+    .order('student_number', { ascending: true });
 
-  const students = studentsRes.data || [];
-  if (students.length === 0) return [];
+  if (!students || students.length === 0) return [];
+
+  const studentIds = students.map(s => s.id);
+  const recordsByStudent = await fetchRecordsByStudentIds(studentIds, baseYear);
 
   const summaries: StudentMeritDemeritSummary[] = students.map(s => {
-    const studentRecords = store[s.id] || [];
-    const sorted = [...studentRecords].sort((a, b) => 
-      b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at)
-    );
+    const sorted = recordsByStudent[s.id] || [];
 
     let totalMeritPoints = 0;
     let totalDemeritPoints = 0;
-
     sorted.forEach(r => {
-      if (r.type === 'merit') {
-        totalMeritPoints += r.points;
-      } else if (r.type === 'demerit') {
-        totalDemeritPoints += r.points;
-      }
+      if (r.type === 'merit') totalMeritPoints += r.points;
+      else if (r.type === 'demerit') totalDemeritPoints += r.points;
     });
 
     const recentRecords: MeritDemeritRecordSummary[] = sorted.slice(0, 3).map(r => ({
@@ -234,16 +222,14 @@ export async function getAllGradesMeritDemeritSummary(
 export async function refreshAllGradesMeritDemeritAction(
   baseYear: number
 ): Promise<Record<number, StudentMeritDemeritSummary[]>> {
-  const store = await getMeritDemeritRecordsStore();
-  const [g1, g2, g3] = await Promise.all([
-    fetchMeritDemeritSummaryList(1, baseYear, store),
-    fetchMeritDemeritSummaryList(2, baseYear, store),
-    fetchMeritDemeritSummaryList(3, baseYear, store)
-  ]);
-
   revalidateTag('merit-demerit');
-  revalidateTag('merit-records-store');
   revalidatePath('/merit-demerit');
+
+  const [g1, g2, g3] = await Promise.all([
+    fetchMeritDemeritSummaryList(1, baseYear),
+    fetchMeritDemeritSummaryList(2, baseYear),
+    fetchMeritDemeritSummaryList(3, baseYear)
+  ]);
 
   return { 1: g1, 2: g2, 3: g3 };
 }
@@ -270,130 +256,101 @@ export interface GrantMeritDemeritPayload {
 
 /**
  * 상벌점 부여 액션 (단일 및 다중 학생 일괄 처리)
+ * merit_demerit_records 테이블에 원자적 INSERT — Race Condition 없음
  */
 export async function grantMeritDemeritAction(payload: GrantMeritDemeritPayload) {
   const profile = await getCurrentUserProfile();
-  if (!profile) {
-    return { error: '로그인이 필요합니다.' };
-  }
+  if (!profile) return { error: '로그인이 필요합니다.' };
 
   const supabase = createAdminClient();
+  const nowIso = new Date().toISOString();
+  const grantedByName = (profile as any).full_name || (profile as any).username || (profile.role === 'admin' ? '관리자' : '교사');
 
-  try {
-    const store = await getMeritDemeritRecordsStore();
-    const nowIso = new Date().toISOString();
-    const grantedByName = (profile as any).full_name || (profile as any).username || (profile.role === 'admin' ? '관리자' : '교사');
-
-    payload.studentIds.forEach(sid => {
-      const meta = payload.studentsMeta.find(m => m.id === sid);
-      const newRecord: MeritDemeritRecord = {
-        id: `mdr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        student_id: sid,
-        student_name: meta?.student_name || '',
-        student_number: meta?.student_number || '',
-        major: meta?.major || '',
-        class_info: meta?.class_info || '',
-        grade: meta?.grade || payload.grade,
-        academic_year: payload.academicYear,
-        rule_id: payload.ruleId,
-        rule_name: payload.ruleName,
-        type: payload.type,
-        points: payload.points,
-        date: payload.date,
-        memo: payload.memo?.trim() || '',
-        granted_by: {
-          userId: profile.id,
-          userName: grantedByName,
-          role: profile.role,
-          at: nowIso
-        },
-        created_at: nowIso
-      };
-
-      if (!store[sid]) {
-        store[sid] = [];
-      }
-      store[sid].push(newRecord);
-    });
-
-    const { error } = await supabase
-      .from('system_settings')
-      .upsert({
-        key: 'merit_demerit_records_store',
-        value: store,
-        updated_at: nowIso
-      });
-
-    if (error) throw error;
-
-    revalidateTag('merit-demerit');
-    revalidateTag('merit-records-store');
-    revalidatePath('/merit-demerit');
-
-    return { 
-      success: true, 
-      count: payload.studentIds.length,
-      grantedType: payload.type,
-      points: payload.points
+  const records: MeritDemeritRecord[] = payload.studentIds.map(sid => {
+    const meta = payload.studentsMeta.find(m => m.id === sid);
+    return {
+      id: crypto.randomUUID(),
+      student_id: sid,
+      student_name: meta?.student_name || '',
+      student_number: meta?.student_number || '',
+      major: meta?.major || '',
+      class_info: meta?.class_info || '',
+      grade: meta?.grade || payload.grade,
+      academic_year: payload.academicYear,
+      rule_id: payload.ruleId,
+      rule_name: payload.ruleName,
+      type: payload.type,
+      points: payload.points,
+      date: payload.date,
+      memo: payload.memo?.trim() || '',
+      granted_by: {
+        userId: profile.id,
+        userName: grantedByName,
+        role: profile.role,
+        at: nowIso
+      },
+      created_at: nowIso
     };
-  } catch (error: any) {
+  });
+
+  const { error } = await supabase
+    .from('merit_demerit_records')
+    .insert(records);
+
+  if (error) {
     console.error('Error granting merit/demerit:', error);
     return { error: error.message || '상벌점 부여 중 오류가 발생했습니다.' };
   }
+
+  revalidateTag('merit-demerit');
+  revalidatePath('/merit-demerit');
+
+  return {
+    success: true,
+    count: records.length,
+    grantedType: payload.type,
+    points: payload.points
+  };
 }
 
 /**
  * 학생 상벌점 이력 1건 취소/삭제 액션
+ * merit_demerit_records 테이블에서 원자적 DELETE — Race Condition 없음
  */
 export async function deleteMeritDemeritRecordAction(recordId: string, studentId: string, academicYear?: number) {
   const profile = await getCurrentUserProfile();
-  if (!profile) {
-    return { error: '로그인이 필요합니다.' };
-  }
+  if (!profile) return { error: '로그인이 필요합니다.' };
 
   const supabase = createAdminClient();
 
-  try {
-    const store = await getMeritDemeritRecordsStore();
-    if (!store[studentId]) {
-      return { error: '해당 학생의 상벌점 기록을 찾을 수 없습니다.' };
-    }
+  const { error, count } = await supabase
+    .from('merit_demerit_records')
+    .delete({ count: 'exact' })
+    .eq('id', recordId)
+    .eq('student_id', studentId);
 
-    const initialLength = store[studentId].length;
-    store[studentId] = store[studentId].filter(r => r.id !== recordId);
-
-    if (store[studentId].length === initialLength) {
-      return { error: '삭제할 기록이 존재하지 않습니다.' };
-    }
-
-    const { error } = await supabase
-      .from('system_settings')
-      .upsert({
-        key: 'merit_demerit_records_store',
-        value: store,
-        updated_at: new Date().toISOString()
-      });
-
-    if (error) throw error;
-
-    revalidateTag('merit-demerit');
-    revalidateTag('merit-records-store');
-    revalidatePath('/merit-demerit');
-
-    return { success: true };
-  } catch (error: any) {
+  if (error) {
     console.error('Error deleting merit/demerit record:', error);
     return { error: error.message || '기록 삭제 중 오류가 발생했습니다.' };
   }
+  if (count === 0) return { error: '삭제할 기록이 존재하지 않습니다.' };
+
+  revalidateTag('merit-demerit');
+  revalidatePath('/merit-demerit');
+
+  return { success: true };
 }
 
 /**
  * [지연 로딩] 개별 학생의 전체 상벌점 상세 이력 조회 (온디맨드 모달용)
  */
 export async function getStudentMeritDemeritHistory(studentId: string): Promise<MeritDemeritRecord[]> {
-  const store = await getMeritDemeritRecordsStore();
-  const records = store[studentId] || [];
-  return [...records].sort((a, b) => 
-    b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at)
-  );
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from('merit_demerit_records')
+    .select('*')
+    .eq('student_id', studentId)
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false });
+  return (data || []) as MeritDemeritRecord[];
 }

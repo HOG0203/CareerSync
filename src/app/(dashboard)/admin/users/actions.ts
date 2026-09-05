@@ -73,11 +73,7 @@ export async function checkIsMasterAdmin(): Promise<boolean> {
     if (!profile || profile.role !== 'admin') return false;
 
     const masterInfo = await getMasterAdminInfo();
-    return (
-      profile.username === masterInfo.username ||
-      profile.full_name === '이호중' ||
-      profile.username === '이호중'
-    );
+    return profile.username === masterInfo.username;
   } catch (err) {
     return false;
   }
@@ -141,7 +137,7 @@ export async function toggleSubAdminAction(targetUsername: string) {
   }
 
   const masterInfo = await getMasterAdminInfo();
-  if (targetUsername === masterInfo.username || targetUsername === '이호중') {
+  if (targetUsername === masterInfo.username) {
     return { error: '메인관리자는 서브관리자로 변경할 수 없습니다.' };
   }
 
@@ -431,11 +427,7 @@ export type AdminRank = 1 | 2 | 3 | 4;
 export async function getUserRank(profile: { username?: string | null; full_name?: string | null; role?: string | null } | null): Promise<AdminRank> {
   if (!profile) return 4;
   const masterInfo = await getMasterAdminInfo();
-  if (
-    profile.username === masterInfo.username ||
-    profile.full_name === '이호중' ||
-    profile.username === '이호중'
-  ) {
+  if (profile.username === masterInfo.username) {
     return 1;
   }
   if (profile.role === 'admin') {

@@ -2,7 +2,7 @@ import React from 'react';
 import { redirect } from 'next/navigation';
 import { getCurrentUserProfile } from '@/lib/data';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
-import { getCachedMeritDemeritRecordsStore } from '@/app/(dashboard)/merit-demerit/actions';
+import { getStudentMeritDemeritHistory } from '@/app/(dashboard)/merit-demerit/actions';
 import { StudentMeritClient } from './student-merit-client';
 import { createAdminClient } from '@/lib/supabase/server';
 
@@ -71,14 +71,14 @@ export default async function StudentMeritPage({
     );
   }
 
-  // 학생 기본 정보 및 상벌점 스토어 병렬 조회
-  const [studentRes, store] = await Promise.all([
+  // 학생 기본 정보 및 해당 학생 상벌점 이력 병렬 조회
+  const [studentRes, records] = await Promise.all([
     supabase
       .from('students')
       .select('id, student_name, student_number, major, class_info, graduation_year')
       .eq('id', targetStudentId)
       .maybeSingle(),
-    getCachedMeritDemeritRecordsStore()
+    getStudentMeritDemeritHistory(targetStudentId)
   ]);
 
   const studentData = studentRes.data;
@@ -108,8 +108,6 @@ export default async function StudentMeritPage({
     class_info: studentData.class_info || '',
     grade
   };
-
-  const records = store[targetStudentId] || [];
 
   return (
     <StudentMeritClient

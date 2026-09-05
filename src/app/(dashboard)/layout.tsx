@@ -36,20 +36,16 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
       supabase.from('system_settings').select('value').eq('key', 'sub_admin_list').maybeSingle(),
     ]);
 
-    const masterUsername = (masterSetting?.value as any)?.username || '이호중';
+    const masterUsername = (masterSetting?.value as any)?.username ?? '';
     isMasterAdmin = Boolean(
-      isAdmin && (
-        userProfile?.username === masterUsername ||
-        userProfile?.full_name === '이호중' ||
-        userProfile?.username === '이호중'
-      )
+      isAdmin && masterUsername && userProfile?.username === masterUsername
     );
 
     const subAdminList = Array.isArray(subAdminSetting?.value) ? (subAdminSetting.value as string[]) : [];
     isSubAdmin = Boolean(isMasterAdmin || (isAdmin && userProfile?.username && subAdminList.includes(userProfile.username)));
   } catch (err) {
-    isMasterAdmin = Boolean(isAdmin && (userProfile?.full_name === '이호중' || userProfile?.username === '이호중'));
-    isSubAdmin = isMasterAdmin;
+    isMasterAdmin = false;
+    isSubAdmin = false;
   }
 
   // 4. 사용자별 개별 메뉴 권한 조회 (system_settings)

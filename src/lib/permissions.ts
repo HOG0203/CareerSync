@@ -1,6 +1,16 @@
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentUserProfile } from '@/lib/data';
 
+async function getMasterAdminUsername(): Promise<string> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('system_settings')
+    .select('value')
+    .eq('key', 'master_admin_info')
+    .maybeSingle();
+  return (data?.value as any)?.username ?? '';
+}
+
 /**
  * 교수학습지원 페이지 접근 권한 검사
  * - 모든 교직원 및 관리자: 기본 접근 허용
@@ -12,9 +22,8 @@ export async function checkTeachingSupportPermission(targetPath: string): Promis
   if (!profile) return false;
   if (profile.role === 'student') return false;
 
-  const isMaster = 
-    profile.username === '이호중' || 
-    profile.full_name === '이호중';
+  const masterUsername = await getMasterAdminUsername();
+  const isMaster = Boolean(masterUsername && profile.username === masterUsername);
 
   if (isMaster) return true;
 

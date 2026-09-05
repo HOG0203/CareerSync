@@ -93,7 +93,7 @@ export function UserTable({
   isMasterAdmin = false,
   isSubAdmin = false,
   subAdminList = [],
-  masterAdminInfo = { username: '이호중', name: '이호중' },
+  masterAdminInfo = { username: '', name: '' },
   currentUserId
 }: UserTableProps) {
   const router = useRouter();
@@ -120,11 +120,7 @@ export function UserTable({
 
   const getProfileRank = React.useCallback((p: any): number => {
     if (!p) return 4;
-    if (
-      p.username === currentMasterAdmin.username ||
-      p.full_name === '이호중' ||
-      p.username === '이호중'
-    ) {
+    if (p.username === currentMasterAdmin.username) {
       return 1;
     }
     if (p.role === 'admin') {
@@ -1269,6 +1265,7 @@ export function UserTable({
         profile={selectedPermissionProfile}
         customPermissionsMap={customPermissionsMap}
         subAdminList={currentSubAdmins}
+        masterUsername={currentMasterAdmin.username}
         onSaved={(newMap) => setCustomPermissionsMap(newMap)}
       />
     </div>

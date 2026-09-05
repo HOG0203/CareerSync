@@ -90,8 +90,8 @@ export const ALL_SYSTEM_MENU_GROUPS = [
   },
 ];
 
-export function getDefaultRoutesForUser(profile: any, subAdminList: string[] = []): string[] {
-  const isMaster = profile?.username === '이호중' || profile?.full_name === '이호중';
+export function getDefaultRoutesForUser(profile: any, subAdminList: string[] = [], masterUsername: string = ''): string[] {
+  const isMaster = Boolean(masterUsername && profile?.username === masterUsername);
   const isSubAdmin = isMaster || (profile?.username && subAdminList.includes(profile.username));
 
   if (profile?.role === 'admin') {
@@ -149,6 +149,7 @@ interface UserPermissionsModalProps {
   profile: any | null;
   customPermissionsMap: Record<string, string[]>;
   subAdminList?: string[];
+  masterUsername?: string;
   onSaved: (newMap: Record<string, string[]>) => void;
 }
 
@@ -158,6 +159,7 @@ export function UserPermissionsModal({
   profile,
   customPermissionsMap,
   subAdminList = [],
+  masterUsername = '',
   onSaved,
 }: UserPermissionsModalProps) {
   const { toast } = useToast();
@@ -166,7 +168,7 @@ export function UserPermissionsModal({
   const [isSaving, setIsSaving] = React.useState(false);
 
   const isCustom = profile ? customPermissionsMap[profile.id] !== undefined : false;
-  const defaultRoutes = React.useMemo(() => (profile ? getDefaultRoutesForUser(profile, subAdminList) : []), [profile, subAdminList]);
+  const defaultRoutes = React.useMemo(() => (profile ? getDefaultRoutesForUser(profile, subAdminList, masterUsername) : []), [profile, subAdminList, masterUsername]);
 
   // 모달 열릴 때 권한 초기화
   React.useEffect(() => {
@@ -175,7 +177,7 @@ export function UserPermissionsModal({
       if (saved && Array.isArray(saved)) {
         setSelectedRoutes(saved);
       } else {
-        setSelectedRoutes(getDefaultRoutesForUser(profile, subAdminList));
+        setSelectedRoutes(getDefaultRoutesForUser(profile, subAdminList, masterUsername));
       }
     }
   }, [isOpen, profile, customPermissionsMap, subAdminList]);

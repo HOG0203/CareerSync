@@ -35,11 +35,7 @@ async function AuditLogsPageContent({
     getUserCustomPermissionsMapAction(),
   ]);
 
-  const isMasterAdmin = Boolean(
-    userProfile?.username === masterInfo.username ||
-    userProfile?.full_name === '이호중' ||
-    userProfile?.username === '이호중'
-  );
+  const isMasterAdmin = Boolean(userProfile?.username === masterInfo.username);
 
   const hasExplicitPerm = userProfile?.id && customPermMap[userProfile.id]?.includes('/admin/audit-logs');
 

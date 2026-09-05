@@ -1,7 +1,19 @@
 'use server'
 
 import { revalidatePath, unstable_cache, revalidateTag } from 'next/cache'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
+
+async function checkIsAdmin(): Promise<boolean> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return false
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+  return profile?.role === 'admin'
+}
 
 export interface MasterCertificate {
   name: string;
@@ -101,6 +113,7 @@ export async function getCachedCertificationConfig(): Promise<CertificationConfi
  * 옥저인증제 종합 설정 저장
  */
 export async function updateCertificationConfig(config: CertificationConfig) {
+  if (!(await checkIsAdmin())) return { error: '관리자 권한이 필요합니다.' }
   const supabase = createAdminClient();
   try {
     const { error } = await supabase
@@ -126,6 +139,7 @@ export async function updateCertificationConfig(config: CertificationConfig) {
  * 시스템 설정 저장 (baseYear 변경 시 전년도 자동 스냅샷 백업 및 Audit Log 기록)
  */
 export async function updateSystemSettings(settings: { baseYear: number }) {
+  if (!(await checkIsAdmin())) return { error: '관리자 권한이 필요합니다.' }
   const supabase = createAdminClient();
 
   try {
@@ -214,6 +228,7 @@ export async function getCachedMasterCertificates(): Promise<MasterCertificate[]
  * 마스터 자격증 목록 저장
  */
 export async function updateMasterCertificates(certificates: MasterCertificate[]) {
+  if (!(await checkIsAdmin())) return { error: '관리자 권한이 필요합니다.' }
   const supabase = createAdminClient()
 
   try {
@@ -278,6 +293,7 @@ export async function getDashboardChartLayout(): Promise<DashboardChartLayout> {
  * 대시보드 차트 배치 순서 저장 (관리자 전용)
  */
 export async function saveDashboardChartLayout(key: 'grade3Order' | 'lowerGradeOrder', newOrder: string[]) {
+  if (!(await checkIsAdmin())) return { error: '관리자 권한이 필요합니다.' }
   const supabase = createAdminClient();
 
   try {
@@ -395,6 +411,7 @@ export async function getCachedMeritDemeritRules(): Promise<MeritDemeritRule[]> 
  * 상벌점 기준 항목 일괄 저장/수정
  */
 export async function updateMeritDemeritRules(rules: MeritDemeritRule[]) {
+  if (!(await checkIsAdmin())) return { error: '관리자 권한이 필요합니다.' }
   const supabase = createAdminClient();
   try {
     const { error } = await supabase

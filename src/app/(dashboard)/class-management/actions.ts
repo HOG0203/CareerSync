@@ -51,27 +51,39 @@ async function syncAcademicHistory(studentUuid: string, info: any) {
       class_info: info.class_info,
       student_number: info.student_number,
       teacher_name: teacherName
-    }, { onConflict: 'student_id, grade' })
+    }, { onConflict: 'student_id, academic_year' })
 }
+
+const ALLOWED_PERSONAL_FIELDS = [
+  'phone_number',
+  'career_aspiration',
+  'special_notes',
+  'career_course',
+  'certificates',
+  'military_status',
+  'desired_work_area',
+  'parents_opinion',
+  'shoe_size',
+  'top_size',
+  'personal_remarks',
+] as const
 
 /**
  * 학생 인적사항 개별 수정 (students 테이블 대상)
  */
 export async function updatePersonalDetail(id: string, field: string, value: any) {
+  if (!ALLOWED_PERSONAL_FIELDS.includes(field as any)) {
+    return { success: false, error: '허용되지 않은 수정 항목입니다.' }
+  }
+
   const supabase = await createClient()
-  
+
   const { error } = await supabase
     .from('students')
     .update({ [field]: (value === '' || value === 'CLEARED') ? null : value })
     .eq('id', id)
 
   if (error) return { success: false, error: error.message }
-
-  // 소속 정보 변경 시 이력 동기화
-  if (['major', 'class_info', 'student_number'].includes(field)) {
-    const { data: student } = await supabase.from('students').select('*').eq('id', id).single()
-    if (student) await syncAcademicHistory(id, student)
-  }
 
   revalidateTag('students')
   revalidatePath('/class-management')
@@ -86,6 +98,11 @@ export async function updatePersonalDetail(id: string, field: string, value: any
  * 학생 인적사항 일괄 수정 (students 테이블 대상)
  */
 export async function bulkUpdatePersonalDetails(updates: { id: string, field: string, value: any }[]) {
+  const invalidField = updates.find(u => !ALLOWED_PERSONAL_FIELDS.includes(u.field as any))
+  if (invalidField) {
+    return { success: false, error: `허용되지 않은 수정 항목입니다: ${invalidField.field}` }
+  }
+
   const supabase = await createClient()
 
   for (const update of updates) {
@@ -93,13 +110,6 @@ export async function bulkUpdatePersonalDetails(updates: { id: string, field: st
       .from('students')
       .update({ [update.field]: (update.value === '' || update.value === 'CLEARED') ? null : update.value })
       .eq('id', update.id)
-  }
-
-  // 이력 동기화
-  const studentIds = Array.from(new Set(updates.map(u => u.id)))
-  for (const sid of studentIds) {
-    const { data: student } = await supabase.from('students').select('*').eq('id', sid).single()
-    if (student) await syncAcademicHistory(sid, student)
   }
 
   revalidateTag('students')
@@ -207,7 +217,7 @@ export async function getAcademicHistory(studentId: string) {
       .select('id, graduation_year, major, class_info, student_number')
       .eq('id', studentId)
       .single(),
-    supabase.from('system_settings').select('*'),
+    supabase.from('system_settings').select('value').eq('key', 'base_year').maybeSingle(),
     supabase
       .from('profiles')
       .select('username, assigned_grade, assigned_major, assigned_class')
@@ -218,11 +228,7 @@ export async function getAcademicHistory(studentId: string) {
   const student = studentRes.data;
   const teachers = teachersRes.data || [];
   
-  let baseYear = 2026;
-  if (settingsRes.data) {
-    const sysYear = settingsRes.data.find((s: any) => s.key === 'base_year');
-    if (sysYear?.value?.year) baseYear = sysYear.value.year;
-  }
+  const baseYear: number = (settingsRes.data?.value as any)?.year ?? 2026;
 
   // 만약 현재 학년 데이터가 history에 없다면 student 정보로 현재 학년 히스토리 항목 구성
   if (student && student.graduation_year && student.major && student.class_info) {
