@@ -22,7 +22,8 @@ import {
   getExamPeriodForDate,
   getExamSlotInfo,
   getVacationForDate,
-  findCurrentWeekNum
+  findCurrentWeekNum,
+  getInstructorAssignmentForSlot
 } from '@/lib/substitute/event-helper';
 import { SemesterWeek } from '@/lib/substitute/validator';
 import { 
@@ -294,6 +295,12 @@ export function InteractiveTeacherTimetable({
     const key = `${day}_${period}`;
     const date = selectedWeek.dates[day] || new Date().toISOString().split('T')[0];
 
+    // 시간강사 상시보강 슬롯은 보강 완료 상태로 교체 및 추가 보강 신청 불가 (선택 차단)
+    const instructorInfo = selectedTeacherName 
+      ? getInstructorAssignmentForSlot(selectedTeacherName, day, period, slot?.classCode, calendarConfig, date)
+      : { isInstructorSlot: false };
+    if (instructorInfo.isInstructorSlot) return;
+
     setSelectedSlots(prev => {
       const exists = prev.some(s => s.key === key);
       if (exists) {
@@ -430,16 +437,35 @@ export function InteractiveTeacherTimetable({
                               📝 {examPeriod.name}
                             </span>
                           )}
-                          {specialDay && (
-                            <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-indigo-100 text-indigo-800 border border-indigo-200 truncate max-w-[95px] flex items-center gap-0.5" title={specialDay.description || `${specialDay.targetDayOfWeek}요일 시간표 운영`}>
-                              <ArrowLeftRight className="h-2.5 w-2.5" />
-                              {specialDay.shortenedPeriods 
-                                ? `⏰ ${specialDay.shortenedPeriods}교시 단축` 
-                                : specialDay.targetDayOfWeek !== d.key 
-                                  ? `${specialDay.targetDayOfWeek}요일 수업` 
-                                  : '교시 변형'}
-                            </span>
-                          )}
+                          {specialDay && (() => {
+                            const hasOverrides = Boolean(specialDay.periodOverrides && Object.keys(specialDay.periodOverrides).length > 0);
+                            let label = specialDay.targetDayOfWeek !== d.key 
+                              ? `${specialDay.targetDayOfWeek}요일 수업` 
+                              : '교시 변형';
+
+                            if (specialDay.shortenedPeriods) {
+                              label = `⏰ ${specialDay.shortenedPeriods}교시 단축`;
+                            } else if (hasOverrides && specialDay.periodOverrides) {
+                              const targetP = Number(Object.keys(specialDay.periodOverrides)[0]) || 6;
+                              const srcP = Number(specialDay.periodOverrides[targetP]) || 5;
+                              label = `🔗 ${srcP}~${targetP}교시 연속`;
+                            }
+
+                            return (
+                              <span
+                                className={cn(
+                                  "px-1.5 py-0.2 rounded text-[9px] font-black border truncate max-w-[95px] flex items-center gap-0.5",
+                                  hasOverrides
+                                    ? "bg-blue-100 text-blue-900 border-blue-200"
+                                    : "bg-indigo-100 text-indigo-800 border-indigo-200"
+                                )}
+                                title={specialDay.description || `${specialDay.targetDayOfWeek}요일 시간표 운영`}
+                              >
+                                <ArrowLeftRight className="h-2.5 w-2.5" />
+                                {label}
+                              </span>
+                            );
+                          })()}
                         </div>
                         <span className="text-[10px] font-mono text-blue-600 font-bold">
                           {selectedWeek.monthDayLabels[d.key] || ''}
@@ -504,6 +530,11 @@ export function InteractiveTeacherTimetable({
                   // 3. 결보강 / 교체 승인 또는 신청된 변동 슬롯이 존재하는 경우
                   const effectiveInfo = effectiveSlotMap[slotKey];
 
+                  // 🌟 시간강사 상시보강 편성 슬롯 검사 (원래 교사의 보강 완료 상태 -> 교체 및 추가 보강 일체 불가 🔒)
+                  const instructorInfo = selectedTeacherName
+                    ? getInstructorAssignmentForSlot(selectedTeacherName, targetDayKey, targetPeriod, slot?.classCode, calendarConfig, dayDate)
+                    : { isInstructorSlot: false };
+
                   // 지필평가/시험 기간인 경우 우선 렌더링
                   if (examInfo?.isExamRunning) {
                     return (
@@ -545,7 +576,7 @@ export function InteractiveTeacherTimetable({
                   }
 
                   // 기본 요일별 교시(예: 수요일 6교시)를 초과하지만, 행사나 변동 슬롯 또는 수업이 없는 경우만 '-' 표시
-                  if (period > effectiveMaxPeriods && !hasEvent && !hasClassEvent && !effectiveInfo && !isSlotActive) {
+                  if (period > effectiveMaxPeriods && !hasEvent && !hasClassEvent && !effectiveInfo && !isSlotActive && !instructorInfo.isInstructorSlot) {
                     return (
                       <td key={d.key} className="p-1 border-r last:border-r-0 border-slate-200 bg-slate-50/30">
                         <span className="text-slate-300 text-[10px]">-</span>
@@ -560,6 +591,35 @@ export function InteractiveTeacherTimetable({
                         <div className="w-full h-full min-h-[52px] rounded-xl border border-emerald-100 flex flex-col items-center justify-center text-[10.5px] text-emerald-700 font-bold">
                           <Palmtree className="h-3.5 w-3.5 mb-0.5 opacity-60" />
                           <span>{vacation.name}</span>
+                        </div>
+                      </td>
+                    );
+                  }
+
+                  // 🌟 시간강사 상시보강 수업인 경우 (기존 교사의 보강 완료 상태 -> 교체 및 보강 일체 불가 🔒)
+                  if (instructorInfo.isInstructorSlot) {
+                    return (
+                      <td key={d.key} className="p-1 border-r last:border-r-0 border-slate-200 h-14">
+                        <div
+                          className="w-full h-full min-h-[48px] max-h-[48px] p-1 sm:p-1.5 rounded-xl border-[1.5px] border-purple-300 bg-purple-50/90 text-purple-950 flex flex-col items-center justify-center text-center relative group shadow-2xs select-none cursor-not-allowed opacity-95"
+                          title={`[시간강사 상시보강 🔒] ${instructorInfo.instructorName || '시간강사'} 선생님께서 상시 보강하는 수업입니다. 교체 및 추가 보강 신청이 불가합니다.`}
+                        >
+                          <span className="absolute -top-1.5 -right-1 text-[8px] px-1.5 py-0.2 rounded-full font-black bg-purple-600 text-white shadow-xs z-20 leading-tight ring-1 ring-white/50">
+                            🔒 강사: {instructorInfo.instructorName}
+                          </span>
+                          <span className="font-extrabold text-[11px] tracking-tight truncate max-w-full leading-tight text-purple-900 line-through decoration-purple-400">
+                            {slot?.subjectName || '수업'}
+                          </span>
+                          <div className="flex items-center justify-center gap-1 mt-0.5 max-w-full overflow-hidden">
+                            {slot?.classCode && (
+                              <span className="text-[8.5px] px-1 py-0 rounded font-black truncate shrink-0 bg-purple-200/80 text-purple-800">
+                                {slot.classCode}
+                              </span>
+                            )}
+                            <span className="text-[8px] font-bold text-purple-700 truncate max-w-[85px]">
+                              (보강완료)
+                            </span>
+                          </div>
                         </div>
                       </td>
                     );

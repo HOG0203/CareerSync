@@ -13,6 +13,7 @@ interface UseSpreadsheetProps {
   groupHeaders?: { label: string; colSpan: number; className?: string }[]
   externalSelectedRowIds?: string[]
   onSelectionChange?: (ids: string[]) => void
+  externalSearchTerm?: string
 }
 
 export function useSpreadsheet({
@@ -23,6 +24,7 @@ export function useSpreadsheet({
   groupHeaders,
   externalSelectedRowIds,
   onSelectionChange,
+  externalSearchTerm,
 }: UseSpreadsheetProps) {
   const router = useRouter()
   const { toast } = useToast()
@@ -110,14 +112,19 @@ export function useSpreadsheet({
     
     const activeFilterEntries = Object.entries(columnFilters).filter(([_, v]) => Array.isArray(v) && v.length > 0);
     const hasActiveFilters = activeFilterEntries.length > 0;
-    const lowerSearch = searchTerm.trim().toLowerCase();
+    const effectiveSearch = (externalSearchTerm !== undefined ? externalSearchTerm : searchTerm).trim().toLowerCase();
+    const lowerSearch = effectiveSearch;
 
     initialData.forEach(s => {
       // 1. Calculate row search match once per student row
       if (lowerSearch) {
-        const matchesSearch = columns.some(col =>
-          String(s[col.key] || '').toLowerCase().includes(lowerSearch)
-        );
+        const matchesSearch = columns.some(col => {
+          const val = s[col.key];
+          if (Array.isArray(val)) {
+            return val.some((v: any) => String(v || '').toLowerCase().includes(lowerSearch));
+          }
+          return String(val || '').toLowerCase().includes(lowerSearch);
+        });
         if (!matchesSearch) return;
       }
 
@@ -152,7 +159,7 @@ export function useSpreadsheet({
       });
     });
     return result;
-  }, [initialData, columns, columnFilters, searchTerm]);
+  }, [initialData, columns, columnFilters, searchTerm, externalSearchTerm]);
 
   const handleFilterChange = React.useCallback((key: string, value: string) => {
     if (key === 'ALL' && value === 'RESET') {
@@ -185,9 +192,10 @@ export function useSpreadsheet({
 
   const filteredData = React.useMemo(() => {
     const activeFilterEntries = Object.entries(columnFilters).filter(([_, v]) => Array.isArray(v) && v.length > 0);
-    const lowerSearch = searchTerm.trim().toLowerCase();
+    const effectiveSearch = (externalSearchTerm !== undefined ? externalSearchTerm : searchTerm).trim().toLowerCase();
+    const lowerSearch = effectiveSearch;
 
-    // Fast path: If no column filters and no internal search, return data directly without re-filtering
+    // Fast path: If no column filters and no internal/external search, return data directly without re-filtering
     if (activeFilterEntries.length === 0 && !lowerSearch) {
       return data;
     }
@@ -203,13 +211,30 @@ export function useSpreadsheet({
       }
       
       if (lowerSearch) {
-        const mS = columns.some(c => String(row[c.key] || '').toLowerCase().includes(lowerSearch));
-        if (!mS) return false;
+        const mS = columns.some(c => {
+          const val = row[c.key];
+          if (Array.isArray(val)) {
+            return val.some((v: any) => String(v || '').toLowerCase().includes(lowerSearch));
+          }
+          return String(val || '').toLowerCase().includes(lowerSearch);
+        });
+        if (mS) return true;
+
+        // 학생 추가 필드(실습기록 등) 매칭 보조
+        if (Array.isArray(row.training_records)) {
+          const matchTraining = row.training_records.some((tr: any) =>
+            String(tr.company || '').toLowerCase().includes(lowerSearch) ||
+            String(tr.return_reason || '').toLowerCase().includes(lowerSearch)
+          );
+          if (matchTraining) return true;
+        }
+
+        return false;
       }
 
       return true;
     });
-  }, [data, columnFilters, searchTerm, columns]);
+  }, [data, columnFilters, searchTerm, externalSearchTerm, columns]);
 
   // Effects
   React.useEffect(() => {

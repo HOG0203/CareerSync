@@ -55,7 +55,6 @@ export function StudentsHubClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = React.useState('');
-  const deferredSearchTerm = React.useDeferredValue(searchTerm);
   const [selectedMajor, setSelectedMajor] = React.useState<string>('all');
   const [selectedClass, setSelectedClass] = React.useState<string>('all');
   const [selectedStatus, setSelectedStatus] = React.useState<string>('all');
@@ -134,50 +133,15 @@ export function StudentsHubClient({
     }
   }, [selectedMajor, classOptions, selectedClass]);
 
-  // 4. 상위 필터링된 데이터 (useDeferredValue 적용으로 타이핑 렉 100% 제거)
+  // 4. 상위 필터링된 데이터 (학과, 반, 취업현황 등 구조적 필터링, 검색어는 시트 내장 엔진으로 0ms 즉각 처리)
   const filteredData = React.useMemo(() => {
     return initialData.filter((student) => {
       if (selectedMajor !== 'all' && student.major !== selectedMajor) return false;
       if (selectedClass !== 'all' && student.class_info !== selectedClass) return false;
       if (selectedStatus !== 'all' && (student.business_type || '미취업') !== selectedStatus) return false;
-
-      if (deferredSearchTerm.trim()) {
-        const term = deferredSearchTerm.toLowerCase();
-        const nameMatch = (student.student_name || '').toLowerCase().includes(term);
-        const numMatch = String(student.student_number || '').includes(term);
-        const phoneMatch = (student.phone_number || '').toLowerCase().includes(term);
-        const majorMatch = (student.major || '').toLowerCase().includes(term);
-        const companyMatch = (student.company || '').toLowerCase().includes(term);
-        const trainingCompanyMatch = (student.latest_training_company || '').toLowerCase().includes(term);
-        const remarksMatch = (student.personal_remarks || '').toLowerCase().includes(term);
-        const specialNotesMatch = (student.special_notes || '').toLowerCase().includes(term);
-        const careerCourseMatch = (student.career_course || '').toLowerCase().includes(term);
-        const employmentStatusMatch = (student.employment_status || '').toLowerCase().includes(term);
-        const aspirationMatch = (student.career_aspiration || '').toLowerCase().includes(term);
-        const certMatch = Array.isArray(student.certificates)
-          ? student.certificates.some((c: string) => c.toLowerCase().includes(term))
-          : false;
-
-        return (
-          nameMatch ||
-          numMatch ||
-          phoneMatch ||
-          majorMatch ||
-          companyMatch ||
-          trainingCompanyMatch ||
-          remarksMatch ||
-          specialNotesMatch ||
-          careerCourseMatch ||
-          employmentStatusMatch ||
-          aspirationMatch ||
-          certMatch
-        );
-      }
-
-
       return true;
     });
-  }, [initialData, selectedMajor, selectedClass, selectedStatus, deferredSearchTerm]);
+  }, [initialData, selectedMajor, selectedClass, selectedStatus]);
 
 
   // 상위 필터 + 아래 시트 열 필터가 모두 반영된 최종 실시간 유효 데이터
@@ -384,6 +348,8 @@ export function StudentsHubClient({
               rankingMap={rankingMap}
               userProfile={userProfile}
               baseYear={baseYear}
+              graduationYear={selectedYear}
+              externalSearchTerm={searchTerm}
               onFilteredDataChange={handleFilteredDataChange}
             />
           </div>

@@ -15,9 +15,6 @@ import {
 import { AcademicCalendarConfig, DEFAULT_ACADEMIC_CALENDAR_2026_2 } from '@/lib/substitute/event-types';
 import { SubstituteStatsView } from '../substitute-stats-view';
 import { SubstituteOfficialForm } from '../substitute-official-form';
-import { Button } from '@/components/ui/button';
-import { ShieldCheck, ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
 
 interface AdminClientProps {
   initialApplications: SubstituteApplication[];

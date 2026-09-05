@@ -14,7 +14,8 @@ import {
   getClassEventsForSlot, 
   getExamSlotInfo,
   getVacationForDate,
-  getSpecialDaySchedule
+  getSpecialDaySchedule,
+  getInstructorAssignmentForSlot
 } from './event-helper';
 
 const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
@@ -253,6 +254,30 @@ export function checkSubstituteItemConflict(
     app => app.id !== currentApplicationId && app.status !== 'rejected'
   );
 
+  // 0. 시간강사 상시보강 편성 여부 검사 (시간강사 배정 수업은 보강 완료 상태이므로 교체 및 보강 불가!)
+  const sourceDay = item.sourceDay || getDayOfWeekFromDate(item.sourceDate);
+  const sourceInstructor = getInstructorAssignmentForSlot(
+    item.originalTeacher,
+    sourceDay,
+    item.sourcePeriod,
+    item.classCode,
+    calendarConfig,
+    item.sourceDate
+  );
+  if (sourceInstructor.isInstructorSlot) {
+    return {
+      hasConflict: true,
+      conflictType: 'ALREADY_MODIFIED',
+      message: `[시간강사 보강완료 🔒] ${item.originalTeacher} 선생님의 ${item.sourceDate}(${sourceDay}) ${item.sourcePeriod}교시 수업은 시간강사(${sourceInstructor.instructorName || '강사'}) 상시보강으로 편성되어 있어 결보강 및 맞교환 신청이 불가합니다.`,
+      details: {
+        date: item.sourceDate,
+        period: item.sourcePeriod,
+        teacherName: item.originalTeacher,
+        classCode: item.classCode
+      }
+    };
+  }
+
   // 1. 현재 결재 진행 중(submitted)인 중복 신청 여부 검사 (승인 완료된 건은 재교체 가능하므로 제외)
   const pendingApps = otherApps.filter(app => app.status === 'submitted');
   for (const app of pendingApps) {
@@ -283,8 +308,29 @@ export function checkSubstituteItemConflict(
       return { hasConflict: true, message: '교체할 일자, 교시 및 교사를 모두 지정해야 합니다.' };
     }
 
-    const sourceDay = item.sourceDay || getDayOfWeekFromDate(item.sourceDate);
     const targetDay = item.targetDay || getDayOfWeekFromDate(item.targetDate);
+
+    // 2-0) 상대 교사의 대상 교시가 시간강사 상시보강인지 검사
+    const targetInstructor = getInstructorAssignmentForSlot(
+      item.targetTeacher,
+      targetDay,
+      item.targetPeriod,
+      undefined,
+      calendarConfig,
+      item.targetDate
+    );
+    if (targetInstructor.isInstructorSlot) {
+      return {
+        hasConflict: true,
+        conflictType: 'ALREADY_MODIFIED',
+        message: `[시간강사 보강완료 🔒] 상대 교사(${item.targetTeacher})의 ${item.targetDate}(${targetDay}) ${item.targetPeriod}교시 수업은 시간강사(${targetInstructor.instructorName || '강사'}) 상시보강으로 편성되어 있어 맞교환이 불가합니다.`,
+        details: {
+          date: item.targetDate,
+          period: item.targetPeriod,
+          teacherName: item.targetTeacher
+        }
+      };
+    }
 
     // 2-1) 상대 교사(targetTeacher)가 원래 신청 시간(sourceDate, sourcePeriod)에 실제로 공강인지 검사
     const isTargetFreeAtSource = isTeacherFreeOnDateAndPeriod(
@@ -342,6 +388,28 @@ export function checkSubstituteItemConflict(
     }
 
     const sourceDay = item.sourceDay || getDayOfWeekFromDate(item.sourceDate);
+
+    // 3-0) 보강 교사가 해당 일시에 시간강사 상시보강 수업이 있는지 검사
+    const subInstructor = getInstructorAssignmentForSlot(
+      item.substituteTeacher,
+      sourceDay,
+      item.sourcePeriod,
+      undefined,
+      calendarConfig,
+      item.sourceDate
+    );
+    if (subInstructor.isInstructorSlot) {
+      return {
+        hasConflict: true,
+        conflictType: 'TEACHER_BUSY',
+        message: `[시간강사 보강 🔒] ${item.substituteTeacher} 선생님은 ${item.sourceDate}(${sourceDay}) ${item.sourcePeriod}교시에 시간강사(${subInstructor.instructorName || '강사'}) 상시보강 수업이 배정되어 있어 다른 수업의 보강을 맡을 수 없습니다.`,
+        details: {
+          date: item.sourceDate,
+          period: item.sourcePeriod,
+          teacherName: item.substituteTeacher
+        }
+      };
+    }
 
     // 3-1) 보강 교사가 해당 일시 실제로 공강인지 검사 (정규 수업, 학교 행사, 지필평가, 결보강 등 완벽 반영)
     const isSubFree = isTeacherFreeOnDateAndPeriod(
@@ -782,6 +850,8 @@ export function getEffectiveSlotForTeacher(
   isTeachingSub?: boolean;
   isClassEventFree?: boolean;
   isTeacherEvent?: boolean;
+  isInstructorAssigned?: boolean;
+  instructorName?: string;
   eventTitle?: string;
   partnerTeacher?: string;
 } {
@@ -924,6 +994,26 @@ export function getEffectiveSlotForTeacher(
       hasClass: false,
       subjectName: '시험 후 하교',
       classCode: regularSlot?.classCode,
+    };
+  }
+
+  // 6) 🌟 시간강사 상시보강 편성 여부 검사 (해당 슬롯은 시간강사가 수업을 전담하므로 맞교환 불가)
+  const instructorInfo = getInstructorAssignmentForSlot(
+    teacherName,
+    day,
+    period,
+    regularSlot?.classCode,
+    calendarConfig,
+    dateStr
+  );
+  if (instructorInfo.isInstructorSlot) {
+    return {
+      hasClass: true,
+      subjectName: regularSlot?.subjectName || '시간강사 수업',
+      classCode: regularSlot?.classCode || '',
+      deptName: regularSlot?.deptName || '',
+      isInstructorAssigned: true,
+      instructorName: instructorInfo.instructorName,
     };
   }
 

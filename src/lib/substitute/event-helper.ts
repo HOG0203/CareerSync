@@ -323,3 +323,318 @@ export function findCurrentWeekNum(
   // 3. 학기 종료 후면 마지막 주차
   return weeks[weeks.length - 1]?.weekNum || 1;
 }
+
+/**
+ * 특정 교사, 요일, 교시(또는 학반)에 매주 시간강사가 상시보강으로 배정되어 있는지 검사
+ * (시간강사 배정 수업은 상시보강 완료 상태이므로 수업교체 및 추가보강 전면 불가)
+ */
+export function getInstructorAssignmentForSlot(
+  teacherName: string,
+  day: string, // "월", "화", "수", "목", "금"
+  period: number, // 1 ~ 7
+  classCode?: string,
+  config?: AcademicCalendarConfig,
+  dateStr?: string // 선택적: 유효기간 검사용
+): {
+  isInstructorSlot: boolean;
+  assignment?: import('./event-types').TeacherInstructorAssignment;
+  instructorName?: string;
+  remarks?: string;
+} {
+  if (!config?.teacherInstructorAssignments || config.teacherInstructorAssignments.length === 0) {
+    return { isInstructorSlot: false };
+  }
+
+  const cleanTeacher = (teacherName || '').trim();
+  if (!cleanTeacher) return { isInstructorSlot: false };
+
+  for (const assign of config.teacherInstructorAssignments) {
+    if (assign.originalTeacherName.trim() !== cleanTeacher) continue;
+
+    // 🌟 1. 일일/주차별(daily) 시간강사인 경우: 주차 기간(effectivePeriod) 또는 특정 일자와 일치해야 함!
+    if (assign.assignmentMode === 'daily') {
+      if (assign.effectivePeriod?.startDate && assign.effectivePeriod?.endDate) {
+        if (!dateStr || dateStr < assign.effectivePeriod.startDate || dateStr > assign.effectivePeriod.endDate) {
+          continue;
+        }
+      } else {
+        const targetDate = assign.assignedDate || assign.effectivePeriod?.startDate;
+        if (!targetDate) continue;
+        // 특정 일자가 주어지지 않았거나 다른 날짜인 경우 일일 강사 슬롯에 미해당
+        if (!dateStr || dateStr !== targetDate) continue;
+      }
+    } else {
+      // 🌟 2. 매주(weekly) 시간강사인 경우: 유효기간 검사 (설정된 경우)
+      if (dateStr && assign.effectivePeriod) {
+        if (assign.effectivePeriod.startDate && dateStr < assign.effectivePeriod.startDate) continue;
+        if (assign.effectivePeriod.endDate && dateStr > assign.effectivePeriod.endDate) continue;
+      }
+    }
+
+    const matchedSlot = assign.assignedSlots.find(slot => {
+      const matchDay = slot.day === day;
+      const matchPeriod = slot.period === period;
+      const matchClass = !classCode || !slot.classCode || slot.classCode === classCode;
+      return matchDay && matchPeriod && matchClass;
+    });
+
+    if (matchedSlot) {
+      return {
+        isInstructorSlot: true,
+        assignment: assign,
+        instructorName: assign.instructorName,
+        remarks: assign.remarks,
+      };
+    }
+  }
+
+  return { isInstructorSlot: false };
+}
+
+/**
+ * 2026학년도 대한민국 법정 공휴일 및 주요 학사 기념일 기본 목록 반환
+ */
+export function getKoreanHolidays(year: number = 2026): VacationPeriod[] {
+  return [
+    { id: `hol-${year}-03-01`, name: '3·1절', startDate: `${year}-03-01`, endDate: `${year}-03-01`, type: 'holiday' },
+    { id: `hol-${year}-03-02`, name: '대체공휴일(3·1절)', startDate: `${year}-03-02`, endDate: `${year}-03-02`, type: 'holiday' },
+    { id: `hol-${year}-05-05`, name: '어린이날', startDate: `${year}-05-05`, endDate: `${year}-05-05`, type: 'holiday' },
+    { id: `hol-${year}-05-24`, name: '부처님오신날', startDate: `${year}-05-24`, endDate: `${year}-05-24`, type: 'holiday' },
+    { id: `hol-${year}-05-25`, name: '대체공휴일(부처님오신날)', startDate: `${year}-05-25`, endDate: `${year}-05-25`, type: 'holiday' },
+    { id: `hol-${year}-06-06`, name: '현충일', startDate: `${year}-06-06`, endDate: `${year}-06-06`, type: 'holiday' },
+    { id: `hol-${year}-08-15`, name: '광복절', startDate: `${year}-08-15`, endDate: `${year}-08-15`, type: 'holiday' },
+    { id: `hol-${year}-08-17`, name: '대체공휴일(광복절)', startDate: `${year}-08-17`, endDate: `${year}-08-17`, type: 'holiday' },
+    { id: `hol-${year}-09-24`, name: '추석 전날', startDate: `${year}-09-24`, endDate: `${year}-09-24`, type: 'holiday' },
+    { id: `hol-${year}-09-25`, name: '추석', startDate: `${year}-09-25`, endDate: `${year}-09-25`, type: 'holiday' },
+    { id: `hol-${year}-09-26`, name: '추석 다음 날', startDate: `${year}-09-26`, endDate: `${year}-09-26`, type: 'holiday' },
+    { id: `hol-${year}-10-03`, name: '개천절', startDate: `${year}-10-03`, endDate: `${year}-10-03`, type: 'holiday' },
+    { id: `hol-${year}-10-05`, name: '대체공휴일(개천절)', startDate: `${year}-10-05`, endDate: `${year}-10-05`, type: 'holiday' },
+    { id: `hol-${year}-10-09`, name: '한글날', startDate: `${year}-10-09`, endDate: `${year}-10-09`, type: 'holiday' },
+    { id: `hol-${year}-12-25`, name: '성탄절', startDate: `${year}-12-25`, endDate: `${year}-12-25`, type: 'holiday' },
+    { id: `hol-${year+1}-01-01`, name: '새해 첫날', startDate: `${year+1}-01-01`, endDate: `${year+1}-01-01`, type: 'holiday' },
+    { id: `hol-${year+1}-02-16`, name: '설날 연휴', startDate: `${year+1}-02-16`, endDate: `${year+1}-02-18`, type: 'holiday' },
+  ];
+}
+
+/**
+ * 엑셀 파일(ArrayBuffer)에서 학사일정 데이터(행사, 휴업일, 대체/변형, 시험) 파싱
+ */
+export async function parseScheduleExcel(
+  buffer: ArrayBuffer
+): Promise<{
+  events: SchoolEvent[];
+  vacations: VacationPeriod[];
+  specialDays: SpecialDaySchedule[];
+  exams: ExamPeriod[];
+}> {
+  const XLSX = await import('xlsx');
+  const workbook = XLSX.read(buffer, { type: 'array' });
+  const firstSheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[firstSheetName];
+  if (!sheet) {
+    return { events: [], vacations: [], specialDays: [], exams: [] };
+  }
+
+  const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet);
+  const events: SchoolEvent[] = [];
+  const vacations: VacationPeriod[] = [];
+  const specialDays: SpecialDaySchedule[] = [];
+  const exams: ExamPeriod[] = [];
+
+  let idx = 1;
+  for (const r of rawRows) {
+    // 컬럼명 유연 대응 (구분/유형, 일정명/행사명, 시작일/일자, 종료일, 대상/교시, 비고)
+    const type = String(r['구분'] || r['유형'] || r['분류'] || '').trim().toLowerCase();
+    const name = String(r['일정명'] || r['행사명'] || r['명칭'] || r['내용'] || '').trim();
+    let startDate = String(r['시작일'] || r['일자'] || r['날짜'] || '').trim();
+    let endDate = String(r['종료일'] || startDate).trim();
+    const details = String(r['상세'] || r['대상'] || r['비고'] || '').trim();
+
+    if (!name || !startDate) continue;
+
+    // YYYY-MM-DD 포맷 정규화
+    if (/^\d{4}\.\d{1,2}\.\d{1,2}$/.test(startDate)) startDate = startDate.replace(/\./g, '-');
+    if (/^\d{4}\.\d{1,2}\.\d{1,2}$/.test(endDate)) endDate = endDate.replace(/\./g, '-');
+    startDate = startDate.split('-').map((p, i) => (i > 0 && p.length === 1 ? `0${p}` : p)).join('-');
+    endDate = endDate.split('-').map((p, i) => (i > 0 && p.length === 1 ? `0${p}` : p)).join('-');
+
+    if (type.includes('방학') || type.includes('휴업') || type.includes('공휴') || type.includes('재량')) {
+      vacations.push({
+        id: `excel-vac-${Date.now()}-${idx++}`,
+        name,
+        startDate,
+        endDate,
+        type: type.includes('공휴') ? 'holiday' : (type.includes('재량') ? 'discretionary' : 'vacation'),
+      });
+    } else if (type.includes('시험') || type.includes('고사') || type.includes('평가')) {
+      exams.push({
+        id: `excel-exam-${Date.now()}-${idx++}`,
+        name,
+        startDate,
+        endDate,
+        targetGrades: [1, 2, 3],
+        examPeriods: [1, 2, 3],
+        afternoonType: 'dismiss',
+        description: details || undefined,
+      });
+    } else if (type.includes('대체') || type.includes('단축') || type.includes('변형') || type.includes('연속') || type.includes('블록')) {
+      const isShortened = type.includes('단축') || /\d+교시\s*단축/.test(details) || /\d+교시\s*단축/.test(name);
+      const isBlockOverride = type.includes('연속') || type.includes('블록') || details.includes('연속') || details.includes('복제') || name.includes('연속');
+      
+      let shortPeriods = undefined;
+      let periodOverrides: Record<number, number> | undefined = undefined;
+
+      if (isShortened) {
+        const matchPeriod = (details + ' ' + name).match(/(\d+)교시/);
+        if (matchPeriod) {
+          shortPeriods = parseInt(matchPeriod[1], 10);
+        }
+      } else if (isBlockOverride) {
+        // e.g. "5~6교시" or "5교시 -> 6교시"
+        const matchBlock = (details + ' ' + name).match(/(\d+)\s*(?:~|->|➔|에서|교시\s*➔)\s*(\d+)교시/);
+        if (matchBlock) {
+          const src = parseInt(matchBlock[1], 10);
+          const tgt = parseInt(matchBlock[2], 10);
+          periodOverrides = { [tgt]: src };
+        } else {
+          periodOverrides = { 6: 5 }; // 기본 5->6교시 연속
+        }
+      }
+
+      specialDays.push({
+        id: `excel-sp-${Date.now()}-${idx++}`,
+        date: startDate,
+        originalDayOfWeek: '금',
+        targetDayOfWeek: '금',
+        shortenedPeriods: shortPeriods,
+        periodOverrides,
+        description: name || details,
+      });
+    } else {
+      // 일반 행사
+      events.push({
+        id: `excel-ev-${Date.now()}-${idx++}`,
+        title: name,
+        date: startDate,
+        day: '월',
+        periods: [1, 2, 3, 4, 5, 6, 7],
+        targetScope: 'all',
+        targetGrades: [1, 2, 3],
+        inChargeTeachers: [],
+        description: details || undefined,
+      });
+    }
+  }
+
+  return { events, vacations, specialDays, exams };
+}
+
+/**
+ * 현재 학사일정 목록을 엑셀 파일로 다운로드 (XLSX 생성)
+ */
+export async function exportScheduleToExcel(config: AcademicCalendarConfig, filename = '2026학년도_학사일정.xlsx') {
+  const XLSX = await import('xlsx');
+  const rows: any[] = [];
+
+  // 1. 방학 및 휴업일
+  config.vacations?.forEach(v => {
+    rows.push({
+      '구분': v.type === 'holiday' ? '공휴일' : (v.type === 'discretionary' ? '재량휴업일' : '방학'),
+      '일정명': v.name,
+      '시작일': v.startDate,
+      '종료일': v.endDate,
+      '상세/비고': v.type === 'holiday' ? '법정공휴일' : (v.type === 'discretionary' ? '학교재량휴업일' : '방학기간'),
+    });
+  });
+
+  // 2. 지필평가
+  config.examPeriods?.forEach(e => {
+    rows.push({
+      '구분': '지필평가',
+      '일정명': e.name,
+      '시작일': e.startDate,
+      '종료일': e.endDate,
+      '상세/비고': `${e.targetGrades?.join(',') || '전'}학년, 시험교시: ${e.examPeriods?.join(',') || '1~3'}, 오후: ${e.afternoonType === 'dismiss' ? '하교' : '수업'}`,
+    });
+  });
+
+  // 3. 대체 및 단축수업 / 교시 연속
+  config.specialDaySchedules?.forEach(s => {
+    const hasOverrides = Boolean(s.periodOverrides && Object.keys(s.periodOverrides).length > 0);
+
+    let category = '대체요일';
+    let detailNote = `${s.originalDayOfWeek || '당일'}요일 ➔ ${s.targetDayOfWeek}요일 시간표`;
+    let title = s.description || `${s.targetDayOfWeek}요일 시간표 대체`;
+
+    if (s.shortenedPeriods) {
+      category = '단축수업';
+      detailNote = `${s.shortenedPeriods}교시 단축수업 운영`;
+      title = s.description || `${s.shortenedPeriods}교시 단축운영`;
+    } else if (hasOverrides && s.periodOverrides) {
+      const targetP = Number(Object.keys(s.periodOverrides)[0]) || 6;
+      const srcP = Number(s.periodOverrides[targetP]) || 5;
+      category = '교시연속(블록)';
+      detailNote = `[연속수업] ${srcP}교시 수업 ➔ ${targetP}교시 복제`;
+      title = s.description || `${srcP}~${targetP}교시 연속/중복 진행`;
+    }
+
+    rows.push({
+      '구분': category,
+      '일정명': title,
+      '시작일': s.date,
+      '종료일': s.date,
+      '상세/비고': detailNote,
+    });
+  });
+
+  // 4. 학교 행사
+  config.events?.forEach(ev => {
+    const teachersSummary = (() => {
+      if (!ev.inChargeTeachers || ev.inChargeTeachers.length === 0) return '';
+      if (ev.inChargeRoleLabel) {
+        const rl = ev.inChargeRoleLabel.trim();
+        if (rl.includes('담임')) {
+          if (rl.includes('1학년')) return '1학년 담임';
+          if (rl.includes('2학년')) return '2학년 담임';
+          if (rl.includes('3학년')) return '3학년 담임';
+          if (rl.includes('전교') || rl.includes('전체') || rl.includes('전학년')) return '전학년 담임';
+          return '담임교사';
+        }
+        if (rl.includes('진로')) {
+          if (rl.includes('1학년')) return '1학년 진로';
+          if (rl.includes('2학년')) return '2학년 진로';
+          if (rl.includes('3학년')) return '3학년 진로';
+          return '진로담당';
+        }
+        if (rl.includes('동아리') || rl.includes('동아')) {
+          if (rl.includes('1학년')) return '1학년 동아리';
+          if (rl.includes('2학년')) return '2학년 동아리';
+          if (rl.includes('3학년')) return '3학년 동아리';
+          return '동아리담당';
+        }
+        return rl.replace(/\s*일괄/g, '').replace(/\(\d+명\)/g, '').trim() || rl;
+      }
+      return ev.inChargeTeachers.length <= 3 
+        ? ev.inChargeTeachers.join(', ') 
+        : `${ev.inChargeTeachers.slice(0, 2).join(', ')} 외 ${ev.inChargeTeachers.length - 2}명`;
+    })();
+
+    const teachersNote = teachersSummary ? ` / 인솔: ${teachersSummary}` : '';
+
+    rows.push({
+      '구분': '학교행사',
+      '일정명': ev.title,
+      '시작일': ev.date,
+      '종료일': ev.date,
+      '상세/비고': `${ev.periods.join(',')}교시 / 대상: ${ev.targetScope === 'grade' ? `${ev.targetGrades?.join(',') || ''}학년` : '전교생'}${teachersNote}`,
+    });
+  });
+
+  // 날짜순 정렬
+  rows.sort((a, b) => String(a['시작일']).localeCompare(String(b['시작일'])));
+
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, '학사일정');
+  XLSX.writeFile(workbook, filename);
+}

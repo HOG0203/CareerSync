@@ -273,6 +273,8 @@ export function StudentTable({
   rankingMap = {},
   userProfile = null,
   baseYear,
+  graduationYear,
+  externalSearchTerm,
   onFilteredDataChange
 }: { 
   initialData: any[], 
@@ -282,6 +284,8 @@ export function StudentTable({
   rankingMap?: Record<string, any>,
   userProfile?: any,
   baseYear?: number,
+  graduationYear?: number | string,
+  externalSearchTerm?: string,
   onFilteredDataChange?: (data: any[] | null) => void
 }) {
 
@@ -291,7 +295,8 @@ export function StudentTable({
   const [asyncRankingMap, setAsyncRankingMap] = React.useState<Record<string, any>>(rankingMap || {});
   const [isRankingsLoading, setIsRankingsLoading] = React.useState(false);
 
-  const gradYear = initialData[0]?.graduation_year;
+  // 명시적 graduationYear를 최우선으로 사용하여 검색 시 0건 발생 등으로 인한 네트워크 재호출 원천 차단
+  const gradYear = graduationYear ? parseInt(String(graduationYear)) : initialData[0]?.graduation_year;
 
   React.useEffect(() => {
     if (rankingMap && Object.keys(rankingMap).length > 0) {
@@ -354,6 +359,7 @@ export function StudentTable({
           onBulkSave={handleBulkSave}
           onAction={handleAction}
           searchPlaceholder="빠른 학생 검색..."
+          externalSearchTerm={externalSearchTerm}
           masterCertificates={masterCertificates}
           masterCompanies={masterCompanies}
           rankingMap={asyncRankingMap}

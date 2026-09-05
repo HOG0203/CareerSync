@@ -31,6 +31,7 @@ export interface SpreadsheetTableProps {
   pageType?: 'admin-students' | 'class-management' | 'students' // 페이지 유형별 전용 모바일 카드 렌더링
   hideCheckbox?: boolean
   hideSearch?: boolean
+  externalSearchTerm?: string
   onFilteredDataChange?: (data: any[] | null) => void
   tableHeightClassName?: string
 }

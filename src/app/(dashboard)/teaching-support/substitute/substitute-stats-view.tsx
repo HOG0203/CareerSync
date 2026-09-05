@@ -38,7 +38,9 @@ import {
   Filter,
   X,
   Loader2,
+  ArrowLeft,
 } from 'lucide-react';
+import Link from 'next/link';
 import * as xlsx from 'xlsx';
 import { AcademicCalendarConfig, DEFAULT_ACADEMIC_CALENDAR_2026_2 } from '@/lib/substitute/event-types';
 import { getEventsForSlot } from '@/lib/substitute/event-helper';
@@ -62,6 +64,7 @@ interface SubstituteStatsViewProps {
   onViewOfficialForm?: (apps: SubstituteApplication | SubstituteApplication[]) => void;
   currentUserFullName?: string;
   selectedTeacherName?: string;
+  onBack?: () => void;
 }
 
 // 학반 포맷 헬퍼 (예: '전32' -> '3-2', '기11' -> '1-1')
@@ -87,6 +90,7 @@ export function SubstituteStatsView({
   onViewOfficialForm,
   currentUserFullName = '수업계',
   selectedTeacherName,
+  onBack,
 }: SubstituteStatsViewProps) {
   // 수업계 잠금 인증 상태 (SSR 하이드레이션 불일치 방지)
   const [isMounted, setIsMounted] = React.useState<boolean>(false);
@@ -804,6 +808,31 @@ export function SubstituteStatsView({
           >
             {isVerifying ? '인증 확인 중...' : '결보강 승인/관리 콘솔 접속'}
           </Button>
+
+          <div className="pt-1">
+            {onBack ? (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={onBack}
+                className="w-full h-9 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl cursor-pointer gap-1.5"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>수업 결보강 관리로 돌아가기</span>
+              </Button>
+            ) : (
+              <Link href="/teaching-support/substitute">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full h-9 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl cursor-pointer gap-1.5"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  <span>수업 결보강 관리로 돌아가기</span>
+                </Button>
+              </Link>
+            )}
+          </div>
         </form>
       </div>
     );
@@ -832,6 +861,31 @@ export function SubstituteStatsView({
 
         {/* 상단 우측 액션 버튼 그룹 */}
         <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          {onBack ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onBack}
+              className="h-9 text-xs font-bold gap-1.5 rounded-xl border-slate-200/80 hover:bg-slate-100 text-slate-700 shadow-2xs cursor-pointer"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 text-slate-600" />
+              <span>뒤로 돌아가기</span>
+            </Button>
+          ) : (
+            <Link href="/teaching-support/substitute">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 text-xs font-bold gap-1.5 rounded-xl border-slate-200/80 hover:bg-slate-100 text-slate-700 shadow-2xs cursor-pointer"
+              >
+                <ArrowLeft className="h-3.5 w-3.5 text-slate-600" />
+                <span>뒤로 돌아가기</span>
+              </Button>
+            </Link>
+          )}
+
           {onSaveCalendarConfig && (
             <Button
               variant="outline"

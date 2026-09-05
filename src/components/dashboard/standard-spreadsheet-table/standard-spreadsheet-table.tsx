@@ -40,6 +40,7 @@ export function StandardSpreadsheetTable({
   pageType,
   hideCheckbox = pageType === 'students',
   hideSearch = false,
+  externalSearchTerm,
   onFilteredDataChange,
   tableHeightClassName,
 }: SpreadsheetTableProps) {
@@ -83,7 +84,7 @@ export function StandardSpreadsheetTable({
     handleMouseEnter,
     handleSaveInternal,
     handleKeyDown,
-  } = useSpreadsheet({ initialData, columns, onSave, onBulkSave, groupHeaders, externalSelectedRowIds, onSelectionChange })
+  } = useSpreadsheet({ initialData, columns, onSave, onBulkSave, groupHeaders, externalSelectedRowIds, onSelectionChange, externalSearchTerm })
 
 
   // 스크롤 메타데이터 동기화
@@ -123,14 +124,15 @@ export function StandardSpreadsheetTable({
   }
 
   const isColumnFilterActive = Object.values(columnFilters).some(v => Array.isArray(v) && v.length > 0);
+  const isSearchActive = !!(externalSearchTerm !== undefined ? externalSearchTerm.trim() : searchTerm.trim());
 
   React.useEffect(() => {
-    if (isColumnFilterActive) {
+    if (isColumnFilterActive || isSearchActive) {
       onFilteredDataChange?.(filteredData);
     } else {
       onFilteredDataChange?.(null);
     }
-  }, [filteredData, isColumnFilterActive, onFilteredDataChange]);
+  }, [filteredData, isColumnFilterActive, isSearchActive, onFilteredDataChange]);
 
 
   if (!mounted) {

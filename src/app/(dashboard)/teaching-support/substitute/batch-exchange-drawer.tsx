@@ -77,7 +77,8 @@ import {
   getSpecialDaySchedule,
   getExamPeriodForDate,
   getExamSlotInfo,
-  getVacationForDate
+  getVacationForDate,
+  getInstructorAssignmentForSlot
 } from '@/lib/substitute/event-helper';
 import { SemesterWeek } from '@/lib/substitute/validator';
 
@@ -519,8 +520,8 @@ export function BatchExchangeDrawer({
             existingApplications,
             calendarConfig
           );
-          // 수업이 없거나, 교사 직접 인솔 행사 중이거나, 학생 행사로 수업이 없어진 경우 교체 불가!
-          if (!pEff.hasClass || pEff.isTeacherEvent || pEff.isClassEventFree) continue;
+          // 수업이 없거나, 교사 직접 인솔 행사 중이거나, 학생 행사로 수업이 없어진 경우, 또는 시간강사 상시보강 수업인 경우 교체 불가!
+          if (!pEff.hasClass || pEff.isTeacherEvent || pEff.isClassEventFree || pEff.isInstructorAssigned) continue;
 
           // 🌟 4. 지필평가/시험 중이거나 시험 후 하교인 경우 교체 불가
           const examInfo = getExamSlotInfo(targetDate, p, pEff.classCode, calendarConfig);
@@ -1053,7 +1054,8 @@ export function BatchExchangeDrawer({
                             const myEvents = getEventsForSlot(targetDate, period, undefined, currentTeacherName, calendarConfig);
                             const myHasEvent = myEvents.length > 0;
                             
-                            const isCalendarBlocked = isHoliday || myHasEvent || isExamRunning || isExamDismissed || isShortenedDismissed;
+                            const isInstructorAssigned = Boolean(pEffective.isInstructorAssigned);
+                            const isCalendarBlocked = isHoliday || myHasEvent || isExamRunning || isExamDismissed || isShortenedDismissed || isInstructorAssigned;
                             const isSameClass = pHasClass && items.some(i => i.classCode && pEffective?.classCode === i.classCode);
                             const isClickable = !myHasConflict && !isCalendarBlocked && isSameClass;
 
@@ -1077,6 +1079,8 @@ export function BatchExchangeDrawer({
                                       ? "bg-rose-50 text-rose-900 border-rose-200 cursor-not-allowed opacity-80"
                                       : isExamDismissed
                                       ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-50"
+                                      : isInstructorAssigned
+                                      ? "bg-purple-50/80 text-purple-900 border-purple-300 cursor-not-allowed opacity-80"
                                       : pHasTeacherEvent
                                       ? "bg-purple-50 text-purple-950 border-purple-300 hover:border-purple-500 shadow-2xs cursor-pointer"
                                       : pEffective.isClassEventFree
@@ -1094,6 +1098,8 @@ export function BatchExchangeDrawer({
                                       ? `[시험 진행] ${examInfo?.exam.name} - 교체 불가`
                                       : isExamDismissed
                                       ? `[시험 후 하교] 수업 없음 - 교체 불가`
+                                      : isInstructorAssigned
+                                      ? `[시간강사 보강완료 🔒] ${pEffective.instructorName || '시간강사'} 선생님 상시보강 수업 - 맞교환 불가`
                                       : pHasTeacherEvent
                                       ? `[행사 진행] ${mainTeacherEvent?.title} (${mainTeacherEvent?.description || '학사일정 행사 인솔'})`
                                       : pEffective.isClassEventFree
@@ -1115,6 +1121,8 @@ export function BatchExchangeDrawer({
                                         ? "text-white" 
                                         : isHoliday
                                         ? "text-rose-700"
+                                        : isInstructorAssigned
+                                        ? "text-purple-900"
                                         : pHasTeacherEvent
                                         ? "text-purple-900"
                                         : pEffective.isClassEventFree
@@ -1123,6 +1131,8 @@ export function BatchExchangeDrawer({
                                     )}>
                                       {isHoliday
                                         ? `[${vacation?.name || '휴업일'}]`
+                                        : isInstructorAssigned
+                                        ? `🔒 ${pEffective.instructorName ? `${pEffective.instructorName}(강사)` : '강사수업'}`
                                         : pHasTeacherEvent
                                         ? `🎭 ${mainTeacherEvent?.title}`
                                         : pEffective.isExchangeIn
@@ -1438,6 +1448,17 @@ export function BatchExchangeDrawer({
                               );
                               const isSubBusyWithApp = Boolean(subActiveApp);
 
+                              // 시간강사 상시보강 검사
+                              const subInstructor = globalSubstituteTeacher ? getInstructorAssignmentForSlot(
+                                globalSubstituteTeacher,
+                                day,
+                                period,
+                                slot?.classCode,
+                                calendarConfig,
+                                targetDate
+                              ) : { isInstructorSlot: false };
+                              const isSubInstructor = Boolean(subInstructor.isInstructorSlot);
+
                               // 이 슬롯이 신청된 보강 대상 슬롯인지 확인 (보강 교사 선택 시 해당 요일/교시 강조)
                               const isTargetSourceSlot = Boolean(globalSubstituteTeacher) && items.some(it => 
                                 it.sourceDay === day && 
@@ -1445,9 +1466,9 @@ export function BatchExchangeDrawer({
                                 (it.sourceDate === targetDate || !it.sourceDate || !targetDate)
                               );
 
-                              // 보강 대상 슬롯인데 행사/수업/결보강으로 충돌(불가)인지 확인
+                              // 보강 대상 슬롯인데 행사/수업/결보강/시간강사로 충돌(불가)인지 확인
                               const isTargetSlotConflict = isTargetSourceSlot && (
-                                isHoliday || isExamRunning || isSubBusyWithApp || subHasEvent || (hasClass && !isShortenedDismissed)
+                                isHoliday || isExamRunning || isSubBusyWithApp || subHasEvent || isSubInstructor || (hasClass && !isShortenedDismissed)
                               );
 
                               return (
@@ -1465,6 +1486,8 @@ export function BatchExchangeDrawer({
                                         ? "bg-rose-50 text-rose-900 border-rose-200"
                                         : isExamDismissed || isShortenedDismissed
                                         ? "bg-slate-100 text-slate-400 border-slate-200"
+                                        : isSubInstructor
+                                        ? "bg-purple-50 text-purple-900 border-purple-200"
                                         : isClassEventRunning
                                         ? "bg-amber-50 text-amber-800 border-amber-200"
                                         : isSubBusyWithApp
@@ -1477,13 +1500,15 @@ export function BatchExchangeDrawer({
                                     )}
                                     title={
                                       isTargetSlotConflict
-                                        ? `[보강 불가(충돌)] ${subHasEvent ? `학교 행사(${subMainEvent.title})` : hasClass ? `정규 수업(${slot?.subjectName})` : isSubBusyWithApp ? '기존 결보강 배정' : '시험/휴업'}으로 인해 보강 불가`
+                                        ? `[보강 불가(충돌)] ${isSubInstructor ? `시간강사 상시보강(${subInstructor.instructorName})` : subHasEvent ? `학교 행사(${subMainEvent.title})` : hasClass ? `정규 수업(${slot?.subjectName})` : isSubBusyWithApp ? '기존 결보강 배정' : '시험/휴업'}으로 인해 보강 불가`
                                         : isHoliday
                                         ? `[휴업일/공휴일] ${vacation?.name || '휴업일'}`
                                         : isShortenedDismissed
                                         ? `[단축수업] ${specialDay?.shortenedPeriods}교시 단축으로 수업 없음`
                                         : isSubBusyWithApp
                                         ? `[실시간 결보강 배정됨] ${subActiveApp?.it.type === 'substitute' ? '수업보강' : '교체'} 투입됨`
+                                        : isSubInstructor
+                                        ? `[시간강사 보강 🔒] ${subInstructor.instructorName || '강사'} 선생님 상시보강 수업 - 보강 투입 불가`
                                         : subHasEvent
                                         ? `[학교 행사] ${subMainEvent.title} (${subMainEvent.description || ''})`
                                         : hasClass
@@ -1500,18 +1525,22 @@ export function BatchExchangeDrawer({
                                           ? "text-rose-700"
                                           : isSubBusyWithApp
                                           ? "text-amber-800"
+                                          : isSubInstructor
+                                          ? "text-purple-900"
                                           : subHasEvent
                                           ? "text-purple-900"
                                           : ""
                                       )}>
                                         {isTargetSlotConflict
-                                          ? `⚠️불가(${subHasEvent ? '행사' : hasClass ? '수업' : '충돌'})`
+                                          ? `⚠️불가(${isSubInstructor ? '강사' : subHasEvent ? '행사' : hasClass ? '수업' : '충돌'})`
                                           : isTargetSourceSlot 
                                           ? '★보강투입' 
                                           : isHoliday
                                           ? `[${vacation?.name || '휴업'}]`
                                           : isSubBusyWithApp
                                           ? (subActiveApp?.it.originalTeacher === globalSubstituteTeacher ? '[결강신청]' : `[${subActiveApp?.it.type === 'substitute' ? '보강투입' : '교체배정'}]`)
+                                          : isSubInstructor
+                                          ? `🔒 ${subInstructor.instructorName ? `${subInstructor.instructorName}(강사)` : '강사수업'}`
                                           : subHasEvent
                                           ? `🎭 ${subMainEvent.title}`
                                           : slot?.subjectName || '공강'}
