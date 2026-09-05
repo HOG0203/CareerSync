@@ -69,6 +69,7 @@ interface InteractiveTeacherTimetableProps {
   selectedWeekNum?: number;
   onSelectWeekNum?: (weekNum: number) => void;
   hideTopControlBar?: boolean;
+  onEditApplication?: (app: SubstituteApplication) => void;
 }
 
 export function InteractiveTeacherTimetable({
@@ -81,6 +82,7 @@ export function InteractiveTeacherTimetable({
   selectedWeekNum: propSelectedWeekNum,
   onSelectWeekNum: propOnSelectWeekNum,
   hideTopControlBar = false,
+  onEditApplication,
 }: InteractiveTeacherTimetableProps) {
   const [selectedSlots, setSelectedSlots] = React.useState<SelectedSlotItem[]>([]);
 
@@ -140,6 +142,8 @@ export function InteractiveTeacherTimetable({
   // 해당 주차에서 해당 교사의 승인/접수된 결보강 변경 이력 매핑 (요일_교시 기준)
   const effectiveSlotMap = React.useMemo(() => {
     const map: Record<string, {
+      appId: string;
+      isApplicant: boolean;
       status: 'approved' | 'submitted';
       type: 'teaching_substitute' | 'absence_substitute' | 'exchange_in' | 'exchange_out';
       partnerTeacher: string;
@@ -169,6 +173,8 @@ export function InteractiveTeacherTimetable({
             if (it.sourceDate === targetDayDate) {
               const key = `${day}_${it.sourcePeriod}`;
               map[key] = {
+                appId: app.id,
+                isApplicant: app.applicantTeacher === teacherName,
                 status: appStatus,
                 type: 'absence_substitute',
                 partnerTeacher: it.substituteTeacher || '보강교사',
@@ -188,6 +194,8 @@ export function InteractiveTeacherTimetable({
             if (it.sourceDate === targetDayDate) {
               const key = `${day}_${it.sourcePeriod}`;
               map[key] = {
+                appId: app.id,
+                isApplicant: app.applicantTeacher === teacherName,
                 status: appStatus,
                 type: 'teaching_substitute',
                 partnerTeacher: it.originalTeacher,
@@ -211,6 +219,8 @@ export function InteractiveTeacherTimetable({
             if (it.sourceDate === selectedWeek.dates[srcDay]) {
               const key = `${srcDay}_${it.sourcePeriod}`;
               map[key] = {
+                appId: app.id,
+                isApplicant: app.applicantTeacher === teacherName,
                 status: appStatus,
                 type: 'exchange_out',
                 partnerTeacher: it.targetTeacher || '교체교사',
@@ -227,6 +237,8 @@ export function InteractiveTeacherTimetable({
             if (it.targetDate && tgtDay && it.targetDate === selectedWeek.dates[tgtDay] && it.targetPeriod) {
               const key = `${tgtDay}_${it.targetPeriod}`;
               map[key] = {
+                appId: app.id,
+                isApplicant: app.applicantTeacher === teacherName,
                 status: appStatus,
                 type: 'exchange_in',
                 partnerTeacher: it.targetTeacher || '교체교사',
@@ -247,6 +259,8 @@ export function InteractiveTeacherTimetable({
             if (it.targetDate && tgtDay && it.targetDate === selectedWeek.dates[tgtDay] && it.targetPeriod) {
               const key = `${tgtDay}_${it.targetPeriod}`;
               map[key] = {
+                appId: app.id,
+                isApplicant: app.applicantTeacher === teacherName,
                 status: appStatus,
                 type: 'exchange_out',
                 partnerTeacher: app.applicantTeacher,
@@ -263,6 +277,8 @@ export function InteractiveTeacherTimetable({
             if (it.sourceDate === selectedWeek.dates[srcDay]) {
               const key = `${srcDay}_${it.sourcePeriod}`;
               map[key] = {
+                appId: app.id,
+                isApplicant: app.applicantTeacher === teacherName,
                 status: appStatus,
                 type: 'exchange_in',
                 partnerTeacher: app.applicantTeacher,
@@ -756,8 +772,9 @@ export function InteractiveTeacherTimetable({
 
                     // 교체 나간 수업 또는 결강 수업 (내가 수업하지 않음)
                     const isPassedToOther = isAbsenceSub || isExchangeOut;
-                    // 교체 나간 수업, 결강 수업, 또는 아직 결재 대기 중(교체중/보강중)인 슬롯은 추가 선택 불가 (완전 잠금)
-                    const isLocked = isPassedToOther || isPending;
+                    // 내가 신청한 접수 대기 중(isPending && isApplicant)인 수업이고 onEditApplication이 있으면 클릭하여 수정 가능!
+                    const canEditThisSlot = Boolean(isPending && effectiveInfo?.isApplicant && onEditApplication);
+                    const isLocked = (isPassedToOther || isPending) && !canEditThisSlot;
                     // 선택 상태 판별
                     const isCellSelected = isSelected && !isLocked;
 
@@ -767,12 +784,21 @@ export function InteractiveTeacherTimetable({
                           type="button"
                           disabled={isLocked}
                           onClick={() => {
+                            if (canEditThisSlot && effectiveInfo) {
+                              const foundApp = applications.find(a => a.id === effectiveInfo.appId);
+                              if (foundApp && onEditApplication) {
+                                onEditApplication(foundApp);
+                                return;
+                              }
+                            }
                             if (!isLocked) {
                               handleSlotClick(d.key, period, dynamicSlot);
                             }
                           }}
                           title={
-                            isPending
+                            canEditThisSlot
+                              ? `현재 접수 대기 중인 신청서입니다. 클릭하여 신청서 내용을 수정할 수 있습니다. (문서번호: ${effectiveInfo.appNumber})`
+                              : isPending
                               ? `현재 결재 진행 중(${isExchangeIn || isExchangeOut ? '교체중' : isTeachingSub ? '보강중' : '결강중'})인 수업입니다. 결재 승인 전에는 추가 변경이 불가능합니다.`
                               : isAbsenceSub
                               ? `이미 ${effectiveInfo.partnerTeacher} 선생님께 보강 배정된 결강 수업입니다. (선택 불가)`

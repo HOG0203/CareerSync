@@ -88,6 +88,7 @@ const PERIODS = [1, 2, 3, 4, 5, 6, 7];
 interface BatchExchangeDrawerProps {
   selectedSlots: SelectedSlotItem[];
   initialMode?: SubstituteType;
+  editingApplication?: SubstituteApplication | null;
   onClose: () => void;
   onSaveApplication: (app: SubstituteApplication, submitImmediately?: boolean) => Promise<void>;
   timetableData: ParsedTimetableResult;
@@ -110,6 +111,7 @@ const REASON_CATEGORIES = [
 export function BatchExchangeDrawer({
   selectedSlots,
   initialMode = 'exchange',
+  editingApplication,
   onClose,
   onSaveApplication,
   timetableData,
@@ -119,6 +121,12 @@ export function BatchExchangeDrawer({
 }: BatchExchangeDrawerProps) {
   const [batchMode, setBatchMode] = React.useState<SubstituteType>(initialMode);
 
+  // 수정 중인 신청서가 있는 경우, 자기 자신(app.id)은 기존 충돌/배정 목록에서 제외
+  const effectiveExistingApplications = React.useMemo(() => {
+    if (!editingApplication) return existingApplications;
+    return existingApplications.filter(a => a.id !== editingApplication.id);
+  }, [existingApplications, editingApplication]);
+
   // 학기 주차 목록 생성
   const semesterWeeks = React.useMemo(() => {
     return generateSemesterWeeksFromConfig(calendarConfig);
@@ -126,13 +134,13 @@ export function BatchExchangeDrawer({
 
   // 신청 슬롯의 날짜에 해당하는 주차를 기본값으로 탐색
   const defaultWeekNum = React.useMemo(() => {
-    const firstDate = selectedSlots[0]?.date;
+    const firstDate = editingApplication?.items[0]?.sourceDate || selectedSlots[0]?.date;
     if (firstDate) {
       const match = semesterWeeks.find(w => w.startDate <= firstDate && w.endDate >= firstDate);
       if (match) return match.weekNum;
     }
     return findCurrentWeekNum(semesterWeeks);
-  }, [selectedSlots, semesterWeeks]);
+  }, [selectedSlots, semesterWeeks, editingApplication]);
 
   const [selectedWeekNum, setSelectedWeekNum] = React.useState<number>(defaultWeekNum);
 
@@ -159,7 +167,7 @@ export function BatchExchangeDrawer({
   // 기준 요일
   const firstSlot = selectedSlots[0];
   const [baseDate, setBaseDate] = React.useState<string>(() => {
-    return selectedSlots[0]?.date || getUpcomingDateForDay(firstSlot?.day || '월');
+    return editingApplication?.items[0]?.sourceDate || selectedSlots[0]?.date || getUpcomingDateForDay(firstSlot?.day || '월');
   });
 
   // 사유 구분 및 상세내용 상태
@@ -203,6 +211,39 @@ export function BatchExchangeDrawer({
     }
   };
   React.useEffect(() => {
+    if (editingApplication) {
+      const firstItem = editingApplication.items[0];
+      const curMode = firstItem?.type || initialMode || 'exchange';
+      setBatchMode(curMode);
+      setItems(editingApplication.items.map(it => ({ ...it })));
+
+      // 사유 파싱: '출장 (전국대회)' -> category: '출장', detail: '전국대회'
+      const match = editingApplication.reason.match(/^([^(]+)(?:\s*\((.*)\))?$/);
+      if (match) {
+        const cat = match[1].trim();
+        if ((REASON_CATEGORIES as readonly string[]).includes(cat)) {
+          setReasonCategory(cat);
+        } else {
+          setReasonCategory('기타입력');
+          setCustomCategory(cat);
+        }
+        setReasonDetail(match[2] ? match[2].trim() : '');
+      } else {
+        setReasonDetail(editingApplication.reason);
+      }
+
+      if (firstItem?.sourceDate) {
+        setBaseDate(firstItem.sourceDate);
+      }
+
+      if (curMode === 'exchange' && firstItem?.targetTeacher) {
+        setPartnerTeacher(firstItem.targetTeacher);
+      } else if (curMode === 'substitute' && firstItem?.substituteTeacher) {
+        setGlobalSubstituteTeacher(firstItem.substituteTeacher);
+      }
+      return;
+    }
+
     const curMode = initialMode || 'exchange';
     setBatchMode(curMode);
 
@@ -212,7 +253,7 @@ export function BatchExchangeDrawer({
         slotDate,
         s.period,
         timetableData,
-        existingApplications,
+        effectiveExistingApplications,
         s.slot.deptName,
         undefined,
         undefined,
@@ -240,7 +281,7 @@ export function BatchExchangeDrawer({
     });
     setItems(initialItems);
     setBaseDate(selectedSlots[0]?.date || getUpcomingDateForDay(selectedSlots[0]?.day || '월'));
-  }, [selectedSlots, initialMode, timetableData, existingApplications, currentTeacherName]);
+  }, [selectedSlots, initialMode, timetableData, effectiveExistingApplications, currentTeacherName, editingApplication]);
 
   // 개별 아이템 업데이트
   const updateItem = (id: string, updates: Partial<SubstituteItem>) => {
@@ -259,7 +300,7 @@ export function BatchExchangeDrawer({
   // 날짜별 바쁜 교사 맵
   const busyTeachersOnDate = React.useMemo(() => {
     const map = new Map<string, Set<string>>();
-    existingApplications.forEach(app => {
+    effectiveExistingApplications.forEach(app => {
       if (app.status !== 'rejected') {
         app.items.forEach(it => {
           if (it.type === 'substitute' && it.substituteTeacher) {
@@ -276,7 +317,7 @@ export function BatchExchangeDrawer({
       }
     });
     return map;
-  }, [existingApplications]);
+  }, [effectiveExistingApplications]);
 
   // 보강 모드 추천 교사 랭킹 (신청 교시 중 보강 가능한 시수가 많은 순서대로 1~5순위)
   const topSubstituteRecommendations = React.useMemo(() => {
@@ -307,7 +348,7 @@ export function BatchExchangeDrawer({
           it.sourceDate,
           it.sourcePeriod,
           timetableData,
-          existingApplications,
+          effectiveExistingApplications,
           undefined,
           calendarConfig
         );
@@ -375,7 +416,7 @@ export function BatchExchangeDrawer({
       b.score - a.score || 
       a.weeklyClassCount - b.weeklyClassCount
     );
-  }, [items, timetableData, currentTeacher, currentTeacherName, existingApplications, calendarConfig]);
+  }, [items, timetableData, currentTeacher, currentTeacherName, effectiveExistingApplications, calendarConfig]);
 
   // 보강 담당 교사 요약
   const substituteTeacherSummary = React.useMemo(() => {
@@ -396,7 +437,7 @@ export function BatchExchangeDrawer({
         calendarConfig
       );
     }).length;
-  }, [items, substituteTeacherSummary, globalSubstituteTeacher, timetableData, existingApplications, calendarConfig]);
+  }, [items, substituteTeacherSummary, globalSubstituteTeacher, timetableData, effectiveExistingApplications, calendarConfig]);
 
   const handleSelectSubstituteTeacher = (name: string) => {
     setGlobalSubstituteTeacher(name);
@@ -429,7 +470,7 @@ export function BatchExchangeDrawer({
       items[0]?.deptName,
       calendarConfig
     );
-  }, [items, timetableData, existingApplications, currentTeacherName, calendarConfig]);
+  }, [items, timetableData, effectiveExistingApplications, currentTeacherName, calendarConfig]);
 
   // 각 아이템별 스마트 맞교환 추천 맵
   const itemRecommendationsMap = React.useMemo(() => {
@@ -447,7 +488,7 @@ export function BatchExchangeDrawer({
       map.set(it.id, recs);
     });
     return map;
-  }, [items, currentTeacherName, timetableData, existingApplications, calendarConfig]);
+  }, [items, currentTeacherName, timetableData, effectiveExistingApplications, calendarConfig]);
 
   // 다교시 일괄 맞교환 파트너 교사 정밀 판별 & 랭킹 (오직 동일 학반 SAME_CLASS 맞교환만 추천 및 허용!)
   // 🌟 추천 순위: 동일교과(1순위) > 동일학과(2순위) > 동일학반 교체 가능 시수 많은 순 (선택된 주차 학사일정·결보강 100% 반영)
@@ -480,7 +521,7 @@ export function BatchExchangeDrawer({
           it.sourceDate,
           it.sourcePeriod,
           timetableData,
-          existingApplications,
+          effectiveExistingApplications,
           undefined,
           calendarConfig
         );
@@ -566,7 +607,7 @@ export function BatchExchangeDrawer({
       if (!a.isSameDept && b.isSameDept) return 1;
       return b.availableTargetSlotCount - a.availableTargetSlotCount || a.partnerTeacher.localeCompare(b.partnerTeacher, 'ko');
     });
-  }, [items, timetableData.teachers, currentTeacher, selectedWeek, selectedWeekNum, currentTeacherName, existingApplications, calendarConfig]);
+  }, [items, timetableData.teachers, currentTeacher, selectedWeek, selectedWeekNum, currentTeacherName, effectiveExistingApplications, calendarConfig]);
 
   // 파트너 교사 변경 핸들러
   const handleSelectPartner = (teacherName: string) => {
@@ -638,10 +679,10 @@ export function BatchExchangeDrawer({
   // 충돌 검사
   const conflicts = React.useMemo(() => {
     return items.map(it => {
-      const res = checkSubstituteItemConflict(it, timetableData, existingApplications, undefined, calendarConfig);
+      const res = checkSubstituteItemConflict(it, timetableData, effectiveExistingApplications, editingApplication?.id, calendarConfig);
       return { id: it.id, ...res };
     });
-  }, [items, timetableData, existingApplications, calendarConfig]);
+  }, [items, timetableData, effectiveExistingApplications, calendarConfig]);
 
   const hasAnyConflict = conflicts.some(c => c.hasConflict);
 
@@ -671,22 +712,26 @@ export function BatchExchangeDrawer({
 
     try {
       setIsSubmitting(true);
-      const appNumber = `CS-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
+      const appNumber = editingApplication
+        ? editingApplication.applicationNumber
+        : `CS-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
+
       const app: SubstituteApplication = {
-        id: `app-${Date.now()}`,
+        ...(editingApplication || {}),
+        id: editingApplication ? editingApplication.id : `app-${Date.now()}`,
         applicationNumber: appNumber,
-        applicantTeacher: currentTeacherName,
-        academicYear: timetableData.academicYear,
-        semester: timetableData.semester,
+        applicantTeacher: editingApplication ? editingApplication.applicantTeacher : currentTeacherName,
+        academicYear: editingApplication?.academicYear || timetableData.academicYear,
+        semester: editingApplication?.semester || timetableData.semester,
         periodStart: items[0]?.sourceDate || baseDate,
         periodEnd: items[items.length - 1]?.sourceDate || baseDate,
         reason: finalReason,
-        applicationDate: new Date().toISOString().split('T')[0],
-        status: submitImmediately ? 'submitted' : 'draft',
+        applicationDate: editingApplication?.applicationDate || new Date().toISOString().split('T')[0],
+        status: submitImmediately ? 'submitted' : (editingApplication?.status || 'draft'),
         items,
-        createdAt: new Date().toISOString(),
+        createdAt: editingApplication?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        submittedAt: submitImmediately ? new Date().toISOString() : undefined,
+        submittedAt: submitImmediately ? (editingApplication?.submittedAt || new Date().toISOString()) : undefined,
       };
 
       await onSaveApplication(app, submitImmediately);
@@ -698,7 +743,7 @@ export function BatchExchangeDrawer({
     }
   };
 
-  if (selectedSlots.length === 0) return null;
+  if (selectedSlots.length === 0 && !editingApplication) return null;
 
   return (
     <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[600px] md:w-[720px] bg-white shadow-2xl border-l border-slate-200 flex flex-col animate-in slide-in-from-right duration-300">
@@ -711,16 +756,27 @@ export function BatchExchangeDrawer({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-black text-sm text-white">
-                수업 {batchMode === 'exchange' ? '교체' : '보강'} 신청
+                {editingApplication ? (
+                  <>수업 신청서 수정 <span className="text-xs font-mono font-normal text-indigo-300">({editingApplication.applicationNumber})</span></>
+                ) : (
+                  `수업 ${batchMode === 'exchange' ? '교체' : '보강'} 신청`
+                )}
               </h3>
               <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-indigo-500 text-white">
                 총 {items.length}개 수업
               </span>
+              {editingApplication && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-amber-950">
+                  수정 모드
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-slate-300 mt-0.5">
-              {batchMode === 'exchange'
-                ? '상대 선생님의 주간 시간표를 보며 원하는 시간대 슬롯을 클릭하여 맞바꿉니다.'
-                : '보강을 담당해 주실 선생님의 주간 시간표를 확인하고 신청합니다.'}
+              {editingApplication
+                ? '제출 접수된 신청서의 사유 및 교체/보강 교사 설정을 수정하고 즉시 반영합니다.'
+                : (batchMode === 'exchange'
+                  ? '상대 선생님의 주간 시간표를 보며 원하는 시간대 슬롯을 클릭하여 맞바꿉니다.'
+                  : '보강을 담당해 주실 선생님의 주간 시간표를 확인하고 신청합니다.')}
             </p>
           </div>
         </div>
@@ -1439,7 +1495,7 @@ export function BatchExchangeDrawer({
                               const isClassEventRunning = subClassEvents.length > 0;
 
                               // 실시간 결보강 배정 검사
-                              const subActiveApp = existingApplications.flatMap(a => a.items.map(it => ({ app: a, it }))).find(x => 
+                              const subActiveApp = effectiveExistingApplications.flatMap(a => a.items.map(it => ({ app: a, it }))).find(x => 
                                 x.app.status !== 'rejected' && (
                                   (x.it.type === 'substitute' && x.it.substituteTeacher === globalSubstituteTeacher && x.it.sourceDate === targetDate && x.it.sourcePeriod === period) ||
                                   (x.it.type === 'exchange' && x.it.targetTeacher === globalSubstituteTeacher && x.it.targetDate === targetDate && x.it.targetPeriod === period) ||
@@ -1687,7 +1743,9 @@ export function BatchExchangeDrawer({
           className="h-10 px-5 text-xs font-black gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-600/30 flex-1 max-w-xs ml-auto"
         >
           <SendHorizontal className="h-4 w-4" />
-          {isSubmitting ? '신청서 생성 중...' : '1장으로 묶어서 공식 신청서 생성'}
+          {isSubmitting
+            ? (editingApplication ? '수정 내용 저장 중...' : '신청서 생성 중...')
+            : (editingApplication ? '신청서 수정 완료 (제출 반영)' : '1장으로 묶어서 공식 신청서 생성')}
         </Button>
       </div>
     </div>

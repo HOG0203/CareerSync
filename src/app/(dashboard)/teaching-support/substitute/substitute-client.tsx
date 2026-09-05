@@ -49,7 +49,8 @@ import {
   Building,
   User,
   UserPlus,
-  AlertCircle
+  AlertCircle,
+  Pencil
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { generateSemesterWeeksFromConfig, findCurrentWeekNum } from '@/lib/substitute/event-helper';
@@ -110,13 +111,48 @@ export function SubstituteClient({
     }
   };
 
-  // 통합 신청 서랍 상태 (1개 슬롯 및 다교시 슬롯 모두 동일 서랍과 통일된 로직 사용)
+  // 통합 신청 서랍 상태 (1개 슬롯 및 다교시 슬롯, 제출된 신청서 수정 모두 동일 서랍과 통일된 로직 사용)
   const [batchSlots, setBatchSlots] = React.useState<SelectedSlotItem[]>([]);
   const [drawerInitialMode, setDrawerInitialMode] = React.useState<SubstituteType>('exchange');
+  const [editingApplication, setEditingApplication] = React.useState<SubstituteApplication | null>(null);
 
   const handleOpenDrawer = (slots: SelectedSlotItem[], mode: 'exchange' | 'substitute' = 'exchange') => {
+    setEditingApplication(null);
     setDrawerInitialMode(mode);
     setBatchSlots(slots);
+  };
+
+  // 제출 접수된 신청서 수정 모드 진입 핸들러
+  const handleStartEditApplication = (app: SubstituteApplication) => {
+    const slotsForApp: SelectedSlotItem[] = app.items.map(it => {
+      const teacher = timetableData.teachers.find(t => t.teacherName === (it.originalTeacher || app.applicantTeacher));
+      const existingSlot = teacher?.slots[`${it.sourceDay}_${it.sourcePeriod}`];
+      return {
+        key: `${it.sourceDay}_${it.sourcePeriod}`,
+        day: it.sourceDay,
+        date: it.sourceDate,
+        period: it.sourcePeriod,
+        slot: existingSlot || {
+          id: `slot-${it.sourceDay}-${it.sourcePeriod}`,
+          teacherName: it.originalTeacher || app.applicantTeacher,
+          homeroomClass: '',
+          day: it.sourceDay,
+          period: it.sourcePeriod,
+          subjectName: it.subjectName,
+          classCode: it.classCode,
+          deptName: it.deptName || '전문교과',
+          grade: 0,
+          classNum: 0,
+          weight: 1,
+          isActivity: false,
+          activityType: '',
+        },
+      };
+    });
+
+    setBatchSlots(slotsForApp);
+    setDrawerInitialMode(app.items[0]?.type || 'exchange');
+    setEditingApplication(app);
   };
 
   // 공식 신청서 뷰 모달 (단일 또는 다중 일괄)
@@ -125,8 +161,8 @@ export function SubstituteClient({
   // 내 신청현황 다중 선택 상태 (제출 접수됨 / 승인됨 일괄 인쇄용)
   const [selectedAppIds, setSelectedAppIds] = React.useState<string[]>([]);
 
-  // 하단 뷰 탭 ('myApps' = 내 신청현황, 'today' = 오늘 전체현황)
-  const [bottomTab, setBottomTab] = React.useState<'myApps' | 'today'>('myApps');
+  // 신청 상태 필터 ('all' = 전체, 'submitted' = 제출접수됨, 'approved' = 승인완료, 'rejected' = 반려됨)
+  const [statusFilter, setStatusFilter] = React.useState<'all' | 'submitted' | 'approved' | 'rejected'>('all');
 
   // 신청서 저장 핸들러
   const handleSaveApplication = async (app: SubstituteApplication) => {
@@ -145,8 +181,8 @@ export function SubstituteClient({
       return [res.data!, ...prev];
     });
 
-    // 하단 탭을 '내 신청 현황'으로 자동 전환하여 방금 등록한 내역이 바로 보이게 함
-    setBottomTab('myApps');
+    setEditingApplication(null);
+    setBatchSlots([]);
   };
 
   // 상태 변경 핸들러
@@ -206,6 +242,17 @@ export function SubstituteClient({
     return applications.filter(a => a.applicantTeacher === selectedTeacherName);
   }, [applications, selectedTeacherName]);
 
+  // 상태별 건수 계산
+  const submittedCount = React.useMemo(() => myApplications.filter(a => a.status === 'submitted').length, [myApplications]);
+  const approvedCount = React.useMemo(() => myApplications.filter(a => a.status === 'approved').length, [myApplications]);
+  const rejectedCount = React.useMemo(() => myApplications.filter(a => a.status === 'rejected').length, [myApplications]);
+
+  // 상태 필터 적용 목록
+  const filteredMyApplications = React.useMemo(() => {
+    if (statusFilter === 'all') return myApplications;
+    return myApplications.filter(a => a.status === statusFilter);
+  }, [myApplications, statusFilter]);
+
   // 다중 선택 토글 핸들러
   const toggleSelectApp = (id: string) => {
     setSelectedAppIds(prev =>
@@ -213,10 +260,10 @@ export function SubstituteClient({
     );
   };
 
-  // 제출/접수된 신청서 전체 선택 토글
+  // 인쇄 가능한 신청서 (현재 필터링된 목록 중 submitted 또는 approved 상태)
   const printableApps = React.useMemo(() => {
-    return myApplications.filter(a => a.status === 'submitted' || a.status === 'approved');
-  }, [myApplications]);
+    return filteredMyApplications.filter(a => a.status === 'submitted' || a.status === 'approved');
+  }, [filteredMyApplications]);
 
   const handleToggleSelectAll = () => {
     if (selectedAppIds.length === printableApps.length && printableApps.length > 0) {
@@ -226,7 +273,7 @@ export function SubstituteClient({
     }
   };
 
-  // '오늘' 결보강 필터
+  // '오늘' 결보강 데이터 (상단 요약 카드용)
   const todayStr = React.useMemo(() => new Date().toISOString().split('T')[0], []);
   const todayItems = React.useMemo(() => {
     const list: {
@@ -543,46 +590,99 @@ export function SubstituteClient({
         selectedWeekNum={selectedWeekNum}
         onSelectWeekNum={setSelectedWeekNum}
         hideTopControlBar={true}
+        onEditApplication={handleStartEditApplication}
       />
 
-      {/* 3. 하단 신청 내역 및 오늘의 결보강 탭 영역 */}
+      {/* 3. 하단 신청 내역 영역 & 상태 필터 바 */}
       <div className="space-y-3 pt-1">
-        {/* 세그먼트 탭 컨트롤 바 */}
+        {/* 상태 필터 컨트롤 바 */}
         <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-xl">
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100/90 rounded-xl">
+            {/* 전체 */}
             <button
               type="button"
-              onClick={() => setBottomTab('myApps')}
+              onClick={() => setStatusFilter('all')}
               className={cn(
                 "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
-                bottomTab === 'myApps'
-                  ? "bg-white text-blue-900 font-black shadow-2xs border border-slate-200/60"
+                statusFilter === 'all'
+                  ? "bg-white text-slate-900 font-black shadow-2xs border border-slate-200/60"
                   : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
               )}
             >
-              <FileText className="h-3.5 w-3.5 text-blue-600" />
-              <span>내 신청 현황</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-100">
+              <FileText className="h-3.5 w-3.5 text-slate-600" />
+              <span>전체</span>
+              <span className={cn(
+                "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                statusFilter === 'all' ? "bg-slate-100 text-slate-800" : "bg-white/80 text-slate-600"
+              )}>
                 {myApplications.length}
               </span>
             </button>
 
+            {/* 제출접수됨 */}
             <button
               type="button"
-              onClick={() => setBottomTab('today')}
+              onClick={() => setStatusFilter('submitted')}
               className={cn(
                 "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
-                bottomTab === 'today'
-                  ? "bg-white text-emerald-900 font-black shadow-2xs border border-slate-200/60"
+                statusFilter === 'submitted'
+                  ? "bg-white text-blue-900 font-black shadow-2xs border border-blue-200/60"
                   : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
               )}
             >
-              <Calendar className="h-3.5 w-3.5 text-emerald-600" />
-              <span>오늘의 결보강</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-100">
-                {todayItems.length}
+              <Clock className="h-3.5 w-3.5 text-blue-600" />
+              <span>제출접수됨</span>
+              <span className={cn(
+                "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                statusFilter === 'submitted' ? "bg-blue-100 text-blue-800" : "bg-blue-50 text-blue-700 border border-blue-100"
+              )}>
+                {submittedCount}
               </span>
             </button>
+
+            {/* 승인완료 */}
+            <button
+              type="button"
+              onClick={() => setStatusFilter('approved')}
+              className={cn(
+                "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
+                statusFilter === 'approved'
+                  ? "bg-white text-emerald-900 font-black shadow-2xs border border-emerald-200/60"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+              )}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+              <span>승인완료</span>
+              <span className={cn(
+                "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                statusFilter === 'approved' ? "bg-emerald-100 text-emerald-800" : "bg-emerald-50 text-emerald-700 border border-emerald-100"
+              )}>
+                {approvedCount}
+              </span>
+            </button>
+
+            {/* 반려됨 (반려 건수가 있을 때만 노출) */}
+            {rejectedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setStatusFilter('rejected')}
+                className={cn(
+                  "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
+                  statusFilter === 'rejected'
+                    ? "bg-white text-rose-900 font-black shadow-2xs border border-rose-200/60"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+                )}
+              >
+                <AlertCircle className="h-3.5 w-3.5 text-rose-600" />
+                <span>반려됨</span>
+                <span className={cn(
+                  "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                  statusFilter === 'rejected' ? "bg-rose-100 text-rose-800" : "bg-rose-50 text-rose-700 border border-rose-100"
+                )}>
+                  {rejectedCount}
+                </span>
+              </button>
+            )}
           </div>
 
           <div className="text-xs text-slate-400 hidden sm:block">
@@ -590,18 +690,28 @@ export function SubstituteClient({
           </div>
         </div>
 
-        {bottomTab === 'myApps' && (
-          <div className="space-y-3">
-            {myApplications.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-8 text-center text-slate-400 space-y-1">
-                <p className="text-xs font-bold text-slate-600">
-                  {selectedTeacherName} 선생님께서 신청하신 수업 교체 및 보강 내역이 없습니다.
-                </p>
-                <p className="text-[11px] text-slate-400">
-                  위 시간표에서 변경할 수업 슬롯을 클릭하여 간편하게 신청하실 수 있습니다.
-                </p>
-              </div>
-            ) : (
+        <div className="space-y-3">
+          {myApplications.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-8 text-center text-slate-400 space-y-1">
+              <p className="text-xs font-bold text-slate-600">
+                {selectedTeacherName} 선생님께서 신청하신 수업 교체 및 보강 내역이 없습니다.
+              </p>
+              <p className="text-[11px] text-slate-400">
+                위 시간표에서 변경할 수업 슬롯을 클릭하여 간편하게 신청하실 수 있습니다.
+              </p>
+            </div>
+          ) : filteredMyApplications.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-8 text-center text-slate-400 space-y-1">
+              <p className="text-xs font-bold text-slate-600">
+                {statusFilter === 'submitted' && '현재 제출접수된 신청서가 없습니다.'}
+                {statusFilter === 'approved' && '현재 승인완료된 신청서가 없습니다.'}
+                {statusFilter === 'rejected' && '반려된 신청서가 없습니다.'}
+              </p>
+              <p className="text-[11px] text-slate-400">
+                상단의 '전체' 탭을 누르면 모든 신청서를 확인하실 수 있습니다.
+              </p>
+            </div>
+          ) : (
               <>
                 {/* 상단 다중 선택 및 일괄 출력 툴바 */}
                 {printableApps.length > 0 && (
@@ -661,7 +771,7 @@ export function SubstituteClient({
 
                 {/* 신청서 카드 그리드 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {myApplications.map(app => {
+                  {filteredMyApplications.map(app => {
                     const isSelected = selectedAppIds.includes(app.id);
                     const isRejected = app.status === 'rejected';
                     return (
@@ -701,6 +811,19 @@ export function SubstituteClient({
                             </span>
                           </div>
                           <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            {app.status === 'submitted' && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleStartEditApplication(app)}
+                                className="h-7 px-2.5 text-xs font-bold gap-1 border-blue-200 bg-blue-50/50 text-blue-700 hover:bg-blue-100 hover:border-blue-300 shadow-2xs cursor-pointer"
+                                title="제출 접수된 신청서 내용 수정"
+                              >
+                                <Pencil className="h-3 w-3 text-blue-600" />
+                                수정
+                              </Button>
+                            )}
                             {!isRejected && (
                               <Button
                                 variant="outline"
@@ -762,59 +885,23 @@ export function SubstituteClient({
               </>
             )}
           </div>
-        )}
+        </div>
 
-        {bottomTab === 'today' && (
-          <div className="space-y-3">
-            {todayItems.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-8 text-center text-slate-400 space-y-1">
-                <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto opacity-70 mb-1" />
-                <p className="text-xs font-bold text-slate-700">
-                  오늘({todayStr})은 등록된 결강이나 수업 교체가 없습니다.
-                </p>
-                <p className="text-[11px] text-slate-400">모든 학급의 정규 시간표대로 수업이 진행됩니다.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {todayItems.map(({ appId, appNumber, applicantTeacher, reason, item }, idx) => (
-                  <div key={`${appId}-${idx}`} className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded-md font-bold bg-slate-900 text-white text-[11px]">
-                        {item.sourcePeriod}교시
-                      </span>
-                      <span className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold ${
-                        item.type === 'substitute' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-blue-50 text-blue-700 border border-blue-200'
-                      }`}>
-                        {item.type === 'substitute' ? '수업보강' : '수업교체'}
-                      </span>
-                    </div>
-                    <p className="font-black text-slate-900">
-                      {getItemClassCode(item, applicantTeacher)} ({getItemSubjectName(item, applicantTeacher)}) - {applicantTeacher} 선생님
-                    </p>
-                    <p className="font-bold text-blue-700 bg-blue-50/70 p-2 rounded-xl border border-blue-100">
-                      ➔ {item.type === 'substitute' ? `보강: ${item.substituteTeacher} 선생님` : `교체: ${item.targetTeacher} 선생님`}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-
-      </div>
-
-      {/* 4. 수업 교체 / 보강 통합 신청 서랍 (1개 수업 및 다교시 일괄 모두 동일 모달/동일 로직) */}
-      {batchSlots.length > 0 && (
+      {/* 4. 수업 교체 / 보강 통합 신청 서랍 (1개 수업 및 다교시 일괄, 제출 신청서 수정 모두 동일 모달/동일 로직) */}
+      {(batchSlots.length > 0 || editingApplication) && (
         <BatchExchangeDrawer
           selectedSlots={batchSlots}
           initialMode={drawerInitialMode}
-          onClose={() => setBatchSlots([])}
+          editingApplication={editingApplication}
+          onClose={() => {
+            setBatchSlots([]);
+            setEditingApplication(null);
+          }}
           onSaveApplication={handleSaveApplication}
           timetableData={timetableData}
           existingApplications={applications}
           calendarConfig={calendarConfig}
-          currentTeacherName={selectedTeacherName}
+          currentTeacherName={editingApplication?.applicantTeacher || selectedTeacherName}
         />
       )}
     </div>
