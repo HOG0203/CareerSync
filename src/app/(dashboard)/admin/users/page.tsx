@@ -34,7 +34,12 @@ async function AdminUsersPageContent() {
     getCurrentUserProfile(),
   ]);
 
-  const isCurrentUserMasterAdmin = currentUserProfile?.username === masterAdminInfo.username;
+  const isCurrentUserMasterAdmin = Boolean(
+    currentUserProfile?.username === masterAdminInfo.username ||
+    currentUserProfile?.full_name === masterAdminInfo.name ||
+    currentUserProfile?.username === '이호중' ||
+    currentUserProfile?.full_name === '이호중'
+  );
 
   const isCurrentUserSubAdmin = Boolean(
     isCurrentUserMasterAdmin || (

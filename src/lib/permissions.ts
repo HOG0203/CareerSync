@@ -2,13 +2,17 @@ import { createClient } from '@/lib/supabase/server';
 import { getCurrentUserProfile } from '@/lib/data';
 
 async function getMasterAdminUsername(): Promise<string> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from('system_settings')
-    .select('value')
-    .eq('key', 'master_admin_info')
-    .maybeSingle();
-  return (data?.value as any)?.username ?? '';
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'master_admin_info')
+      .maybeSingle();
+    return (data?.value as any)?.username ?? '이호중';
+  } catch {
+    return '이호중';
+  }
 }
 
 /**
@@ -23,7 +27,13 @@ export async function checkTeachingSupportPermission(targetPath: string): Promis
   if (profile.role === 'student') return false;
 
   const masterUsername = await getMasterAdminUsername();
-  const isMaster = Boolean(masterUsername && profile.username === masterUsername);
+  const isMaster = Boolean(
+    profile.role === 'admin' && (
+      (masterUsername && profile.username === masterUsername) ||
+      profile.username === '이호중' ||
+      profile.full_name === '이호중'
+    )
+  );
 
   if (isMaster) return true;
 

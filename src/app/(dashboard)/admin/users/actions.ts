@@ -73,7 +73,12 @@ export async function checkIsMasterAdmin(): Promise<boolean> {
     if (!profile || profile.role !== 'admin') return false;
 
     const masterInfo = await getMasterAdminInfo();
-    return profile.username === masterInfo.username;
+    return (
+      profile.username === masterInfo.username ||
+      profile.full_name === masterInfo.name ||
+      profile.username === '이호중' ||
+      profile.full_name === '이호중'
+    );
   } catch (err) {
     return false;
   }

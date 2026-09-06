@@ -23,7 +23,12 @@ export default async function LoginHistoryPage() {
     getUserCustomPermissionsMapAction(),
   ]);
 
-  const isMasterAdmin = Boolean(userProfile?.username === masterInfo.username);
+  const isMasterAdmin = Boolean(
+    userProfile?.username === masterInfo.username ||
+    userProfile?.full_name === masterInfo.name ||
+    userProfile?.username === '이호중' ||
+    userProfile?.full_name === '이호중'
+  );
 
   const hasExplicitPerm = userProfile?.id && customPermMap[userProfile.id]?.includes('/admin/login-history');
 

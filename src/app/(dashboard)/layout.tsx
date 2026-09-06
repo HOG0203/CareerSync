@@ -12,6 +12,7 @@ import { MobileBottomTab } from '@/components/dashboard/mobile-bottom-tab';
 import { PageViewTracker } from '@/components/dashboard/page-view-tracker';
 import { redirect } from 'next/navigation';
 import { getCurrentUserProfile } from '@/lib/data';
+import { getMasterAdminInfo, getSubAdminList } from '@/app/(dashboard)/admin/users/actions';
 
 export default async function DashboardLayout({ children }: PropsWithChildren) {
   const supabase = await createClient();
@@ -31,21 +32,30 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
   let isMasterAdmin = false;
   let isSubAdmin = false;
   try {
-    const [{ data: masterSetting }, { data: subAdminSetting }] = await Promise.all([
-      supabase.from('system_settings').select('value').eq('key', 'master_admin_info').maybeSingle(),
-      supabase.from('system_settings').select('value').eq('key', 'sub_admin_list').maybeSingle(),
+    const [masterInfo, subAdminList] = await Promise.all([
+      getMasterAdminInfo(),
+      getSubAdminList(),
     ]);
 
-    const masterUsername = (masterSetting?.value as any)?.username ?? '';
+    const masterUsername = masterInfo?.username || '이호중';
+    const masterName = masterInfo?.name || '이호중';
+
     isMasterAdmin = Boolean(
-      isAdmin && masterUsername && userProfile?.username === masterUsername
+      isAdmin && (
+        (masterUsername && userProfile?.username === masterUsername) ||
+        (masterName && userProfile?.full_name === masterName) ||
+        userProfile?.username === '이호중' ||
+        userProfile?.full_name === '이호중'
+      )
     );
 
-    const subAdminList = Array.isArray(subAdminSetting?.value) ? (subAdminSetting.value as string[]) : [];
-    isSubAdmin = Boolean(isMasterAdmin || (isAdmin && userProfile?.username && subAdminList.includes(userProfile.username)));
+    const subList = Array.isArray(subAdminList) ? subAdminList : [];
+    isSubAdmin = Boolean(isMasterAdmin || (isAdmin && userProfile?.username && subList.includes(userProfile.username)));
   } catch (err) {
-    isMasterAdmin = false;
-    isSubAdmin = false;
+    isMasterAdmin = Boolean(
+      isAdmin && (userProfile?.username === '이호중' || userProfile?.full_name === '이호중')
+    );
+    isSubAdmin = isMasterAdmin;
   }
 
   // 4. 사용자별 개별 메뉴 권한 조회 (system_settings)

@@ -246,14 +246,16 @@ export default function Nav({
     }
   ];
 
-  const staffGroups = customPermissions && Array.isArray(customPermissions)
+  const staffGroups = isMasterAdmin
     ? fullStaffGroups
-        .map(group => ({
-          ...group,
-          items: group.items.filter(item => customPermissions.includes(item.href)),
-        }))
-        .filter(group => group.items.length > 0)
-    : defaultStaffGroups;
+    : (customPermissions && Array.isArray(customPermissions)
+        ? fullStaffGroups
+            .map(group => ({
+              ...group,
+              items: group.items.filter(item => customPermissions.includes(item.href)),
+            }))
+            .filter(group => group.items.length > 0)
+        : defaultStaffGroups);
 
   const groups = isStudent ? studentGroups : staffGroups;
 
