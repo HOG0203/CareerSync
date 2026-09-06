@@ -87,6 +87,27 @@ export function normalizeBoolean(input: any): boolean {
 }
 
 /**
+ * 엑셀 날짜 일련번호(예: 46247)를 'YYYY-MM-DD' (예: '2026-08-13') 문자열로 자동 변환하는 헬퍼
+ */
+export function formatExcelDate(val: any): string {
+  if (val === null || val === undefined || val === '') return '';
+  const s = String(val).trim();
+  const num = Number(s);
+  // 엑셀 일련번호 범위: 30000(1982년) ~ 65000(2077년)
+  if (!isNaN(num) && num >= 30000 && num <= 65000) {
+    const utcMs = Math.round((num - 25569) * 86400 * 1000);
+    const date = new Date(utcMs);
+    if (!isNaN(date.getTime())) {
+      const y = date.getUTCFullYear();
+      const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(date.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+  }
+  return s;
+}
+
+/**
  * 취업역량 파싱된 단일 레코드
  */
 export interface RawEmploymentRecord {
@@ -141,7 +162,11 @@ export function parseEmploymentWorkbook(fileBuffer: ArrayBuffer, fileName: strin
     const isEduSheet = sheetName.includes('산학교육') || sheetName.includes('교육') || fileName.includes('산학교육') || fileName.includes('교육') || fileName.includes('2.산학');
     const isCourseSheet = sheetName.includes('진로코스') || sheetName.includes('취업진로') || sheetName.includes('코스') || fileName.includes('진로코스') || fileName.includes('취업진로') || fileName.includes('코스') || fileName.includes('1.취업');
     const isContestSheet = sheetName.includes('기능대회') || sheetName.includes('기능경기') || fileName.includes('기능대회') || fileName.includes('기능경기') || fileName.includes('4.기능');
-    const isFieldSheet = sheetName.includes('현장실습') || sheetName.includes('도제') || sheetName.includes('취업명단') || fileName.includes('현장실습') || fileName.includes('도제') || fileName.includes('취업') || fileName.includes('5.현장');
+    // 현장실습/도제/취업확정 시트 판단: 취업진로코스(1.취업)와 겹치지 않도록 방지
+    const isFieldSheet = !isCourseSheet && (
+      sheetName.includes('현장실습') || sheetName.includes('도제') || sheetName.includes('취업명단') || sheetName.includes('취업확정') || sheetName.includes('조기취업') ||
+      fileName.includes('현장실습') || fileName.includes('도제') || fileName.includes('취업명단') || fileName.includes('취업확정') || fileName.includes('조기취업') || fileName.includes('5.현장')
+    );
 
     // 주요 컬럼 인덱스 매핑
     const colMap = {
@@ -159,9 +184,9 @@ export function parseEmploymentWorkbook(fileBuffer: ArrayBuffer, fileName: strin
         : -1,
       eduDate: headers.findIndex(h => h.includes('이수일자') || h.includes('일자') || h.includes('일시') || h.includes('날짜')),
       
-      // 2. 취업진로코스 (현장실습 시트에서는 참여학기를 코스로 오인하지 않도록 방지)
-      courseTerm: !isFieldSheet && (isCourseSheet || (!isEduSheet && !isClubSheet && !isContestSheet))
-        ? headers.findIndex(h => (h.includes('코스') && h.includes('학기')) || (isCourseSheet && (h === '참여학기' || h.includes('학기'))) || (h.includes('학기') && !h.includes('실적') && !h.includes('구분')))
+      // 2. 취업진로코스 (코스명 컬럼이 존재하거나 코스 시트인 경우 우선 매핑)
+      courseTerm: (isCourseSheet || headers.some(h => h === '코스명' || h.includes('코스명') || h === '코스') || (!isFieldSheet && !isEduSheet && !isClubSheet && !isContestSheet))
+        ? headers.findIndex(h => (h.includes('코스') && h.includes('학기')) || (h === '참여학기' || h.includes('학기')) || (h.includes('학기') && !h.includes('실적') && !h.includes('구분')))
         : -1,
       courseName: headers.findIndex(h => h === '코스명' || h.includes('코스명') || (h.includes('진로코스') && !h.includes('학기')) || h === '코스'),
       
@@ -457,7 +482,8 @@ export function parseEmploymentWorkbook(fileBuffer: ArrayBuffer, fileName: strin
       // G. 산학교육 이수 파싱
       if (colMap.edu1 !== -1 && row[colMap.edu1]) {
         const eduTitle = String(row[colMap.edu1]).trim();
-        const eduDate = colMap.eduDate !== -1 ? String(row[colMap.eduDate] || '').trim() : '';
+        const rawDate = colMap.eduDate !== -1 ? row[colMap.eduDate] : '';
+        const eduDate = formatExcelDate(rawDate);
         if (eduTitle && eduTitle !== 'X' && eduTitle !== '미이수') {
           records.push({
             id: `${recId}_edu`,

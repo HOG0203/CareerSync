@@ -44,6 +44,7 @@ next-env.d.ts
 /*.xlsx
 /*.xls
 /*.xlsxx
+/public/uploads/
 
 # firebase
 firebase-debug.log

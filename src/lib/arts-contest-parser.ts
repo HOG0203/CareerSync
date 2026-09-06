@@ -93,10 +93,10 @@ export function parseArtsContestWorkbook(fileBuffer: ArrayBuffer, fileName: stri
       sportsTerm: headers.findIndex(h => (h.includes('활동학기') || h.includes('참여학기') || h.includes('학기')) && !h.includes('대회')),
       
       // B. 교내외 대회
-      contestCategory: headers.findIndex(h => h === '대회구분' || h === '교내외구분' || h.includes('교내') || h.includes('교외')),
+      contestCategory: headers.findIndex(h => h === '대회구분' || h === '교내외구분' || (h.includes('교내') && !h.includes('대회명')) || (h.includes('교외') && !h.includes('대회명'))),
       contestType: headers.findIndex(h => h === '실적구분' || h === '참가입상구분' || h === '수상여부' || h.includes('입상구분')),
-      contestTitle: headers.findIndex(h => h === '대회명' || h.includes('대회명') || h === '행사명' || h.includes('대회')),
-      contestAward: headers.findIndex(h => h === '수상명' || h === '입상명' || h.includes('상명') || h.includes('수상') || h.includes('입상')),
+      contestTitle: headers.findIndex(h => h === '대회명' || (h.includes('대회명') && !h.includes('구분')) || h === '행사명' || (h.includes('대회') && !h.includes('구분') && !h.includes('학기'))),
+      contestAward: headers.findIndex(h => h === '수상명' || h === '입상명' || h === '수상내역' || h.includes('상명') || (h.includes('수상') && !h.includes('구분')) || (h.includes('입상') && !h.includes('구분'))),
       contestDate: headers.findIndex(h => h.includes('일자') || h.includes('일시') || h.includes('수상일') || h.includes('개최일') || h.includes('날짜')),
     };
 

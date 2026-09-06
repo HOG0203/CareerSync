@@ -44,8 +44,14 @@ import {
   BookOpen, 
   Trophy, 
   GraduationCap,
-  Heart
+  Heart,
+  Calendar as CalendarIcon
 } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
+import { formatExcelDate } from '@/lib/employment-parser';
 import { cn } from '@/lib/utils';
 
 interface EvaluationEditModalProps {
@@ -86,6 +92,7 @@ export function EvaluationEditModal({
   // 3. 취업역량 상세 상태
   const [industryEduList, setIndustryEduList] = React.useState<IndustryEduItem[]>([]);
   const [newEduItem, setNewEduItem] = React.useState({ dateOrTerm: '', title: '', remarks: '' });
+  const [eduDatePickerOpen, setEduDatePickerOpen] = React.useState(false);
 
   const [careerCourses, setCareerCourses] = React.useState<Record<string, string>>({});
   const [newCourse, setNewCourse] = React.useState({ term: '1-1', name: '', remarks: '' });
@@ -126,6 +133,7 @@ export function EvaluationEditModal({
   const [newSports, setNewSports] = React.useState({ term: '1-1', name: '', remarks: '' });
 
   const [contestList, setContestList] = React.useState<ContestItem[]>([]);
+  const [contestDatePickerOpen, setContestDatePickerOpen] = React.useState(false);
   const [newContest, setNewContest] = React.useState<{
     dateOrTerm: string;
     category: '교내대회' | '교외대회';
@@ -637,13 +645,99 @@ export function EvaluationEditModal({
 
                   {/* 행 추가 인풋 */}
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 bg-slate-50/90 p-3 rounded-xl border border-slate-200 items-center">
-                    <div className="sm:col-span-3">
+                    <div className="sm:col-span-3 flex items-center gap-1">
                       <Input
-                        placeholder="일자 (예: 2026-07-10)"
+                        placeholder="일자 (2026-07-10)"
                         value={newEduItem.dateOrTerm}
-                        onChange={(e) => setNewEduItem(prev => ({ ...prev, dateOrTerm: e.target.value }))}
-                        className="h-10 text-xs sm:text-sm bg-white"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (/^\d{5}$/.test(val.trim())) {
+                            const formatted = formatExcelDate(val.trim());
+                            if (formatted !== val.trim()) {
+                              setNewEduItem(prev => ({ ...prev, dateOrTerm: formatted }));
+                              return;
+                            }
+                          }
+                          setNewEduItem(prev => ({ ...prev, dateOrTerm: val }));
+                        }}
+                        className="h-10 text-xs bg-white flex-1"
                       />
+                      <Popover open={eduDatePickerOpen} onOpenChange={setEduDatePickerOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-10 w-10 p-0 rounded-md border-slate-200 bg-white hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 shrink-0"
+                            title="달력에서 날짜 선택"
+                          >
+                            <CalendarIcon className="h-4 w-4 text-indigo-600" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-3 z-[100] rounded-2xl shadow-xl border-slate-200 bg-white" align="start">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 px-1">
+                              <span className="text-xs font-bold text-slate-800">일자 선택</span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setNewEduItem(prev => ({ ...prev, dateOrTerm: format(new Date(), 'yyyy-MM-dd') }));
+                                    setEduDatePickerOpen(false);
+                                  }}
+                                  className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 px-1.5 py-0.5 rounded hover:bg-indigo-50"
+                                >
+                                  오늘
+                                </button>
+                                {newEduItem.dateOrTerm && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setNewEduItem(prev => ({ ...prev, dateOrTerm: '' }));
+                                      setEduDatePickerOpen(false);
+                                    }}
+                                    className="text-[11px] font-medium text-slate-400 hover:text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50"
+                                  >
+                                    초기화
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <Calendar
+                              mode="single"
+                              selected={(() => {
+                                const val = newEduItem.dateOrTerm;
+                                if (!val) return undefined;
+                                const match = val.match(/\b\d{4}-\d{2}-\d{2}\b/);
+                                if (match) {
+                                  const d = new Date(match[0]);
+                                  return isNaN(d.getTime()) ? undefined : d;
+                                }
+                                const d = new Date(val);
+                                return isNaN(d.getTime()) ? undefined : d;
+                              })()}
+                              defaultMonth={(() => {
+                                const val = newEduItem.dateOrTerm;
+                                if (!val) return new Date();
+                                const match = val.match(/\b\d{4}-\d{2}-\d{2}\b/);
+                                if (match) {
+                                  const d = new Date(match[0]);
+                                  return isNaN(d.getTime()) ? new Date() : d;
+                                }
+                                const d = new Date(val);
+                                return isNaN(d.getTime()) ? new Date() : d;
+                              })()}
+                              onSelect={(date) => {
+                                if (date) {
+                                  setNewEduItem(prev => ({ ...prev, dateOrTerm: format(date, 'yyyy-MM-dd') }));
+                                  setEduDatePickerOpen(false);
+                                }
+                              }}
+                              locale={ko}
+                              initialFocus
+                            />
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                     <div className="sm:col-span-5">
                       <Input
@@ -1272,13 +1366,99 @@ export function EvaluationEditModal({
 
                   {/* 대회 실적 추가 인라인 폼 */}
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 bg-slate-50/90 p-3 rounded-xl border border-slate-200 items-center">
-                    <div className="sm:col-span-2">
+                    <div className="sm:col-span-2 flex items-center gap-1">
                       <Input
                         placeholder="일자 (2026-07-14)"
                         value={newContest.dateOrTerm}
-                        onChange={(e) => setNewContest(prev => ({ ...prev, dateOrTerm: e.target.value }))}
-                        className="h-10 text-xs bg-white"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (/^\d{5}$/.test(val.trim())) {
+                            const formatted = formatExcelDate(val.trim());
+                            if (formatted !== val.trim()) {
+                              setNewContest(prev => ({ ...prev, dateOrTerm: formatted }));
+                              return;
+                            }
+                          }
+                          setNewContest(prev => ({ ...prev, dateOrTerm: val }));
+                        }}
+                        className="h-10 text-xs bg-white flex-1"
                       />
+                      <Popover open={contestDatePickerOpen} onOpenChange={setContestDatePickerOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-10 w-10 p-0 rounded-md border-slate-200 bg-white hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 shrink-0"
+                            title="달력에서 날짜 선택"
+                          >
+                            <CalendarIcon className="h-4 w-4 text-indigo-600" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-3 z-[100] rounded-2xl shadow-xl border-slate-200 bg-white" align="start">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 px-1">
+                              <span className="text-xs font-bold text-slate-800">일자 선택</span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setNewContest(prev => ({ ...prev, dateOrTerm: format(new Date(), 'yyyy-MM-dd') }));
+                                    setContestDatePickerOpen(false);
+                                  }}
+                                  className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 px-1.5 py-0.5 rounded hover:bg-indigo-50"
+                                >
+                                  오늘
+                                </button>
+                                {newContest.dateOrTerm && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setNewContest(prev => ({ ...prev, dateOrTerm: '' }));
+                                      setContestDatePickerOpen(false);
+                                    }}
+                                    className="text-[11px] font-medium text-slate-400 hover:text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50"
+                                  >
+                                    초기화
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <Calendar
+                              mode="single"
+                              selected={(() => {
+                                const val = newContest.dateOrTerm;
+                                if (!val) return undefined;
+                                const match = val.match(/\b\d{4}-\d{2}-\d{2}\b/);
+                                if (match) {
+                                  const d = new Date(match[0]);
+                                  return isNaN(d.getTime()) ? undefined : d;
+                                }
+                                const d = new Date(val);
+                                return isNaN(d.getTime()) ? undefined : d;
+                              })()}
+                              defaultMonth={(() => {
+                                const val = newContest.dateOrTerm;
+                                if (!val) return new Date();
+                                const match = val.match(/\b\d{4}-\d{2}-\d{2}\b/);
+                                if (match) {
+                                  const d = new Date(match[0]);
+                                  return isNaN(d.getTime()) ? new Date() : d;
+                                }
+                                const d = new Date(val);
+                                return isNaN(d.getTime()) ? new Date() : d;
+                              })()}
+                              onSelect={(date) => {
+                                if (date) {
+                                  setNewContest(prev => ({ ...prev, dateOrTerm: format(date, 'yyyy-MM-dd') }));
+                                  setContestDatePickerOpen(false);
+                                }
+                              }}
+                              locale={ko}
+                              initialFocus
+                            />
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                     <div className="sm:col-span-2">
                       <Select 

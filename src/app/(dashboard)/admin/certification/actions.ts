@@ -12,6 +12,7 @@ import {
   RecordAuditMeta
 } from '@/lib/certification-calculator';
 import { logAuditAction } from '@/lib/audit-logger';
+import { formatExcelDate } from '@/lib/employment-parser';
 
 const EVAL_SETTINGS_KEY = 'certification_evaluations_store';
 
@@ -24,7 +25,51 @@ export async function clearEvaluationsStoreCache() {
 }
 
 /**
- * 평가 데이터 저장소 (Map: studentId -> CertificationEvaluationData) 조회 (초고속 인메모리 캐싱)
+ * student_cert_evaluations 전용 RDB 테이블에 학생별 평가 데이터를 안전하게 원자적 UPSERT하는 헬퍼
+ */
+async function upsertStudentCertEvaluations(
+  supabase: any,
+  records: Array<{ studentId: string; data: CertificationEvaluationData; academicYear: number }>
+) {
+  if (!records || records.length === 0) return;
+  const now = new Date().toISOString();
+
+  const payloads = records.map(r => ({
+    student_id: r.studentId,
+    academic_year: r.academicYear || 2026,
+    vocational_details: r.data.vocational_details || {},
+    vocational_grade_1: r.data.vocational_grade_1 ?? null,
+    vocational_grade_2: r.data.vocational_grade_2 ?? null,
+    vocational_grade_3: r.data.vocational_grade_3 ?? null,
+    vocational_mock_grade: r.data.vocational_mock_grade ?? null,
+    volunteer_school_hours: Number(r.data.volunteer_school_hours || 0),
+    volunteer_outside_hours: Number(r.data.volunteer_outside_hours || 0),
+    volunteer_meta: r.data.volunteer_meta || null,
+    employment_details: r.data.employment_details || {},
+    arts_contest_details: r.data.arts_contest_details || {},
+    manual_overrides: r.data.manual_overrides || null,
+    created_by: r.data.created_by || null,
+    updated_by: r.data.updated_by || null,
+    updated_at: now,
+  }));
+
+  try {
+    const CHUNK_SIZE = 500;
+    for (let i = 0; i < payloads.length; i += CHUNK_SIZE) {
+      const chunk = payloads.slice(i, i + CHUNK_SIZE);
+      await supabase
+        .from('student_cert_evaluations')
+        .upsert(chunk, { onConflict: 'student_id' });
+    }
+  } catch (err) {
+    console.error('Error upserting to student_cert_evaluations:', err);
+  }
+}
+
+/**
+ * 평가 데이터 저장소 (Map: studentId -> CertificationEvaluationData) 조회
+ * 1순위: 전용 RDB 테이블(student_cert_evaluations) 조회
+ * 2순위(폴백): system_settings 조회
  */
 export async function getEvaluationsStore(): Promise<Record<string, CertificationEvaluationData>> {
   const now = Date.now();
@@ -34,6 +79,39 @@ export async function getEvaluationsStore(): Promise<Record<string, Certificatio
 
   try {
     const supabase = createAdminClient();
+
+    // 1순위: student_cert_evaluations RDB 테이블 조회
+    const { data: tableRows, error: tableErr } = await supabase
+      .from('student_cert_evaluations')
+      .select('*');
+
+    if (!tableErr && tableRows && tableRows.length > 0) {
+      const store: Record<string, CertificationEvaluationData> = {};
+      for (const row of tableRows) {
+        store[row.student_id] = {
+          id: row.student_id,
+          student_id: row.student_id,
+          academic_year: row.academic_year,
+          vocational_details: row.vocational_details || {},
+          vocational_grade_1: row.vocational_grade_1,
+          vocational_grade_2: row.vocational_grade_2,
+          vocational_grade_3: row.vocational_grade_3,
+          vocational_mock_grade: row.vocational_mock_grade,
+          volunteer_school_hours: Number(row.volunteer_school_hours || 0),
+          volunteer_outside_hours: Number(row.volunteer_outside_hours || 0),
+          volunteer_meta: row.volunteer_meta,
+          employment_details: row.employment_details || {},
+          arts_contest_details: row.arts_contest_details || {},
+          manual_overrides: row.manual_overrides,
+          created_by: row.created_by,
+          updated_by: row.updated_by,
+        };
+      }
+      evalStoreMemoryCache = { data: store, timestamp: now };
+      return store;
+    }
+
+    // 2순위 (폴백): 기존 system_settings 조회
     const { data } = await supabase
       .from('system_settings')
       .select('value')
@@ -310,8 +388,14 @@ export async function saveStudentEvaluationAction(
     created_by: existing.created_by || auditMeta,
   };
 
-  currentStore[studentId] = updatedStudentData;
+  // 3-1. student_cert_evaluations 전용 테이블에 원자적 UPSERT (동시성 보장)
+  await upsertStudentCertEvaluations(supabase, [{
+    studentId,
+    data: updatedStudentData,
+    academicYear: settings.baseYear,
+  }]);
 
+  // 3-2. system_settings 백업 동기화
   const { error: saveErr } = await supabase
     .from('system_settings')
     .upsert({
@@ -502,6 +586,7 @@ export async function batchImportVolunteerAction(studentsList: VolunteerImportSt
   const currentStore = await getEvaluationsStore();
   let updatedCount = 0;
   const skippedStudents: string[] = [];
+  const updatedRecordsForDb: Array<{ studentId: string; data: CertificationEvaluationData; academicYear: number }> = [];
 
   const cleanClass = (c: any) => String(c || '').replace(/[^0-9]/g, '');
   const cleanNum = (n: any) => String(n || '').replace(/[^0-9]/g, '');
@@ -529,7 +614,7 @@ export async function batchImportVolunteerAction(studentsList: VolunteerImportSt
         at: new Date().toISOString(),
       };
 
-      currentStore[matched.id] = {
+      const studentEval = {
         ...(currentStore[matched.id] || { student_id: matched.id }),
         volunteer_school_hours: row.schoolHours,
         volunteer_outside_hours: row.outsideHours,
@@ -538,12 +623,18 @@ export async function batchImportVolunteerAction(studentsList: VolunteerImportSt
         student_id: matched.id,
         academic_year: baseYear,
       };
+      currentStore[matched.id] = studentEval;
+      updatedRecordsForDb.push({ studentId: matched.id, data: studentEval, academicYear: baseYear });
       updatedCount++;
     } else {
       skippedStudents.push(`${row.studentName} (${row.grade}학년 ${row.classInfo} ${row.studentNumber}번 - 매칭 학생 없음)`);
     }
   }
 
+  // 1. student_cert_evaluations 전용 테이블에 원자적 UPSERT (Race Condition 원천 차단)
+  await upsertStudentCertEvaluations(supabase, updatedRecordsForDb);
+
+  // 2. system_settings 백업 동기화
   const { error: saveErr } = await supabase
     .from('system_settings')
     .upsert({
@@ -638,6 +729,7 @@ export async function batchImportVocationalAction(studentsList: VocationalImport
   const currentStore = await getEvaluationsStore();
   let updatedCount = 0;
   const skippedStudents: string[] = [];
+  const updatedRecordsForDb: Array<{ studentId: string; data: CertificationEvaluationData; academicYear: number }> = [];
 
   for (const row of studentsList) {
     if (!row.studentId) {
@@ -704,9 +796,14 @@ export async function batchImportVocationalAction(studentsList: VocationalImport
     }
 
     currentStore[row.studentId] = updatedEval;
+    updatedRecordsForDb.push({ studentId: row.studentId, data: updatedEval, academicYear: baseYear });
     updatedCount++;
   }
 
+  // 1. student_cert_evaluations 전용 테이블에 원자적 UPSERT (Race Condition 원천 차단)
+  await upsertStudentCertEvaluations(supabase, updatedRecordsForDb);
+
+  // 2. system_settings 백업 동기화
   const { error: saveErr } = await supabase
     .from('system_settings')
     .upsert({
@@ -780,8 +877,11 @@ export async function batchImportEmploymentAction(
   };
 
   const supabase = createAdminClient();
+  const settings = await getSystemSettings();
+  const baseYear = settings.baseYear;
   const currentStore = await getEvaluationsStore();
   let updatedCount = 0;
+  const updatedRecordsForDb: Array<{ studentId: string; data: CertificationEvaluationData; academicYear: number }> = [];
 
   for (const row of rows) {
     const existing = currentStore[row.studentId] || { student_id: row.studentId };
@@ -878,9 +978,14 @@ export async function batchImportEmploymentAction(
     };
 
     currentStore[row.studentId] = updatedEval;
+    updatedRecordsForDb.push({ studentId: row.studentId, data: updatedEval, academicYear: settings.baseYear });
     updatedCount++;
   }
 
+  // 1. student_cert_evaluations 전용 테이블에 원자적 UPSERT (Race Condition 원천 차단)
+  await upsertStudentCertEvaluations(supabase, updatedRecordsForDb);
+
+  // 2. system_settings 백업 동기화
   const { error: saveErr } = await supabase
     .from('system_settings')
     .upsert({
@@ -952,6 +1057,7 @@ export async function batchImportArtsContestAction(
   const supabase = createAdminClient();
   const currentStore = await getEvaluationsStore();
   let updatedCount = 0;
+  const updatedRecordsForDb: Array<{ studentId: string; data: CertificationEvaluationData; academicYear: number }> = [];
 
   for (const row of rows) {
     const existing = currentStore[row.studentId] || { student_id: row.studentId };
@@ -986,9 +1092,14 @@ export async function batchImportArtsContestAction(
     };
 
     currentStore[row.studentId] = updatedEval;
+    updatedRecordsForDb.push({ studentId: row.studentId, data: updatedEval, academicYear: 2026 });
     updatedCount++;
   }
 
+  // 1. student_cert_evaluations 전용 테이블에 원자적 UPSERT (Race Condition 원천 차단)
+  await upsertStudentCertEvaluations(supabase, updatedRecordsForDb);
+
+  // 2. system_settings 백업 동기화
   const { error: saveErr } = await supabase
     .from('system_settings')
     .upsert({
@@ -1356,13 +1467,14 @@ export async function getMyImportedRecordsAction(
       (eDetails.industry_edu_list || []).forEach((item: any, idx: number) => {
         if (isAdmin || item.created_by?.userId === currentUserId || (!item.created_by && profile.role === 'teacher')) {
           totalItemCount++;
+          const formattedDate = formatExcelDate(item.dateOrTerm);
           result.push({
             ...base,
             rowKey: `${studentId}_industry_edu_${idx}`,
-            summary: [`산학교육: ${item.title}${item.dateOrTerm ? ` (${item.dateOrTerm})` : ''}`],
+            summary: [`산학교육: ${item.title}${formattedDate ? ` (${formattedDate})` : ''}`],
             registeredAt: item.created_by?.at,
             registeredByName: item.created_by?.userName,
-            rawItemData: { type: 'industry_edu', title: item.title || '', dateOrTerm: item.dateOrTerm || '', idx },
+            rawItemData: { type: 'industry_edu', title: item.title || '', dateOrTerm: formattedDate || '', idx },
           });
         }
       });
@@ -1471,13 +1583,28 @@ export async function getMyImportedRecordsAction(
       (aDetails.contest_list || []).forEach((item: any, idx: number) => {
         if (isAdmin || item.created_by?.userId === currentUserId || (!item.created_by && profile.role === 'teacher')) {
           totalItemCount++;
+          const formattedDate = formatExcelDate(item.dateOrTerm);
+          let itemCat = item.category || '교내대회';
+          if (itemCat.includes('교외')) itemCat = '교외대회';
+          else if (itemCat.includes('교내')) itemCat = '교내대회';
+          const typeLabel = item.type === 'award' 
+            ? `입상 - ${item.award || '1점'}` 
+            : `참가${item.award && item.award !== '참가' ? ` - ${item.award}` : ' - 0.5점'}`;
           result.push({
             ...base,
             rowKey: `${studentId}_contest_${idx}`,
-            summary: [`대회 실적: [${item.category || '교내'}] ${item.title} (${item.type === 'award' ? `입상 - ${item.award || '1점'}` : '참가 - 0.5점'})`],
+            summary: [`대회 실적: [${itemCat}] ${item.title} (${typeLabel})${formattedDate ? ` [${formattedDate}]` : ''}`],
             registeredAt: item.created_by?.at,
             registeredByName: item.created_by?.userName,
-            rawItemData: { type: 'contest', category: item.category || '교내', title: item.title || '', contestType: item.type || 'award', award: item.award || '1점', idx },
+            rawItemData: { 
+              type: 'contest', 
+              category: itemCat, 
+              title: item.title || '', 
+              contestType: item.type || 'award', 
+              award: item.award || (item.type === 'award' ? '입상' : '참가'), 
+              dateOrTerm: formattedDate || '',
+              idx 
+            },
           });
         }
       });
@@ -1552,9 +1679,12 @@ export async function updateSingleImportedRecordAction(
 
   if (category === 'vocational') {
     const vocationalDetails = data.vocationalDetails || {};
+    const targetGradeKey = data.targetGradeKey as 'grade1' | 'grade2' | 'grade3' | 'mock' | undefined;
     const updatedDetails: any = { ...(prev.vocational_details || {}) };
 
-    (['grade1', 'grade2', 'grade3', 'mock'] as const).forEach((gk) => {
+    const keysToProcess = targetGradeKey ? [targetGradeKey] : (['grade1', 'grade2', 'grade3', 'mock'] as const);
+
+    keysToProcess.forEach((gk) => {
       const gItem = vocationalDetails[gk];
       if (gItem) {
         const kVal = gItem.korean && gItem.korean > 0 ? Number(gItem.korean) : 5;
@@ -1580,10 +1710,10 @@ export async function updateSingleImportedRecordAction(
       student_id: studentId,
       academic_year: baseYear,
       vocational_details: updatedDetails,
-      vocational_grade_1: updatedDetails.grade1?.isCompleted ? updatedDetails.grade1.gradeSum : undefined,
-      vocational_grade_2: updatedDetails.grade2?.isCompleted ? updatedDetails.grade2.gradeSum : undefined,
-      vocational_grade_3: updatedDetails.grade3?.isCompleted ? updatedDetails.grade3.gradeSum : undefined,
-      vocational_mock_grade: updatedDetails.mock?.isCompleted ? updatedDetails.mock.gradeSum : undefined,
+      vocational_grade_1: updatedDetails.grade1?.isCompleted ? updatedDetails.grade1.gradeSum : (prev.vocational_grade_1 ?? undefined),
+      vocational_grade_2: updatedDetails.grade2?.isCompleted ? updatedDetails.grade2.gradeSum : (prev.vocational_grade_2 ?? undefined),
+      vocational_grade_3: updatedDetails.grade3?.isCompleted ? updatedDetails.grade3.gradeSum : (prev.vocational_grade_3 ?? undefined),
+      vocational_mock_grade: updatedDetails.mock?.isCompleted ? updatedDetails.mock.gradeSum : (prev.vocational_mock_grade ?? undefined),
       updated_by: auditMeta,
     };
   } else if (category === 'volunteer') {
@@ -1609,11 +1739,39 @@ export async function updateSingleImportedRecordAction(
         eDetails.industry_edu_list = list;
       }
     } else if (rowKey.includes('_career_courses_')) {
-      const term = rowKey.split('_career_courses_')[1];
-      eDetails.career_courses = { ...(eDetails.career_courses || {}), [term]: data.course };
+      const originalTerm = rowKey.split('_career_courses_')[1];
+      const newTerm = data.term || originalTerm;
+      const courseVal = data.course || '';
+
+      const nextCourses = { ...(eDetails.career_courses || {}) };
+      const nextMeta = { ...(eDetails.career_courses_meta || {}) };
+
+      if (originalTerm !== newTerm) {
+        delete nextCourses[originalTerm];
+        delete nextMeta[originalTerm];
+      }
+      nextCourses[newTerm] = courseVal;
+      nextMeta[newTerm] = auditMeta;
+
+      eDetails.career_courses = nextCourses;
+      eDetails.career_courses_meta = nextMeta;
     } else if (rowKey.includes('_major_clubs_')) {
-      const grade = rowKey.split('_major_clubs_')[1];
-      eDetails.major_clubs = { ...(eDetails.major_clubs || {}), [grade]: data.club };
+      const originalGrade = rowKey.split('_major_clubs_')[1];
+      const newGrade = data.grade || originalGrade;
+      const clubVal = data.club || '';
+
+      const nextClubs = { ...(eDetails.major_clubs || {}) };
+      const nextMeta = { ...(eDetails.major_clubs_meta || {}) };
+
+      if (originalGrade !== newGrade) {
+        delete nextClubs[originalGrade];
+        delete nextMeta[originalGrade];
+      }
+      nextClubs[newGrade] = clubVal;
+      nextMeta[newGrade] = auditMeta;
+
+      eDetails.major_clubs = nextClubs;
+      eDetails.major_clubs_meta = nextMeta;
     } else if (rowKey.includes('_skills_contest')) {
       eDetails.skills_contest = { ...(eDetails.skills_contest || {}), name: data.name, level: data.level, created_by: eDetails.skills_contest?.created_by || auditMeta };
     } else if (rowKey.includes('_field_training')) {
@@ -1625,8 +1783,22 @@ export async function updateSingleImportedRecordAction(
         created_by: existing?.created_by || auditMeta,
       };
     } else if (rowKey.includes('_apprenticeship_')) {
-      const term = rowKey.split('_apprenticeship_')[1];
-      eDetails.apprenticeship = { ...(eDetails.apprenticeship || {}), [term]: data.company };
+      const originalTerm = rowKey.split('_apprenticeship_')[1];
+      const newTerm = data.term || originalTerm;
+      const compVal = data.company || '';
+
+      const nextAppr = { ...(eDetails.apprenticeship || {}) };
+      const nextMeta = { ...(eDetails.apprenticeship_meta || {}) };
+
+      if (originalTerm !== newTerm) {
+        delete nextAppr[originalTerm];
+        delete nextMeta[originalTerm];
+      }
+      nextAppr[newTerm] = compVal;
+      nextMeta[newTerm] = auditMeta;
+
+      eDetails.apprenticeship = nextAppr;
+      eDetails.apprenticeship_meta = nextMeta;
     } else if (rowKey.includes('_employed_early')) {
       const existing = eDetails.employed_early;
       eDetails.employed_early = {
@@ -1652,19 +1824,62 @@ export async function updateSingleImportedRecordAction(
           ...list[idx],
           category: data.category || list[idx].category,
           title: data.title || list[idx].title,
+          dateOrTerm: data.dateOrTerm !== undefined ? data.dateOrTerm : list[idx].dateOrTerm,
           type: data.contestType || list[idx].type,
-          award: data.contestType === 'award' ? (data.award || list[idx].award) : undefined,
+          award: data.award !== undefined ? data.award : (data.contestType === 'award' ? '입상' : '참가'),
         };
         aDetails.contest_list = list;
       }
+      const contestEval = evaluateContestList(list);
+      currentStore[studentId] = {
+        ...prev,
+        student_id: studentId,
+        academic_year: baseYear,
+        contest_award_count: contestEval.effectiveAwardCount,
+        contest_participate_count: contestEval.effectivePartCount,
+        arts_contest_details: aDetails,
+        updated_by: auditMeta,
+      };
     } else if (rowKey.includes('_arts_sports_')) {
-      const term = rowKey.split('_arts_sports_')[1];
-      aDetails.arts_sports = { ...(aDetails.arts_sports || {}), [term]: data.dept };
-    }
+      const originalTerm = rowKey.split('_arts_sports_')[1];
+      const newTerm = data.term || originalTerm;
+      const deptVal = data.dept || '';
 
-    currentStore[studentId] = { ...prev, student_id: studentId, academic_year: baseYear, arts_contest_details: aDetails, updated_by: auditMeta };
+      const nextSports = { ...(aDetails.arts_sports || {}) };
+      const nextMeta = { ...(aDetails.arts_sports_meta || {}) };
+
+      if (originalTerm !== newTerm) {
+        delete nextSports[originalTerm];
+        delete nextMeta[originalTerm];
+      }
+      nextSports[newTerm] = deptVal;
+      nextMeta[newTerm] = auditMeta;
+
+      aDetails.arts_sports = nextSports;
+      aDetails.arts_sports_meta = nextMeta;
+
+      const sportsCount = Object.keys(nextSports).length;
+      currentStore[studentId] = {
+        ...prev,
+        student_id: studentId,
+        academic_year: baseYear,
+        arts_sports_semesters: sportsCount,
+        arts_contest_details: aDetails,
+        updated_by: auditMeta,
+      };
+    } else {
+      currentStore[studentId] = { ...prev, student_id: studentId, academic_year: baseYear, arts_contest_details: aDetails, updated_by: auditMeta };
+    }
   }
 
+  // 1. student_cert_evaluations 전용 테이블에 원자적 UPSERT (동시성 보장)
+  await upsertStudentCertEvaluations(supabase, [{
+    studentId,
+    data: currentStore[studentId],
+    academicYear: baseYear,
+  }]);
+
+  // 2. system_settings 백업 동기화
   const { error: saveErr } = await supabase
     .from('system_settings')
     .upsert(
@@ -1702,7 +1917,8 @@ export async function updateSingleImportedRecordAction(
  */
 export async function deleteMyImportedRecordsAction(
   category: 'volunteer' | 'vocational' | 'employment' | 'arts_contest',
-  targetStudentIds?: string[]
+  targetStudentIds?: string[],
+  targetRowKeys?: string[]
 ): Promise<{
   success: boolean;
   deletedStudentsCount: number;
@@ -1746,6 +1962,12 @@ export async function deleteMyImportedRecordsAction(
       const vDetails = evalData.vocational_details;
       if (vDetails) {
         for (const gradeKey of ['grade1', 'grade2', 'grade3', 'mock'] as const) {
+          const expectedRowKey = `${studentId}_vocational_${gradeKey}`;
+          // targetRowKeys가 제공된 경우 해당 rowKey가 포함되어 있을 때만 삭제 (선택 학년만 핀포인트 삭제)
+          if (targetRowKeys && targetRowKeys.length > 0 && !targetRowKeys.includes(expectedRowKey)) {
+            continue;
+          }
+
           const gData = vDetails[gradeKey];
           if (gData) {
             const gMeta = gData.created_by;
@@ -1859,7 +2081,11 @@ export async function deleteMyImportedRecordsAction(
       if (aDetails) {
         // 대회 실적
         if (aDetails.contest_list) {
-          aDetails.contest_list = aDetails.contest_list.filter(item => {
+          aDetails.contest_list = aDetails.contest_list.filter((item, idx) => {
+            const expectedRowKey = `${studentId}_contest_${idx}`;
+            if (targetRowKeys && targetRowKeys.length > 0 && !targetRowKeys.includes(expectedRowKey)) {
+              return true;
+            }
             const canDel = isAdmin || item.created_by?.userId === currentUserId || (!item.created_by && profile.role === 'teacher');
             if (canDel) {
               modified = true;
@@ -1868,13 +2094,18 @@ export async function deleteMyImportedRecordsAction(
             }
             return true;
           });
-          evalData.contest_award_count = aDetails.contest_list.filter(c => c.type === 'award').length;
-          evalData.contest_participate_count = aDetails.contest_list.filter(c => c.type === 'participate').length;
+          const contestEval = evaluateContestList(aDetails.contest_list);
+          evalData.contest_award_count = contestEval.effectiveAwardCount;
+          evalData.contest_participate_count = contestEval.effectivePartCount;
         }
 
         // 운동부/관악부
         if (aDetails.arts_sports) {
           Object.keys(aDetails.arts_sports).forEach(term => {
+            const expectedRowKey = `${studentId}_arts_sports_${term}`;
+            if (targetRowKeys && targetRowKeys.length > 0 && !targetRowKeys.includes(expectedRowKey)) {
+              return;
+            }
             const meta = aDetails.arts_sports_meta?.[term];
             if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
               delete aDetails.arts_sports![term];
@@ -1900,6 +2131,17 @@ export async function deleteMyImportedRecordsAction(
   }
 
   if (deletedStudentsCount > 0) {
+    // 1. student_cert_evaluations 전용 테이블에 변경된 학생들 원자적 UPSERT (Race Condition 차단)
+    const modifiedRecords = studentIdsToProcess
+      .filter(sid => currentStore[sid])
+      .map(sid => ({
+        studentId: sid,
+        data: currentStore[sid],
+        academicYear: currentStore[sid].academic_year || 2026,
+      }));
+    await upsertStudentCertEvaluations(supabase, modifiedRecords);
+
+    // 2. system_settings 백업 동기화
     const { error: saveErr } = await supabase
       .from('system_settings')
       .upsert({

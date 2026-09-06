@@ -173,10 +173,18 @@ export function EmploymentImportCard({
         }
       }
 
-      toast({
-        title: '취업역량 엑셀 분석 완료',
-        description: `총 ${fileArr.length}개 파일에서 ${allNewRecords.length}건의 실적 데이터를 로드했습니다.`,
-      });
+      if (allNewRecords.length === 0) {
+        toast({
+          title: '인식된 학생 실적 없음',
+          description: `업로드한 파일에서 학생 실적 행을 찾지 못했습니다. 헤더에 '이름', '참여학기/코스명/교육명' 등이 올바르게 기재되어 있는지 확인해주세요.`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: '취업역량 엑셀 분석 완료',
+          description: `총 ${fileArr.length}개 파일에서 ${allNewRecords.length}건의 실적 데이터를 로드했습니다.`,
+        });
+      }
     } catch (err: any) {
       console.error(err);
       toast({
