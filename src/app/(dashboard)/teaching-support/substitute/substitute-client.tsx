@@ -377,19 +377,21 @@ export function SubstituteClient({
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5 w-full pt-1">
-      {/* 1. 제목줄: 상단 타이틀 헤더 (표준 모던 스타일) */}
+      {/* 1. 제목줄: 상단 타이틀 헤더 (모바일 반응형 최적화) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between shrink-0 px-1 gap-2.5">
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 flex items-center gap-2.5 whitespace-nowrap">
-            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-100 shrink-0">
-              <ArrowLeftRight className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
+        <div className="flex flex-col gap-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-100 shrink-0">
+              <ArrowLeftRight className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
             </div>
-            <span>수업 결보강 & 교체 관리</span>
-            <span className="text-[11px] bg-blue-600 text-white px-2.5 py-0.5 rounded-full font-black whitespace-nowrap">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-slate-900 leading-tight">
+              수업 결보강 & 교체 관리
+            </h2>
+            <span className="text-[10px] sm:text-[11px] bg-blue-600 text-white px-2 sm:px-2.5 py-0.5 rounded-full font-black whitespace-nowrap">
               {timetableData.academicYear}학년도 {timetableData.semester}학기
             </span>
-          </h2>
-          <p className="text-slate-500 text-xs font-medium">
+          </div>
+          <p className="text-slate-500 text-[11px] sm:text-xs font-medium">
             시간표에서 변경할 수업을 클릭하여 스마트 공강 추천과 함께 수업 교체 및 결보강을 신속하게 처리합니다.
           </p>
         </div>
@@ -398,7 +400,7 @@ export function SubstituteClient({
         <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
           <Link
             href="/teaching-support/substitute/admin"
-            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-2xs transition-all"
+            className="inline-flex items-center gap-1.5 h-8 sm:h-9 px-3 sm:px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-2xs transition-all"
           >
             <ShieldCheck className="h-3.5 w-3.5 text-blue-400" />
             <span>수업계 관리자</span>
@@ -406,80 +408,80 @@ export function SubstituteClient({
         </div>
       </div>
 
-      {/* 2. 통계: 핵심 요약 통계 카드 4종 */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 animate-in fade-in duration-200">
+      {/* 2. 통계: 핵심 요약 통계 카드 4종 (모바일 2열 콤팩트 최적화) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 animate-in fade-in duration-200">
         {/* 카드 1: 내 결보강 신청 */}
         <Card className="border-slate-200/80 shadow-2xs hover:shadow-sm transition-all rounded-2xl bg-white">
-          <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-[11px] sm:text-xs font-bold text-slate-500">내 결보강 신청</p>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-black text-blue-600">{summaryStats.myTotal}</span>
-                <span className="text-xs font-bold text-slate-400">건</span>
+          <CardContent className="p-3 sm:p-4 flex items-center justify-between gap-1.5">
+            <div className="space-y-0.5 sm:space-y-1 min-w-0">
+              <p className="text-[10.5px] sm:text-xs font-bold text-slate-500 truncate">내 결보강 신청</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-xl sm:text-3xl font-black text-blue-600">{summaryStats.myTotal}</span>
+                <span className="text-[11px] sm:text-xs font-bold text-slate-400">건</span>
               </div>
-              <p className="text-[10.5px] text-slate-500 font-medium">
+              <p className="text-[9.5px] sm:text-[10.5px] text-slate-500 font-medium truncate">
                 승인 <strong className="text-emerald-600">{summaryStats.myApproved}</strong> · 대기 <strong className="text-blue-600">{summaryStats.mySubmitted}</strong>
               </p>
             </div>
-            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100 shrink-0">
-              <FileText className="h-5 w-5" />
+            <div className="h-8 w-8 sm:h-11 sm:w-11 rounded-xl sm:rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100 shrink-0">
+              <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           </CardContent>
         </Card>
 
         {/* 카드 2: 오늘의 결보강 */}
         <Card className="border-slate-200/80 shadow-2xs hover:shadow-sm transition-all rounded-2xl bg-white">
-          <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-[11px] sm:text-xs font-bold text-slate-500">오늘의 결보강</p>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-black text-emerald-600">{summaryStats.todayTotal}</span>
-                <span className="text-xs font-bold text-slate-400">건</span>
+          <CardContent className="p-3 sm:p-4 flex items-center justify-between gap-1.5">
+            <div className="space-y-0.5 sm:space-y-1 min-w-0">
+              <p className="text-[10.5px] sm:text-xs font-bold text-slate-500 truncate">오늘의 결보강</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-xl sm:text-3xl font-black text-emerald-600">{summaryStats.todayTotal}</span>
+                <span className="text-[11px] sm:text-xs font-bold text-slate-400">건</span>
               </div>
-              <p className="text-[10.5px] text-slate-500 font-medium">
+              <p className="text-[9.5px] sm:text-[10.5px] text-slate-500 font-medium truncate">
                 보강 <strong className="text-amber-600">{summaryStats.todaySub}</strong> · 교체 <strong className="text-blue-600">{summaryStats.todayExchange}</strong>
               </p>
             </div>
-            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 shrink-0">
-              <Calendar className="h-5 w-5" />
+            <div className="h-8 w-8 sm:h-11 sm:w-11 rounded-xl sm:rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 shrink-0">
+              <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           </CardContent>
         </Card>
 
         {/* 카드 3: 이번 학기 누적 승인 */}
         <Card className="border-slate-200/80 shadow-2xs hover:shadow-sm transition-all rounded-2xl bg-white">
-          <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-[11px] sm:text-xs font-bold text-slate-500">이번 학기 누적 승인</p>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-black text-indigo-600">{summaryStats.totalApproved}</span>
-                <span className="text-xs font-bold text-slate-400">건</span>
+          <CardContent className="p-3 sm:p-4 flex items-center justify-between gap-1.5">
+            <div className="space-y-0.5 sm:space-y-1 min-w-0">
+              <p className="text-[10.5px] sm:text-xs font-bold text-slate-500 truncate">이번 학기 누적 승인</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-xl sm:text-3xl font-black text-indigo-600">{summaryStats.totalApproved}</span>
+                <span className="text-[11px] sm:text-xs font-bold text-slate-400">건</span>
               </div>
-              <p className="text-[10.5px] text-slate-500 font-medium">
-                전체 신청 {summaryStats.totalApps}건 중 완료
+              <p className="text-[9.5px] sm:text-[10.5px] text-slate-500 font-medium truncate">
+                신청 {summaryStats.totalApps}건 중 완료
               </p>
             </div>
-            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 shrink-0">
-              <CheckCircle2 className="h-5 w-5" />
+            <div className="h-8 w-8 sm:h-11 sm:w-11 rounded-xl sm:rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 shrink-0">
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           </CardContent>
         </Card>
 
         {/* 카드 4: 스마트 수업 맞교환 */}
         <Card className="border-slate-200/80 shadow-2xs hover:shadow-sm transition-all rounded-2xl bg-white">
-          <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-[11px] sm:text-xs font-bold text-slate-500">스마트 수업 맞교환</p>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-black text-amber-600">{summaryStats.totalExchangeItems}</span>
-                <span className="text-xs font-bold text-slate-400">건</span>
+          <CardContent className="p-3 sm:p-4 flex items-center justify-between gap-1.5">
+            <div className="space-y-0.5 sm:space-y-1 min-w-0">
+              <p className="text-[10.5px] sm:text-xs font-bold text-slate-500 truncate">스마트 수업 맞교환</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-xl sm:text-3xl font-black text-amber-600">{summaryStats.totalExchangeItems}</span>
+                <span className="text-[11px] sm:text-xs font-bold text-slate-400">건</span>
               </div>
-              <p className="text-[10.5px] text-slate-500 font-medium">
-                시수 결손 없는 상호 교환
+              <p className="text-[9.5px] sm:text-[10.5px] text-slate-500 font-medium truncate">
+                시수 결손 없는 맞바꿈
               </p>
             </div>
-            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 border border-amber-100 shrink-0">
-              <ArrowLeftRight className="h-5 w-5" />
+            <div className="h-8 w-8 sm:h-11 sm:w-11 rounded-xl sm:rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 border border-amber-100 shrink-0">
+              <ArrowLeftRight className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           </CardContent>
         </Card>
@@ -487,15 +489,15 @@ export function SubstituteClient({
 
       {/* 3. 필터: 통합 필터 툴바 */}
       <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl shrink-0">
-        <CardContent className="p-3 sm:p-3.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <CardContent className="p-2.5 sm:p-3.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
           {/* 좌측: 교사 선택 & 주차 선택 */}
           <div className="flex flex-wrap items-center gap-2">
             {/* 교사 선택 */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 rounded-xl px-2.5 py-1">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 rounded-xl px-2.5 py-1 flex-1 sm:flex-none min-w-[130px]">
               <User className="h-3.5 w-3.5 text-blue-600 shrink-0" />
               <span className="text-xs font-bold text-slate-500 shrink-0">교사:</span>
               <Select value={selectedTeacherName} onValueChange={setSelectedTeacherName}>
-                <SelectTrigger className="w-[140px] sm:w-[160px] h-7 text-xs font-bold border-none bg-transparent shadow-none focus:ring-0 px-0">
+                <SelectTrigger className="w-full sm:w-[150px] h-7 text-xs font-bold border-none bg-transparent shadow-none focus:ring-0 px-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="max-h-60 rounded-xl shadow-lg border-slate-200">
@@ -514,14 +516,14 @@ export function SubstituteClient({
             </div>
 
             {/* 주차 선택 네비게이션 */}
-            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/80 rounded-xl px-1.5 py-0.5">
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/80 rounded-xl px-1.5 py-0.5 flex-1 sm:flex-none min-w-[170px]">
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
                 disabled={selectedWeekNum <= 1}
                 onClick={handlePrevWeek}
-                className="h-6 w-6 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-white"
+                className="h-6 w-6 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-white shrink-0"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
               </Button>
@@ -532,7 +534,7 @@ export function SubstituteClient({
                 value={String(selectedWeekNum)}
                 onValueChange={val => setSelectedWeekNum(parseInt(val))}
               >
-                <SelectTrigger className="h-7 border-none bg-transparent shadow-none focus:ring-0 text-xs font-bold text-slate-800 w-[180px] sm:w-[200px] px-1">
+                <SelectTrigger className="h-7 border-none bg-transparent shadow-none focus:ring-0 text-xs font-bold text-slate-800 w-full sm:w-[190px] px-1">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="max-h-64 rounded-xl shadow-lg border-slate-200">
@@ -551,7 +553,7 @@ export function SubstituteClient({
                 size="icon"
                 disabled={selectedWeekNum >= semesterWeeks.length}
                 onClick={handleNextWeek}
-                className="h-6 w-6 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-white"
+                className="h-6 w-6 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-white shrink-0"
               >
                 <ChevronRight className="h-3.5 w-3.5" />
               </Button>
@@ -564,7 +566,7 @@ export function SubstituteClient({
                 variant="outline"
                 size="sm"
                 onClick={() => setSelectedTeacherName(defaultTeacherName)}
-                className="h-8 px-2.5 text-xs font-bold text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100 rounded-xl"
+                className="h-7 sm:h-8 px-2.5 text-xs font-bold text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100 rounded-xl shrink-0"
               >
                 내 시간표 보기
               </Button>
@@ -572,9 +574,9 @@ export function SubstituteClient({
           </div>
 
           {/* 우측 안내 팁 */}
-          <div className="flex items-center gap-1.5 text-[11.5px] font-medium text-slate-500">
+          <div className="flex items-center gap-1.5 text-[11px] sm:text-[11.5px] font-medium text-slate-500">
             <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-            <span>시간표의 수업 슬롯을 클릭하여 결보강 또는 맞교환을 신청하세요</span>
+            <span>시간표 슬롯 클릭 시 결보강/교체 신청 가능</span>
           </div>
         </CardContent>
       </Card>
@@ -595,9 +597,9 @@ export function SubstituteClient({
 
       {/* 3. 하단 신청 내역 영역 & 상태 필터 바 */}
       <div className="space-y-3 pt-1">
-        {/* 상태 필터 컨트롤 바 */}
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
-          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100/90 rounded-xl">
+        {/* 상태 필터 컨트롤 바 (모바일 가로 스크롤 지원) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white p-2 sm:p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-xl overflow-x-auto scrollbar-none max-w-full">
             {/* 전체 */}
             <button
               type="button"

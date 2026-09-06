@@ -153,15 +153,15 @@ function SingleApplicationSheet({
   return (
     <div
       className={cn(
-        'bg-white p-8 sm:p-12 max-w-[850px] mx-auto border border-slate-200 shadow-md text-black font-sans print:shadow-none print:border-none print:p-0 print:m-0 print:w-full print:max-w-none print:block',
+        'bg-white p-3.5 sm:p-8 md:p-12 max-w-[850px] mx-auto border border-slate-200 shadow-md text-black font-sans print:shadow-none print:border-none print:p-0 print:m-0 print:w-full print:max-w-none print:block',
         !isLast ? 'mb-10 print:mb-0 sub-official-sheet-break' : 'sub-official-sheet-last'
       )}
       style={!isLast ? { breakAfter: 'page', pageBreakAfter: 'always' } : undefined}
     >
       {/* 1. 문서 제목 (상단 중앙 박스 형태) */}
       <div className='flex justify-center mb-5 pt-2'>
-        <div className='inline-block px-7 py-2 bg-slate-200/80 rounded-md shadow-xs'>
-          <h1 className='text-2xl sm:text-3xl font-black text-center tracking-[0.35em] pl-3 text-black font-sans'>
+        <div className='inline-block px-4 sm:px-7 py-2 bg-slate-200/80 rounded-md shadow-xs'>
+          <h1 className='text-lg sm:text-2xl md:text-3xl font-black text-center tracking-[0.15em] sm:tracking-[0.35em] pl-1.5 sm:pl-3 text-black font-sans'>
             수업 교체 및 보강 신청서
           </h1>
         </div>
@@ -186,19 +186,19 @@ function SingleApplicationSheet({
       </div>
 
       {/* 3. 신청 기본 정보 및 문구 */}
-      <div className='space-y-1.5 text-[13px] font-sans text-black leading-relaxed mb-4'>
+      <div className='space-y-1.5 text-[12px] sm:text-[13px] font-sans text-black leading-relaxed mb-4'>
         <p className='flex items-baseline'>
-          <span className='font-bold w-48 shrink-0'>수업교체 및 보강 신청 기간 :</span>
+          <span className='font-bold w-40 sm:w-48 shrink-0'>수업교체 및 보강 신청 기간 :</span>
           <span className='font-bold'>{periodText}</span>
         </p>
         <p className='flex items-baseline'>
-          <span className='font-bold w-48 shrink-0'>사유 :</span>
+          <span className='font-bold w-40 sm:w-48 shrink-0'>사유 :</span>
           <span className='font-bold'>{reason}</span>
         </p>
         <p className='text-center pt-2 font-medium'>
           위와 같은 사유에 의해 다음과 같이 <strong>{actionTypeLabel}</strong>을 신청하오니 허가 바랍니다.
         </p>
-        <div className='text-right pr-6 pt-1 space-y-1'>
+        <div className='text-right pr-2 sm:pr-6 pt-1 space-y-1'>
           <p className='text-xs'>
             {appYear}년 {appMonth}월 {appDay}일
           </p>
@@ -209,8 +209,8 @@ function SingleApplicationSheet({
       </div>
 
       {/* 4. 원본 PDF 100% 동일 3단 공식 신청 표 (파스텔 하늘/분홍/노랑 테마) */}
-      <div className='overflow-x-auto'>
-        <table className='w-full table-fixed border-collapse border border-black text-center text-[11px] leading-tight'>
+      <div className='overflow-x-auto pb-2'>
+        <table className='w-full table-fixed border-collapse border border-black text-center text-[11px] leading-tight min-w-[640px]'>
           <thead>
             {/* 대분류 헤더 1행 */}
             <tr className='border-b border-black font-black text-xs'>
@@ -557,14 +557,17 @@ export function SubstituteOfficialForm({
           )}
         </div>
 
-        <div className='flex items-center gap-2'>
+        <div className='flex items-center gap-2 shrink-0'>
           <Button
             size='sm'
             onClick={handlePrint}
             className='h-9 text-xs font-bold gap-1.5 bg-slate-900 hover:bg-slate-800 text-white shadow-xs cursor-pointer'
           >
-            <Printer className='h-4 w-4' />
-            공식 신청서 A4 {appList.length > 1 ? (viewMode === 'consolidated' ? '1장 통합 인쇄' : `일괄 인쇄 (${appList.length}장)`) : '인쇄'}
+            <Printer className='h-4 w-4 shrink-0' />
+            <span className='sm:hidden'>A4 인쇄</span>
+            <span className='hidden sm:inline'>
+              공식 신청서 A4 {appList.length > 1 ? (viewMode === 'consolidated' ? '1장 통합 인쇄' : `일괄 인쇄 (${appList.length}장)`) : '인쇄'}
+            </span>
           </Button>
         </div>
       </div>

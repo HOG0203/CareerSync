@@ -405,20 +405,26 @@ export function InteractiveTeacherTimetable({
       {/* 2. 메인 주간 인터랙티브 시간표 카드 */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden relative">
         {/* 카드 상단 인라인 교사 헤더 바 */}
-        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2.5">
-            <span className="text-base font-black text-slate-900">
+        <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm sm:text-base font-black text-slate-900">
               {selectedTeacher?.teacherName} 선생님 주간 시간표
             </span>
             {selectedTeacher?.homeroomClass && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] sm:text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                 담임: {selectedTeacher.homeroomClass}
               </span>
             )}
           </div>
 
-          <div className="text-xs text-slate-500">
-            기준 주차: <strong className="text-slate-900 font-bold">{selectedWeek.label}</strong>
+          <div className="flex items-center justify-between sm:justify-end gap-2 text-xs text-slate-500">
+            <div>
+              기준 주차: <strong className="text-slate-900 font-bold">{selectedWeek.label}</strong>
+            </div>
+            {/* 모바일 전용 좌우 스크롤 힌트 */}
+            <span className="sm:hidden text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+              👈 좌우 스크롤 👉
+            </span>
           </div>
         </div>
 
@@ -976,9 +982,9 @@ export function InteractiveTeacherTimetable({
       </div>
     </div>
 
-      {/* 3. 선택된 수업이 있을 때 뜨는 하단 신청 바 */}
+      {/* 3. 선택된 수업이 있을 때 뜨는 하단 신청 바 (모바일 하단 탭 가림 방지를 위해 bottom-20 lg:bottom-6 적용) */}
       {selectedSlots.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 backdrop-blur-md text-white px-6 py-3.5 rounded-3xl shadow-2xl border border-slate-700 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4">
+        <div className="fixed bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 z-40 max-w-[95vw] bg-slate-900/95 backdrop-blur-md text-white px-4 sm:px-6 py-2.5 sm:py-3.5 rounded-3xl shadow-2xl border border-slate-700 flex items-center gap-2.5 sm:gap-4 animate-in fade-in slide-in-from-bottom-4">
           <div className="flex items-center gap-2">
             <span className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-black shadow-xs">
               {selectedSlots.length}

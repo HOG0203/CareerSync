@@ -746,9 +746,17 @@ export function BatchExchangeDrawer({
   if (selectedSlots.length === 0 && !editingApplication) return null;
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[600px] md:w-[720px] bg-white shadow-2xl border-l border-slate-200 flex flex-col animate-in slide-in-from-right duration-300">
-      {/* 1. 상단 헤더 */}
-      <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-900 text-white">
+    <>
+      {/* 0. 모바일/데스크톱 백드롭 오버레이 (바깥 클릭 시 닫기) */}
+      <div 
+        onClick={onClose}
+        className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200" 
+      />
+
+      {/* 모달 서랍 본체 (z-[70]으로 MobileBottomTab z-50보다 상위에 위치하여 모바일에서도 완벽 표시) */}
+      <div className="fixed inset-y-0 right-0 z-[70] w-full sm:w-[600px] md:w-[720px] h-[100dvh] max-h-[100dvh] bg-white shadow-2xl border-l border-slate-200 flex flex-col animate-in slide-in-from-right duration-300">
+        {/* 1. 상단 헤더 */}
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-900 text-white shrink-0">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0">
             <Layers className="h-5 w-5" />
@@ -791,7 +799,7 @@ export function BatchExchangeDrawer({
       </div>
 
       {/* 2. 스크롤 본문 */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 text-xs text-slate-700">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-4 text-xs text-slate-700">
         {/* 모드 선택 스위처 (교체 vs 보강) */}
         <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl border border-slate-200">
           <button
@@ -1007,7 +1015,7 @@ export function BatchExchangeDrawer({
 
               {/* 시간표 테이블 */}
               <div className="overflow-x-auto rounded-xl border border-indigo-200/90 bg-white shadow-2xs">
-                <table className="w-full table-fixed text-center border-collapse text-xs">
+                <table className="w-full table-fixed text-center border-collapse text-xs min-w-[480px]">
                   <thead>
                     <tr className="bg-indigo-50/80 border-b border-indigo-100 text-[11px] font-black text-indigo-950">
                       <th className="py-1.5 px-1 w-10 border-r border-indigo-100 text-slate-500 font-bold shrink-0">교시</th>
@@ -1417,7 +1425,7 @@ export function BatchExchangeDrawer({
 
                 {/* 시간표 테이블 */}
                 <div className="overflow-x-auto rounded-xl border border-emerald-200/90 bg-white shadow-2xs">
-                  <table className="w-full table-fixed text-center border-collapse text-xs">
+                  <table className="w-full table-fixed text-center border-collapse text-xs min-w-[480px]">
                     <thead>
                       <tr className="bg-emerald-50/80 border-b border-emerald-100 text-[11px] font-black text-emerald-950">
                         <th className="py-1.5 px-1 w-10 border-r border-emerald-100 text-slate-500 font-bold shrink-0">교시</th>
@@ -1725,13 +1733,13 @@ export function BatchExchangeDrawer({
         )}
       </div>
 
-      {/* 3. 하단 액션 바 */}
-      <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
+      {/* 3. 하단 액션 바 (shrink-0 및 safe-area 패딩으로 모바일에서도 완벽 노출) */}
+      <div className="p-3.5 sm:p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-2.5 shrink-0 z-20 pb-[max(0.875rem,env(safe-area-inset-bottom))]">
         <Button
           type="button"
           variant="outline"
           onClick={onClose}
-          className="h-10 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-xl"
+          className="h-10 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-xl px-3 sm:px-4 shrink-0 cursor-pointer"
         >
           닫기
         </Button>
@@ -1740,14 +1748,22 @@ export function BatchExchangeDrawer({
           type="button"
           onClick={() => handleSubmit(true)}
           disabled={isSubmitting || items.length === 0 || hasAnyConflict}
-          className="h-10 px-5 text-xs font-black gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-600/30 flex-1 max-w-xs ml-auto"
+          className="h-10 px-3.5 sm:px-5 text-xs font-black gap-1.5 sm:gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-600/30 flex-1 max-w-sm ml-auto cursor-pointer"
         >
-          <SendHorizontal className="h-4 w-4" />
-          {isSubmitting
-            ? (editingApplication ? '수정 내용 저장 중...' : '신청서 생성 중...')
-            : (editingApplication ? '신청서 수정 완료 (제출 반영)' : '1장으로 묶어서 공식 신청서 생성')}
+          <SendHorizontal className="h-4 w-4 shrink-0" />
+          <span className="truncate">
+            {isSubmitting
+              ? (editingApplication ? '수정 내용 저장 중...' : '신청서 생성 중...')
+              : (editingApplication ? '신청서 수정 완료 (제출 반영)' : (
+                  <>
+                    <span className="sm:hidden">공식 신청서 생성</span>
+                    <span className="hidden sm:inline">1장으로 묶어서 공식 신청서 생성</span>
+                  </>
+                ))}
+          </span>
         </Button>
       </div>
     </div>
+    </>
   );
 }

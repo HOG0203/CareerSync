@@ -84,6 +84,28 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
+// 학급 코드에서 정확한 학년 추출 (예: "축11" -> 1, "건21" -> 2, "도31" -> 3, "1-1" -> 1, "1학년" -> 1)
+export const getTeacherHomeroomGrade = (homeroom?: string): number | null => {
+  if (!homeroom) return null;
+  const match = homeroom.match(/\d/);
+  return match ? parseInt(match[0], 10) : null;
+};
+
+// 슬롯에서 학년 숫자 추출 (예: '축11' -> 1, '2-1' -> 2 등)
+export const extractSlotGrade = (slot: any): number | null => {
+  if (!slot) return null;
+  if (typeof slot.grade === 'number' && slot.grade >= 1 && slot.grade <= 3) {
+    return slot.grade;
+  }
+  const code = (slot.classCode || '').trim();
+  if (!code) return null;
+  if (code.length >= 2 && /\d/.test(code.charAt(1))) {
+    return parseInt(code.charAt(1), 10);
+  }
+  const match = code.match(/\d/);
+  return match ? parseInt(match[0], 10) : null;
+};
+
 interface AcademicScheduleModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -186,6 +208,9 @@ export function AcademicScheduleModal({
   // 행사 인솔교사 개별 추가 팝오버 및 검색 상태
   const [showTeacherPicker, setShowTeacherPicker] = React.useState<boolean>(false);
   const [teacherSearchQuery, setTeacherSearchQuery] = React.useState<string>('');
+
+  // 모바일 직접입력 모달용 당일 등록 일정 목록 접기/펼치기 상태
+  const [showMobileExistingList, setShowMobileExistingList] = React.useState<boolean>(false);
 
   // 모달 컨테이너 ref (팝업 메뉴의 모달 내부 상대위치 계산 및 넘침 방지)
   const modalContainerRef = React.useRef<HTMLDivElement>(null);
@@ -451,6 +476,18 @@ export function AcademicScheduleModal({
     return days;
   }, [calendarYear, calendarMonth, events, vacations, specialDaySchedules, examPeriods, teacherInstructorAssignments]);
 
+  // 모바일 캘린더용 현재 선택된 날짜 객체
+  const selectedDayObj = React.useMemo(() => {
+    if (selectedCalendarDate) {
+      const found = calendarDays.find(d => d.dateStr === selectedCalendarDate);
+      if (found) return found;
+    }
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayFound = calendarDays.find(d => d.dateStr === todayStr && d.isCurrentMonth);
+    if (todayFound) return todayFound;
+    return calendarDays.find(d => d.isCurrentMonth) || calendarDays[0];
+  }, [calendarDays, selectedCalendarDate]);
+
   // 월 이동
   const handlePrevMonth = () => {
     if (calendarMonth === 1) {
@@ -469,6 +506,67 @@ export function AcademicScheduleModal({
       setCalendarMonth(m => m + 1);
     }
   };
+
+  // 행사 인솔교사 요약 (1학년 담임 등 일괄 설정인 경우 명단 나열 없이 "1학년 담임"으로만 표출)
+  const formatEventInChargeSummary = React.useCallback((ev: {
+    inChargeTeachers?: string[];
+    inChargeRoleLabel?: string;
+  }) => {
+    if (!ev.inChargeTeachers || ev.inChargeTeachers.length === 0) return '';
+
+    // 1. inChargeRoleLabel 기반 분석
+    if (ev.inChargeRoleLabel) {
+      const rl = ev.inChargeRoleLabel.trim();
+      if (rl.includes('담임')) {
+        if (rl.includes('1학년') || rl.includes('1')) return '1학년 담임';
+        if (rl.includes('2학년') || rl.includes('2')) return '2학년 담임';
+        if (rl.includes('3학년') || rl.includes('3')) return '3학년 담임';
+        if (rl.includes('전교') || rl.includes('전체') || rl.includes('전학년')) return '전학년 담임';
+        return '담임교사';
+      }
+      if (rl.includes('진로')) {
+        if (rl.includes('1학년')) return '1학년 진로';
+        if (rl.includes('2학년')) return '2학년 진로';
+        if (rl.includes('3학년')) return '3학년 진로';
+        return '진로담당';
+      }
+      if (rl.includes('동아리') || rl.includes('동아')) {
+        if (rl.includes('1학년')) return '1학년 동아리';
+        if (rl.includes('2학년')) return '2학년 동아리';
+        if (rl.includes('3학년')) return '3학년 동아리';
+        return '동아리담당';
+      }
+      return rl.replace(/\s*일괄/g, '').replace(/\(\d+명\)/g, '').trim() || rl;
+    }
+
+    // 2. timetableData 담임 목록 직접 매칭 분석
+    if (timetableData?.teachers) {
+      const allTeachers = timetableData.teachers;
+      const getGradeHomeroom = (grade: number) => 
+        allTeachers.filter(t => t.homeroomClass && getTeacherHomeroomGrade(t.homeroomClass) === grade).map(t => t.teacherName);
+
+      const g1 = getGradeHomeroom(1);
+      const g2 = getGradeHomeroom(2);
+      const g3 = getGradeHomeroom(3);
+      const allH = allTeachers.filter(t => t.homeroomClass && getTeacherHomeroomGrade(t.homeroomClass) !== null).map(t => t.teacherName);
+
+      const isMatch = (list: string[]) => 
+        list.length > 0 && 
+        list.length === ev.inChargeTeachers!.length && 
+        list.every(name => ev.inChargeTeachers!.includes(name));
+
+      if (isMatch(g1)) return '1학년 담임';
+      if (isMatch(g2)) return '2학년 담임';
+      if (isMatch(g3)) return '3학년 담임';
+      if (isMatch(allH)) return '전학년 담임';
+    }
+
+    // 3. 개별 지정인 경우 (3명 이하는 이름 나열, 4명 이상은 외 N명)
+    if (ev.inChargeTeachers.length <= 3) {
+      return ev.inChargeTeachers.join(', ');
+    }
+    return `${ev.inChargeTeachers.slice(0, 2).join(', ')} 외 ${ev.inChargeTeachers.length - 2}명`;
+  }, [timetableData]);
 
   // ==========================================
   // [마스터 데이터 테이블] 1년치 전체 일정 통합 리스트 & 필터
@@ -498,15 +596,16 @@ export function AcademicScheduleModal({
         title: v.name,
         badgeLabel: isHoliday ? '🏖️ 공휴일' : (isDiscretionary ? '🏫 재량휴업' : '🌴 방학'),
         badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300',
-        details: v.endDate !== v.startDate 
-          ? `${v.startDate} ~ ${v.endDate} (${isHoliday ? '법정공휴일' : (isDiscretionary ? '학교재량휴업' : '방학기간')})`
-          : (isHoliday ? '법정공휴일' : (isDiscretionary ? '학교재량휴업일' : '방학기간')),
+        details: v.startDate === v.endDate ? '하루 휴업' : `${v.startDate} ~ ${v.endDate} (방학/휴업 기간)`,
         rawItem: v,
       });
     });
 
     // 2. 지필평가
     examPeriods.forEach(e => {
+      const gradesText = e.targetGrades.length === 3 ? '전학년' : `${e.targetGrades.join(',')}학년`;
+      const periodsText = e.examPeriods ? `${e.examPeriods.join(',')}교시 시험` : '시험일';
+      const dismissText = e.afternoonType === 'dismiss' ? '오후 하교' : '정규수업';
       list.push({
         id: e.id,
         category: 'exam',
@@ -514,47 +613,38 @@ export function AcademicScheduleModal({
         endDate: e.endDate !== e.startDate ? e.endDate : undefined,
         title: e.name,
         badgeLabel: '📝 지필평가',
-        badgeClass: 'bg-rose-100 text-rose-900 border-rose-300',
-        details: `대상: ${e.targetGrades.join(',')}학년 | 시험교시: ${e.examPeriods.join('·')}교시 | 오후: ${e.afternoonType === 'dismiss' ? '하교' : '정규수업'}`,
+        badgeClass: 'bg-rose-100 text-rose-900 border-rose-300 font-black',
+        details: `${gradesText} | ${periodsText} | ${dismissText}`,
         rawItem: e,
       });
     });
 
-    // 3. 단축수업 및 교시연속/대체
+    // 3. 단축 및 대체 요일
     specialDaySchedules.forEach(s => {
-      const hasOverrides = Boolean(s.periodOverrides && Object.keys(s.periodOverrides).length > 0);
       if (s.shortenedPeriods) {
         list.push({
           id: s.id,
           category: 'shortened',
           date: s.date,
-          title: s.description || `${s.shortenedPeriods}교시 단축수업`,
-          badgeLabel: `⏰ ${s.shortenedPeriods}교시 단축`,
-          badgeClass: 'bg-amber-100 text-amber-900 border-amber-300',
-          details: `${s.shortenedPeriods}교시까지 단축 운영 (${s.description || '정규 수업 단축'})`,
-          rawItem: s,
-        });
-      } else if (hasOverrides && s.periodOverrides) {
-        const targetP = Number(Object.keys(s.periodOverrides)[0]) || 6;
-        const srcP = Number(s.periodOverrides[targetP]) || 5;
-        list.push({
-          id: s.id,
-          category: 'special_day',
-          date: s.date,
-          title: s.description || `${srcP}~${targetP}교시 연속수업`,
-          badgeLabel: `🔗 ${srcP}~${targetP}교시 연속`,
-          badgeClass: 'bg-blue-100 text-blue-900 border-blue-300 font-bold',
-          details: `[연속수업] ${srcP}교시 수업 ➔ ${targetP}교시 연속 진행 (${s.description || '정규 시간표 연동'})`,
+          title: `${s.shortenedPeriods}교시 단축수업`,
+          badgeLabel: '⏰ 단축수업',
+          badgeClass: 'bg-amber-100 text-amber-900 border-amber-300 font-black',
+          details: `정규 수업을 ${s.shortenedPeriods}교시까지만 운영 (${s.description || '단축수업 진행'})`,
           rawItem: s,
         });
       } else {
+        const hasOverrides = Boolean(s.periodOverrides && Object.keys(s.periodOverrides).length > 0);
+        const title = hasOverrides 
+          ? (s.description || '교시 변형/연속')
+          : `${s.targetDayOfWeek}요일 대체 시간표`;
+
         list.push({
           id: s.id,
           category: 'special_day',
           date: s.date,
-          title: s.description || `${s.targetDayOfWeek}요일 시간표 대체`,
-          badgeLabel: `🔄 ${s.originalDayOfWeek || '당일'} ➔ ${s.targetDayOfWeek}요일`,
-          badgeClass: 'bg-indigo-100 text-indigo-900 border-indigo-300',
+          title,
+          badgeLabel: '🔄 요일대체',
+          badgeClass: 'bg-indigo-100 text-indigo-900 border-indigo-300 font-bold',
           details: `${s.originalDayOfWeek || '당일'}요일에 ${s.targetDayOfWeek}요일 시간표로 수업 대체 (${s.description || '시간표 변경'})`,
           rawItem: s,
         });
@@ -568,63 +658,7 @@ export function AcademicScheduleModal({
       const locationText = ev.location ? ` | 📍 ${ev.location}` : '';
 
       // 인솔교사 요약 (일괄 설정인 경우 "1학년 담임" 등 간소화)
-      const teachersSummary = (() => {
-        if (!ev.inChargeTeachers || ev.inChargeTeachers.length === 0) return '';
-
-        // 1. inChargeRoleLabel 기반 분석
-        if (ev.inChargeRoleLabel) {
-          const rl = ev.inChargeRoleLabel.trim();
-          if (rl.includes('담임')) {
-            if (rl.includes('1학년')) return '1학년 담임';
-            if (rl.includes('2학년')) return '2학년 담임';
-            if (rl.includes('3학년')) return '3학년 담임';
-            if (rl.includes('전교') || rl.includes('전체') || rl.includes('전학년')) return '전학년 담임';
-            return '담임교사';
-          }
-          if (rl.includes('진로')) {
-            if (rl.includes('1학년')) return '1학년 진로';
-            if (rl.includes('2학년')) return '2학년 진로';
-            if (rl.includes('3학년')) return '3학년 진로';
-            return '진로담당';
-          }
-          if (rl.includes('동아리') || rl.includes('동아')) {
-            if (rl.includes('1학년')) return '1학년 동아리';
-            if (rl.includes('2학년')) return '2학년 동아리';
-            if (rl.includes('3학년')) return '3학년 동아리';
-            return '동아리담당';
-          }
-          return rl.replace(/\s*일괄/g, '').replace(/\(\d+명\)/g, '').trim() || rl;
-        }
-
-        // 2. timetableData 담임 목록 직접 매칭 분석
-        if (timetableData?.teachers) {
-          const allTeachers = timetableData.teachers;
-          const getGradeHomeroom = (grade: number) => 
-            allTeachers.filter(t => t.homeroomClass && getTeacherHomeroomGrade(t.homeroomClass) === grade).map(t => t.teacherName);
-
-          const g1 = getGradeHomeroom(1);
-          const g2 = getGradeHomeroom(2);
-          const g3 = getGradeHomeroom(3);
-          const allH = allTeachers.filter(t => t.homeroomClass && getTeacherHomeroomGrade(t.homeroomClass) !== null).map(t => t.teacherName);
-
-          const isMatch = (list: string[]) => 
-            list.length > 0 && 
-            list.length === ev.inChargeTeachers.length && 
-            list.every(name => ev.inChargeTeachers.includes(name));
-
-          if (isMatch(g1)) return '1학년 담임';
-          if (isMatch(g2)) return '2학년 담임';
-          if (isMatch(g3)) return '3학년 담임';
-          if (isMatch(allH)) return '전학년 담임';
-        }
-
-        // 3. 개별 지정인 경우
-        if (ev.inChargeTeachers.length <= 3) {
-          return ev.inChargeTeachers.join(', ');
-        }
-        return `${ev.inChargeTeachers.slice(0, 2).join(', ')} 외 ${ev.inChargeTeachers.length - 2}명`;
-      })();
-
+      const teachersSummary = formatEventInChargeSummary(ev);
       const teachersText = teachersSummary ? ` | 인솔: ${teachersSummary}` : '';
 
       list.push({
@@ -634,14 +668,13 @@ export function AcademicScheduleModal({
         title: ev.title,
         badgeLabel: '🎭 학교행사',
         badgeClass: 'bg-purple-100 text-purple-900 border-purple-300',
-        details: `대상: ${scopeText} | ${periodsText}${locationText}${teachersText}`,
+        details: `${scopeText} | ${periodsText}${locationText}${teachersText}`,
         rawItem: ev,
       });
     });
 
-    // 날짜순 정렬
-    return list.sort((a, b) => a.date.localeCompare(b.date));
-  }, [vacations, examPeriods, specialDaySchedules, events, timetableData]);
+    return list.sort((a, b) => b.date.localeCompare(a.date));
+  }, [events, vacations, specialDaySchedules, examPeriods, formatEventInChargeSummary]);
 
   // 마스터 데이터 필터링 (검색어 + 카테고리 필터)
   const filteredMasterRows = React.useMemo(() => {
@@ -973,23 +1006,6 @@ export function AcademicScheduleModal({
     );
   };
 
-  // 학급 코드 또는 슬롯에서 정확한 학년 추출 (예: '기14' -> 1, '섬21' -> 2, '도31' -> 3, '1-1' -> 1)
-  const extractSlotGrade = (slot?: { grade?: number; classCode?: string }): number | null => {
-    if (!slot) return null;
-    if (typeof slot.grade === 'number' && slot.grade >= 1 && slot.grade <= 3) {
-      return slot.grade;
-    }
-    const code = (slot.classCode || '').trim();
-    if (!code) return null;
-    // '도31', '기14', '섬22' 처럼 2번째 글자가 학년 숫자인 경우
-    if (code.length >= 2 && /\d/.test(code.charAt(1))) {
-      return parseInt(code.charAt(1), 10);
-    }
-    // '1-1', '2-3' 같은 일반 형식
-    const match = code.match(/\d/);
-    return match ? parseInt(match[0], 10) : null;
-  };
-
   // 퀵 행사: 담임교사 일괄 자동 배정
   const handleAssignHomeroomToModalEvent = (scope = modalEventScope, grade = modalEventGrade) => {
     const targetTeachers = (timetableData?.teachers || []).filter(t => {
@@ -1007,8 +1023,8 @@ export function AcademicScheduleModal({
     }
 
     const label = scope === 'grade'
-      ? `${grade}학년 담임교사 일괄 (${targetTeachers.length}명)`
-      : `전교생 담임교사 일괄 (${targetTeachers.length}명)`;
+      ? `${grade}학년 담임`
+      : '전학년 담임';
 
     setModalEventTeachers(targetTeachers);
     setModalEventRoleLabel(label);
@@ -1034,8 +1050,8 @@ export function AcademicScheduleModal({
     }
 
     const label = scope === 'grade'
-      ? `${grade}학년 진로담당 일괄 (${targetTeachers.length}명)`
-      : `전체 진로담당 일괄 (${targetTeachers.length}명)`;
+      ? `${grade}학년 진로`
+      : '전체 진로';
 
     setModalEventTeachers(targetTeachers);
     setModalEventRoleLabel(label);
@@ -1061,8 +1077,8 @@ export function AcademicScheduleModal({
     }
 
     const label = scope === 'grade'
-      ? `${grade}학년 동아리담당 일괄 (${targetTeachers.length}명)`
-      : `전체 동아리담당 일괄 (${targetTeachers.length}명)`;
+      ? `${grade}학년 동아리`
+      : '전체 동아리';
 
     setModalEventTeachers(targetTeachers);
     setModalEventRoleLabel(label);
@@ -1076,12 +1092,14 @@ export function AcademicScheduleModal({
       alert(`'${trimmed}' 교사는 이미 배정되어 있습니다.`);
       return;
     }
+    setModalEventRoleLabel(''); // 개별 추가 시 일괄 라벨 해제
     setModalEventTeachers(prev => [...prev, trimmed]);
     setTeacherSearchQuery('');
   };
 
   // 행사: 개별 교사 제외
   const handleRemoveTeacherFromModalEvent = (teacherName: string) => {
+    setModalEventRoleLabel(''); // 개별 제외 시 일괄 라벨 해제
     setModalEventTeachers(prev => prev.filter(t => t !== teacherName));
   };
 
@@ -1215,13 +1233,6 @@ export function AcademicScheduleModal({
 
   if (!isOpen) return null;
 
-  // 학급 코드에서 정확한 학년 추출 (예: "축11" -> 1, "건21" -> 2, "도31" -> 3, "1-1" -> 1)
-  const getTeacherHomeroomGrade = (homeroom?: string): number | null => {
-    if (!homeroom) return null;
-    const match = homeroom.match(/\d/);
-    return match ? parseInt(match[0], 10) : null;
-  };
-
   // 담임교사 일괄 자동 배정 핸들러
   const handleAutoAssignHomeroomTeachers = () => {
     const targetTeachers = timetableData.teachers.filter(t => {
@@ -1239,8 +1250,8 @@ export function AcademicScheduleModal({
     }
 
     const label = newEventScope === 'grade'
-      ? `${newEventGrade}학년 담임교사 일괄 (${targetTeachers.length}명)`
-      : `전교생 담임교사 일괄 (${targetTeachers.length}명)`;
+      ? `${newEventGrade}학년 담임`
+      : '전학년 담임';
 
     setNewEventInChargeTeachers(targetTeachers);
     setNewEventInChargeRoleLabel(label);
@@ -1266,8 +1277,8 @@ export function AcademicScheduleModal({
     }
 
     const label = newEventScope === 'grade'
-      ? `${newEventGrade}학년 진로담당 일괄 (${targetTeachers.length}명)`
-      : `전체 진로담당 일괄 (${targetTeachers.length}명)`;
+      ? `${newEventGrade}학년 진로`
+      : '전체 진로';
 
     setNewEventInChargeTeachers(targetTeachers);
     setNewEventInChargeRoleLabel(label);
@@ -1293,8 +1304,8 @@ export function AcademicScheduleModal({
     }
 
     const label = newEventScope === 'grade'
-      ? `${newEventGrade}학년 동아리담당 일괄 (${targetTeachers.length}명)`
-      : `전체 동아리담당 일괄 (${targetTeachers.length}명)`;
+      ? `${newEventGrade}학년 동아리`
+      : '전체 동아리';
 
     setNewEventInChargeTeachers(targetTeachers);
     setNewEventInChargeRoleLabel(label);
@@ -1827,20 +1838,20 @@ export function AcademicScheduleModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent ref={modalContainerRef} showCloseButton={false} className="max-w-4xl h-[88vh] max-h-[850px] flex flex-col p-0 border-none shadow-2xl rounded-2xl overflow-hidden bg-white">
+      <DialogContent ref={modalContainerRef} showCloseButton={false} className="w-full h-full max-w-full max-h-full sm:max-w-4xl sm:w-[95vw] sm:h-[88vh] sm:max-h-[850px] flex flex-col p-0 border-none shadow-2xl rounded-none sm:rounded-2xl overflow-hidden bg-white z-[70]">
         {/* 1. 표준 분리형 2단 상단 헤더 (1단: 제목 & 배지, 2단: 4대 탭 바) */}
         <div className="bg-white border-b border-slate-200 shrink-0">
           {/* 1단: 제목 & 배지 & 닫기 */}
-          <div className="px-5 pt-3.5 pb-2.5 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 font-bold shadow-2xs">
-                <CalendarDays className="h-5 w-5" />
+          <div className="px-3.5 sm:px-5 pt-3 sm:pt-3.5 pb-2 sm:pb-2.5 flex items-center justify-between gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-2.5">
+              <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 font-bold shadow-2xs">
+                <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
-              <div className="flex items-center gap-2">
-                <DialogTitle className="text-lg font-black text-slate-900 tracking-tight">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <DialogTitle className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
                   {config.academicYear || 2026}학년도 연간 학사일정
                 </DialogTitle>
-                <Badge className="bg-blue-50 text-blue-700 border-blue-200/80 text-[11px] px-2 py-0.5 rounded-lg font-black">
+                <Badge className="bg-blue-50 text-blue-700 border-blue-200/80 text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-lg font-black">
                   수업계
                 </Badge>
               </div>
@@ -1849,21 +1860,21 @@ export function AcademicScheduleModal({
             <button
               type="button"
               onClick={onClose}
-              className="h-8 w-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+              className="h-8 w-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer shrink-0"
               title="닫기"
             >
-              <X className="h-4.5 w-4.5" />
+              <X className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
             </button>
           </div>
 
-          {/* 2단: 4대 핵심 업무 탭 스위처 바 */}
-          <div className="px-5 pb-2.5">
-            <div className="flex items-center gap-1.5 bg-slate-100/90 p-1 rounded-xl">
+          {/* 2단: 4대 핵심 업무 탭 스위처 바 (모바일 가로 스크롤 보호) */}
+          <div className="px-3 sm:px-5 pb-2.5 overflow-x-auto scrollbar-none">
+            <div className="flex items-center gap-1 sm:gap-1.5 bg-slate-100/90 p-1 rounded-xl min-w-max">
               <button
                 type="button"
                 onClick={() => setActiveTab('calendar')}
                 className={cn(
-                  "flex-1 py-1.5 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                  "py-1.5 px-2.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap",
                   activeTab === 'calendar'
                     ? "bg-white text-blue-900 font-black shadow-xs border border-slate-200/60"
                     : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
@@ -1877,7 +1888,7 @@ export function AcademicScheduleModal({
                 type="button"
                 onClick={() => setActiveTab('details')}
                 className={cn(
-                  "flex-1 py-1.5 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                  "py-1.5 px-2.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap",
                   activeTab === 'details'
                     ? "bg-white text-indigo-900 font-black shadow-xs border border-slate-200/60"
                     : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
@@ -1891,7 +1902,7 @@ export function AcademicScheduleModal({
                 type="button"
                 onClick={() => setActiveTab('instructors')}
                 className={cn(
-                  "flex-1 py-1.5 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                  "py-1.5 px-2.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap",
                   activeTab === 'instructors'
                     ? "bg-white text-purple-900 font-black shadow-xs border border-slate-200/60"
                     : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
@@ -1905,7 +1916,7 @@ export function AcademicScheduleModal({
                 type="button"
                 onClick={() => setActiveTab('settings')}
                 className={cn(
-                  "flex-1 py-1.5 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                  "py-1.5 px-2.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap",
                   activeTab === 'settings'
                     ? "bg-white text-emerald-900 font-black shadow-xs border border-slate-200/60"
                     : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
@@ -1988,8 +1999,222 @@ export function AcademicScheduleModal({
                 </div>
               </div>
 
-              {/* 월별 캘린더 그리드 (flex-1 로 모달 높이를 가득 채움) */}
-              <div className="flex-1 flex flex-col border border-slate-200 rounded-2xl overflow-hidden shadow-2xs bg-white min-h-0">
+              {/* [모바일 전용] 스마트 도트 캘린더 + 하단 선택일 일정 상세 카드 (md:hidden) */}
+              <div className="md:hidden flex-1 flex flex-col min-h-0 space-y-2 overflow-hidden">
+                {/* 1. 모바일 7열 캘린더 (도트 요약) */}
+                <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs bg-white shrink-0">
+                  {/* 요일 헤더 */}
+                  <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-center text-[11px] font-black py-1 shrink-0">
+                    <div className="text-rose-600">일</div>
+                    <div className="text-slate-700">월</div>
+                    <div className="text-slate-700">화</div>
+                    <div className="text-slate-700">수</div>
+                    <div className="text-slate-700">목</div>
+                    <div className="text-slate-700">금</div>
+                    <div className="text-blue-600">토</div>
+                  </div>
+
+                  {/* 날짜 셀 그리드 */}
+                  <div className="grid grid-cols-7 divide-x divide-y divide-slate-100 bg-slate-50/20">
+                    {calendarDays.map((cDay, idx) => {
+                      const isSunday = cDay.dayOfWeek === 0;
+                      const isSaturday = cDay.dayOfWeek === 6;
+                      const isToday = cDay.dateStr === new Date().toISOString().split('T')[0];
+                      const isSelected = selectedDayObj?.dateStr === cDay.dateStr;
+
+                      const hasVacation = cDay.vacations.length > 0;
+                      const hasExam = cDay.exams.length > 0;
+                      const hasShortened = cDay.specialDays.some(s => s.shortenedPeriods);
+                      const hasSwap = cDay.specialDays.some(s => !s.shortenedPeriods);
+                      const hasEvent = cDay.events.length > 0;
+                      const hasInstructor = cDay.instructors.length > 0;
+
+                      return (
+                        <div
+                          key={`mob-${cDay.dateStr}-${idx}`}
+                          onClick={() => {
+                            if (!cDay.isCurrentMonth) return;
+                            setSelectedCalendarDate(cDay.dateStr);
+                          }}
+                          className={cn(
+                            "py-1.5 px-0.5 flex flex-col items-center justify-between transition-all cursor-pointer relative min-h-[44px]",
+                            !cDay.isCurrentMonth ? "bg-slate-100/40 text-slate-300 opacity-50 pointer-events-none" : "bg-white hover:bg-blue-50/40",
+                            isSelected && "bg-blue-50/90 ring-2 ring-blue-600 ring-inset",
+                            isToday && !isSelected && "bg-amber-50/60"
+                          )}
+                        >
+                          <span className={cn(
+                            "text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full leading-none",
+                            !cDay.isCurrentMonth ? "text-slate-300" : (
+                              isSunday ? "text-rose-600" : (isSaturday ? "text-blue-600" : "text-slate-800")
+                            ),
+                            isSelected && "bg-blue-600 text-white font-black shadow-xs",
+                            isToday && !isSelected && "font-black text-blue-700 ring-1 ring-blue-400"
+                          )}>
+                            {cDay.dayNumber}
+                          </span>
+
+                          {/* 컬러 도트 인디케이터 */}
+                          <div className="flex items-center justify-center gap-0.5 pt-0.5 h-2">
+                            {hasVacation && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" title="휴업/방학" />}
+                            {hasExam && <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" title="지필평가" />}
+                            {hasShortened && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" title="단축수업" />}
+                            {hasSwap && <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 shrink-0" title="대체요일" />}
+                            {hasEvent && <span className="w-1.5 h-1.5 rounded-full bg-purple-600 shrink-0" title="학교행사" />}
+                            {hasInstructor && <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" title="시간강사" />}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. 하단 선택일 일정 상세 카드 & 등록 버튼 */}
+                {selectedDayObj && (
+                  <div className="flex-1 min-h-0 bg-slate-50/70 border border-slate-200/90 rounded-2xl p-3 flex flex-col gap-2 shadow-2xs overflow-hidden">
+                    {/* 선택일 타이틀 바 & 일정 등록 버튼 */}
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200/70 shrink-0">
+                      <div className="flex items-center gap-1.5">
+                        <Calendar className="h-4 w-4 text-blue-600" />
+                        <span className="text-xs font-black text-slate-900">
+                          {selectedDayObj.dateStr}
+                        </span>
+                        <span className="text-[11px] font-bold text-slate-500">
+                          ({getDayOfWeekFromDate(selectedDayObj.dateStr)}요일)
+                        </span>
+                      </div>
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => handleOpenDayMenu(selectedDayObj)}
+                        className="h-7 px-2.5 text-xs font-bold gap-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-2xs cursor-pointer"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>일정 추가</span>
+                      </Button>
+                    </div>
+
+                    {/* 선택일 세부 일정 스크롤 목록 */}
+                    <div className="flex-1 overflow-y-auto space-y-2 pr-0.5 custom-scrollbar">
+                      {(() => {
+                        const hasAny = selectedDayObj.vacations.length > 0 || 
+                                       selectedDayObj.exams.length > 0 || 
+                                       selectedDayObj.specialDays.length > 0 || 
+                                       selectedDayObj.events.length > 0 || 
+                                       selectedDayObj.instructors.length > 0;
+
+                        if (!hasAny) {
+                          return (
+                            <div className="py-6 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-1.5">
+                              <p>등록된 학사일정이 없습니다.</p>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenDayMenu(selectedDayObj)}
+                                className="text-blue-600 hover:text-blue-700 font-bold text-xs underline cursor-pointer"
+                              >
+                                이 날짜에 새 일정 등록하기
+                              </button>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <>
+                            {/* 휴업일 */}
+                            {selectedDayObj.vacations.map(v => (
+                              <div key={v.id} className="p-2.5 rounded-xl bg-white border border-emerald-200 flex items-center justify-between shadow-2xs">
+                                <div className="space-y-0.5">
+                                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                                    {v.type === 'holiday' ? '공휴일' : v.type === 'discretionary' ? '재량휴업일' : '방학'}
+                                  </span>
+                                  <div className="text-xs font-black text-slate-900">🏖️ {v.name}</div>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Button variant="ghost" size="sm" onClick={() => handleDayModalPrefillVacation(v)} className="h-7 px-2 text-xs font-bold text-indigo-600">수정</Button>
+                                  <Button variant="ghost" size="sm" onClick={() => handleDeleteVacation(v.id)} className="h-7 px-2 text-xs font-bold text-rose-600">삭제</Button>
+                                </div>
+                              </div>
+                            ))}
+
+                            {/* 지필평가 */}
+                            {selectedDayObj.exams.map(e => (
+                              <div key={e.id} className="p-2.5 rounded-xl bg-white border border-rose-200 flex items-center justify-between shadow-2xs">
+                                <div className="space-y-0.5">
+                                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-rose-100 text-rose-800">지필평가</span>
+                                  <div className="text-xs font-black text-slate-900">📝 {e.name}</div>
+                                  <div className="text-[11px] text-slate-500">{e.examPeriods.join(', ')}교시 시험</div>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Button variant="ghost" size="sm" onClick={() => handleDayModalPrefillExam(e)} className="h-7 px-2 text-xs font-bold text-indigo-600">수정</Button>
+                                  <Button variant="ghost" size="sm" onClick={() => handleDeleteExamPeriod(e.id)} className="h-7 px-2 text-xs font-bold text-rose-600">삭제</Button>
+                                </div>
+                              </div>
+                            ))}
+
+                            {/* 단축수업 / 대체요일 */}
+                            {selectedDayObj.specialDays.map(s => {
+                              const isShort = Boolean(s.shortenedPeriods);
+                              return (
+                                <div key={s.id} className={cn("p-2.5 rounded-xl bg-white flex items-center justify-between shadow-2xs border", isShort ? "border-amber-300" : "border-indigo-200")}>
+                                  <div className="space-y-0.5">
+                                    <span className={cn("text-[10px] font-black px-1.5 py-0.5 rounded", isShort ? "bg-amber-100 text-amber-900" : "bg-indigo-100 text-indigo-900")}>
+                                      {isShort ? '단축수업' : '대체요일'}
+                                    </span>
+                                    <div className="text-xs font-black text-slate-900">
+                                      {isShort ? `⏰ ${s.shortenedPeriods}교시 단축수업` : `🔄 ${s.targetDayOfWeek}요일 대체 시간표`}
+                                    </div>
+                                    {s.description && <div className="text-[11px] text-slate-500">{s.description}</div>}
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Button variant="ghost" size="sm" onClick={() => isShort ? handleDayModalPrefillShortened(s) : handleDayModalPrefillSwapDay(s)} className="h-7 px-2 text-xs font-bold text-indigo-600">수정</Button>
+                                    <Button variant="ghost" size="sm" onClick={() => handleDeleteSpecialDay(s.id)} className="h-7 px-2 text-xs font-bold text-rose-600">삭제</Button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+
+                            {/* 학교행사 */}
+                            {selectedDayObj.events.map(ev => (
+                              <div key={ev.id} className="p-2.5 rounded-xl bg-white border border-purple-200 flex items-center justify-between shadow-2xs">
+                                <div className="space-y-0.5">
+                                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-purple-100 text-purple-800">학교행사</span>
+                                  <div className="text-xs font-black text-slate-900">🎭 {ev.title}</div>
+                                  <div className="text-[11px] text-slate-500">
+                                    {ev.periods.join(', ')}교시 · {ev.targetScope === 'all' ? '전교생' : `${ev.targetGrades?.join(',')}학년`}
+                                    {(() => {
+                                      const inCharge = formatEventInChargeSummary(ev);
+                                      return inCharge ? ` · 담당: ${inCharge}` : '';
+                                    })()}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Button variant="ghost" size="sm" onClick={() => handleDayModalPrefillEvent(ev)} className="h-7 px-2 text-xs font-bold text-purple-600">수정</Button>
+                                  <Button variant="ghost" size="sm" onClick={() => handleDeleteEvent(ev.id)} className="h-7 px-2 text-xs font-bold text-rose-600">삭제</Button>
+                                </div>
+                              </div>
+                            ))}
+
+                            {/* 일일 시간강사 */}
+                            {selectedDayObj.instructors.map(inst => (
+                              <div key={inst.id} className="p-2.5 rounded-xl bg-white border border-amber-200 flex items-center justify-between shadow-2xs">
+                                <div className="space-y-0.5">
+                                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-100 text-amber-900">시간강사</span>
+                                  <div className="text-xs font-black text-slate-900">👤 {inst.instructorName} 강사</div>
+                                  <div className="text-[11px] text-slate-500">{inst.originalTeacherName} 선생님 대리</div>
+                                </div>
+                              </div>
+                            ))}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* [데스크톱 전용] 월별 캘린더 그리드 (hidden md:flex) */}
+              <div className="hidden md:flex flex-1 flex-col border border-slate-200 rounded-2xl overflow-hidden shadow-2xs bg-white min-h-0">
                 {/* 요일 헤더 */}
                 <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/90 text-center text-xs font-black py-1.5 shrink-0">
                   <div className="text-rose-600">일</div>
@@ -3062,17 +3287,164 @@ export function AcademicScheduleModal({
             {isSaving ? '저장 중...' : '학사일정 전체 저장'}
           </Button>
         </div>
-                        {/* [직접입력 모달] 좌·우 2단 분할(Split) 레이아웃 모달 */}
+        {/* [직접입력 모달] 모바일 네이티브 풀스크린 & 데스크톱 2단 분할 레이아웃 */}
         {dayScheduleModal && (
-          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4">
             <div 
-              className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-[840px] w-full max-h-[90vh] flex flex-col md:flex-row overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-slate-800"
+              className="bg-white rounded-none sm:rounded-2xl shadow-2xl border-0 sm:border sm:border-slate-200 max-w-[860px] w-full h-[100dvh] sm:h-auto sm:max-h-[90vh] flex flex-col md:flex-row overflow-hidden animate-in fade-in sm:zoom-in-95 duration-150 text-slate-800"
               onClick={(e) => e.stopPropagation()}
             >
               {/* ========================================================= */}
-              {/* 좌측 사이드 패널: 날짜 정보, 5대 카테고리 메뉴, 등록된 일정 목록 */}
+              {/* [모바일 전용 상단 컴팩트 바] (md:hidden) */}
               {/* ========================================================= */}
-              <div className="w-full md:w-[260px] shrink-0 bg-slate-50/90 border-b md:border-b-0 md:border-r border-slate-200/80 p-4 flex flex-col justify-between overflow-y-auto custom-scrollbar gap-3">
+              <div className="md:hidden shrink-0 bg-slate-50 border-b border-slate-200/90">
+                {/* 1. 모바일 상단 미니 헤더 (선택 날짜 + 수정 알림 + 닫기 버튼) */}
+                <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-slate-200/70 bg-white">
+                  <div className="flex items-center gap-2">
+                    <div className="h-7 w-7 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 font-bold shrink-0">
+                      <Calendar className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-black text-slate-900 tracking-tight">
+                          {dayScheduleModal.dateStr}
+                        </span>
+                        <span className="text-[10px] font-black text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
+                          {dayScheduleModal.dayOfWeek}요일
+                        </span>
+                      </div>
+                      {editingScheduleId && (
+                        <div className="text-[10px] font-bold text-amber-700 flex items-center gap-1">
+                          <span>✏️ &apos;{editingScheduleId.originalTitle}&apos; 수정 중</span>
+                          <button
+                            type="button"
+                            onClick={handleCancelEditMode}
+                            className="underline text-rose-600 ml-1 cursor-pointer"
+                          >
+                            취소
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setDayScheduleModal(null)}
+                    className="h-8 w-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                    title="닫기"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* 2. 5대 카테고리 횡스크롤 탭 바 */}
+                <div className="px-3 py-2 flex items-center gap-1.5 overflow-x-auto scrollbar-none bg-slate-50">
+                  {[
+                    { id: 'holiday', icon: '🏖️', label: '휴업/재량' },
+                    { id: 'shortened', icon: '⏰', label: '단축수업' },
+                    { id: 'special_day', icon: '🔄', label: '대체시간표' },
+                    { id: 'exam', icon: '📝', label: '지필평가' },
+                    { id: 'event', icon: '🎭', label: '학교행사' },
+                  ].map(cat => {
+                    const isActive = dayScheduleModal.activeCategory === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setDayScheduleModal(p => p ? { ...p, activeCategory: cat.id as any } : null)}
+                        className={cn(
+                          "px-2.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1 shrink-0 border",
+                          isActive
+                            ? "bg-blue-600 text-white border-blue-600 shadow-xs font-black"
+                            : "bg-white text-slate-700 border-slate-200/90 hover:bg-slate-100"
+                        )}
+                      >
+                        <span>{cat.icon}</span>
+                        <span>{cat.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* 3. 모바일용 당일 등록 일정 접이식 아코디언 */}
+                {(() => {
+                  const curVac = vacations.filter(v => v.startDate <= dayScheduleModal.dateStr && v.endDate >= dayScheduleModal.dateStr);
+                  const curEx = examPeriods.filter(e => e.startDate <= dayScheduleModal.dateStr && e.endDate >= dayScheduleModal.dateStr);
+                  const curSp = specialDaySchedules.filter(s => s.date === dayScheduleModal.dateStr);
+                  const curEv = events.filter(e => e.date === dayScheduleModal.dateStr);
+                  const totalCount = curVac.length + curEx.length + curSp.length + curEv.length;
+
+                  if (totalCount === 0) return null;
+
+                  return (
+                    <div className="border-t border-slate-200/70 bg-white">
+                      <button
+                        type="button"
+                        onClick={() => setShowMobileExistingList(p => !p)}
+                        className="w-full px-3 py-1.5 text-left text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center justify-between cursor-pointer bg-slate-50/50"
+                      >
+                        <span className="flex items-center gap-1.5 text-[11px]">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-600 inline-block" />
+                          <span>당일 등록된 기존 일정 ({totalCount}건)</span>
+                        </span>
+                        <span className="text-[10px] text-blue-600 font-black">
+                          {showMobileExistingList ? '접기 ▲' : '확인/수정 ▼'}
+                        </span>
+                      </button>
+
+                      {showMobileExistingList && (
+                        <div className="p-2 space-y-1 max-h-32 overflow-y-auto custom-scrollbar border-t border-slate-100 bg-slate-50/30">
+                          {curVac.map(v => (
+                            <div key={v.id} className="p-1.5 rounded-lg bg-white border border-emerald-200 text-xs font-bold flex items-center justify-between">
+                              <button type="button" onClick={() => handleDayModalPrefillVacation(v)} className="truncate text-left flex items-center gap-1 cursor-pointer">
+                                <span>🏖️</span>
+                                <span className="text-emerald-950 truncate">{v.name}</span>
+                              </button>
+                              <Button variant="ghost" size="sm" onClick={() => { handleCancelEditMode(); handleDeleteVacation(v.id); }} className="h-6 px-1.5 text-[10px] text-rose-600">삭제</Button>
+                            </div>
+                          ))}
+                          {curEx.map(e => (
+                            <div key={e.id} className="p-1.5 rounded-lg bg-white border border-rose-200 text-xs font-bold flex items-center justify-between">
+                              <button type="button" onClick={() => handleDayModalPrefillExam(e)} className="truncate text-left flex items-center gap-1 cursor-pointer">
+                                <span>📝</span>
+                                <span className="text-rose-950 truncate">{e.name}</span>
+                              </button>
+                              <Button variant="ghost" size="sm" onClick={() => { handleCancelEditMode(); handleDeleteExamPeriod(e.id); }} className="h-6 px-1.5 text-[10px] text-rose-600">삭제</Button>
+                            </div>
+                          ))}
+                          {curSp.map(s => {
+                            const isShort = !!s.shortenedPeriods;
+                            return (
+                              <div key={s.id} className="p-1.5 rounded-lg bg-white border border-indigo-200 text-xs font-bold flex items-center justify-between">
+                                <button type="button" onClick={() => isShort ? handleDayModalPrefillShortened(s) : handleDayModalPrefillSwapDay(s)} className="truncate text-left flex items-center gap-1 cursor-pointer">
+                                  <span>{isShort ? '⏰' : '🔄'}</span>
+                                  <span className="text-indigo-950 truncate">{isShort ? `${s.shortenedPeriods}교시 단축` : `${s.targetDayOfWeek} 대체`}</span>
+                                </button>
+                                <Button variant="ghost" size="sm" onClick={() => { handleCancelEditMode(); handleDeleteSpecialDay(s.id); }} className="h-6 px-1.5 text-[10px] text-rose-600">삭제</Button>
+                              </div>
+                            );
+                          })}
+                          {curEv.map(ev => (
+                            <div key={ev.id} className="p-1.5 rounded-lg bg-white border border-purple-200 text-xs font-bold flex items-center justify-between">
+                              <button type="button" onClick={() => handleDayModalPrefillEvent(ev)} className="truncate text-left flex items-center gap-1 cursor-pointer">
+                                <span>🎭</span>
+                                <span className="text-purple-950 truncate">{ev.title}</span>
+                              </button>
+                              <Button variant="ghost" size="sm" onClick={() => { handleCancelEditMode(); handleDeleteEvent(ev.id); }} className="h-6 px-1.5 text-[10px] text-rose-600">삭제</Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* ========================================================= */}
+              {/* [데스크톱 전용 좌측 패널] (hidden md:flex) */}
+              {/* ========================================================= */}
+              <div className="hidden md:flex w-[260px] shrink-0 bg-slate-50/90 border-r border-slate-200/80 p-4 flex-col justify-between overflow-y-auto custom-scrollbar gap-3">
                 <div className="space-y-3">
                   {/* 상단: 선택 날짜 배너 */}
                   <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs space-y-1">
@@ -3092,7 +3464,7 @@ export function AcademicScheduleModal({
                     </div>
                   </div>
 
-                  {/* 5대 카테고리 세로 메뉴 */}
+                  {/* 5대 카테고리: 데스크톱 세로 메뉴 */}
                   <div className="space-y-1">
                     <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block px-1">
                       일정 유형 선택
@@ -3425,9 +3797,9 @@ export function AcademicScheduleModal({
               {/* ========================================================= */}
               {/* 우측 메인 패널: 헤더, 상세 입력 폼, 하단 액션 버튼 */}
               {/* ========================================================= */}
-              <div className="flex-1 flex flex-col justify-between bg-white min-w-0">
-                {/* 1. 우측 헤더 (현재 선택된 카테고리 명칭 및 닫기 버튼) */}
-                <div className="px-6 py-3.5 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div className="flex-1 flex flex-col justify-between bg-white min-w-0 min-h-0 overflow-hidden">
+                {/* 1. 우측 헤더 (데스크톱 전용 헤더바) */}
+                <div className="hidden md:flex px-6 py-3.5 border-b border-slate-100 items-center justify-between shrink-0">
                   <div>
                     <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
                       {dayScheduleModal.activeCategory === 'holiday' && <span>🏖️ 휴업일 / 재량휴업일 설정</span>}
@@ -3454,8 +3826,8 @@ export function AcademicScheduleModal({
                   </button>
                 </div>
 
-                {/* 2. 우측 폼 본문 (넓고 시원한 공간) */}
-                <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-4">
+                {/* 2. 우측 폼 본문 (모바일/데스크톱 반응형 패딩 & min-h-0 스크롤) */}
+                <div className="p-3.5 sm:p-6 overflow-y-auto custom-scrollbar flex-1 min-h-0 space-y-3.5 sm:space-y-4">
                   {/* [1. 휴업일] */}
                   {dayScheduleModal.activeCategory === 'holiday' && (
                     <div className="space-y-4">
@@ -4148,7 +4520,7 @@ export function AcademicScheduleModal({
                             <span>담당 / 인솔 교사 지정</span>
                           </label>
                           <span className="text-xs font-bold text-purple-700 bg-white px-2 py-0.5 rounded-md border border-purple-200">
-                            {modalEventTeachers.length}명 지정됨
+                            {modalEventRoleLabel ? modalEventRoleLabel : `${modalEventTeachers.length}명 지정됨`}
                           </span>
                         </div>
 
@@ -4160,13 +4532,13 @@ export function AcademicScheduleModal({
                             onClick={() => handleAssignHomeroomToModalEvent()}
                             className={cn(
                               "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border",
-                              modalEventRoleLabel.includes('담임교사 일괄')
+                              modalEventRoleLabel.includes('담임')
                                 ? "bg-purple-600 text-white border-purple-600 shadow-xs font-black"
                                 : "bg-white border-purple-200 text-purple-800 hover:bg-purple-50"
                             )}
                           >
-                            <span>👨‍🏫 {modalEventScope === 'grade' ? `${modalEventGrade}학년 담임 일괄` : '전교생 담임 일괄'}</span>
-                            {modalEventRoleLabel.includes('담임교사 일괄') && <span className="text-[10px] font-black">✓</span>}
+                            <span>👨‍🏫 {modalEventScope === 'grade' ? `${modalEventGrade}학년 담임` : '전학년 담임'}</span>
+                            {modalEventRoleLabel.includes('담임') && <span className="text-[10px] font-black">✓</span>}
                           </button>
 
                           {/* 진로담당 일괄 */}
@@ -4175,13 +4547,13 @@ export function AcademicScheduleModal({
                             onClick={() => handleAssignCareerToModalEvent()}
                             className={cn(
                               "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border",
-                              modalEventRoleLabel.includes('진로담당')
+                              modalEventRoleLabel.includes('진로')
                                 ? "bg-purple-600 text-white border-purple-600 shadow-xs font-black"
                                 : "bg-white border-purple-200 text-purple-800 hover:bg-purple-50"
                             )}
                           >
-                            <span>{modalEventScope === 'grade' ? `${modalEventGrade}학년 진로담당` : '전체 진로담당'}</span>
-                            {modalEventRoleLabel.includes('진로담당') && <span className="text-[10px] font-black ml-0.5">✓</span>}
+                            <span>{modalEventScope === 'grade' ? `${modalEventGrade}학년 진로` : '전체 진로'}</span>
+                            {modalEventRoleLabel.includes('진로') && <span className="text-[10px] font-black ml-0.5">✓</span>}
                           </button>
 
                           {/* 동아리담당 일괄 */}
@@ -4190,13 +4562,13 @@ export function AcademicScheduleModal({
                             onClick={() => handleAssignClubToModalEvent()}
                             className={cn(
                               "px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border",
-                              modalEventRoleLabel.includes('동아리담당')
+                              modalEventRoleLabel.includes('동아')
                                 ? "bg-purple-600 text-white border-purple-600 shadow-xs font-black"
                                 : "bg-white border-purple-200 text-purple-800 hover:bg-purple-50"
                             )}
                           >
-                            <span>{modalEventScope === 'grade' ? `${modalEventGrade}학년 동아리담당` : '전체 동아리담당'}</span>
-                            {modalEventRoleLabel.includes('동아리담당') && <span className="text-[10px] font-black ml-0.5">✓</span>}
+                            <span>{modalEventScope === 'grade' ? `${modalEventGrade}학년 동아리` : '전체 동아리'}</span>
+                            {modalEventRoleLabel.includes('동아') && <span className="text-[10px] font-black ml-0.5">✓</span>}
                           </button>
 
                           {/* 개별 교사 추가 토글 */}
@@ -4328,31 +4700,60 @@ export function AcademicScheduleModal({
                           </div>
                         )}
 
-                        {/* 배정 라벨 및 태그 */}
-                        {modalEventRoleLabel && (
-                          <div className="flex items-center gap-1 text-xs font-bold text-purple-900 bg-purple-50 px-2.5 py-1 rounded-md border border-purple-200">
-                            <span>✨ {modalEventRoleLabel}</span>
-                          </div>
-                        )}
-
-                        {modalEventTeachers.length > 0 && (
-                          <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto custom-scrollbar pt-0.5">
-                            {modalEventTeachers.map(tName => (
-                              <span
-                                key={tName}
-                                className="px-2 py-0.5 rounded-md bg-white border border-purple-200 text-xs font-bold text-purple-900 flex items-center gap-1 shadow-2xs"
+                        {/* 배정 라벨 및 명단 요약 (일괄 설정 시 1학년 담임 등으로만 표출, 명단은 접힘) */}
+                        {modalEventRoleLabel ? (
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between p-2.5 rounded-xl bg-purple-100/80 border border-purple-300">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-black text-purple-950">✨ {modalEventRoleLabel}</span>
+                                <span className="text-[11px] font-bold text-purple-700 bg-white px-2 py-0.5 rounded-md border border-purple-200">
+                                  총 {modalEventTeachers.length}명
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setShowDetailedTeachers(prev => !prev)}
+                                className="text-xs text-purple-700 hover:text-purple-950 underline font-bold cursor-pointer"
                               >
-                                {tName}
-                                <button
-                                  type="button"
-                                  onClick={() => setModalEventTeachers(prev => prev.filter(t => t !== tName))}
-                                  className="text-purple-400 hover:text-rose-600 font-black cursor-pointer text-xs ml-0.5"
-                                >
-                                  ×
-                                </button>
-                              </span>
-                            ))}
+                                {showDetailedTeachers ? '명단 접기 ▲' : '명단 확인 ▼'}
+                              </button>
+                            </div>
+
+                            {/* 명단 확인 클릭 시에만 펼쳐짐 */}
+                            {showDetailedTeachers && modalEventTeachers.length > 0 && (
+                              <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto custom-scrollbar p-2 bg-white rounded-lg border border-purple-100 animate-in fade-in duration-150">
+                                {modalEventTeachers.map(tName => (
+                                  <span
+                                    key={tName}
+                                    className="px-2 py-0.5 rounded-md bg-purple-50 border border-purple-200 text-xs font-bold text-purple-900 flex items-center gap-1"
+                                  >
+                                    {tName}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
+                        ) : (
+                          /* 개별 교사 지정인 경우에만 태그들 직접 표출 */
+                          modalEventTeachers.length > 0 && (
+                            <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto custom-scrollbar pt-0.5">
+                              {modalEventTeachers.map(tName => (
+                                <span
+                                  key={tName}
+                                  className="px-2 py-0.5 rounded-md bg-white border border-purple-200 text-xs font-bold text-purple-900 flex items-center gap-1 shadow-2xs"
+                                >
+                                  {tName}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveTeacherFromModalEvent(tName)}
+                                    className="text-purple-400 hover:text-rose-600 font-black cursor-pointer text-xs ml-0.5"
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )
                         )}
                       </div>
 
@@ -4370,13 +4771,13 @@ export function AcademicScheduleModal({
                   )}
                 </div>
 
-                {/* 3. 우측 하단 액션 버튼 */}
-                <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-2 shrink-0">
+                {/* 3. 우측 하단 고정 액션 버튼 (등록/저장 버튼 강조) */}
+                <div className="px-4 py-3 sm:px-6 sm:py-3.5 border-t border-slate-200 bg-white/95 sm:bg-slate-50/70 backdrop-blur-xs flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-lg sm:shadow-none">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setDayScheduleModal(null)}
-                    className="h-9 px-4 text-xs font-bold text-slate-600 rounded-xl cursor-pointer border-slate-200 hover:bg-slate-100"
+                    className="w-[28%] sm:w-auto h-11 sm:h-10 px-3 sm:px-5 text-xs font-bold text-slate-500 bg-slate-100/70 hover:bg-slate-200/80 border-slate-200 rounded-xl cursor-pointer shrink-0 transition-colors"
                   >
                     닫기
                   </Button>
@@ -4384,19 +4785,22 @@ export function AcademicScheduleModal({
                     type="button"
                     onClick={handleSaveDaySchedule}
                     className={cn(
-                      "h-9 px-5 text-xs font-bold text-white rounded-xl shadow-xs cursor-pointer gap-1.5",
+                      "flex-1 sm:flex-initial h-11 sm:h-10 px-5 sm:px-8 text-sm font-black text-white rounded-xl shadow-md hover:shadow-lg transition-all cursor-pointer gap-2 shrink-0",
                       editingScheduleId 
-                        ? "bg-amber-600 hover:bg-amber-700" 
-                        : "bg-blue-600 hover:bg-blue-700"
+                        ? "bg-amber-600 hover:bg-amber-700 active:bg-amber-800" 
+                        : "bg-blue-600 hover:bg-blue-700 active:bg-blue-800"
                     )}
                   >
                     {editingScheduleId ? (
                       <>
-                        <Pencil className="h-3.5 w-3.5" />
+                        <Pencil className="h-4 w-4 shrink-0" />
                         <span>수정 내용 저장</span>
                       </>
                     ) : (
-                      <span>등록 완료</span>
+                      <>
+                        <Check className="h-4.5 w-4.5 shrink-0 stroke-[3]" />
+                        <span>일정 등록 완료</span>
+                      </>
                     )}
                   </Button>
                 </div>

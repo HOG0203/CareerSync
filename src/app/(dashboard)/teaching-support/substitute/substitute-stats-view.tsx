@@ -393,6 +393,40 @@ export function SubstituteStatsView({
     });
   }, [allItems, ledgerStatusFilter, ledgerMonthFilter, searchTerm]);
 
+  // 모바일 대장용 신청번호(신청서)별 그룹화 리스트
+  const groupedLedgerApps = React.useMemo(() => {
+    const map = new Map<string, {
+      appId: string;
+      appNumber: string;
+      applicantTeacher: string;
+      reason: string;
+      rawStatus: string;
+      status: string;
+      approvedAt?: string;
+      approvedBy?: string;
+      items: typeof filteredItems;
+    }>();
+
+    filteredItems.forEach(item => {
+      if (!map.has(item.appId)) {
+        map.set(item.appId, {
+          appId: item.appId,
+          appNumber: item.appNumber,
+          applicantTeacher: item.applicantTeacher,
+          reason: item.reason,
+          rawStatus: item.rawStatus,
+          status: item.status,
+          approvedAt: item.approvedAt,
+          approvedBy: item.approvedBy,
+          items: [],
+        });
+      }
+      map.get(item.appId)!.items.push(item);
+    });
+
+    return Array.from(map.values());
+  }, [filteredItems]);
+
   // 2. 보강수당 지급 관리용 아이템 리스트 (승인 완료된 보강 수업)
   const substituteAllowanceList = React.useMemo(() => {
     const list: {
@@ -774,13 +808,13 @@ export function SubstituteStatsView({
   // 1. 미인증 시 잠금 화면
   if (!isAuthenticated) {
     return (
-      <div className="max-w-md mx-auto my-12 bg-white p-6 sm:p-8 rounded-2xl border border-slate-200/80 shadow-2xs text-center space-y-4">
+      <div className="max-w-md mx-auto my-6 sm:my-12 bg-white p-4 sm:p-8 rounded-2xl border border-slate-200/80 shadow-2xs text-center space-y-4">
         <div className="w-12 h-12 bg-blue-50 border border-blue-100 rounded-2xl flex items-center justify-center mx-auto text-blue-600 shadow-2xs">
           <Lock className="h-6 w-6" />
         </div>
         <div>
-          <h2 className="text-lg font-bold text-slate-900 tracking-tight">수업계 결보강 승인/관리 인증</h2>
-          <p className="text-xs text-slate-500 mt-1">
+          <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">수업계 결보강 승인/관리 인증</h2>
+          <p className="text-[11px] sm:text-xs text-slate-500 mt-1">
             수업계 담당 교사 전용 화면입니다. 인증 비밀번호를 입력해 주세요.
           </p>
         </div>
@@ -841,36 +875,36 @@ export function SubstituteStatsView({
   // 2. 인증 완료 시 수업계 메인 콘솔
   return (
     <div className="flex flex-col gap-3 sm:gap-4 w-full pt-1">
-      {/* 1. 상단 타이틀 헤더 (class-management 스타일) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 px-1">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-              <ShieldCheck className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600" />
+      {/* 1. 상단 타이틀 헤더 (모바일 반응형 최적화) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 px-1">
+        <div className="flex flex-col gap-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2 leading-tight">
+              <ShieldCheck className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 shrink-0" />
               결보강 승인 & 관리 센터
             </h2>
-            <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hidden sm:inline-flex items-center gap-1">
+            <span className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
               <CheckCircle2 className="h-3 w-3 text-emerald-600" />
               수업계 접속 중
             </span>
           </div>
-          <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed">
+          <p className="text-muted-foreground text-[11px] sm:text-xs font-medium leading-relaxed">
             교사 제출 결보강 서류를 검토하고 나이스(NEIS) 등록 후 승인, 보강수당 집계 및 대장을 총괄 관리합니다.
           </p>
         </div>
 
         {/* 상단 우측 액션 버튼 그룹 */}
-        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap self-start sm:self-auto shrink-0">
           {onBack ? (
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={onBack}
-              className="h-9 text-xs font-bold gap-1.5 rounded-xl border-slate-200/80 hover:bg-slate-100 text-slate-700 shadow-2xs cursor-pointer"
+              className="h-8 sm:h-9 text-xs font-bold gap-1 sm:gap-1.5 px-2.5 sm:px-3 rounded-xl border-slate-200/80 hover:bg-slate-100 text-slate-700 shadow-2xs cursor-pointer"
             >
               <ArrowLeft className="h-3.5 w-3.5 text-slate-600" />
-              <span>뒤로 돌아가기</span>
+              <span>뒤로가기</span>
             </Button>
           ) : (
             <Link href="/teaching-support/substitute">
@@ -878,10 +912,10 @@ export function SubstituteStatsView({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-9 text-xs font-bold gap-1.5 rounded-xl border-slate-200/80 hover:bg-slate-100 text-slate-700 shadow-2xs cursor-pointer"
+                className="h-8 sm:h-9 text-xs font-bold gap-1 sm:gap-1.5 px-2.5 sm:px-3 rounded-xl border-slate-200/80 hover:bg-slate-100 text-slate-700 shadow-2xs cursor-pointer"
               >
                 <ArrowLeft className="h-3.5 w-3.5 text-slate-600" />
-                <span>뒤로 돌아가기</span>
+                <span>뒤로가기</span>
               </Button>
             </Link>
           )}
@@ -891,10 +925,10 @@ export function SubstituteStatsView({
               variant="outline"
               size="sm"
               onClick={() => setIsCalendarModalOpen(true)}
-              className="h-9 text-xs font-bold gap-1.5 rounded-xl border-slate-200/80 hover:bg-blue-50 hover:text-blue-800 hover:border-blue-200 text-slate-700 shadow-2xs"
+              className="h-8 sm:h-9 text-xs font-bold gap-1 sm:gap-1.5 px-2.5 sm:px-3 rounded-xl border-slate-200/80 hover:bg-blue-50 hover:text-blue-800 hover:border-blue-200 text-slate-700 shadow-2xs"
             >
               <Calendar className="h-3.5 w-3.5 text-blue-600" />
-              학사일정 & 행사 설정
+              <span>학사일정 & 행사</span>
             </Button>
           )}
 
@@ -909,28 +943,28 @@ export function SubstituteStatsView({
               setPinModalError('');
               setPinModalSuccess('');
             }}
-            className="h-9 text-xs font-bold gap-1.5 rounded-xl border-slate-200/80 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-200 text-slate-700 shadow-2xs"
+            className="h-8 sm:h-9 text-xs font-bold gap-1 sm:gap-1.5 px-2.5 sm:px-3 rounded-xl border-slate-200/80 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-200 text-slate-700 shadow-2xs"
           >
             <KeyRound className="h-3.5 w-3.5 text-amber-600" />
-            비밀번호 변경
+            <span>비밀번호 변경</span>
           </Button>
 
           <Button
             variant="ghost"
             size="sm"
             onClick={handleLock}
-            className="h-9 text-xs font-bold text-slate-400 hover:text-slate-700 hover:bg-slate-100 gap-1 rounded-xl"
+            className="h-8 sm:h-9 text-xs font-bold text-slate-400 hover:text-slate-700 hover:bg-slate-100 gap-1 px-2 rounded-xl"
             title="콘솔 잠금"
           >
             <Lock className="h-3.5 w-3.5" />
-            잠금
+            <span className="hidden sm:inline">잠금</span>
           </Button>
         </div>
       </div>
 
-      {/* 2. 세그먼트 탭 컨트롤 바 (class-management 스타일) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-xl flex-1 sm:flex-none overflow-x-auto">
+      {/* 2. 세그먼트 탭 컨트롤 바 (모바일 가로 스크롤 지원) */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white p-2 sm:p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-xl w-full sm:w-auto overflow-x-auto scrollbar-none">
           {/* 1. NEIS 등록 대기 탭 */}
           <button
             type="button"
@@ -1087,8 +1121,8 @@ export function SubstituteStatsView({
                   key={app.id}
                   className="bg-white rounded-2xl border border-slate-200 shadow-2xs hover:border-slate-300 transition-all p-4 space-y-3"
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
-                    <div className="flex items-center gap-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-100 pb-2.5">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <input
                         type="checkbox"
                         checked={selectedPendingIds.includes(app.id)}
@@ -1101,31 +1135,31 @@ export function SubstituteStatsView({
                         }}
                         className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                       />
-                      <span className="text-xs font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                      <span className="text-[11px] sm:text-xs font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
                         {app.applicationNumber}
                       </span>
-                      <strong className="text-sm font-black text-slate-900">
+                      <strong className="text-xs sm:text-sm font-black text-slate-900">
                         {app.applicantTeacher} 선생님
                       </strong>
-                      <span className="text-xs text-slate-500">
+                      <span className="text-[11px] sm:text-xs text-slate-500">
                         ({app.periodStart} {app.periodStart !== app.periodEnd ? `~ ${app.periodEnd}` : ''})
                       </span>
-                      <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                      <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-bold bg-amber-50 text-amber-800 border border-amber-200">
                         사유: {app.reason}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1.5 flex-wrap">
+                    <div className="flex items-center gap-1.5 flex-wrap shrink-0">
                       {onViewOfficialForm && (
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           onClick={() => onViewOfficialForm(app)}
-                          className="h-10 px-4 text-sm font-black gap-1.5 border-slate-300 hover:bg-slate-100 text-slate-800 rounded-xl cursor-pointer shadow-xs"
+                          className="h-8 sm:h-10 px-2.5 sm:px-4 text-xs sm:text-sm font-black gap-1 sm:gap-1.5 border-slate-300 hover:bg-slate-100 text-slate-800 rounded-xl cursor-pointer shadow-xs"
                         >
-                          <Printer className="h-4 w-4 text-indigo-600" />
-                          A4 출력
+                          <Printer className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-600" />
+                          <span>A4 출력</span>
                         </Button>
                       )}
 
@@ -1133,10 +1167,11 @@ export function SubstituteStatsView({
                         type="button"
                         size="sm"
                         onClick={() => handleApprove(app.id)}
-                        className="h-10 px-4 text-sm font-black gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs cursor-pointer"
+                        className="h-8 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm font-black gap-1 sm:gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs cursor-pointer"
                       >
-                        <CheckCircle2 className="h-4 w-4" />
-                        나이스 등록 완료 ➔ 승인
+                        <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <span className="sm:hidden">승인</span>
+                        <span className="hidden sm:inline">나이스 등록 완료 ➔ 승인</span>
                       </Button>
 
                       <Button
@@ -1144,17 +1179,65 @@ export function SubstituteStatsView({
                         variant="ghost"
                         size="sm"
                         onClick={() => handleReject(app.id)}
-                        className="h-10 px-3 text-sm font-black text-rose-600 hover:bg-rose-50 rounded-xl cursor-pointer"
+                        className="h-8 sm:h-10 px-2.5 sm:px-3 text-xs sm:text-sm font-black text-rose-600 hover:bg-rose-50 rounded-xl cursor-pointer"
                       >
-                        <XCircle className="h-4 w-4" />
-                        반려
+                        <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <span>반려</span>
                       </Button>
                     </div>
                   </div>
 
-                  {/* 세부 항목 테이블 */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-center text-xs border-collapse">
+                  {/* 세부 항목: 모바일 리스트 뷰 */}
+                  <div className="md:hidden divide-y divide-slate-100 border border-slate-100 rounded-xl overflow-hidden bg-slate-50/40">
+                    {app.items.map((it, idx) => {
+                      const isSub = it.type === 'substitute';
+                      const classRoom = formatClassGradeAndRoom(it.classCode);
+                      return (
+                        <div key={it.id || idx} className="p-2.5 space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-slate-800">
+                                {it.sourceDate} <span className="text-slate-400 text-[11px]">({it.sourceDay})</span>
+                              </span>
+                              <span className="font-black text-indigo-700">
+                                {it.sourcePeriod}교시
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-700 font-bold text-[10px]">
+                                {it.deptName} {classRoom}
+                              </span>
+                              <span className="font-bold text-slate-800 truncate max-w-[130px]">
+                                {it.subjectName}
+                              </span>
+                            </div>
+
+                            <span className={cn(
+                              "px-2 py-0.5 rounded-full text-[10px] font-black border shrink-0",
+                              isSub ? "bg-amber-50 text-amber-800 border-amber-200" : "bg-blue-50 text-blue-700 border-blue-200"
+                            )}>
+                              {isSub ? '수업보강' : '수업교체'}
+                            </span>
+                          </div>
+
+                          <div className="text-xs text-slate-700 flex items-start gap-1 pt-0.5 pl-0.5">
+                            <span className="text-slate-400 font-bold text-[11px] shrink-0">↳ 내용:</span>
+                            {isSub ? (
+                              <span className="font-black text-amber-900 break-all">
+                                보강 담당: {it.substituteTeacher} 선생님
+                              </span>
+                            ) : (
+                              <span className="font-bold text-indigo-900 break-all">
+                                교체 상대: {it.targetTeacher} 선생님 ({it.targetDate} {it.targetPeriod}교시 {it.targetSubject || it.subjectName})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* 세부 항목: 데스크톱 테이블 뷰 (hidden md:block) */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-center text-xs border-collapse min-w-[540px]">
                       <thead>
                         <tr className="bg-slate-50 text-slate-600 border-y border-slate-200 font-bold">
                           <th className="py-2 px-2">수업일자</th>
@@ -1216,62 +1299,62 @@ export function SubstituteStatsView({
       {/* ========================================================================= */}
       {activeSubTab === 'allowance' && (
         <div className="space-y-4">
-          {/* 상단 4대 핵심 지표 요약 카드 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+          {/* 상단 4대 핵심 지표 요약 카드 (모바일 2열 그리드 최적화) */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3.5">
+            <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500">총 승인된 보강 수업</span>
-                <span className="p-2 rounded-xl bg-slate-100 text-slate-600">
-                  <Clock className="h-4 w-4" />
+                <span className="text-[10.5px] sm:text-xs font-bold text-slate-500 truncate">승인된 보강</span>
+                <span className="p-1.5 sm:p-2 rounded-xl bg-slate-100 text-slate-600 shrink-0">
+                  <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </span>
               </div>
-              <p className="text-2xl font-black text-slate-900 mt-1">
-                {allowanceSummary.totalCount} <span className="text-sm font-bold text-slate-500">건</span>
+              <p className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
+                {allowanceSummary.totalCount} <span className="text-xs sm:text-sm font-bold text-slate-500">건</span>
               </p>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-emerald-200 shadow-2xs bg-emerald-50/20">
+            <div className="bg-white p-3 sm:p-4 rounded-2xl border border-emerald-200 shadow-2xs bg-emerald-50/20">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-emerald-800">수당 지급 대상 (인정)</span>
-                <span className="p-2 rounded-xl bg-emerald-100 text-emerald-700">
-                  <CheckSquare className="h-4 w-4" />
+                <span className="text-[10.5px] sm:text-xs font-bold text-emerald-800 truncate">수당 지급 대상</span>
+                <span className="p-1.5 sm:p-2 rounded-xl bg-emerald-100 text-emerald-700 shrink-0">
+                  <CheckSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </span>
               </div>
-              <p className="text-2xl font-black text-emerald-700 mt-1">
-                {allowanceSummary.payableCount} <span className="text-sm font-bold text-emerald-600">시간</span>
+              <p className="text-xl sm:text-2xl font-black text-emerald-700 mt-1">
+                {allowanceSummary.payableCount} <span className="text-xs sm:text-sm font-bold text-emerald-600">시간</span>
               </p>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500">수당 계산 제외 (미지급)</span>
-                <span className="p-2 rounded-xl bg-rose-50 text-rose-600">
-                  <Square className="h-4 w-4" />
+                <span className="text-[10.5px] sm:text-xs font-bold text-slate-500 truncate">수당 계산 제외</span>
+                <span className="p-1.5 sm:p-2 rounded-xl bg-rose-50 text-rose-600 shrink-0">
+                  <Square className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </span>
               </div>
-              <p className="text-2xl font-black text-rose-600 mt-1">
-                {allowanceSummary.excludedCount} <span className="text-sm font-bold text-slate-400">건</span>
+              <p className="text-xl sm:text-2xl font-black text-rose-600 mt-1">
+                {allowanceSummary.excludedCount} <span className="text-xs sm:text-sm font-bold text-slate-400">건</span>
               </p>
             </div>
 
-            <div className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white p-4 rounded-2xl shadow-md border border-indigo-800">
+            <div className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white p-3 sm:p-4 rounded-2xl shadow-md border border-indigo-800">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-indigo-200">총 보강수당 지급 예정액</span>
-                <span className="p-2 rounded-xl bg-indigo-500/20 text-indigo-300">
-                  <Coins className="h-4 w-4" />
+                <span className="text-[10.5px] sm:text-xs font-bold text-indigo-200 truncate">총 지급 예정액</span>
+                <span className="p-1.5 sm:p-2 rounded-xl bg-indigo-500/20 text-indigo-300 shrink-0">
+                  <Coins className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </span>
               </div>
-              <p className="text-2xl font-black text-amber-300 mt-1">
-                {allowanceSummary.totalAmount.toLocaleString()} <span className="text-sm font-bold text-white">원</span>
+              <p className="text-base sm:text-2xl font-black text-amber-300 mt-1 truncate">
+                {allowanceSummary.totalAmount.toLocaleString()} <span className="text-xs sm:text-sm font-bold text-white">원</span>
               </p>
             </div>
           </div>
 
           {/* 보강수당 단가 설정 & 일괄 액션 & 검색 바 */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3.5">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3.5 sm:p-4 space-y-3.5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
               {/* 시간당 단가 설정 */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-black text-slate-700 flex items-center gap-1">
                   <Coins className="h-4 w-4 text-amber-500" />
                   시간당 보강수당 단가:
@@ -1282,7 +1365,7 @@ export function SubstituteStatsView({
                       type="text"
                       value={tempRateInput}
                       onChange={e => setTempRateInput(e.target.value)}
-                      className="w-28 h-8 text-xs font-black text-right"
+                      className="w-24 sm:w-28 h-8 text-xs font-black text-right"
                       placeholder="금액 입력"
                     />
                     <span className="text-xs font-bold text-slate-600">원</span>
@@ -1304,7 +1387,7 @@ export function SubstituteStatsView({
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <strong className="text-sm font-black text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-200">
+                    <strong className="text-xs sm:text-sm font-black text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-200">
                       {hourlyRate.toLocaleString()}원 / 시간
                     </strong>
                     <Button
@@ -1323,48 +1406,48 @@ export function SubstituteStatsView({
               </div>
 
               {/* 엑셀 다운로드 및 일괄 선택 */}
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 <Button
                   variant="outline"
-                  size="default"
+                  size="sm"
                   onClick={handleSelectAllAllowance}
-                  className="h-10 px-3.5 sm:px-4 text-xs sm:text-[13px] font-bold text-slate-700 border-slate-200/90 hover:bg-slate-50 rounded-xl shadow-2xs cursor-pointer gap-1.5"
+                  className="h-8 sm:h-9 px-2.5 sm:px-3.5 text-xs font-bold text-slate-700 border-slate-200/90 hover:bg-slate-50 rounded-xl shadow-2xs cursor-pointer gap-1"
                 >
-                  <CheckSquare className="h-4 w-4 text-emerald-600" />
-                  전체 선택 (전체 지급)
+                  <CheckSquare className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>전체 지급</span>
                 </Button>
 
                 <Button
                   variant="outline"
-                  size="default"
+                  size="sm"
                   onClick={handleDeselectAllAllowance}
-                  className="h-10 px-3.5 sm:px-4 text-xs sm:text-[13px] font-bold text-slate-700 border-slate-200/90 hover:bg-slate-50 rounded-xl shadow-2xs cursor-pointer gap-1.5"
+                  className="h-8 sm:h-9 px-2.5 sm:px-3.5 text-xs font-bold text-slate-700 border-slate-200/90 hover:bg-slate-50 rounded-xl shadow-2xs cursor-pointer gap-1"
                 >
-                  <Square className="h-4 w-4 text-rose-500" />
-                  전체 해제 (전체 제외)
+                  <Square className="h-3.5 w-3.5 text-rose-500" />
+                  <span>전체 제외</span>
                 </Button>
 
                 <Button
-                  size="default"
+                  size="sm"
                   onClick={handleExportAllowanceExcel}
-                  className="h-10 px-4 sm:px-5 text-xs sm:text-[13px] font-black gap-2 bg-emerald-600 hover:bg-emerald-700 text-white border-none rounded-xl cursor-pointer shadow-xs"
+                  className="h-8 sm:h-9 px-3 sm:px-4 text-xs font-black gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white border-none rounded-xl cursor-pointer shadow-xs"
                 >
-                  <Download className="h-4 w-4 text-white" />
-                  보강수당 지급명세서 엑셀 다운로드
+                  <Download className="h-3.5 w-3.5 text-white" />
+                  <span>엑셀 다운로드</span>
                 </Button>
               </div>
             </div>
 
             {/* 필터 및 검색 바 */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-500">지급 필터:</span>
-                <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-1 sm:pb-0">
+                <span className="text-xs font-bold text-slate-500 shrink-0">지급 필터:</span>
+                <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs shrink-0">
                   <button
                     type="button"
                     onClick={() => setAllowanceFilter('all')}
                     className={cn(
-                      "px-3 py-1 rounded-lg font-bold transition-all cursor-pointer",
+                      "px-2.5 sm:px-3 py-1 rounded-lg font-bold transition-all cursor-pointer text-[11px] sm:text-xs",
                       allowanceFilter === 'all' ? "bg-white text-slate-900 shadow-2xs font-black" : "text-slate-500 hover:text-slate-900"
                     )}
                   >
@@ -1374,7 +1457,7 @@ export function SubstituteStatsView({
                     type="button"
                     onClick={() => setAllowanceFilter('payable')}
                     className={cn(
-                      "px-3 py-1 rounded-lg font-bold transition-all cursor-pointer",
+                      "px-2.5 sm:px-3 py-1 rounded-lg font-bold transition-all cursor-pointer text-[11px] sm:text-xs",
                       allowanceFilter === 'payable' ? "bg-white text-emerald-700 shadow-2xs font-black" : "text-slate-500 hover:text-slate-900"
                     )}
                   >
@@ -1384,7 +1467,7 @@ export function SubstituteStatsView({
                     type="button"
                     onClick={() => setAllowanceFilter('excluded')}
                     className={cn(
-                      "px-3 py-1 rounded-lg font-bold transition-all cursor-pointer",
+                      "px-2.5 sm:px-3 py-1 rounded-lg font-bold transition-all cursor-pointer text-[11px] sm:text-xs",
                       allowanceFilter === 'excluded' ? "bg-white text-rose-700 shadow-2xs font-black" : "text-slate-500 hover:text-slate-900"
                     )}
                   >
@@ -1405,9 +1488,89 @@ export function SubstituteStatsView({
               </div>
             </div>
 
-            {/* 보강수당 메인 테이블 */}
-            <div className="overflow-x-auto pt-1">
-              <table className="w-full border-collapse text-center text-xs">
+            {/* 모바일 화면: 보강수당 건별 카드 뷰 (md:hidden) */}
+            <div className="md:hidden space-y-2.5 pt-1">
+              {filteredAllowanceList.length === 0 ? (
+                <div className="py-10 text-center text-slate-400 text-xs font-medium bg-slate-50/60 rounded-2xl border border-dashed border-slate-200">
+                  승인된 보강 수업 내역이 없습니다.
+                </div>
+              ) : (
+                filteredAllowanceList.map((item) => (
+                  <div
+                    key={item.uniqueKey}
+                    className={cn(
+                      "p-3 rounded-2xl border transition-all space-y-2",
+                      item.isPayable 
+                        ? "bg-white border-slate-200 shadow-2xs" 
+                        : "bg-slate-50/70 border-slate-200/60 opacity-80"
+                    )}
+                  >
+                    {/* 상단: 체크박스 + 보강교사 + 인정시수/금액 */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={item.isPayable}
+                          onChange={() => handleToggleAllowanceItem(item.uniqueKey)}
+                          className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                        />
+                        <div>
+                          <div className="text-sm font-black text-indigo-950">
+                            {item.substituteTeacher} <span className="text-xs font-normal text-slate-500">선생님</span>
+                          </div>
+                          <div className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5 pt-0.5 flex-wrap">
+                            <span>{item.sourceDate} ({item.sourceDay})</span>
+                            <span className="font-black text-indigo-700">{item.sourcePeriod}교시</span>
+                            <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 font-mono text-[10px]">
+                              {formatClassGradeAndRoom(item.classCode)}
+                            </span>
+                            <span>{item.subjectName}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0 space-y-0.5">
+                        {item.isPayable ? (
+                          <>
+                            <span className="inline-block px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-black text-[10.5px]">
+                              1시간 인정
+                            </span>
+                            <div className="text-xs font-black text-emerald-700">
+                              {item.amount.toLocaleString()}원
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <span className="inline-block px-2 py-0.5 rounded-full bg-slate-200 text-slate-500 font-bold text-[10.5px]">
+                              수당 제외
+                            </span>
+                            <div className="text-xs font-bold text-slate-400">
+                              0원 (미지급)
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 하단: 결강 교사 정보 및 사유 */}
+                    <div className="text-xs text-slate-600 bg-slate-50/80 px-2.5 py-1.5 rounded-xl flex items-center justify-between gap-2 border border-slate-100">
+                      <div>
+                        <span className="text-slate-400 font-bold mr-1">결강:</span>
+                        <span className="font-bold text-slate-800">{item.applicantTeacher}</span>
+                        {item.reason && <span className="text-slate-500 ml-1.5">({item.reason})</span>}
+                      </div>
+                      <span className="text-[10.5px] font-mono text-slate-400">
+                        {item.appNumber}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* 데스크톱: 보강수당 메인 테이블 (hidden md:block) */}
+            <div className="hidden md:block overflow-x-auto pt-1">
+              <table className="w-full border-collapse text-center text-xs min-w-[780px]">
                 <thead>
                   <tr className="bg-slate-100/90 text-slate-700 border-b-2 border-slate-200 text-[11px] font-black">
                     <th className="py-2.5 px-2 w-14 border-r border-slate-200">
@@ -1532,7 +1695,44 @@ export function SubstituteStatsView({
               </span>
             </div>
 
-            <div className="overflow-x-auto">
+            {/* 모바일 화면: 교사별 집계 카드 그리드 (md:hidden) */}
+            <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {teacherAllowanceBreakdown.length === 0 ? (
+                <div className="col-span-full py-8 text-center text-slate-400 text-xs font-medium bg-slate-50/60 rounded-2xl border border-dashed border-slate-200">
+                  보강 배정된 내역이 없습니다.
+                </div>
+              ) : (
+                teacherAllowanceBreakdown.map((t) => (
+                  <div key={t.teacherName} className="p-3 bg-slate-50/50 rounded-2xl border border-slate-200/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-900">
+                        {t.teacherName} 선생님
+                      </span>
+                      <span className="text-xs font-black text-emerald-700">
+                        {t.totalAmount.toLocaleString()}원
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 text-center text-[10.5px]">
+                      <div className="bg-white p-1.5 rounded-lg border border-slate-100">
+                        <div className="text-slate-400">총 보강</div>
+                        <div className="font-bold text-slate-800">{t.totalCount}회</div>
+                      </div>
+                      <div className="bg-emerald-50/60 p-1.5 rounded-lg border border-emerald-100/60">
+                        <div className="text-emerald-700">인정 시수</div>
+                        <div className="font-black text-emerald-800">{t.payableCount}시간</div>
+                      </div>
+                      <div className="bg-rose-50/60 p-1.5 rounded-lg border border-rose-100/60">
+                        <div className="text-rose-700">제외</div>
+                        <div className="font-bold text-rose-800">{t.excludedCount}회</div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* 데스크톱: 교사별 보강수당 집계표 (hidden md:block) */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full border-collapse text-center text-xs">
                 <thead>
                   <tr className="bg-slate-100/90 text-slate-700 border-b-2 border-slate-200 text-[11px] font-black">
@@ -1646,15 +1846,15 @@ export function SubstituteStatsView({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
               <div className="relative w-full sm:w-56">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                <Search className="absolute left-3 top-2.5 sm:top-3 h-4 w-4 text-slate-400" />
                 <Input
                   type="text"
                   placeholder="교사명 / 과목 / 학반 / 사유 검색"
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
-                  className="pl-9 h-10 text-xs sm:text-sm bg-slate-50 border-slate-200 rounded-xl"
+                  className="pl-9 h-9 sm:h-10 text-xs sm:text-sm bg-slate-50 border-slate-200 rounded-xl"
                 />
               </div>
 
@@ -1662,13 +1862,13 @@ export function SubstituteStatsView({
               <Button
                 onClick={handleExportOfficialInternalApprovalLedger}
                 disabled={isExportingExcel}
-                className="h-10 px-4 text-xs sm:text-sm font-black gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-xs rounded-xl cursor-pointer"
+                className="h-9 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm font-black gap-1.5 sm:gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-xs rounded-xl cursor-pointer"
                 title="공식 2단 결재란(수업계, 부장)과 통계 요약이 포함된 내부결재 기안용 엑셀 파일을 다운로드합니다."
               >
                 {isExportingExcel ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
                 ) : (
-                  <FileSpreadsheet className="h-4 w-4" />
+                  <FileSpreadsheet className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 )}
                 {ledgerMonthFilter !== 'all' 
                   ? `${parseInt(ledgerMonthFilter.split('-')[1], 10)}월 내부결재용 엑셀` 
@@ -1679,10 +1879,10 @@ export function SubstituteStatsView({
               <Button
                 variant="outline"
                 onClick={handleExportLedger}
-                className="h-10 px-3.5 text-xs sm:text-sm font-bold gap-1.5 border-slate-200 hover:bg-slate-50 text-slate-700 shadow-2xs rounded-xl cursor-pointer"
+                className="h-9 sm:h-10 px-2.5 sm:px-3.5 text-xs sm:text-sm font-bold gap-1 sm:gap-1.5 border-slate-200 hover:bg-slate-50 text-slate-700 shadow-2xs rounded-xl cursor-pointer"
                 title="현재 화면 표의 데이터를 엑셀 시트로 백업 저장합니다."
               >
-                <Download className="h-4 w-4 text-slate-500" />
+                <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-500" />
                 일반 대장
               </Button>
 
@@ -1690,17 +1890,145 @@ export function SubstituteStatsView({
               <Button
                 variant="outline"
                 onClick={() => window.print()}
-                className="h-10 px-3.5 text-xs sm:text-sm font-bold gap-1.5 border-slate-200 hover:bg-slate-50 text-slate-700 shadow-2xs rounded-xl cursor-pointer"
+                className="h-9 sm:h-10 px-2.5 sm:px-3.5 text-xs sm:text-sm font-bold gap-1 sm:gap-1.5 border-slate-200 hover:bg-slate-50 text-slate-700 shadow-2xs rounded-xl cursor-pointer"
               >
-                <Printer className="h-4 w-4 text-slate-500" />
+                <Printer className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-500" />
                 인쇄
               </Button>
             </div>
           </div>
 
-          {/* 대장 표 */}
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-center text-xs">
+          {/* 모바일 화면: 신청번호(신청서) 단위 카드 뷰 */}
+          <div className="md:hidden space-y-3">
+            {groupedLedgerApps.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-xs font-medium bg-slate-50/60 rounded-2xl border border-dashed border-slate-200">
+                해당하는 결보강 내역이 없습니다.
+              </div>
+            ) : (
+              groupedLedgerApps.map((app) => {
+                const targetApp = applications.find(a => a.id === app.appId);
+                return (
+                  <div 
+                    key={app.appId} 
+                    className="bg-white rounded-2xl border border-slate-200 shadow-2xs p-3.5 space-y-3 transition-shadow hover:shadow-xs"
+                  >
+                    {/* 카드 헤더: 신청번호, 신청교사, 상태 배지, 승인/취소 액션 */}
+                    <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-mono text-[11px] font-black text-slate-700 bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-md">
+                            {app.appNumber}
+                          </span>
+                          <span className="text-xs font-bold text-slate-500">
+                            총 {app.items.length}개 교시
+                          </span>
+                        </div>
+                        <div className="text-sm font-black text-slate-900 truncate">
+                          {app.applicantTeacher} <span className="text-xs font-normal text-slate-500">선생님</span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-1.5 shrink-0">
+                        <span className={cn(
+                          "px-2.5 py-0.5 rounded-full text-[11px] font-black",
+                          app.rawStatus === 'approved' ? "bg-emerald-100 text-emerald-800" :
+                          app.rawStatus === 'submitted' ? "bg-indigo-100 text-indigo-800" : "bg-slate-100 text-slate-600"
+                        )}>
+                          {app.status}
+                        </span>
+
+                        {app.rawStatus === 'approved' ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRevertToSubmitted(app.appId)}
+                            className="h-7 text-[11px] text-slate-500 hover:text-slate-800 font-bold px-2 cursor-pointer bg-slate-100 hover:bg-slate-200/70 rounded-lg"
+                          >
+                            <RotateCcw className="h-3 w-3 mr-1" />
+                            승인취소
+                          </Button>
+                        ) : app.rawStatus === 'submitted' ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleApprove(app.appId)}
+                            className="h-7 text-[11px] text-emerald-700 hover:text-emerald-800 font-bold px-2 cursor-pointer bg-emerald-50 hover:bg-emerald-100 rounded-lg"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+                            승인
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {/* 사유 */}
+                    {app.reason && (
+                      <div className="text-xs text-slate-600 bg-slate-50 border border-slate-100 px-2.5 py-1.5 rounded-xl">
+                        <span className="text-slate-400 font-bold mr-1.5">사유:</span>
+                        {app.reason}
+                      </div>
+                    )}
+
+                    {/* 신청서에 포함된 교시별 상세 목록 */}
+                    <div className="divide-y divide-slate-100 border border-slate-100 rounded-xl overflow-hidden bg-slate-50/40">
+                      {app.items.map((it, idx) => (
+                        <div key={idx} className="p-2.5 space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-slate-800">
+                                {it.sourceDate} <span className="text-slate-400 text-[11px]">({it.sourceDay})</span>
+                              </span>
+                              <span className="font-black text-indigo-700">
+                                {it.sourcePeriod}교시
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-700 font-bold text-[10px]">
+                                {it.gradeClass}
+                              </span>
+                              <span className="font-bold text-slate-800 truncate max-w-[130px]">
+                                {it.subjectName}
+                              </span>
+                            </div>
+
+                            <span className={cn(
+                              "px-2 py-0.5 rounded-full text-[10px] font-black border shrink-0",
+                              it.type === '수업보강' 
+                                ? "bg-amber-50 text-amber-800 border-amber-200" 
+                                : "bg-blue-50 text-blue-700 border-blue-200"
+                            )}>
+                              {it.type}
+                            </span>
+                          </div>
+
+                          <div className="text-xs text-slate-600 flex items-start gap-1 pt-0.5 pl-0.5">
+                            <span className="text-slate-400 font-bold text-[11px] shrink-0">↳ 처리:</span>
+                            <span className="font-semibold text-slate-800 break-all">{it.targetInfo}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* 카드 하단: 공식 신청서 보기 버튼 */}
+                    {onViewOfficialForm && targetApp && (
+                      <div className="pt-0.5 flex items-center justify-end">
+                        <button
+                          type="button"
+                          onClick={() => onViewOfficialForm(targetApp)}
+                          className="text-xs text-slate-600 hover:text-blue-700 font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer"
+                        >
+                          <Printer className="h-3.5 w-3.5 text-slate-400" />
+                          공식 신청서 보기
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* 데스크톱/태블릿 화면: 공식 관리대장 표 (hidden md:block) */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full border-collapse text-center text-xs min-w-[850px]">
               <thead>
                 <tr className="bg-slate-100/90 text-slate-700 border-b-2 border-slate-200 text-[11px] font-black">
                   <th className="py-2.5 px-2 w-12 border-r border-slate-200">순번</th>
@@ -1816,8 +2144,8 @@ export function SubstituteStatsView({
       {/* 탭 4: 교사별 누적 보강 시수 통계 */}
       {/* ========================================================================= */}
       {activeSubTab === 'teacherStats' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3.5">
-          <div className="flex items-center justify-between">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3.5 sm:p-4 space-y-3.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-black text-slate-800">
               전체 교사 누적 결강/보강 시수 집계 ({teacherStats.length}명)
             </span>
@@ -1825,15 +2153,79 @@ export function SubstituteStatsView({
               variant="outline"
               size="sm"
               onClick={handleExportStats}
-              className="h-9 text-xs font-bold gap-1.5 border-slate-200 hover:bg-slate-50 text-emerald-700 shadow-2xs rounded-xl cursor-pointer"
+              className="h-8 sm:h-9 text-xs font-bold gap-1 sm:gap-1.5 border-slate-200 hover:bg-slate-50 text-emerald-700 shadow-2xs rounded-xl cursor-pointer"
             >
-              <Download className="h-4 w-4 text-emerald-600" />
+              <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600" />
               통계 엑셀 다운로드
             </Button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-center text-xs">
+          {/* 모바일 화면: 교사별 누적 시수 통계 카드 그리드 (md:hidden) */}
+          <div className="md:hidden space-y-2.5">
+            {teacherStats.length === 0 ? (
+              <div className="py-10 text-center text-slate-400 text-xs font-medium bg-slate-50/60 rounded-2xl border border-dashed border-slate-200">
+                집계된 교사 통계 데이터가 없습니다.
+              </div>
+            ) : (
+              teacherStats.map((t, idx) => (
+                <div key={t.teacherName} className="p-3 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-2.5">
+                  {/* 상단: 순번, 교사명, 담임학반 */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-slate-400 text-[11px] font-bold">
+                        #{idx + 1}
+                      </span>
+                      <span className="text-sm font-black text-slate-900">
+                        {t.teacherName} 선생님
+                      </span>
+                    </div>
+                    <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                      {t.homeroomClass ? `${t.homeroomClass}` : '비담임'}
+                    </span>
+                  </div>
+
+                  {/* 4대 누적 지표 2x2 그리드 */}
+                  <div className="grid grid-cols-2 gap-1.5 text-xs">
+                    {/* 결강 시수 */}
+                    <div className="p-2 rounded-xl bg-rose-50/50 border border-rose-100/80 flex items-center justify-between">
+                      <span className="text-rose-700 font-bold text-[11px]">결강 시수</span>
+                      <span className="font-black text-rose-800">
+                        {t.absenceHours > 0 ? `${t.absenceHours}시간` : '-'}
+                      </span>
+                    </div>
+
+                    {/* 보강 진행 시수 */}
+                    <div className="p-2 rounded-xl bg-indigo-50/50 border border-indigo-100/80 flex items-center justify-between">
+                      <span className="text-indigo-700 font-bold text-[11px]">수업보강</span>
+                      <span className="font-black text-indigo-800">
+                        {t.substituteHours > 0 ? `${t.substituteHours}시간` : '-'}
+                      </span>
+                    </div>
+
+                    {/* 수업 교체 횟수 */}
+                    <div className="p-2 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
+                      <span className="text-slate-500 font-bold text-[11px]">수업 교체</span>
+                      <span className="font-black text-slate-800">
+                        {t.exchangeCount > 0 ? `${t.exchangeCount}회` : '-'}
+                      </span>
+                    </div>
+
+                    {/* 수당 정산 시수 */}
+                    <div className="p-2 rounded-xl bg-emerald-50/60 border border-emerald-200/80 flex items-center justify-between">
+                      <span className="text-emerald-700 font-black text-[11px]">수당 정산</span>
+                      <span className="font-black text-emerald-800">
+                        {t.payableSubstituteHours > 0 ? `${t.payableSubstituteHours}시간` : '-'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* 데스크톱: 전체 교사 통계 표 (hidden md:block) */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full border-collapse text-center text-xs min-w-[650px]">
               <thead>
                 <tr className="bg-slate-100/90 text-slate-700 border-b-2 border-slate-200 text-[11px] font-black">
                   <th className="py-2.5 px-2 w-12 border-r border-slate-200">순번</th>
@@ -1904,7 +2296,7 @@ export function SubstituteStatsView({
 
       {/* 비밀번호 변경 모달 */}
       {isPinModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-sm overflow-hidden p-6 space-y-4 animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
