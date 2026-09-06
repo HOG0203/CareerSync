@@ -1851,6 +1851,9 @@ export function AcademicScheduleModal({
                 <DialogTitle className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
                   {config.academicYear || 2026}학년도 연간 학사일정
                 </DialogTitle>
+                <DialogDescription className="sr-only">
+                  {config.academicYear || 2026}학년도 연간 학사일정 및 수업 시수 설정
+                </DialogDescription>
                 <Badge className="bg-blue-50 text-blue-700 border-blue-200/80 text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-lg font-black">
                   수업계
                 </Badge>
