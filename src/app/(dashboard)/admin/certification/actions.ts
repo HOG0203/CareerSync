@@ -1063,6 +1063,8 @@ export async function batchImportArtsContestAction(
     const existing = currentStore[row.studentId] || { student_id: row.studentId };
     const prevArts = existing.arts_contest_details || {};
 
+    // 1. 운동부/관악부 학기별 슬롯 병합 (새 업로드 학기는 덮어쓰고, 기존 학기는 보존)
+    const mergedSports = { ...(prevArts.arts_sports || {}), ...(row.artsSports || {}) };
     const updatedSportsMeta = { ...(prevArts.arts_sports_meta || {}) };
     if (row.artsSports) {
       Object.keys(row.artsSports).forEach(k => {
@@ -1070,24 +1072,38 @@ export async function batchImportArtsContestAction(
       });
     }
 
-    const updatedContestList = (row.contestList || []).map(c => ({
+    // 2. 교내외 대회 실적 병합 (동일 대회는 최신 정보로 덮어쓰고, 다른 기존 대회는 보존)
+    const existingContestList = prevArts.contest_list || [];
+    const newContestList = (row.contestList || []).map(c => ({
       ...c,
       created_by: (c as any).created_by || auditMeta,
     }));
 
-    const contestEval = evaluateContestList(updatedContestList);
+    const contestMap = new Map<string, any>();
+    for (const c of existingContestList) {
+      const key = c.id || `${c.dateOrTerm || ''}_${c.title}_${c.type}`;
+      contestMap.set(key, c);
+    }
+    for (const c of newContestList) {
+      const key = c.id || `${c.dateOrTerm || ''}_${c.title}_${c.type}`;
+      contestMap.set(key, c);
+    }
+    const finalContestList = Array.from(contestMap.values());
+
+    const contestEval = evaluateContestList(finalContestList);
+    const finalSportsSemesters = Object.keys(mergedSports).length;
 
     const updatedEval: CertificationEvaluationData = {
       ...existing,
       created_by: existing.created_by || auditMeta,
       updated_by: auditMeta,
-      arts_sports_semesters: row.artsSportsSemesters,
+      arts_sports_semesters: finalSportsSemesters,
       contest_award_count: contestEval.effectiveAwardCount,
       contest_participate_count: contestEval.effectivePartCount,
       arts_contest_details: {
-        arts_sports: row.artsSports || {},
+        arts_sports: mergedSports,
         arts_sports_meta: updatedSportsMeta,
-        contest_list: updatedContestList,
+        contest_list: finalContestList,
       }
     };
 
@@ -1119,6 +1135,7 @@ export async function batchImportArtsContestAction(
     details: { count: updatedCount }
   });
 
+  clearCertificationSummaryCache();
   revalidateTag('cert-eval');
   revalidateTag('cert-eval-grade-3');
   revalidateTag('cert-eval-grade-2');
@@ -1902,6 +1919,7 @@ export async function updateSingleImportedRecordAction(
     details: { category, studentId, data },
   });
 
+  clearCertificationSummaryCache();
   revalidateTag('cert-eval');
   revalidateTag(`cert-eval-grade-3`);
   revalidateTag(`cert-eval-grade-2`);
@@ -2161,6 +2179,7 @@ export async function deleteMyImportedRecordsAction(
       details: { category, deletedStudentsCount, deletedItemsCount }
     });
 
+    clearCertificationSummaryCache();
     revalidateTag('cert-eval');
     revalidateTag('cert-eval-grade-3');
     revalidateTag('cert-eval-grade-2');
