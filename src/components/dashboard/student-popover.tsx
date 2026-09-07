@@ -678,7 +678,7 @@ export function StudentPopover({
         </div>
       </div>
 
-      {(!isLowerGrade || (student.has_field_training === 'O' || (currentTrainingRecords && currentTrainingRecords.length > 0))) && (
+      {(student.has_field_training === 'O' || (currentTrainingRecords && currentTrainingRecords.length > 0)) && (
         <div className="pt-1 space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-[11px] text-emerald-800 font-black uppercase tracking-tight flex items-center gap-1">
@@ -693,34 +693,28 @@ export function StudentPopover({
               상세보기 <ExternalLink className="h-2.5 w-2.5" />
             </Button>
           </div>
-          {(student.has_field_training === 'O' || (currentTrainingRecords && currentTrainingRecords.length > 0)) ? (
-            <div className="space-y-1 bg-emerald-50/30 p-2 rounded-lg border border-emerald-100">
-              <div className="grid grid-cols-2 gap-x-3 text-[10px]">
-                <p className="flex justify-between"><span className="text-slate-400">실습내용</span> <span className={cn(
-                  "font-black text-right",
-                  latestRecord?.hiring_status === '채용전환' || student.is_hiring_conversion ? "text-blue-600" : 
-                  latestRecord?.hiring_status === '복교' || student.is_returned === 'O' ? "text-rose-600" : "text-emerald-700"
-                )}>{latestRecord?.hiring_status || (student.is_hiring_conversion ? '채용전환' : student.is_returned === 'O' ? '복교' : student.has_field_training === 'O' ? '현장실습' : '-')}</span></p>
-                <p className="flex justify-between"><span className="text-slate-400 pl-2">지원금</span> <span className="font-bold text-slate-700">{latestRecord?.stipend_status || student.training_stipend_status || '-'}</span></p>
-              </div>
-              <div className="pt-1 border-t border-emerald-100 mt-1 space-y-1">
-                <p className="flex justify-between text-[10px]">
-                  <span className="text-slate-400">실습기간</span>
-                  <span className="font-bold text-slate-700 text-right">{(latestRecord?.start_date || student.start_date || '?')} ~ {(latestRecord?.end_date || student.end_date || '?')}</span>
+          <div className="space-y-1 bg-emerald-50/30 p-2 rounded-lg border border-emerald-100">
+            <div className="grid grid-cols-2 gap-x-3 text-[10px]">
+              <p className="flex justify-between"><span className="text-slate-400">실습내용</span> <span className={cn(
+                "font-black text-right",
+                latestRecord?.hiring_status === '채용전환' || student.is_hiring_conversion === 'O' ? "text-blue-600" : 
+                latestRecord?.hiring_status === '복교' || student.is_returned === 'O' ? "text-rose-600" : "text-emerald-700"
+              )}>{latestRecord?.hiring_status || (student.is_hiring_conversion === 'O' ? '채용전환' : student.is_returned === 'O' ? '복교' : student.has_field_training === 'O' ? '현장실습' : '-')}</span></p>
+              <p className="flex justify-between"><span className="text-slate-400 pl-2">지원금</span> <span className="font-bold text-slate-700">{latestRecord?.stipend_status || student.training_stipend_status || '-'}</span></p>
+            </div>
+            <div className="pt-1 border-t border-emerald-100 mt-1 space-y-1">
+              <p className="flex justify-between text-[10px]">
+                <span className="text-slate-400">실습기간</span>
+                <span className="font-bold text-slate-700 text-right">{(latestRecord?.start_date || student.start_date || '?')} ~ {(latestRecord?.end_date || student.end_date || '?')}</span>
+              </p>
+              <div className="pt-1 border-t border-emerald-100/50">
+                <p className="text-[9px] text-emerald-500 font-bold uppercase mb-0.5">실습처</p>
+                <p className="font-black text-emerald-700 text-[17px] leading-tight truncate">
+                  {latestRecord?.company || student.latest_training_company || '미정'}
                 </p>
-                <div className="pt-1 border-t border-emerald-100/50">
-                  <p className="text-[9px] text-emerald-500 font-bold uppercase mb-0.5">실습처</p>
-                  <p className="font-black text-emerald-700 text-[17px] leading-tight truncate">
-                    {latestRecord?.company || student.latest_training_company || '미정'}
-                  </p>
-                </div>
               </div>
             </div>
-          ) : (
-            <p className="text-[10px] text-slate-400 italic bg-slate-50 p-2 rounded-lg text-center border border-dashed">
-              등록된 현장실습 이력이 없습니다.
-            </p>
-          )}
+          </div>
         </div>
       )}
 
