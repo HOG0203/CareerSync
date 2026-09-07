@@ -34,6 +34,7 @@ import { useRouter } from 'next/navigation';
 import { getStudentScoresById, getStudentRankSummary, updateStudentField } from '@/app/students/actions';
 import { Button } from '@/components/ui/button';
 import { CounselingModal } from '@/app/(dashboard)/class-management/counseling-modal';
+import { FieldTrainingModal } from '@/app/(dashboard)/students/field-training-modal';
 
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -71,6 +72,7 @@ export function StudentPopover({
   const [isGradeModalOpen, setIsGradeModalOpen] = React.useState(false);
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = React.useState(false);
   const [isCounselingModalOpen, setIsCounselingModalOpen] = React.useState(false);
+  const [isFieldTrainingModalOpen, setIsFieldTrainingModalOpen] = React.useState(false);
   const [detailedScores, setDetailedScores] = React.useState<any[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
 
@@ -104,6 +106,8 @@ export function StudentPopover({
   const [currentCompany, setCurrentCompany] = React.useState(student.company || '');
   const [isCompanySaving, setIsCompanySaving] = React.useState(false);
 
+  const [currentTrainingRecords, setCurrentTrainingRecords] = React.useState<any[]>(student.training_records || []);
+
   React.useEffect(() => {
     setCurrentEmploymentStatus(student.employment_status || '');
     setCurrentCompanyType(student.company_type || '');
@@ -112,6 +116,7 @@ export function StudentPopover({
     setCurrentCareerAspiration(student.career_aspiration || '');
     setCurrentSpecialNotes(student.special_notes || '');
     setCurrentCompany(student.company || '');
+    setCurrentTrainingRecords(student.training_records || []);
   }, [
     student.employment_status,
     student.company_type,
@@ -120,6 +125,7 @@ export function StudentPopover({
     student.career_aspiration,
     student.special_notes,
     student.company,
+    student.training_records,
   ]);
 
   // 팝오버가 열렸을 때 rankingSummary가 없으면 단건 석차 요약을 비동기로 자동 조회
@@ -240,6 +246,39 @@ export function StudentPopover({
     } finally {
       setIsCompanySaving(false);
     }
+  };
+
+  const latestRecord = React.useMemo(() => {
+    if (!currentTrainingRecords || currentTrainingRecords.length === 0) return null;
+    const sorted = [...currentTrainingRecords].sort((a, b) => (b.training_order || 0) - (a.training_order || 0));
+    return sorted[0];
+  }, [currentTrainingRecords]);
+
+  const handleUpdateRecords = (studentId: string, updatedRecords: any[]) => {
+    setCurrentTrainingRecords(updatedRecords);
+    student.training_records = updatedRecords;
+    if (updatedRecords && updatedRecords.length > 0) {
+      student.has_field_training = 'O';
+      const sorted = [...updatedRecords].sort((a, b) => (b.training_order || 0) - (a.training_order || 0));
+      const latest = sorted[0];
+      if (latest) {
+        student.latest_training_company = latest.company || '';
+        student.start_date = latest.start_date || '';
+        student.end_date = latest.end_date || '';
+        student.training_stipend_status = latest.stipend_status || '-';
+        student.is_hiring_conversion = latest.hiring_status === '채용전환' ? 'O' : 'X';
+        student.is_returned = latest.hiring_status === '복교' ? 'O' : 'X';
+      }
+    } else {
+      student.has_field_training = 'X';
+      student.latest_training_company = '';
+      student.start_date = '';
+      student.end_date = '';
+      student.training_stipend_status = '-';
+      student.is_hiring_conversion = 'X';
+      student.is_returned = 'X';
+    }
+    router.refresh();
   };
 
   const getDesireColor = (student: StudentEmploymentData) => {
@@ -639,33 +678,49 @@ export function StudentPopover({
         </div>
       </div>
 
-      {(student.has_field_training === 'O' || (student.training_records && student.training_records.length > 0)) && (
+      {(!isLowerGrade || (student.has_field_training === 'O' || (currentTrainingRecords && currentTrainingRecords.length > 0))) && (
         <div className="pt-1 space-y-2">
-          <p className="text-[11px] text-emerald-800 font-black uppercase tracking-tight flex items-center gap-1">
-            <Briefcase className="h-3 w-3" /> 현장실습 상세
-          </p>
-          <div className="space-y-1 bg-emerald-50/30 p-2 rounded-lg border border-emerald-100">
-            <div className="grid grid-cols-2 gap-x-3 text-[10px]">
-              <p className="flex justify-between"><span className="text-slate-400">실습내용</span> <span className={cn(
-                "font-black text-right",
-                student.is_hiring_conversion ? "text-blue-600" : 
-                student.is_returned === 'O' ? "text-rose-600" : "text-emerald-700"
-              )}>{student.is_hiring_conversion ? '채용전환' : student.is_returned === 'O' ? '복교' : student.has_field_training === 'O' ? '현장실습' : '-'}</span></p>
-              <p className="flex justify-between"><span className="text-slate-400 pl-2">지원금</span> <span className="font-bold text-slate-700">{student.training_stipend_status || '-'}</span></p>
-            </div>
-            <div className="pt-1 border-t border-emerald-100 mt-1 space-y-1">
-              <p className="flex justify-between text-[10px]">
-                <span className="text-slate-400">실습기간</span>
-                <span className="font-bold text-slate-700 text-right">{student.start_date || '?'} ~ {student.end_date || '?'}</span>
-              </p>
-              <div className="pt-1 border-t border-emerald-100/50">
-                <p className="text-[9px] text-emerald-500 font-bold uppercase mb-0.5">실습처</p>
-                <p className="font-black text-emerald-700 text-[17px] leading-tight truncate">
-                  {student.latest_training_company || '미정'}
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] text-emerald-800 font-black uppercase tracking-tight flex items-center gap-1">
+              <Briefcase className="h-3 w-3" /> 현장실습 상세
+            </p>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={(e) => { e.stopPropagation(); setIsFieldTrainingModalOpen(true); }}
+              className="h-6 px-2 text-[9px] font-black text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 gap-1"
+            >
+              상세보기 <ExternalLink className="h-2.5 w-2.5" />
+            </Button>
+          </div>
+          {(student.has_field_training === 'O' || (currentTrainingRecords && currentTrainingRecords.length > 0)) ? (
+            <div className="space-y-1 bg-emerald-50/30 p-2 rounded-lg border border-emerald-100">
+              <div className="grid grid-cols-2 gap-x-3 text-[10px]">
+                <p className="flex justify-between"><span className="text-slate-400">실습내용</span> <span className={cn(
+                  "font-black text-right",
+                  latestRecord?.hiring_status === '채용전환' || student.is_hiring_conversion ? "text-blue-600" : 
+                  latestRecord?.hiring_status === '복교' || student.is_returned === 'O' ? "text-rose-600" : "text-emerald-700"
+                )}>{latestRecord?.hiring_status || (student.is_hiring_conversion ? '채용전환' : student.is_returned === 'O' ? '복교' : student.has_field_training === 'O' ? '현장실습' : '-')}</span></p>
+                <p className="flex justify-between"><span className="text-slate-400 pl-2">지원금</span> <span className="font-bold text-slate-700">{latestRecord?.stipend_status || student.training_stipend_status || '-'}</span></p>
+              </div>
+              <div className="pt-1 border-t border-emerald-100 mt-1 space-y-1">
+                <p className="flex justify-between text-[10px]">
+                  <span className="text-slate-400">실습기간</span>
+                  <span className="font-bold text-slate-700 text-right">{(latestRecord?.start_date || student.start_date || '?')} ~ {(latestRecord?.end_date || student.end_date || '?')}</span>
                 </p>
+                <div className="pt-1 border-t border-emerald-100/50">
+                  <p className="text-[9px] text-emerald-500 font-bold uppercase mb-0.5">실습처</p>
+                  <p className="font-black text-emerald-700 text-[17px] leading-tight truncate">
+                    {latestRecord?.company || student.latest_training_company || '미정'}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <p className="text-[10px] text-slate-400 italic bg-slate-50 p-2 rounded-lg text-center border border-dashed">
+              등록된 현장실습 이력이 없습니다.
+            </p>
+          )}
         </div>
       )}
 
@@ -1115,6 +1170,14 @@ export function StudentPopover({
           class_info: student.class_info || '',
           student_number: student.student_number || ''
         }}
+      />
+
+      <FieldTrainingModal 
+        isOpen={isFieldTrainingModalOpen}
+        onClose={() => setIsFieldTrainingModalOpen(false)}
+        student={{ ...student, training_records: currentTrainingRecords }}
+        isAdmin={userProfile?.role === 'admin'}
+        onUpdateRecords={handleUpdateRecords}
       />
     </>
   );

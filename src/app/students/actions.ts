@@ -612,6 +612,7 @@ export async function upsertFieldTrainingRecord(record: any) {
   if (dbHiringStatus === '채용전환') await supabase.from('student_employments').upsert({ id: data.student_id, company: data.company, updated_at: new Date().toISOString() }, { onConflict: 'id' })
   revalidateTag('students');
   revalidatePath('/field-training');
+  revalidatePath('/employment-status');
   return { success: true, data: upserted }
 }
 
@@ -626,6 +627,7 @@ export async function deleteFieldTrainingRecord(id: string) {
   if (error) return { error: error.message }
   revalidateTag('students');
   revalidatePath('/field-training');
+  revalidatePath('/employment-status');
   return { success: true }
 }
 
