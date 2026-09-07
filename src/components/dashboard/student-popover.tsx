@@ -88,9 +88,34 @@ export function StudentPopover({
   const [isStatusSaving, setIsStatusSaving] = React.useState(false);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = React.useState(false);
 
+  const [currentCompanyType, setCurrentCompanyType] = React.useState(student.company_type || '');
+  const [isCompanyTypeSaving, setIsCompanyTypeSaving] = React.useState(false);
+
+  const [currentBusinessType, setCurrentBusinessType] = React.useState(student.business_type || '');
+  const [isBusinessTypeSaving, setIsBusinessTypeSaving] = React.useState(false);
+
+  const [currentIsDesiring, setCurrentIsDesiring] = React.useState(student.is_desiring_employment || '');
+  const [currentCareerAspiration, setCurrentCareerAspiration] = React.useState(student.career_aspiration || '');
+  const [isDesireSaving, setIsDesireSaving] = React.useState(false);
+
+  const [currentSpecialNotes, setCurrentSpecialNotes] = React.useState(student.special_notes || '');
+  const [isSpecialNotesSaving, setIsSpecialNotesSaving] = React.useState(false);
+
   React.useEffect(() => {
     setCurrentEmploymentStatus(student.employment_status || '');
-  }, [student.employment_status]);
+    setCurrentCompanyType(student.company_type || '');
+    setCurrentBusinessType(student.business_type || '');
+    setCurrentIsDesiring(student.is_desiring_employment || '');
+    setCurrentCareerAspiration(student.career_aspiration || '');
+    setCurrentSpecialNotes(student.special_notes || '');
+  }, [
+    student.employment_status,
+    student.company_type,
+    student.business_type,
+    student.is_desiring_employment,
+    student.career_aspiration,
+    student.special_notes,
+  ]);
 
   // 팝오버가 열렸을 때 rankingSummary가 없으면 단건 석차 요약을 비동기로 자동 조회
   React.useEffect(() => {
@@ -126,9 +151,79 @@ export function StudentPopover({
     }
   };
 
+  const handleCompanyTypeChange = async (val: string) => {
+    setCurrentCompanyType(val);
+    setIsCompanyTypeSaving(true);
+    try {
+      await updateStudentField(student.id, 'company_type', val);
+      student.company_type = val;
+      router.refresh();
+    } catch (err) {
+      console.error('Failed to update company_type:', err);
+    } finally {
+      setIsCompanyTypeSaving(false);
+    }
+  };
+
+  const handleBusinessTypeChange = async (val: string) => {
+    setCurrentBusinessType(val);
+    setIsBusinessTypeSaving(true);
+    try {
+      await updateStudentField(student.id, 'business_type', val);
+      student.business_type = val;
+      router.refresh();
+    } catch (err) {
+      console.error('Failed to update business_type:', err);
+    } finally {
+      setIsBusinessTypeSaving(false);
+    }
+  };
+
+  const handleDesireChange = async (val: string) => {
+    setCurrentIsDesiring(val);
+    setIsDesireSaving(true);
+    try {
+      await updateStudentField(student.id, 'is_desiring_employment', val);
+      student.is_desiring_employment = val;
+      router.refresh();
+    } catch (err) {
+      console.error('Failed to update is_desiring_employment:', err);
+    } finally {
+      setIsDesireSaving(false);
+    }
+  };
+
+  const handleAspirationChange = async (val: string) => {
+    setCurrentCareerAspiration(val);
+    setIsDesireSaving(true);
+    try {
+      await updateStudentField(student.id, 'career_aspiration', val);
+      student.career_aspiration = val;
+      router.refresh();
+    } catch (err) {
+      console.error('Failed to update career_aspiration:', err);
+    } finally {
+      setIsDesireSaving(false);
+    }
+  };
+
+  const handleSpecialNotesChange = async (val: string) => {
+    setCurrentSpecialNotes(val);
+    setIsSpecialNotesSaving(true);
+    try {
+      await updateStudentField(student.id, 'special_notes', val);
+      student.special_notes = val;
+      router.refresh();
+    } catch (err) {
+      console.error('Failed to update special_notes:', err);
+    } finally {
+      setIsSpecialNotesSaving(false);
+    }
+  };
+
   const getDesireColor = (student: StudentEmploymentData) => {
-    const isDesiring = student.is_desiring_employment;
-    const aspiration = student.career_aspiration;
+    const isDesiring = currentIsDesiring || student.is_desiring_employment;
+    const aspiration = currentCareerAspiration || student.career_aspiration;
 
     if (isLowerGrade) {
       if (aspiration === '취업') return 'bg-emerald-500';
@@ -138,8 +233,7 @@ export function StudentPopover({
 
     if (isDesiring === '예') return 'bg-emerald-500';
     if (isDesiring === '아니오') return 'bg-rose-500';
-
-    return 'bg-transparent';
+    return 'bg-slate-400';
   };
 
   const hasCounselingAccess = React.useMemo(() => {
@@ -245,20 +339,60 @@ export function StudentPopover({
             )}
           </div>
         </div>
-        <span className={cn(
-          "text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 mt-0.5",
-          isLowerGrade ? (
-            student.career_aspiration === '취업' ? "bg-emerald-100 text-emerald-700" : 
-            student.career_aspiration === '진학' ? "bg-rose-100 text-rose-700" : 
-            student.career_aspiration === '제외인정자' ? "bg-slate-100 text-slate-600" : "bg-slate-100 text-slate-600"
-          ) : (
-            student.is_desiring_employment === '예' ? "bg-emerald-100 text-emerald-700" : 
-            student.is_desiring_employment === '아니오' ? "bg-rose-100 text-rose-700" : 
-            "bg-slate-100 text-slate-600"
-          )
-        )}>
-          희망: {isLowerGrade ? (student.career_aspiration || '미정') : (student.is_desiring_employment || '미정')}
-        </span>
+        {userProfile?.role === 'admin' ? (
+          <div className="relative shrink-0 mt-0.5">
+            <select
+              disabled={isDesireSaving}
+              value={isLowerGrade ? (currentCareerAspiration || '') : (currentIsDesiring || '')}
+              onChange={(e) => isLowerGrade ? handleAspirationChange(e.target.value) : handleDesireChange(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              className={cn(
+                "text-[10px] font-bold rounded-full py-0.5 pl-2 pr-4 cursor-pointer appearance-none outline-none border transition-colors shadow-2xs",
+                isLowerGrade ? (
+                  currentCareerAspiration === '취업' ? "bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200" : 
+                  currentCareerAspiration === '진학' ? "bg-rose-100 text-rose-700 border-rose-300 hover:bg-rose-200" : 
+                  currentCareerAspiration === '제외인정자' ? "bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200" : 
+                  "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                ) : (
+                  currentIsDesiring === '예' ? "bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200" : 
+                  currentIsDesiring === '아니오' ? "bg-rose-100 text-rose-700 border-rose-300 hover:bg-rose-200" : 
+                  "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                )
+              )}
+            >
+              <option value="">희망: (미정)</option>
+              {isLowerGrade ? (
+                ['취업', '진학', '제외인정자', '기타'].map((opt) => (
+                  <option key={opt} value={opt}>
+                    희망: {opt}
+                  </option>
+                ))
+              ) : (
+                ['예', '아니오'].map((opt) => (
+                  <option key={opt} value={opt}>
+                    희망: {opt}
+                  </option>
+                ))
+              )}
+            </select>
+            <ChevronDown className="h-2.5 w-2.5 text-slate-400 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        ) : (
+          <span className={cn(
+            "text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 mt-0.5",
+            isLowerGrade ? (
+              (currentCareerAspiration || student.career_aspiration) === '취업' ? "bg-emerald-100 text-emerald-700" : 
+              (currentCareerAspiration || student.career_aspiration) === '진학' ? "bg-rose-100 text-rose-700" : 
+              (currentCareerAspiration || student.career_aspiration) === '제외인정자' ? "bg-slate-100 text-slate-600" : "bg-slate-100 text-slate-600"
+            ) : (
+              (currentIsDesiring || student.is_desiring_employment) === '예' ? "bg-emerald-100 text-emerald-700" : 
+              (currentIsDesiring || student.is_desiring_employment) === '아니오' ? "bg-rose-100 text-rose-700" : 
+              "bg-slate-100 text-slate-600"
+            )
+          )}>
+            희망: {isLowerGrade ? (currentCareerAspiration || student.career_aspiration || '미정') : (currentIsDesiring || student.is_desiring_employment || '미정')}
+          </span>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -267,28 +401,77 @@ export function StudentPopover({
             <BarChart3 className="h-3 w-3" /> {isLowerGrade ? '진로희망' : '취업 상세'}
           </p>
           {!isLowerGrade && (
-            <span className={cn(
-              "text-[9px] px-2 py-0.5 rounded-full font-black",
-              student.business_type === '취업' ? "bg-emerald-100 text-emerald-700" : 
-              student.business_type === '미취업' ? "bg-rose-100 text-rose-700" :
-              student.business_type === '채용진행중' ? "bg-amber-100 text-amber-700" :
-              student.business_type === '현장실습중' ? "bg-blue-100 text-blue-700" :
-              student.business_type === '도제OJT' ? "bg-emerald-50 text-emerald-600" :
-              (student.business_type === '제외인정자' || student.career_aspiration === '제외인정자') ? "bg-slate-100 text-slate-700" :
-              "bg-slate-50 text-slate-400"
-            )}>
-              현황: {student.business_type || (student.career_aspiration === '진학' ? '진학희망' : '미결정')}
-            </span>
+            userProfile?.role === 'admin' ? (
+              <div className="relative inline-flex items-center">
+                <select
+                  disabled={isBusinessTypeSaving}
+                  value={currentBusinessType || ''}
+                  onChange={(e) => handleBusinessTypeChange(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className={cn(
+                    "text-[9px] font-black rounded-full py-0.5 pl-2 pr-4 cursor-pointer appearance-none outline-none border transition-colors shadow-2xs",
+                    currentBusinessType === '취업' ? "bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200" : 
+                    currentBusinessType === '미취업' ? "bg-rose-100 text-rose-700 border-rose-300 hover:bg-rose-200" :
+                    currentBusinessType === '채용진행중' ? "bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200" :
+                    currentBusinessType === '현장실습중' ? "bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200" :
+                    currentBusinessType === '도제OJT' ? "bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100" :
+                    (currentBusinessType === '제외인정자' || student.career_aspiration === '제외인정자') ? "bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200" :
+                    "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100"
+                  )}
+                >
+                  <option value="">현황: (미결정)</option>
+                  {['취업', '미취업', '제외인정자', '채용진행중', '현장실습중', '도제OJT'].map((opt) => (
+                    <option key={opt} value={opt}>
+                      현황: {opt}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="h-2 w-2 text-slate-400 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            ) : (
+              <span className={cn(
+                "text-[9px] px-2 py-0.5 rounded-full font-black",
+                (currentBusinessType || student.business_type) === '취업' ? "bg-emerald-100 text-emerald-700" : 
+                (currentBusinessType || student.business_type) === '미취업' ? "bg-rose-100 text-rose-700" :
+                (currentBusinessType || student.business_type) === '채용진행중' ? "bg-amber-100 text-amber-700" :
+                (currentBusinessType || student.business_type) === '현장실습중' ? "bg-blue-100 text-blue-700" :
+                (currentBusinessType || student.business_type) === '도제OJT' ? "bg-emerald-50 text-emerald-600" :
+                ((currentBusinessType || student.business_type) === '제외인정자' || student.career_aspiration === '제외인정자') ? "bg-slate-100 text-slate-700" :
+                "bg-slate-50 text-slate-400"
+              )}>
+                현황: {currentBusinessType || student.business_type || (student.career_aspiration === '진학' ? '진학희망' : '미결정')}
+              </span>
+            )
           )}
         </div>
         <div className="space-y-1 bg-slate-50 p-2 rounded-lg border border-slate-100">
           {isLowerGrade ? (
             <>
               <div className="text-[10px]">
-                <p className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-slate-400">희망기업유형</span> 
-                  <span className="font-black text-blue-600 text-right">{student.special_notes || '미설정'}</span>
-                </p>
+                  {userProfile?.role === 'admin' ? (
+                    <div className="relative inline-block w-[120px] text-right">
+                      <select
+                        disabled={isSpecialNotesSaving}
+                        value={currentSpecialNotes || ''}
+                        onChange={(e) => handleSpecialNotesChange(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full text-[10px] font-bold text-slate-800 bg-white border border-slate-200 rounded py-0.5 pl-1.5 pr-4 hover:border-slate-300 transition-colors cursor-pointer appearance-none outline-none text-left shadow-2xs"
+                      >
+                        <option value="">(미설정)</option>
+                        {['대/공기업', '공무원', '중견/강소기업', '부사관', '도제반', '청솔반', '축구부', '검도부', '특수교육대상자', '가업승계', '아우스빌둥', '군특성화', '기술사관', '운동부', '기타'].map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="h-2.5 w-2.5 text-slate-400 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  ) : (
+                    <span className="font-black text-blue-600 text-right">{currentSpecialNotes || student.special_notes || '미설정'}</span>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-slate-200 mt-1">
                 <div>
@@ -357,10 +540,30 @@ export function StudentPopover({
                   )}
                 </div>
 
-                <p className="flex justify-between items-center">
-                  <span className="text-slate-400 pl-2">기업구분</span> 
-                  <span className="font-black text-blue-600 text-right">{student.company_type || '미분류'}</span>
-                </p>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400 pl-2 shrink-0">기업구분</span> 
+                  {userProfile?.role === 'admin' ? (
+                    <div className="relative inline-block w-[95px] text-right">
+                      <select
+                        disabled={isCompanyTypeSaving}
+                        value={currentCompanyType || ''}
+                        onChange={(e) => handleCompanyTypeChange(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full text-[10px] font-bold text-slate-800 bg-white border border-slate-200 rounded py-0.5 pl-1.5 pr-4 hover:border-slate-300 transition-colors cursor-pointer appearance-none outline-none text-left shadow-2xs"
+                      >
+                        <option value="">(미분류)</option>
+                        {['대기업', '공기업', '공무원', '중견기업', '강소기업', '연계교육', '부사관'].map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="h-2.5 w-2.5 text-slate-400 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  ) : (
+                    <span className="font-black text-blue-600 text-right">{currentCompanyType || student.company_type || '미분류'}</span>
+                  )}
+                </div>
               </div>
               <div className="pt-1 border-t border-slate-200 mt-1">
                 <p className="text-[9px] text-slate-400 font-bold uppercase mb-0.5">취업처</p>
@@ -569,7 +772,7 @@ export function StudentPopover({
               className="w-[92vw] max-w-[360px] max-h-[85vh] p-4 overflow-y-auto rounded-2xl shadow-2xl bg-white border-none z-[100] [&>button]:hidden"
               onClick={(e) => {
                 const target = e.target as HTMLElement;
-                if (target.closest('button') || target.closest('a')) return;
+                if (target.closest('button') || target.closest('a') || target.closest('select') || target.closest('option')) return;
                 setOpen(false);
               }}
             >
