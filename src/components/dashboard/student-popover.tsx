@@ -101,6 +101,9 @@ export function StudentPopover({
   const [currentSpecialNotes, setCurrentSpecialNotes] = React.useState(student.special_notes || '');
   const [isSpecialNotesSaving, setIsSpecialNotesSaving] = React.useState(false);
 
+  const [currentCompany, setCurrentCompany] = React.useState(student.company || '');
+  const [isCompanySaving, setIsCompanySaving] = React.useState(false);
+
   React.useEffect(() => {
     setCurrentEmploymentStatus(student.employment_status || '');
     setCurrentCompanyType(student.company_type || '');
@@ -108,6 +111,7 @@ export function StudentPopover({
     setCurrentIsDesiring(student.is_desiring_employment || '');
     setCurrentCareerAspiration(student.career_aspiration || '');
     setCurrentSpecialNotes(student.special_notes || '');
+    setCurrentCompany(student.company || '');
   }, [
     student.employment_status,
     student.company_type,
@@ -115,6 +119,7 @@ export function StudentPopover({
     student.is_desiring_employment,
     student.career_aspiration,
     student.special_notes,
+    student.company,
   ]);
 
   // 팝오버가 열렸을 때 rankingSummary가 없으면 단건 석차 요약을 비동기로 자동 조회
@@ -218,6 +223,22 @@ export function StudentPopover({
       console.error('Failed to update special_notes:', err);
     } finally {
       setIsSpecialNotesSaving(false);
+    }
+  };
+
+  const handleCompanySave = async (val: string) => {
+    const trimmed = val.trim();
+    if (trimmed === (student.company || '').trim()) return;
+    setIsCompanySaving(true);
+    try {
+      await updateStudentField(student.id, 'company', trimmed);
+      student.company = trimmed;
+      setCurrentCompany(trimmed);
+      router.refresh();
+    } catch (err) {
+      console.error('Failed to update company:', err);
+    } finally {
+      setIsCompanySaving(false);
     }
   };
 
@@ -566,10 +587,51 @@ export function StudentPopover({
                 </div>
               </div>
               <div className="pt-1 border-t border-slate-200 mt-1">
-                <p className="text-[9px] text-slate-400 font-bold uppercase mb-0.5">취업처</p>
-                <p className="font-black text-blue-600 text-[17px] leading-tight truncate">
-                  {student.company || '미정'}
-                </p>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-[9px] text-slate-400 font-bold uppercase">취업처 (회사명)</p>
+                  {isCompanySaving && (
+                    <span className="flex items-center gap-1 text-[9px] text-blue-600 font-bold">
+                      <Loader2 className="h-2.5 w-2.5 animate-spin" /> 저장 중...
+                    </span>
+                  )}
+                </div>
+                {userProfile?.role === 'admin' ? (
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="text"
+                      disabled={isCompanySaving}
+                      value={currentCompany}
+                      placeholder="취업처(회사명) 직접 입력..."
+                      onChange={(e) => setCurrentCompany(e.target.value)}
+                      onBlur={() => handleCompanySave(currentCompany)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.currentTarget.blur();
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex-1 text-[13px] font-black text-blue-900 bg-white border border-slate-200 rounded-lg px-2.5 py-1 hover:border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all shadow-2xs placeholder:text-slate-300 placeholder:font-normal"
+                    />
+                    {currentCompany.trim() !== (student.company || '').trim() && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={isCompanySaving}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCompanySave(currentCompany);
+                        }}
+                        className="h-7 px-2.5 text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-2xs shrink-0"
+                      >
+                        저장
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="font-black text-blue-600 text-[17px] leading-tight truncate">
+                    {currentCompany || student.company || '미정'}
+                  </p>
+                )}
               </div>
             </>
           )}
@@ -772,7 +834,7 @@ export function StudentPopover({
               className="w-[92vw] max-w-[360px] max-h-[85vh] p-4 overflow-y-auto rounded-2xl shadow-2xl bg-white border-none z-[100] [&>button]:hidden"
               onClick={(e) => {
                 const target = e.target as HTMLElement;
-                if (target.closest('button') || target.closest('a') || target.closest('select') || target.closest('option')) return;
+                if (target.closest('button') || target.closest('a') || target.closest('select') || target.closest('option') || target.closest('input')) return;
                 setOpen(false);
               }}
             >
@@ -798,17 +860,17 @@ export function StudentPopover({
             avoidCollisions={true}
             onPointerDownOutside={(e) => {
               const target = e.target as HTMLElement;
-              if (target?.closest('select') || target?.tagName === 'OPTION') {
+              if (target?.closest('select') || target?.tagName === 'OPTION' || target?.closest('input')) {
                 e.preventDefault();
               }
             }}
             onFocusOutside={(e) => {
-              // select 조작 시 포커스 이동으로 인한 팝오버 닫힘 원천 차단
+              // select 또는 input 조작 시 포커스 이동으로 인한 팝오버 닫힘 원천 차단
               e.preventDefault();
             }}
             onInteractOutside={(e) => {
               const target = e.target as HTMLElement;
-              if (target?.closest('select') || target?.tagName === 'OPTION') {
+              if (target?.closest('select') || target?.tagName === 'OPTION' || target?.closest('input')) {
                 e.preventDefault();
               }
             }}
