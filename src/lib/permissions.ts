@@ -50,6 +50,9 @@ export async function checkTeachingSupportPermission(targetPath: string): Promis
       const userPerms = permMap[profile.id];
       // 관리자가 해당 사용자에게 개별 커스텀 권한 목록을 설정해 둔 경우 해당 권한 준수
       if (Array.isArray(userPerms)) {
+        if (targetPath === '/teaching-support/substitute/admin') {
+          return userPerms.includes('/teaching-support/substitute');
+        }
         return userPerms.includes(targetPath);
       }
     }
