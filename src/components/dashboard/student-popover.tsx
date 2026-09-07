@@ -103,6 +103,9 @@ export function StudentPopover({
   const [currentSpecialNotes, setCurrentSpecialNotes] = React.useState(student.special_notes || '');
   const [isSpecialNotesSaving, setIsSpecialNotesSaving] = React.useState(false);
 
+  const [currentCareerCourse, setCurrentCareerCourse] = React.useState(student.career_course || '');
+  const [isCareerCourseSaving, setIsCareerCourseSaving] = React.useState(false);
+
   const [currentCompany, setCurrentCompany] = React.useState(student.company || '');
   const [isCompanySaving, setIsCompanySaving] = React.useState(false);
 
@@ -115,6 +118,7 @@ export function StudentPopover({
     setCurrentIsDesiring(student.is_desiring_employment || '');
     setCurrentCareerAspiration(student.career_aspiration || '');
     setCurrentSpecialNotes(student.special_notes || '');
+    setCurrentCareerCourse(student.career_course || '');
     setCurrentCompany(student.company || '');
     setCurrentTrainingRecords(student.training_records || []);
   }, [
@@ -124,6 +128,7 @@ export function StudentPopover({
     student.is_desiring_employment,
     student.career_aspiration,
     student.special_notes,
+    student.career_course,
     student.company,
     student.training_records,
   ]);
@@ -229,6 +234,20 @@ export function StudentPopover({
       console.error('Failed to update special_notes:', err);
     } finally {
       setIsSpecialNotesSaving(false);
+    }
+  };
+
+  const handleCareerCourseChange = async (val: string) => {
+    setCurrentCareerCourse(val);
+    setIsCareerCourseSaving(true);
+    try {
+      await updateStudentField(student.id, 'career_course', val);
+      student.career_course = val;
+      router.refresh();
+    } catch (err) {
+      console.error('Failed to update career_course:', err);
+    } finally {
+      setIsCareerCourseSaving(false);
     }
   };
 
@@ -535,10 +554,33 @@ export function StudentPopover({
               </div>
               <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-slate-200 mt-1">
                 <div>
-                  <p className="text-[9px] text-slate-400 font-bold uppercase mb-0.5">희망진로코스</p>
-                  <p className="font-black text-blue-600 text-xs sm:text-sm leading-tight truncate">
-                    {student.career_course || '미설정'}
+                  <p className="text-[9px] text-slate-400 font-bold uppercase mb-0.5 flex items-center justify-between">
+                    <span>희망진로코스</span>
+                    {isCareerCourseSaving && <Loader2 className="h-2.5 w-2.5 animate-spin text-blue-600" />}
                   </p>
+                  {userProfile?.role === 'admin' ? (
+                    <div className="relative mt-0.5">
+                      <select
+                        disabled={isCareerCourseSaving}
+                        value={currentCareerCourse || ''}
+                        onChange={(e) => handleCareerCourseChange(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full text-xs font-bold text-blue-600 bg-white border border-slate-200 rounded-md py-1 pl-2 pr-6 hover:border-slate-300 transition-colors cursor-pointer appearance-none outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
+                      >
+                        <option value="">(미설정)</option>
+                        {['청솔반', '취업맞춤반', '중견기업반', '반도체아카데미반', '혁신인재반', '부사관반', '일학습병행', '계약학과', '도제반', '아우스빌둥', '군특성화', '기술사관', '운동부', '전문대학', '4년제대학', '일반취업', '진학', '입대', '기타(직접입력)'].map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="h-3 w-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  ) : (
+                    <p className="font-black text-blue-600 text-xs sm:text-sm leading-tight truncate">
+                      {currentCareerCourse || student.career_course || '미설정'}
+                    </p>
+                  )}
                 </div>
                 <div className="relative">
                   <p className="text-[9px] text-emerald-600 font-bold uppercase mb-0.5 flex items-center justify-between">
