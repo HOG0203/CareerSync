@@ -526,7 +526,7 @@ export function StandardSpreadsheetTable({
                           onClick={(e) => { e.stopPropagation(); onAction(row.id, 'field_training_action'); }}
                         >
                           <Award className="h-3 w-3 text-emerald-600" />
-                          실습이력
+                          이력관리
                         </Button>
                       )}
                     </div>

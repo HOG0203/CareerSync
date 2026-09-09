@@ -312,7 +312,7 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
     >
       <div className="px-2 text-[11px] w-full h-full flex items-center justify-center whitespace-nowrap">
         {config.type === 'action' ? (
-          <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] bg-blue-50 text-blue-600 font-bold hover:bg-blue-100" onClick={(e) => { e.stopPropagation(); onAction?.(id, field); }}>상세보기</Button>
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] bg-blue-50 text-blue-600 font-bold hover:bg-blue-100" onClick={(e) => { e.stopPropagation(); onAction?.(id, field); }}>{config.actionLabel || '상세보기'}</Button>
         ) : field === 'student_name' ? (
           !disableNamePopover ? (
             <StudentPopover student={rowData} rankingSummary={rankingMap?.[id]} isRankingsLoading={isRankingsLoading} userProfile={userProfile} baseYear={baseYear}>

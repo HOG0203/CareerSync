@@ -14,6 +14,7 @@ export type StudentEmploymentData = {
   business_type?: string;
   company?: string;
   has_field_training?: string;
+  latest_training_order?: number | string;
   latest_training_company?: string;
   start_date?: string;
   end_date?: string;

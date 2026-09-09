@@ -54,7 +54,14 @@ export default function CompanyTypeChart({
     return Object.entries(counts)
       .map(([name, value]) => ({ name, value }))
       .filter(d => d.value > 0)
-      .sort((a, b) => b.value - a.value);
+      .sort((a, b) => {
+        const indexA = COMPANY_TYPES.indexOf(a.name);
+        const indexB = COMPANY_TYPES.indexOf(b.name);
+        const orderA = indexA === -1 ? 999 : indexA;
+        const orderB = indexB === -1 ? 999 : indexB;
+        if (orderA !== orderB) return orderA - orderB;
+        return b.value - a.value;
+      });
   }, [data]);
 
   // 2. 학과별 또는 반별 막대 차트용 데이터 집계 (MAJOR_SORT_ORDER 준수)

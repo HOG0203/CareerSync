@@ -3,6 +3,7 @@ export interface ColumnConfig {
   label: string
   width: number
   type?: 'text' | 'select' | 'date' | 'multi-select' | 'action'
+  actionLabel?: string
   options?: { label: string; value: string }[] | ((rowData: any) => { label: string; value: string }[])
   readOnly?: boolean
   variant?: (val: any) => string

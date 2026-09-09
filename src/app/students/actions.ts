@@ -27,6 +27,89 @@ const BASIC_INFO_FIELDS = [
   'career_aspiration', 'military_status', 'special_notes', 'career_course', 'labor_education_status'
 ];
 
+const FIELD_TRAINING_EDITABLE_FIELDS = [
+  'latest_training_company',
+  'start_date',
+  'end_date',
+  'training_stipend_status',
+  'is_hiring_conversion',
+  'is_returned'
+];
+
+async function updateStudentFieldTrainingRecord(
+  supabase: any,
+  studentId: string,
+  field: string,
+  value: any
+) {
+  let finalVal = value;
+  if (value === '' || value === 'CLEARED' || (Array.isArray(value) && value.length === 0)) finalVal = null;
+
+  // 최신 실습 기록 조회 (내림차순 정렬 1건)
+  const { data: latestRecords } = await supabase
+    .from('field_training_records')
+    .select('*')
+    .eq('student_id', studentId)
+    .order('training_order', { ascending: false })
+    .limit(1);
+
+  const latest = latestRecords && latestRecords.length > 0 ? latestRecords[0] : null;
+
+  if (latest) {
+    const updateData: any = { updated_at: new Date().toISOString() };
+    if (field === 'latest_training_company') {
+      updateData.company = finalVal || '';
+    } else if (field === 'start_date') {
+      updateData.start_date = normalizeDate(finalVal);
+    } else if (field === 'end_date') {
+      updateData.end_date = normalizeDate(finalVal);
+    } else if (field === 'training_stipend_status') {
+      updateData.stipend_status = finalVal || 'X';
+    } else if (field === 'is_hiring_conversion') {
+      if (finalVal) {
+        updateData.hiring_status = '채용전환';
+        updateData.conversion_date = normalizeDate(finalVal) || finalVal;
+      }
+    } else if (field === 'is_returned') {
+      updateData.hiring_status = finalVal === 'O' ? '복교' : '진행중';
+    }
+
+    const { error } = await supabase
+      .from('field_training_records')
+      .update(updateData)
+      .eq('id', latest.id);
+
+    if (error) return { success: false, error: error.message };
+
+    // 채용전환 상태인 경우 취업처도 동기화
+    if (latest.hiring_status === '채용전환' && field === 'latest_training_company' && finalVal) {
+      await supabase.from('student_employments').upsert({ id: studentId, company: finalVal, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+    }
+
+    return { success: true };
+  } else {
+    // 실습 이력이 없는 경우 1차 실습으로 신규 등록
+    const newRecord: any = {
+      student_id: studentId,
+      training_order: 1,
+      company: field === 'latest_training_company' ? (finalVal || '') : '',
+      start_date: field === 'start_date' ? normalizeDate(finalVal) : null,
+      end_date: field === 'end_date' ? normalizeDate(finalVal) : null,
+      stipend_status: field === 'training_stipend_status' ? (finalVal || 'X') : 'X',
+      hiring_status: field === 'is_returned' && finalVal === 'O' ? '복교' : (field === 'is_hiring_conversion' && finalVal ? '채용전환' : '진행중'),
+      conversion_date: field === 'is_hiring_conversion' ? (normalizeDate(finalVal) || finalVal) : null,
+      updated_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase
+      .from('field_training_records')
+      .insert([newRecord]);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  }
+}
+
 /**
  * 학적 이력 동기화
  */
@@ -417,6 +500,44 @@ export async function updateStudentField(id: string, field: string, value: any) 
     if (profile?.role !== 'admin') return { success: false, error: '현재진로코스는 관리자만 변경할 수 있습니다.' };
   }
 
+  // 현장실습/도제OJT 관련 필드 처리
+  if (FIELD_TRAINING_EDITABLE_FIELDS.includes(field)) {
+    const { data: studentInfo } = await supabase.from('students').select('student_name, student_number, class_info').eq('id', id).single();
+    const studentLabel = studentInfo ? `${studentInfo.student_name} (${studentInfo.class_info ? `${studentInfo.class_info}반 ` : ''}${studentInfo.student_number ? `${studentInfo.student_number}번` : ''})` : `학생 (ID: ${id})`;
+
+    const res = await updateStudentFieldTrainingRecord(supabase, id, field, value);
+    if (!res.success) return res;
+
+    // 감사 로그 비동기 백그라운드 처리 (대기 시간 0초)
+    void (async () => {
+      try {
+        const { logAuditAction } = await import('@/lib/audit-logger');
+        await logAuditAction({
+          action_type: 'STUDENT_UPDATE',
+          target_name: `${studentLabel} - [${field}]`,
+          details: { 
+            student_id: id, 
+            student_name: studentInfo?.student_name,
+            field, 
+            new_value: value ?? '(빈값)', 
+            old_value: '(실습이력)' 
+          }
+        });
+      } catch (e) {}
+    })();
+
+    const { clearAssignedStudentDetailsCache } = await import('@/lib/data');
+    await clearAssignedStudentDetailsCache();
+
+    revalidateTag('students');
+    revalidatePath('/students'); 
+    revalidatePath('/admin/students'); 
+    revalidatePath('/class-management');
+    revalidatePath('/employment-status');
+    revalidatePath('/field-training');
+    return { success: true };
+  }
+
   let finalValue = value;
   if (field === 'graduation_year') finalValue = value ? parseInt(value) : null;
   else if (value === '' || value === 'CLEARED' || (Array.isArray(value) && value.length === 0)) finalValue = null;
@@ -512,10 +633,14 @@ export async function bulkUpdateStudentData(updates: { id: string, field: string
 
   const supabase = await createClient(); const settings = await getSystemSettings()
   for (const update of updates) {
-    let fv = update.value;
-    if (update.field === 'graduation_year') fv = update.value ? parseInt(update.value) : null;
-    else if (update.value === '' || update.value === 'CLEARED' || (Array.isArray(update.value) && update.value.length === 0)) fv = null;
-    await supabase.from(BASIC_INFO_FIELDS.includes(update.field) ? 'students' : 'student_employments').update({ [update.field]: fv, updated_at: new Date().toISOString() }).eq('id', update.id);
+    if (FIELD_TRAINING_EDITABLE_FIELDS.includes(update.field)) {
+      await updateStudentFieldTrainingRecord(supabase, update.id, update.field, update.value);
+    } else {
+      let fv = update.value;
+      if (update.field === 'graduation_year') fv = update.value ? parseInt(update.value) : null;
+      else if (update.value === '' || update.value === 'CLEARED' || (Array.isArray(update.value) && update.value.length === 0)) fv = null;
+      await supabase.from(BASIC_INFO_FIELDS.includes(update.field) ? 'students' : 'student_employments').update({ [update.field]: fv, updated_at: new Date().toISOString() }).eq('id', update.id);
+    }
   }
 
   const { logAuditAction } = await import('@/lib/audit-logger');
@@ -535,6 +660,7 @@ export async function bulkUpdateStudentData(updates: { id: string, field: string
   revalidatePath('/employment-status');
   revalidatePath('/labor-education');
   revalidatePath('/dashboard');
+  revalidatePath('/field-training');
 
   return { success: true }
 }

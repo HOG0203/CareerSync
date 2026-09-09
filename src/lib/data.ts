@@ -193,6 +193,7 @@ export async function getFilteredStudentData(graduationYear: string, baseYear?: 
       id: s.id, // ID 유지 보장
       training_records: studentTrainings,
       has_field_training: latestTraining ? 'O' : '',
+      latest_training_order: latestTraining?.training_order ? `${latestTraining.training_order}차` : '-',
       latest_training_company: latestTraining?.company,
       start_date: latestTraining?.start_date,
       end_date: latestTraining?.end_date,
@@ -419,6 +420,7 @@ export async function getAssignedStudentDetails(major: string, classInfo: string
       training_records: studentTrainings, 
       counseling_logs: (s as any).student_counseling_logs || [],
       has_field_training: latestTraining ? 'O' : '',
+      latest_training_order: latestTraining?.training_order ? `${latestTraining.training_order}차` : '-',
       latest_training_company: latestTraining?.company,
       start_date: latestTraining?.start_date,
       end_date: latestTraining?.end_date,
@@ -472,6 +474,7 @@ function flattenStudentData(students: any[], employments: any[], trainings: any[
     return {
       ...student, ...employment, training_records: studentTrainings,
       has_field_training: latestTraining ? 'O' : '',
+      latest_training_order: latestTraining?.training_order ? `${latestTraining.training_order}차` : '-',
       latest_training_company: latestTraining?.company,
       start_date: latestTraining?.start_date,
       end_date: latestTraining?.end_date,

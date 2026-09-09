@@ -231,8 +231,7 @@ const COLUMNS: ColumnConfig[] = [
       { label: '공무원', value: '공무원' }, 
       { label: '중견기업', value: '중견기업' }, 
       { label: '강소기업', value: '강소기업' }, 
-      { label: '연계교육', value: '연계교육' }, 
-      { label: '부사관', value: '부사관' }
+      { label: '연계교육', value: '연계교육' }
     ],
     variant: (val) => {
       switch (val) {
@@ -248,20 +247,47 @@ const COLUMNS: ColumnConfig[] = [
     }
   },
   { key: 'company', label: '취업처\n(회사명)', width: 120 },
-  { key: 'latest_training_company', label: '실습처\n(회사명)', width: 110, readOnly: true },
-  { key: 'start_date', label: '시작일', width: 80, readOnly: true },
-  { key: 'end_date', label: '종료일', width: 80, readOnly: true },
-  { key: 'training_stipend_status', label: '지원금\n신청', width: 45, readOnly: true },
+  { 
+    key: 'latest_training_order', 
+    label: '차수', 
+    width: 45, 
+    readOnly: true,
+    variant: (val) => {
+      if (!val || val === '-') return 'text-slate-400 font-normal';
+      if (val === '1차') return 'bg-blue-50 text-blue-700 border-blue-200 font-bold';
+      if (val === '2차') return 'bg-amber-50 text-amber-700 border-amber-200 font-bold';
+      if (val === '3차') return 'bg-purple-50 text-purple-700 border-purple-200 font-bold';
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold';
+    }
+  },
+  { key: 'latest_training_company', label: '실습처\n(회사명)', width: 110 },
+  { key: 'start_date', label: '시작일', width: 85 },
+  { key: 'end_date', label: '종료일', width: 85 },
+  { 
+    key: 'training_stipend_status', 
+    label: '지원금\n신청', 
+    width: 50, 
+    type: 'select',
+    options: [
+      { label: 'O', value: 'O' },
+      { label: 'X', value: 'X' },
+    ],
+    variant: (val) => {
+      if (val === 'O') return 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold';
+      if (val === 'X') return 'bg-rose-50 text-rose-700 border-rose-200';
+      return 'text-slate-400';
+    }
+  },
   { key: 'is_hiring_conversion', label: '채용\n전환', width: 80, readOnly: true },
   { key: 'is_returned', label: '복교', width: 50, readOnly: true },
-  { key: 'field_training_action', label: '실습이력', width: 85, type: 'action' },
+  { key: 'field_training_action', label: '실습관리', width: 75, type: 'action', actionLabel: '이력관리' },
   { key: 'personal_remarks', label: '비고(특이사항)', width: 140 },
 ]
 
 const GROUP_HEADERS = [
   { label: '기본 정보', colSpan: 8, className: 'bg-slate-100 text-slate-900 text-[11px]' },
   { label: '취업 현황', colSpan: 5, className: 'bg-blue-100/50 text-blue-900 text-[11px]' },
-  { label: '현장실습/도제OJT 상세 및 결과 (최근 차수)', colSpan: 7, className: 'bg-amber-100/50 text-amber-900 text-[11px]' },
+  { label: '현장실습 상세 및 결과 (최근 차수)', colSpan: 8, className: 'bg-amber-100/50 text-amber-900 text-[11px]' },
   { label: '비고(특이사항)', colSpan: 1, className: 'bg-slate-50 text-slate-700 text-[11px]' },
 ]
 
