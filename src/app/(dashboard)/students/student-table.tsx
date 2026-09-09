@@ -278,8 +278,18 @@ const COLUMNS: ColumnConfig[] = [
       return 'text-slate-400';
     }
   },
-  { key: 'is_hiring_conversion', label: '채용\n전환', width: 80, readOnly: true },
-  { key: 'is_returned', label: '복교', width: 50, readOnly: true },
+  { 
+    key: 'is_hiring_conversion', 
+    label: '채용\n전환', 
+    width: 85,
+    variant: (val) => val ? 'bg-blue-50 text-blue-700 border-blue-200 font-bold' : ''
+  },
+  { 
+    key: 'return_reason', 
+    label: '복교\n사유', 
+    width: 105,
+    variant: (val) => val ? 'bg-rose-50 text-rose-700 border-rose-200 font-bold' : ''
+  },
   { key: 'field_training_action', label: '실습관리', width: 75, type: 'action', actionLabel: '이력관리' },
   { key: 'personal_remarks', label: '비고(특이사항)', width: 140 },
 ]

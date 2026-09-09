@@ -4,6 +4,54 @@ import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import { ColumnConfig } from './types'
+import { MAJOR_SORT_ORDER } from '@/lib/types'
+
+function compareSpreadsheetValues(a: any, b: any, key: string, direction: 'asc' | 'desc') {
+  let valA = a[key];
+  let valB = b[key];
+
+  if (Array.isArray(valA)) valA = valA.join(', ');
+  if (Array.isArray(valB)) valB = valB.join(', ');
+
+  const isAEmpty = valA === null || valA === undefined || valA === '' || valA === '-';
+  const isBEmpty = valB === null || valB === undefined || valB === '' || valB === '-';
+
+  // 빈 값(NULL/공백/-)은 항상 맨 뒤로 배치
+  if (isAEmpty && isBEmpty) return 0;
+  if (isAEmpty) return 1;
+  if (isBEmpty) return -1;
+
+  let cmp = 0;
+
+  if (key === 'major') {
+    const cleanA = String(valA).replace(/과|공업계/g, '').trim();
+    const cleanB = String(valB).replace(/과|공업계/g, '').trim();
+    const idxA = MAJOR_SORT_ORDER.findIndex(m => m.includes(cleanA) || cleanA.includes(m.replace(/과|공업계/g, '').trim()));
+    const idxB = MAJOR_SORT_ORDER.findIndex(m => m.includes(cleanB) || cleanB.includes(m.replace(/과|공업계/g, '').trim()));
+    if (idxA !== -1 && idxB !== -1) {
+      cmp = idxA - idxB;
+    } else {
+      cmp = String(valA).localeCompare(String(valB), 'ko');
+    }
+  } else if (key === 'latest_training_order') {
+    const numA = parseInt(String(valA).replace(/[^\d]/g, ''), 10) || 0;
+    const numB = parseInt(String(valB).replace(/[^\d]/g, ''), 10) || 0;
+    cmp = numA - numB;
+  } else {
+    const strA = String(valA).trim();
+    const strB = String(valB).trim();
+    const numA = Number(strA);
+    const numB = Number(strB);
+
+    if (!isNaN(numA) && !isNaN(numB) && strA !== '' && strB !== '') {
+      cmp = numA - numB;
+    } else {
+      cmp = strA.localeCompare(strB, 'ko', { numeric: true, sensitivity: 'base' });
+    }
+  }
+
+  return direction === 'asc' ? cmp : -cmp;
+}
 
 interface UseSpreadsheetProps {
   initialData: any[]
@@ -31,6 +79,7 @@ export function useSpreadsheet({
 
   const [data, setData] = React.useState(initialData)
   const [columnFilters, setColumnFilters] = React.useState<Record<string, string[]>>({})
+  const [sortConfig, setSortConfig] = React.useState<{ key: string; direction: 'asc' | 'desc' } | null>(null)
   const [searchTerm, setSearchTerm] = React.useState('')
   const [selectionStart, setSelectionStart] = React.useState<any>(null)
   const [selectionEnd, setSelectionEnd] = React.useState<any>(null)
@@ -190,51 +239,64 @@ export function useSpreadsheet({
     });
   }, [filterOptions]);
 
+  const handleSortChange = React.useCallback((key: string, direction: 'asc' | 'desc' | null) => {
+    if (!direction) {
+      setSortConfig(null);
+    } else {
+      setSortConfig({ key, direction });
+    }
+  }, []);
+
   const filteredData = React.useMemo(() => {
     const activeFilterEntries = Object.entries(columnFilters).filter(([_, v]) => Array.isArray(v) && v.length > 0);
     const effectiveSearch = (externalSearchTerm !== undefined ? externalSearchTerm : searchTerm).trim().toLowerCase();
     const lowerSearch = effectiveSearch;
 
-    // Fast path: If no column filters and no internal/external search, return data directly without re-filtering
-    if (activeFilterEntries.length === 0 && !lowerSearch) {
-      return data;
-    }
+    let result = data;
 
-    return data.filter(row => {
-      if (activeFilterEntries.length > 0) {
-        const mF = activeFilterEntries.every(([f, v]) => {
-          const rowVal = row[f];
-          const nV = (rowVal === null || rowVal === undefined || rowVal === '') ? '(빈칸)' : String(rowVal);
-          return v.includes(nV);
-        });
-        if (!mF) return false;
-      }
-      
-      if (lowerSearch) {
-        const mS = columns.some(c => {
-          const val = row[c.key];
-          if (Array.isArray(val)) {
-            return val.some((v: any) => String(v || '').toLowerCase().includes(lowerSearch));
+    if (activeFilterEntries.length > 0 || lowerSearch) {
+      result = data.filter(row => {
+        if (activeFilterEntries.length > 0) {
+          const mF = activeFilterEntries.every(([f, v]) => {
+            const rowVal = row[f];
+            const nV = (rowVal === null || rowVal === undefined || rowVal === '') ? '(빈칸)' : String(rowVal);
+            return v.includes(nV);
+          });
+          if (!mF) return false;
+        }
+        
+        if (lowerSearch) {
+          const mS = columns.some(c => {
+            const val = row[c.key];
+            if (Array.isArray(val)) {
+              return val.some((v: any) => String(v || '').toLowerCase().includes(lowerSearch));
+            }
+            return String(val || '').toLowerCase().includes(lowerSearch);
+          });
+          if (mS) return true;
+
+          // 학생 추가 필드(실습기록 등) 매칭 보조
+          if (Array.isArray(row.training_records)) {
+            const matchTraining = row.training_records.some((tr: any) =>
+              String(tr.company || '').toLowerCase().includes(lowerSearch) ||
+              String(tr.return_reason || '').toLowerCase().includes(lowerSearch)
+            );
+            if (matchTraining) return true;
           }
-          return String(val || '').toLowerCase().includes(lowerSearch);
-        });
-        if (mS) return true;
 
-        // 학생 추가 필드(실습기록 등) 매칭 보조
-        if (Array.isArray(row.training_records)) {
-          const matchTraining = row.training_records.some((tr: any) =>
-            String(tr.company || '').toLowerCase().includes(lowerSearch) ||
-            String(tr.return_reason || '').toLowerCase().includes(lowerSearch)
-          );
-          if (matchTraining) return true;
+          return false;
         }
 
-        return false;
-      }
+        return true;
+      });
+    }
 
-      return true;
-    });
-  }, [data, columnFilters, searchTerm, externalSearchTerm, columns]);
+    if (sortConfig) {
+      return [...result].sort((a, b) => compareSpreadsheetValues(a, b, sortConfig.key, sortConfig.direction));
+    }
+
+    return result;
+  }, [data, columnFilters, searchTerm, externalSearchTerm, columns, sortConfig]);
 
   // Effects
   React.useEffect(() => {
@@ -243,7 +305,7 @@ export function useSpreadsheet({
       const maxScroll = Math.max(0, filteredData.length * ROW_HEIGHT + HEADER_HEIGHT - containerHeight);
       if (containerRef.current.scrollTop > maxScroll) containerRef.current.scrollTop = 0;
     }
-  }, [columnFilters, searchTerm, filteredData.length, containerHeight, HEADER_HEIGHT])
+  }, [columnFilters, searchTerm, sortConfig, filteredData.length, containerHeight, HEADER_HEIGHT])
 
   React.useEffect(() => {
     const updateScrollPos = () => {
@@ -546,6 +608,8 @@ export function useSpreadsheet({
   return {
     data,
     filteredData,
+    sortConfig,
+    handleSortChange,
     filterOptions,
     columnFilters,
     searchTerm,

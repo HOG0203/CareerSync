@@ -198,8 +198,9 @@ export async function getFilteredStudentData(graduationYear: string, baseYear?: 
       start_date: latestTraining?.start_date,
       end_date: latestTraining?.end_date,
       training_stipend_status: latestTraining?.stipend_status,
-      is_hiring_conversion: latestTraining?.hiring_status === '채용전환' ? latestTraining?.conversion_date : '',
-      is_returned: latestTraining?.hiring_status === '복교' ? 'O' : '',
+      is_hiring_conversion: latestTraining?.hiring_status === '채용전환' ? (latestTraining?.conversion_date || 'O') : '',
+      is_returned: latestTraining?.hiring_status === '복교' ? (latestTraining?.return_reason || '복교') : '',
+      return_reason: latestTraining?.hiring_status === '복교' ? (latestTraining?.return_reason || '복교') : '',
     };
   });
 
@@ -425,8 +426,9 @@ export async function getAssignedStudentDetails(major: string, classInfo: string
       start_date: latestTraining?.start_date,
       end_date: latestTraining?.end_date,
       training_stipend_status: latestTraining?.stipend_status,
-      is_hiring_conversion: latestTraining?.hiring_status === '채용전환' ? latestTraining?.conversion_date : '',
-      is_returned: latestTraining?.hiring_status === '복교' ? 'O' : '',
+      is_hiring_conversion: latestTraining?.hiring_status === '채용전환' ? (latestTraining?.conversion_date || 'O') : '',
+      is_returned: latestTraining?.hiring_status === '복교' ? (latestTraining?.return_reason || '복교') : '',
+      return_reason: latestTraining?.hiring_status === '복교' ? (latestTraining?.return_reason || '복교') : '',
     };
   }).sort((a, b) => (a.student_number || '').localeCompare(b.student_number || '', undefined, { numeric: true }));
 
@@ -479,8 +481,9 @@ function flattenStudentData(students: any[], employments: any[], trainings: any[
       start_date: latestTraining?.start_date,
       end_date: latestTraining?.end_date,
       training_stipend_status: latestTraining?.stipend_status,
-      is_hiring_conversion: latestTraining?.hiring_status === '채용전환' ? latestTraining?.conversion_date : '',
-      is_returned: latestTraining?.hiring_status === '복교' ? 'O' : '',
+      is_hiring_conversion: latestTraining?.hiring_status === '채용전환' ? (latestTraining?.conversion_date || 'O') : '',
+      is_returned: latestTraining?.hiring_status === '복교' ? (latestTraining?.return_reason || '복교') : '',
+      return_reason: latestTraining?.hiring_status === '복교' ? (latestTraining?.return_reason || '복교') : '',
     };
   });
 }

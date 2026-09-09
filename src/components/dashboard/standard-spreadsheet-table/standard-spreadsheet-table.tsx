@@ -58,6 +58,8 @@ export function StandardSpreadsheetTable({
 
   const {
     filteredData,
+    sortConfig,
+    handleSortChange,
     filterOptions,
     columnFilters,
     searchTerm,
@@ -207,10 +209,12 @@ export function StandardSpreadsheetTable({
                     filterOptions={filterOptions}
                     columnFilters={columnFilters}
                     onFilterChange={handleFilterChange}
-                onSelectAll={handleSelectAll}
-                isAllSelected={filteredData.length > 0 && filteredData.every(r => selectedRowIds.includes(r.id))}
-                hideCheckbox={hideCheckbox}
-              />
+                    onSelectAll={handleSelectAll}
+                    isAllSelected={filteredData.length > 0 && filteredData.every(r => selectedRowIds.includes(r.id))}
+                    hideCheckbox={hideCheckbox}
+                    sortConfig={sortConfig}
+                    onSortChange={handleSortChange}
+                  />
               <tbody>
                 {(() => {
                   const totalCount = filteredData.length;

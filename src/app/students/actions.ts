@@ -33,7 +33,8 @@ const FIELD_TRAINING_EDITABLE_FIELDS = [
   'end_date',
   'training_stipend_status',
   'is_hiring_conversion',
-  'is_returned'
+  'is_returned',
+  'return_reason'
 ];
 
 async function updateStudentFieldTrainingRecord(
@@ -66,12 +67,23 @@ async function updateStudentFieldTrainingRecord(
     } else if (field === 'training_stipend_status') {
       updateData.stipend_status = finalVal || 'X';
     } else if (field === 'is_hiring_conversion') {
-      if (finalVal) {
+      if (finalVal && finalVal !== 'X') {
         updateData.hiring_status = '채용전환';
-        updateData.conversion_date = normalizeDate(finalVal) || finalVal;
+        updateData.conversion_date = normalizeDate(finalVal) || (finalVal === 'O' ? (latest.end_date || new Date().toISOString().slice(0, 10)) : finalVal);
+        updateData.return_reason = null; // 복교사유 초기화
+      } else {
+        updateData.hiring_status = '진행중';
+        updateData.conversion_date = null;
       }
-    } else if (field === 'is_returned') {
-      updateData.hiring_status = finalVal === 'O' ? '복교' : '진행중';
+    } else if (field === 'is_returned' || field === 'return_reason') {
+      if (finalVal && finalVal !== 'X') {
+        updateData.hiring_status = '복교';
+        updateData.return_reason = finalVal;
+        updateData.conversion_date = null; // 채용전환 초기화
+      } else {
+        updateData.hiring_status = '진행중';
+        updateData.return_reason = null;
+      }
     }
 
     const { error } = await supabase
@@ -82,13 +94,17 @@ async function updateStudentFieldTrainingRecord(
     if (error) return { success: false, error: error.message };
 
     // 채용전환 상태인 경우 취업처도 동기화
-    if (latest.hiring_status === '채용전환' && field === 'latest_training_company' && finalVal) {
-      await supabase.from('student_employments').upsert({ id: studentId, company: finalVal, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+    const effectiveCompany = field === 'latest_training_company' && finalVal ? finalVal : latest.company;
+    if ((updateData.hiring_status === '채용전환' || latest.hiring_status === '채용전환') && effectiveCompany) {
+      await supabase.from('student_employments').upsert({ id: studentId, company: effectiveCompany, updated_at: new Date().toISOString() }, { onConflict: 'id' });
     }
 
     return { success: true };
   } else {
     // 실습 이력이 없는 경우 1차 실습으로 신규 등록
+    const isConv = field === 'is_hiring_conversion' && finalVal && finalVal !== 'X';
+    const isRet = (field === 'is_returned' || field === 'return_reason') && finalVal && finalVal !== 'X';
+
     const newRecord: any = {
       student_id: studentId,
       training_order: 1,
@@ -96,8 +112,9 @@ async function updateStudentFieldTrainingRecord(
       start_date: field === 'start_date' ? normalizeDate(finalVal) : null,
       end_date: field === 'end_date' ? normalizeDate(finalVal) : null,
       stipend_status: field === 'training_stipend_status' ? (finalVal || 'X') : 'X',
-      hiring_status: field === 'is_returned' && finalVal === 'O' ? '복교' : (field === 'is_hiring_conversion' && finalVal ? '채용전환' : '진행중'),
-      conversion_date: field === 'is_hiring_conversion' ? (normalizeDate(finalVal) || finalVal) : null,
+      hiring_status: isRet ? '복교' : (isConv ? '채용전환' : '진행중'),
+      conversion_date: isConv ? (normalizeDate(finalVal) || (finalVal === 'O' ? new Date().toISOString().slice(0, 10) : finalVal)) : null,
+      return_reason: isRet ? finalVal : null,
       updated_at: new Date().toISOString()
     };
 
@@ -106,6 +123,11 @@ async function updateStudentFieldTrainingRecord(
       .insert([newRecord]);
 
     if (error) return { success: false, error: error.message };
+
+    if (isConv && newRecord.company) {
+      await supabase.from('student_employments').upsert({ id: studentId, company: newRecord.company, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+    }
+
     return { success: true };
   }
 }

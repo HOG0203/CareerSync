@@ -23,6 +23,7 @@ export type StudentEmploymentData = {
   conversion_date?: string;
   is_returned?: string;
   return_to_school_reason?: string;
+  return_reason?: string;
   remarks?: string;
   certificates?: string[];
   career_aspiration?: string;
