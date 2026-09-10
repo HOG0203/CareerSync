@@ -23,6 +23,29 @@ export function formatStudentAuthPassword(rawPassword: string): string {
 }
 
 /**
+ * 2026.09.01, 2026/09/01, 2026-09-01, 26.9.1 등 다양한 날짜 형식을 'YYYY-MM-DD'로 변환
+ */
+export function parseFlexibleDate(dateStr: string | null | undefined): string | null {
+  if (!dateStr || dateStr.trim() === '') return null;
+  const trimmed = dateStr.trim();
+  const match = trimmed.match(/^[\d.\-\/]+/);
+  if (!match) return null;
+  const clean = match[0].replace(/[.\/]$/, '').replace(/[.\/]/g, '-');
+  const parts = clean.split('-').filter(p => p !== '');
+  if (parts.length === 3) {
+    let year = parts[0];
+    const month = parts[1].padStart(2, '0');
+    const day = parts[2].padStart(2, '0');
+    if (year.length === 2) year = '20' + year;
+    const yNum = Number(year), mNum = Number(month), dNum = Number(day);
+    if (yNum >= 1900 && yNum <= 2100 && mNum >= 1 && mNum <= 12 && dNum >= 1 && dNum <= 31) {
+      return `${year}-${month}-${day}`;
+    }
+  }
+  return null;
+}
+
+/**
  * 학교 공식 학과 정렬 우선순위:
  * 자동화기계과 > 친환경자동차과 > 건설과 > 스마트공간건축과 > 스마트공간과 > 스마트전기과 > 바이오화학과 > 스마트융합섬유과
  */

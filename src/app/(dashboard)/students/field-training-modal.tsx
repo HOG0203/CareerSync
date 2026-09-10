@@ -29,7 +29,7 @@ import { format, parseISO, isValid } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { CalendarIcon, Plus, Trash2, Save, History, Building2, CheckCircle2, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { upsertFieldTrainingRecord, deleteFieldTrainingRecord } from '@/app/students/actions'
+import { upsertFieldTrainingRecord, deleteFieldTrainingRecord, getStudentFieldTrainings } from '@/app/students/actions'
 import { useToast } from '@/hooks/use-toast'
 import { Badge } from '@/components/ui/badge'
 
@@ -125,21 +125,70 @@ export function FieldTrainingModal({ isOpen, onClose, student, isAdmin = false, 
   const router = useRouter()
 
   React.useEffect(() => {
-    if (student && student.training_records) {
-      setRecords([...student.training_records].sort((a, b) => b.training_order - a.training_order))
-    } else {
-      setRecords([])
+    if (!isOpen || !student) {
+      if (!isOpen) {
+        // Radix UI 모달 닫힘 후 body의 pointer-events: none 고립 현상 방지 구원 코드
+        const timer = setTimeout(() => {
+          if (typeof document !== 'undefined') {
+            document.body.style.pointerEvents = ''
+          }
+        }, 150)
+        return () => clearTimeout(timer)
+      }
+      return
     }
 
-    if (!isOpen) {
-      // Radix UI 모달 닫힘 후 body의 pointer-events: none 고립 현상 방지 구원 코드
-      const timer = setTimeout(() => {
-        if (typeof document !== 'undefined') {
-          document.body.style.pointerEvents = ''
-        }
-      }, 150)
-      return () => clearTimeout(timer)
+    // 1. 기존 props 데이터로 0초 즉시 초기 렌더링
+    let initialList: any[] = [];
+    if (Array.isArray(student.training_records) && student.training_records.length > 0) {
+      initialList = [...student.training_records];
     }
+
+    // 학생 객체에 실습 정보(실습처, 시작일 등)가 있으나 training_records가 비어있거나 동기화 전인 경우 즉시 1차 레코드 합성
+    const hasCompany = Boolean(student.latest_training_company && String(student.latest_training_company).trim() !== '');
+    const hasStart = Boolean(student.start_date && String(student.start_date).trim() !== '');
+    const hasEnd = Boolean(student.end_date && String(student.end_date).trim() !== '');
+    const hasConv = Boolean(student.is_hiring_conversion && String(student.is_hiring_conversion).trim() !== '' && student.is_hiring_conversion !== 'X');
+    const hasRet = Boolean(student.return_reason && String(student.return_reason).trim() !== '' && student.return_reason !== 'X');
+
+    if (hasCompany || hasStart || hasEnd || hasConv || hasRet) {
+      const orderNum = parseInt(String(student.latest_training_order || '1').replace(/[^\d]/g, ''), 10) || 1;
+      const alreadyHas = initialList.some((r: any) => r.training_order === orderNum);
+      if (!alreadyHas) {
+        initialList.push({
+          id: `temp-opt-${Date.now()}`,
+          student_id: student.id,
+          training_order: orderNum,
+          company: student.latest_training_company || '',
+          start_date: student.start_date || null,
+          end_date: student.end_date || null,
+          stipend_status: student.training_stipend_status || 'X',
+          hiring_status: hasRet ? '복교' : (hasConv ? '채용전환' : '진행중'),
+          conversion_date: hasConv ? (student.is_hiring_conversion === 'O' ? (student.end_date || new Date().toISOString().slice(0, 10)) : student.is_hiring_conversion) : null,
+          return_reason: hasRet ? student.return_reason : null,
+          updated_at: new Date().toISOString()
+        });
+      }
+    }
+
+    setRecords([...initialList].sort((a, b) => b.training_order - a.training_order));
+
+    // 2. 모달 열릴 때 백그라운드에서 최신 DB 레코드 비동기 재확인 및 보정
+    let isSubscribed = true;
+    getStudentFieldTrainings(student.id).then(latestData => {
+      if (isSubscribed && latestData && latestData.length > 0) {
+        setRecords(latestData);
+        if (student) {
+          student.training_records = latestData;
+        }
+      }
+    }).catch(err => {
+      console.error('Failed to load fresh field training records:', err);
+    });
+
+    return () => {
+      isSubscribed = false;
+    };
   }, [student, isOpen])
 
   const handleAddRecord = () => {

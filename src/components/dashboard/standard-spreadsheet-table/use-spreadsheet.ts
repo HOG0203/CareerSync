@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import { ColumnConfig } from './types'
 import { MAJOR_SORT_ORDER } from '@/lib/types'
+import { parseFlexibleDate } from '@/lib/student-utils'
 
 function compareSpreadsheetValues(a: any, b: any, key: string, direction: 'asc' | 'desc') {
   let valA = a[key];
@@ -51,6 +52,61 @@ function compareSpreadsheetValues(a: any, b: any, key: string, direction: 'asc' 
   }
 
   return direction === 'asc' ? cmp : -cmp;
+}
+
+const FIELD_TRAINING_KEYS = ['latest_training_company', 'start_date', 'end_date', 'training_stipend_status', 'is_hiring_conversion', 'is_returned', 'return_reason'];
+
+function deriveFieldTrainingOptimisticState(prevStudent: any, updatedField: string, updatedValue: any): Record<string, any> {
+  if (!FIELD_TRAINING_KEYS.includes(updatedField)) return {};
+
+  const merged = { ...prevStudent, [updatedField]: updatedValue };
+  const hasComp = Boolean(merged.latest_training_company && String(merged.latest_training_company).trim() !== '');
+  const hasStart = Boolean(merged.start_date && String(merged.start_date).trim() !== '');
+  const hasEnd = Boolean(merged.end_date && String(merged.end_date).trim() !== '');
+  const hasConv = Boolean(merged.is_hiring_conversion && String(merged.is_hiring_conversion).trim() !== '' && merged.is_hiring_conversion !== 'X');
+  const hasReturn = Boolean(merged.return_reason && String(merged.return_reason).trim() !== '' && merged.return_reason !== 'X');
+
+  const hasAnyTraining = hasComp || hasStart || hasEnd || hasConv || hasReturn;
+
+  const currentOrder = prevStudent.latest_training_order;
+  const isExistingOrder = currentOrder && currentOrder !== '-' && currentOrder !== '';
+  const effectiveOrder = hasAnyTraining ? (isExistingOrder ? (parseInt(String(currentOrder).replace(/[^\d]/g, ''), 10) || 1) : 1) : 0;
+
+  // training_records 배열도 즉시 동기화하여 이력관리 모달 열 때 0초 반영
+  let newRecords = Array.isArray(prevStudent.training_records) ? [...prevStudent.training_records] : [];
+  if (hasAnyTraining) {
+    const normStart = parseFlexibleDate(merged.start_date) || merged.start_date || null;
+    const normEnd = parseFlexibleDate(merged.end_date) || merged.end_date || null;
+    const normConv = hasConv ? (merged.is_hiring_conversion === 'O' ? (normEnd || new Date().toISOString().slice(0, 10)) : (parseFlexibleDate(merged.is_hiring_conversion) || merged.is_hiring_conversion)) : null;
+
+    const existingIdx = newRecords.findIndex((r: any) => r.training_order === effectiveOrder);
+    const updatedRecordData = {
+      student_id: prevStudent.id,
+      training_order: effectiveOrder,
+      company: merged.latest_training_company || '',
+      start_date: normStart,
+      end_date: normEnd,
+      stipend_status: merged.training_stipend_status || 'X',
+      hiring_status: hasReturn ? '복교' : (hasConv ? '채용전환' : '진행중'),
+      conversion_date: normConv,
+      return_reason: hasReturn ? merged.return_reason : null,
+      updated_at: new Date().toISOString()
+    };
+    if (existingIdx !== -1) {
+      newRecords[existingIdx] = { ...newRecords[existingIdx], ...updatedRecordData };
+    } else {
+      newRecords = [{ id: `temp-opt-${Date.now()}`, ...updatedRecordData }, ...newRecords];
+    }
+  } else {
+    // 모든 실습 정보가 비워진 경우 해당 차수 레코드 제거
+    newRecords = newRecords.filter((r: any) => r.training_order !== (parseInt(String(currentOrder).replace(/[^\d]/g, ''), 10) || 1));
+  }
+
+  return {
+    latest_training_order: hasAnyTraining ? `${effectiveOrder}차` : '-',
+    has_field_training: hasAnyTraining ? 'O' : '',
+    training_records: newRecords
+  };
 }
 
 interface UseSpreadsheetProps {
@@ -494,7 +550,8 @@ export function useSpreadsheet({
           if (config.type === 'multi-select') finalVal = finalVal ? finalVal.split(',').map((v: any) => v.trim()) : [];
           if (newData[dIdx][config.key] !== finalVal) {
             historyUpdates.push({ id: rowData.id, field: config.key, oldValue: newData[dIdx][config.key] });
-            newData[dIdx] = { ...newData[dIdx], [config.key]: finalVal };
+            const optTraining = deriveFieldTrainingOptimisticState(newData[dIdx], config.key, finalVal);
+            newData[dIdx] = { ...newData[dIdx], [config.key]: finalVal, ...optTraining };
             updates.push({ id: rowData.id, field: config.key, value: finalVal });
           }
         }
@@ -520,7 +577,8 @@ export function useSpreadsheet({
         const emptyVal = config.key === 'certificates' ? [] : '';
         if (newData[dIdx][config.key] !== emptyVal) {
           hUpdates.push({ id: rowData.id, field: config.key, oldValue: newData[dIdx][config.key] });
-          newData[dIdx] = { ...newData[dIdx], [config.key]: emptyVal };
+          const optTraining = deriveFieldTrainingOptimisticState(newData[dIdx], config.key, emptyVal);
+          newData[dIdx] = { ...newData[dIdx], [config.key]: emptyVal, ...optTraining };
           updates.push({ id: rowData.id, field: config.key, value: emptyVal });
         }
       }
@@ -540,27 +598,36 @@ export function useSpreadsheet({
       setIsPickerOpen(true);
       return { success: true };
     }
-    const finalValue = (value === 'CLEARED' || value === '') ? null : value;
+    const finalValue = (value === 'CLEARED' || value === '' || value === undefined) ? null : value;
     const student = data.find(s => s.id === id);
-    const oldValue = student ? student[field] : null;
+    const rawOld = student ? student[field] : null;
+    const oldValue = (rawOld === 'CLEARED' || rawOld === '' || rawOld === undefined) ? null : rawOld;
 
     if (oldValue === finalValue) {
       setEditingCell(null);
       return { success: true };
     }
 
+    // 실습 관련 필드인 경우 차수(latest_training_order) 및 실습여부(has_field_training), training_records 즉시(0ms) 낙관적 연동
+    const optimisticTraining = student ? deriveFieldTrainingOptimisticState(student, field, finalValue) : {};
+    const optimisticOldTraining = student ? {
+      latest_training_order: student.latest_training_order,
+      has_field_training: student.has_field_training,
+      training_records: student.training_records
+    } : {};
+
     // 1. 즉시 0ms 낙관적 UI 업데이트 (편집 상자 바로 닫기 및 화면 즉시 변경)
     setEditingCell(null);
     if (student) recordHistory([{ id, field, oldValue }]);
-    setData(prev => prev.map(s => s.id === id ? { ...s, [field]: finalValue } : s));
-    setDetailData((prev: any) => (prev && prev.id === id) ? { ...prev, [field]: finalValue } : prev);
+    setData(prev => prev.map(s => s.id === id ? { ...s, [field]: finalValue, ...optimisticTraining } : s));
+    setDetailData((prev: any) => (prev && prev.id === id) ? { ...prev, [field]: finalValue, ...optimisticTraining } : prev);
 
     // 2. 백그라운드 서버 DB 저장
     const result = await onSave(id, field, finalValue);
 
     // 3. 서버 저장 실패 시 원래 값으로 롤백 및 알림
     if (!result || !result.success) {
-      setData(prev => prev.map(s => s.id === id ? { ...s, [field]: oldValue } : s));
+      setData(prev => prev.map(s => s.id === id ? { ...s, [field]: oldValue, ...optimisticOldTraining } : s));
       toast({ variant: 'destructive', title: '저장 실패', description: result?.error || '서버 저증 중 오류가 발생했습니다.' });
       return result || { success: false };
     }

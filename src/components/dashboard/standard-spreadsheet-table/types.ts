@@ -16,7 +16,7 @@ export interface SpreadsheetTableProps {
   onBulkSave: (updates: { id: string; field: string; value: any }[]) => Promise<{ success: boolean; error?: string }>
   onPromote?: (ids: string[]) => Promise<{ success: boolean; error?: string }>
   onDelete?: (ids: string[]) => Promise<{ success: boolean; error?: string }>
-  onAction?: (id: string, key: string) => void
+  onAction?: (id: string, key: string, rowData?: any) => void
   selectedRowIds?: string[]
   onSelectionChange?: (ids: string[]) => void
   groupHeaders?: { label: string; colSpan: number; className?: string }[]

@@ -86,6 +86,20 @@ async function updateStudentFieldTrainingRecord(
       }
     }
 
+    // 수정 후 데이터가 모두 비어 있는지 확인 (실습처, 시작일, 종료일, 복교사유, 전환일 등이 모두 빈 값인 유령 데이터 방지)
+    const merged = { ...latest, ...updateData };
+    const hasCompany = Boolean(merged.company && String(merged.company).trim() !== '');
+    const hasStartDate = Boolean(merged.start_date);
+    const hasEndDate = Boolean(merged.end_date);
+    const hasConversion = Boolean(merged.conversion_date || (merged.hiring_status === '채용전환'));
+    const hasReturn = Boolean(merged.return_reason && String(merged.return_reason).trim() !== '');
+
+    if (!hasCompany && !hasStartDate && !hasEndDate && !hasConversion && !hasReturn) {
+      // 모든 주요 실습 데이터가 비워진 경우 유령 레코드 남기지 않고 삭제
+      await supabase.from('field_training_records').delete().eq('id', latest.id);
+      return { success: true };
+    }
+
     const { error } = await supabase
       .from('field_training_records')
       .update(updateData)
@@ -101,7 +115,13 @@ async function updateStudentFieldTrainingRecord(
 
     return { success: true };
   } else {
-    // 실습 이력이 없는 경우 1차 실습으로 신규 등록
+    // 실습 이력이 없는 상태에서 빈 값/취소 커밋인 경우 1차 실습 레코드를 생성하지 않음
+    const cleanStr = String(finalVal || '').trim();
+    if (!finalVal || cleanStr === '' || cleanStr === 'X' || cleanStr === 'CLEARED' || cleanStr === '-') {
+      return { success: true };
+    }
+
+    // 유효한 값이 입력된 경우에만 1차 실습으로 신규 등록
     const isConv = field === 'is_hiring_conversion' && finalVal && finalVal !== 'X';
     const isRet = (field === 'is_returned' || field === 'return_reason') && finalVal && finalVal !== 'X';
 
@@ -777,6 +797,24 @@ export async function deleteFieldTrainingRecord(id: string) {
   revalidatePath('/field-training');
   revalidatePath('/employment-status');
   return { success: true }
+}
+
+/**
+ * 특정 학생의 최신 실습 이력 전체 목록을 직접 DB에서 조회합니다.
+ */
+export async function getStudentFieldTrainings(studentId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('field_training_records')
+    .select('*')
+    .eq('student_id', studentId)
+    .order('training_order', { ascending: false });
+
+  if (error) {
+    console.error('Failed to fetch student field trainings:', error);
+    return [];
+  }
+  return data || [];
 }
 
 /**

@@ -527,7 +527,7 @@ export function StandardSpreadsheetTable({
                           size="sm"
                           variant="ghost"
                           className="h-6 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-1.5 gap-1 shrink-0"
-                          onClick={(e) => { e.stopPropagation(); onAction(row.id, 'field_training_action'); }}
+                          onClick={(e) => { e.stopPropagation(); onAction(row.id, 'field_training_action', row); }}
                         >
                           <Award className="h-3 w-3 text-emerald-600" />
                           이력관리

@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { useRouter } from 'next/navigation'
 import { StandardSpreadsheetTable, ColumnConfig } from '@/components/dashboard/standard-spreadsheet-table'
 import { updateStudentField, bulkUpdateStudentData } from '@/app/students/actions'
 import { fetchYearlyRankings } from '../employment-status/actions'
@@ -261,8 +262,8 @@ const COLUMNS: ColumnConfig[] = [
     }
   },
   { key: 'latest_training_company', label: '실습처\n(회사명)', width: 110 },
-  { key: 'start_date', label: '시작일', width: 85 },
-  { key: 'end_date', label: '종료일', width: 85 },
+  { key: 'start_date', label: '시작일', width: 95, type: 'date' },
+  { key: 'end_date', label: '종료일', width: 95, type: 'date' },
   { 
     key: 'training_stipend_status', 
     label: '지원금\n신청', 
@@ -281,7 +282,8 @@ const COLUMNS: ColumnConfig[] = [
   { 
     key: 'is_hiring_conversion', 
     label: '채용\n전환', 
-    width: 85,
+    width: 95,
+    type: 'date',
     variant: (val) => val ? 'bg-blue-50 text-blue-700 border-blue-200 font-bold' : ''
   },
   { 
@@ -325,6 +327,7 @@ export function StudentTable({
   onFilteredDataChange?: (data: any[] | null) => void
 }) {
 
+  const router = useRouter()
   const [selectedStudent, setSelectedStudent] = React.useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = React.useState(false)
 
@@ -363,9 +366,9 @@ export function StudentTable({
     return await bulkUpdateStudentData(updates);
   }, [isAdmin]);
 
-  const handleAction = React.useCallback((id: string, key: string) => {
+  const handleAction = React.useCallback((id: string, key: string, rowData?: any) => {
     if (key === 'field_training_action') {
-      const student = initialData.find(s => s.id === id)
+      const student = rowData || initialData.find(s => s.id === id)
       if (student) {
         setSelectedStudent(student)
         setIsModalOpen(true)
@@ -421,7 +424,10 @@ export function StudentTable({
 
       <FieldTrainingModal 
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          router.refresh();
+        }}
         student={selectedStudent}
         isAdmin={isAdmin}
         masterCompanies={masterCompanies}

@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { X, Building2 } from 'lucide-react'
+import { X, Building2, Calendar as CalendarIcon } from 'lucide-react'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -11,6 +11,7 @@ import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { StudentPopover } from '@/components/dashboard/student-popover'
+import { parseFlexibleDate } from '@/lib/student-utils'
 
 export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, rIdx, cIdx, isEditing, isSelected, isFocused, onMouseDown, onMouseEnter, onStartEdit, onEndEdit, onSave, onAction, rankingMap, isRankingsLoading, userProfile, disableNamePopover, baseYear, masterCompanies = [] }: any) => {
   const [localValue, setLocalValue] = React.useState(value || '')
@@ -92,7 +93,10 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
     isCommittingRef.current = true;
 
     const finalVal = v === '기타(직접입력)' ? '' : v;
-    if (finalVal !== value) {
+    const normFinal = (finalVal === undefined || finalVal === null || finalVal === '' || finalVal === 'CLEARED') ? '' : String(finalVal).trim();
+    const normCurrent = (value === undefined || value === null || value === '' || value === 'CLEARED') ? '' : String(value).trim();
+
+    if (normFinal !== normCurrent) {
       onSave(id, field, finalVal);
     }
     onEndEdit();
@@ -179,16 +183,71 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
         </td>
       )
     }
-    if (config.type === 'date') return (
-      <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative h-8 z-40 bg-white ring-2 ring-blue-500 ring-inset overflow-hidden" style={{ minWidth: config.width, width: config.width }}>
-        <Popover open={true} onOpenChange={(open) => !open && onEndEdit()}>
-          <PopoverTrigger asChild><div className="h-8 w-full flex items-center justify-center text-[11px] cursor-pointer font-medium">{localValue || '-'}</div></PopoverTrigger>
-          <PopoverContent className="w-auto p-0 z-[200]" align="start" side="bottom" avoidCollisions={true} collisionPadding={10}>
-            <Calendar mode="single" selected={localValue ? new Date(localValue) : undefined} onSelect={(date) => date && handleCommit(format(date, 'yyyy-MM-dd'))} locale={ko} initialFocus />
-          </PopoverContent>
-        </Popover>
-      </td>
-    )
+    if (config.type === 'date') {
+      const parsedDate = parseFlexibleDate(localValue);
+      const selectedDate = parsedDate ? new Date(parsedDate) : undefined;
+      return (
+        <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative h-8 z-40 bg-white ring-2 ring-blue-500 ring-inset overflow-hidden" style={{ minWidth: config.width, width: config.width }}>
+          <div className="flex items-center w-full h-8 bg-white pr-0.5">
+            <Input 
+              autoFocus 
+              value={localValue} 
+              onChange={(e) => setLocalValue(e.target.value)} 
+              onBlur={() => {
+                const norm = parseFlexibleDate(localValue) || localValue.trim();
+                handleCommit(norm);
+              }} 
+              onKeyDown={(e) => { 
+                if (e.key === 'Enter') { 
+                  e.preventDefault(); 
+                  e.stopPropagation(); 
+                  const norm = parseFlexibleDate(localValue) || localValue.trim();
+                  handleCommit(norm); 
+                } 
+                if (e.key === 'Escape') { 
+                  e.preventDefault(); 
+                  e.stopPropagation(); 
+                  onEndEdit(); 
+                } 
+              }} 
+              placeholder="YYYY-MM-DD"
+              className="h-8 flex-1 min-w-0 text-[11px] border-none rounded-none focus-visible:ring-0 px-1 bg-transparent font-medium" 
+            />
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  type="button"
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-6 w-6 shrink-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 p-0"
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                  }}
+                  title="달력에서 선택"
+                >
+                  <CalendarIcon className="h-3.5 w-3.5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 z-[99999]" align="end" side="bottom" avoidCollisions={true} collisionPadding={10}>
+                <Calendar 
+                  mode="single" 
+                  selected={selectedDate} 
+                  onSelect={(date) => {
+                    if (date) {
+                      const formatted = format(date, 'yyyy-MM-dd');
+                      setLocalValue(formatted);
+                      handleCommit(formatted);
+                    }
+                  }} 
+                  locale={ko} 
+                  initialFocus 
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+        </td>
+      );
+    }
     if (config.type === 'multi-select') return <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative h-8 z-40 bg-white" style={{ minWidth: config.width, width: config.width }} />;
 
     // 취업처(회사명) 자동완성 셀 렌더링
@@ -312,7 +371,7 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
     >
       <div className="px-2 text-[11px] w-full h-full flex items-center justify-center whitespace-nowrap">
         {config.type === 'action' ? (
-          <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] bg-blue-50 text-blue-600 font-bold hover:bg-blue-100" onClick={(e) => { e.stopPropagation(); onAction?.(id, field); }}>{config.actionLabel || '상세보기'}</Button>
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] bg-blue-50 text-blue-600 font-bold hover:bg-blue-100" onClick={(e) => { e.stopPropagation(); onAction?.(id, field, rowData); }}>{config.actionLabel || '상세보기'}</Button>
         ) : field === 'student_name' ? (
           !disableNamePopover ? (
             <StudentPopover student={rowData} rankingSummary={rankingMap?.[id]} isRankingsLoading={isRankingsLoading} userProfile={userProfile} baseYear={baseYear}>
