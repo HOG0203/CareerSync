@@ -217,6 +217,23 @@ export function EmploymentStatusHubClient({
   }, [initialData, selectedMajor, selectedClass, selectedStatus, isLowerGrade]);
 
 
+  // 4-1. 검색창 입력 시 매칭된 학생 수 계산
+  const searchMatchedCount = React.useMemo(() => {
+    if (!searchQuery || !searchQuery.trim()) return null;
+    const q = searchQuery.toLowerCase().trim();
+    return filteredData.filter((student) => {
+      const certStr = Array.isArray(student.certificates)
+        ? student.certificates.join(' ')
+        : (typeof student.certificates === 'string' ? student.certificates : '');
+
+      const targetStr = isLowerGrade
+        ? `${student.student_name || ''} ${student.career_aspiration || ''} ${student.career_course || ''} ${student.employment_status || ''} ${student.special_notes || ''} ${student.major || ''} ${student.class_info || ''} ${certStr}`.toLowerCase()
+        : `${student.student_name || ''} ${student.employment_status || ''} ${student.company_type || ''} ${student.business_type || ''} ${student.company || ''} ${student.latest_training_company || ''} ${student.major || ''} ${student.class_info || ''} ${certStr}`.toLowerCase();
+
+      return targetStr.includes(q);
+    }).length;
+  }, [filteredData, searchQuery, isLowerGrade]);
+
   // 5. 핵심 요약 통계 계산
   const stats = React.useMemo(() => {
     const total = filteredData.length;
@@ -282,13 +299,23 @@ export function EmploymentStatusHubClient({
         <Card className="border-slate-200/80 shadow-2xs hover:shadow-sm transition-all rounded-2xl bg-white">
           <CardContent className="p-4 sm:p-5 flex items-center justify-between">
             <div className="space-y-1">
-              <p className="text-[11px] sm:text-xs font-bold text-slate-500">조회 학생수</p>
+              <p className="text-[11px] sm:text-xs font-bold text-slate-500">
+                {searchMatchedCount !== null ? '검색 결과 학생수' : '조회 학생수'}
+              </p>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-black text-slate-900">{stats.total}</span>
-                <span className="text-xs font-bold text-slate-500">명</span>
+                <span className="text-2xl sm:text-3xl font-black text-slate-900">
+                  {searchMatchedCount !== null ? searchMatchedCount : stats.total}
+                </span>
+                <span className="text-xs font-bold text-slate-500">
+                  명 {searchMatchedCount !== null && <span className="text-[11px] text-slate-400 font-normal">/ 전체 {stats.total}명</span>}
+                </span>
               </div>
             </div>
-            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100 shrink-0">
+            <div className={`h-10 w-10 sm:h-11 sm:w-11 rounded-2xl flex items-center justify-center border shrink-0 transition-colors ${
+              searchMatchedCount !== null 
+                ? 'bg-blue-600 text-white border-blue-600 shadow-xs' 
+                : 'bg-blue-50 text-blue-600 border-blue-100'
+            }`}>
               <Users className="h-5 w-5" />
             </div>
           </CardContent>
@@ -495,22 +522,30 @@ export function EmploymentStatusHubClient({
 
             {/* 우측: 실시간 검색창 및 범례 */}
             <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-start lg:justify-end">
-              <div className="relative w-full sm:w-[220px]">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="이름, 자격증, 회사명..."
-                  value={localSearchTerm}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  className="pl-8 pr-7 h-9 text-xs rounded-xl border-slate-200"
-                />
-                {localSearchTerm && (
-                  <button
-                    type="button"
-                    onClick={() => handleSearchChange('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+              <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                <div className="relative w-full sm:w-[220px]">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="이름, 자격증, 회사명..."
+                    value={localSearchTerm}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    className="pl-8 pr-7 h-9 text-xs rounded-xl border-slate-200"
+                  />
+                  {localSearchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => handleSearchChange('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+                {searchMatchedCount !== null && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200/80 px-2.5 py-1.5 rounded-xl whitespace-nowrap animate-in fade-in zoom-in-95 duration-150">
+                    <span className="text-slate-500 font-medium">검색결과</span>
+                    <span className="font-extrabold text-blue-700">{searchMatchedCount}</span>명
+                  </span>
                 )}
               </div>
 
