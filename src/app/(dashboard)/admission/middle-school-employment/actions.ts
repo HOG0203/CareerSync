@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/server';
 import { getCurrentUserProfile } from '@/lib/data';
 
@@ -48,6 +48,7 @@ export async function updateStudentAdmissionAction(
     return { success: false, error: error.message };
   }
 
+  revalidateTag('students');
   revalidatePath('/admission/middle-school-employment');
   revalidatePath('/employment-status');
   return { success: true };
@@ -166,6 +167,7 @@ export async function batchUpdateAdmissionFromExcelAction(
     );
   }
 
+  revalidateTag('students');
   revalidatePath('/admission/middle-school-employment');
   revalidatePath('/employment-status');
 
@@ -215,6 +217,7 @@ export async function batchUpdateMultipleStudentsInlineAction(
     if (!error) successCount++;
   }
 
+  revalidateTag('students');
   revalidatePath('/admission/middle-school-employment');
   revalidatePath('/employment-status');
   return { success: true, count: successCount };
@@ -271,6 +274,7 @@ export async function bulkAssignMiddleSchoolAction(
     return { success: false, error: error.message };
   }
 
+  revalidateTag('students');
   revalidatePath('/admission/middle-school-employment');
   revalidatePath('/employment-status');
   return { success: true, count: count || studentIds.length };
