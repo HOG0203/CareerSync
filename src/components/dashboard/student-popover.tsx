@@ -153,118 +153,183 @@ export function StudentPopover({
     if (!open) setIsStatusDropdownOpen(false);
   }, [open]);
 
-  const handleStatusChange = async (val: string) => {
+  const handleStatusChange = (val: string) => {
+    const prev = currentEmploymentStatus;
     setCurrentEmploymentStatus(val);
-    setIsStatusSaving(true);
-    try {
-      await updateStudentField(student.id, 'employment_status', val);
-      student.employment_status = val;
-      router.refresh();
-    } catch (err) {
-      console.error('Failed to update employment_status:', err);
-    } finally {
-      setIsStatusSaving(false);
-    }
+    student.employment_status = val;
+    setIsStatusDropdownOpen(false);
+
+    void (async () => {
+      try {
+        const res = await updateStudentField(student.id, 'employment_status', val);
+        if (res && !res.success) {
+          setCurrentEmploymentStatus(prev);
+          student.employment_status = prev;
+        } else {
+          router.refresh();
+        }
+      } catch (err) {
+        console.error('Failed to update employment_status:', err);
+        setCurrentEmploymentStatus(prev);
+        student.employment_status = prev;
+      }
+    })();
   };
 
-  const handleCompanyTypeChange = async (val: string) => {
+  const handleCompanyTypeChange = (val: string) => {
+    const prev = currentCompanyType;
     setCurrentCompanyType(val);
-    setIsCompanyTypeSaving(true);
-    try {
-      await updateStudentField(student.id, 'company_type', val);
-      student.company_type = val;
-      router.refresh();
-    } catch (err) {
-      console.error('Failed to update company_type:', err);
-    } finally {
-      setIsCompanyTypeSaving(false);
-    }
+    student.company_type = val;
+
+    void (async () => {
+      try {
+        const res = await updateStudentField(student.id, 'company_type', val);
+        if (res && !res.success) {
+          setCurrentCompanyType(prev);
+          student.company_type = prev;
+        } else {
+          router.refresh();
+        }
+      } catch (err) {
+        console.error('Failed to update company_type:', err);
+        setCurrentCompanyType(prev);
+        student.company_type = prev;
+      }
+    })();
   };
 
-  const handleBusinessTypeChange = async (val: string) => {
+  const handleBusinessTypeChange = (val: string) => {
+    const prev = currentBusinessType;
     setCurrentBusinessType(val);
-    setIsBusinessTypeSaving(true);
-    try {
-      await updateStudentField(student.id, 'business_type', val);
-      student.business_type = val;
-      router.refresh();
-    } catch (err) {
-      console.error('Failed to update business_type:', err);
-    } finally {
-      setIsBusinessTypeSaving(false);
-    }
+    student.business_type = val;
+
+    void (async () => {
+      try {
+        const res = await updateStudentField(student.id, 'business_type', val);
+        if (res && !res.success) {
+          setCurrentBusinessType(prev);
+          student.business_type = prev;
+        } else {
+          router.refresh();
+        }
+      } catch (err) {
+        console.error('Failed to update business_type:', err);
+        setCurrentBusinessType(prev);
+        student.business_type = prev;
+      }
+    })();
   };
 
-  const handleDesireChange = async (val: string) => {
+  const handleDesireChange = (val: string) => {
+    const prev = currentIsDesiring;
     setCurrentIsDesiring(val);
-    setIsDesireSaving(true);
-    try {
-      await updateStudentField(student.id, 'is_desiring_employment', val);
-      student.is_desiring_employment = val;
-      router.refresh();
-    } catch (err) {
-      console.error('Failed to update is_desiring_employment:', err);
-    } finally {
-      setIsDesireSaving(false);
-    }
+    student.is_desiring_employment = val;
+
+    void (async () => {
+      try {
+        const res = await updateStudentField(student.id, 'is_desiring_employment', val);
+        if (res && !res.success) {
+          setCurrentIsDesiring(prev);
+          student.is_desiring_employment = prev;
+        } else {
+          router.refresh();
+        }
+      } catch (err) {
+        console.error('Failed to update is_desiring_employment:', err);
+        setCurrentIsDesiring(prev);
+        student.is_desiring_employment = prev;
+      }
+    })();
   };
 
-  const handleAspirationChange = async (val: string) => {
+  const handleAspirationChange = (val: string) => {
+    const prev = currentCareerAspiration;
     setCurrentCareerAspiration(val);
-    setIsDesireSaving(true);
-    try {
-      await updateStudentField(student.id, 'career_aspiration', val);
-      student.career_aspiration = val;
-      router.refresh();
-    } catch (err) {
-      console.error('Failed to update career_aspiration:', err);
-    } finally {
-      setIsDesireSaving(false);
-    }
+    student.career_aspiration = val;
+
+    void (async () => {
+      try {
+        const res = await updateStudentField(student.id, 'career_aspiration', val);
+        if (res && !res.success) {
+          setCurrentCareerAspiration(prev);
+          student.career_aspiration = prev;
+        } else {
+          router.refresh();
+        }
+      } catch (err) {
+        console.error('Failed to update career_aspiration:', err);
+        setCurrentCareerAspiration(prev);
+        student.career_aspiration = prev;
+      }
+    })();
   };
 
-  const handleSpecialNotesChange = async (val: string) => {
+  const handleSpecialNotesChange = (val: string) => {
+    const prev = currentSpecialNotes;
     setCurrentSpecialNotes(val);
-    setIsSpecialNotesSaving(true);
-    try {
-      await updateStudentField(student.id, 'special_notes', val);
-      student.special_notes = val;
-      router.refresh();
-    } catch (err) {
-      console.error('Failed to update special_notes:', err);
-    } finally {
-      setIsSpecialNotesSaving(false);
-    }
+    student.special_notes = val;
+
+    void (async () => {
+      try {
+        const res = await updateStudentField(student.id, 'special_notes', val);
+        if (res && !res.success) {
+          setCurrentSpecialNotes(prev);
+          student.special_notes = prev;
+        } else {
+          router.refresh();
+        }
+      } catch (err) {
+        console.error('Failed to update special_notes:', err);
+        setCurrentSpecialNotes(prev);
+        student.special_notes = prev;
+      }
+    })();
   };
 
-  const handleCareerCourseChange = async (val: string) => {
+  const handleCareerCourseChange = (val: string) => {
+    const prev = currentCareerCourse;
     setCurrentCareerCourse(val);
-    setIsCareerCourseSaving(true);
-    try {
-      await updateStudentField(student.id, 'career_course', val);
-      student.career_course = val;
-      router.refresh();
-    } catch (err) {
-      console.error('Failed to update career_course:', err);
-    } finally {
-      setIsCareerCourseSaving(false);
-    }
+    student.career_course = val;
+
+    void (async () => {
+      try {
+        const res = await updateStudentField(student.id, 'career_course', val);
+        if (res && !res.success) {
+          setCurrentCareerCourse(prev);
+          student.career_course = prev;
+        } else {
+          router.refresh();
+        }
+      } catch (err) {
+        console.error('Failed to update career_course:', err);
+        setCurrentCareerCourse(prev);
+        student.career_course = prev;
+      }
+    })();
   };
 
-  const handleCompanySave = async (val: string) => {
+  const handleCompanySave = (val: string) => {
     const trimmed = val.trim();
     if (trimmed === (student.company || '').trim()) return;
-    setIsCompanySaving(true);
-    try {
-      await updateStudentField(student.id, 'company', trimmed);
-      student.company = trimmed;
-      setCurrentCompany(trimmed);
-      router.refresh();
-    } catch (err) {
-      console.error('Failed to update company:', err);
-    } finally {
-      setIsCompanySaving(false);
-    }
+    const prev = currentCompany;
+    setCurrentCompany(trimmed);
+    student.company = trimmed;
+
+    void (async () => {
+      try {
+        const res = await updateStudentField(student.id, 'company', trimmed);
+        if (res && !res.success) {
+          setCurrentCompany(prev);
+          student.company = prev;
+        } else {
+          router.refresh();
+        }
+      } catch (err) {
+        console.error('Failed to update company:', err);
+        setCurrentCompany(prev);
+        student.company = prev;
+      }
+    })();
   };
 
   const latestRecord = React.useMemo(() => {

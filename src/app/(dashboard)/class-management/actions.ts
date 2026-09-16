@@ -85,6 +85,19 @@ export async function updatePersonalDetail(id: string, field: string, value: any
 
   if (error) return { success: false, error: error.message }
 
+  // 감사 로그 비동기 기록
+  void (async () => {
+    try {
+      const { logAuditAction } = await import('@/lib/audit-logger');
+      const { data: st } = await supabase.from('students').select('student_name').eq('id', id).single();
+      await logAuditAction({
+        action_type: 'STUDENT_UPDATE',
+        target_name: `${st?.student_name || '학생'} - [${field}]`,
+        details: { student_id: id, field, new_value: value }
+      });
+    } catch (e) {}
+  })();
+
   revalidateTag('students')
   revalidatePath('/class-management')
   revalidatePath('/employment-status')

@@ -48,6 +48,20 @@ export async function updateStudentAdmissionAction(
     return { success: false, error: error.message };
   }
 
+  // 감사 로그 기록
+  void (async () => {
+    try {
+      const { logAuditAction } = await import('@/lib/audit-logger');
+      const { data: st } = await supabase.from('students').select('student_name').eq('id', studentId).single();
+      await logAuditAction({
+        actor_name: profile.full_name || profile.username,
+        action_type: 'STUDENT_UPDATE',
+        target_name: `${st?.student_name || '학생'} - [입학정보/출신교]`,
+        details: { student_id: studentId, updated_fields: updateData }
+      });
+    } catch (e) {}
+  })();
+
   revalidateTag('students');
   revalidatePath('/admission/middle-school-employment');
   revalidatePath('/employment-status');
