@@ -104,9 +104,9 @@ html {
   margin-right: 0px !important;
 }
 
-/* 드롭다운이 열려도 배경이 상호작용 가능하게 유지 (스크롤바 사라짐 방지) */
+/* 드롭다운/팝오버 컨텐츠가 모달 및 서랍 상위에 항상 정상 배치되도록 z-index 99999 적용 */
 [data-radix-popper-content-wrapper] {
-  z-index: 50 !important;
+  z-index: 99999 !important;
 }
 
 @keyframes highlight-neon-glow {
