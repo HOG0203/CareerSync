@@ -88,21 +88,24 @@ export function MiddleSchoolEmploymentClient({
   const [isExcelModalOpen, setIsExcelModalOpen] = React.useState(false);
   const [editingStudent, setEditingStudent] = React.useState<StudentEmploymentData | null>(null);
 
-  // 출신 중학교 정보가 있거나 취업된 학생 목록 필터링 (채용진행중 학생 제외)
+  // 취업 완료된 학생 목록만 필터링 (청솔반, 진학, 미취업, 제외인정자, 채용진행중 등 제외)
   const initialEmployedStudents = React.useMemo(() => {
     return initialStudents.filter((student) => {
       const bType = (student.business_type || '').trim();
       const status = (student.employment_status || '').trim();
+      const company = (student.company || student.latest_training_company || '').trim();
 
-      // 채용진행중인 학생은 제외
-      if (bType === '채용진행중' || status === '채용진행중' || bType.includes('채용진행') || status.includes('채용진행')) {
+      // 미취업, 진학, 청솔반, 제외인정자, 채용진행중 등 비취업 학생 제외
+      if (
+        ['미취업', '진학', '청솔반', '제외인정자', '채용진행중', '아니오', '미결정'].includes(bType) ||
+        ['미취업', '진학', '청솔반', '제외인정자', '채용진행중', '아니오', '미결정'].includes(status) ||
+        bType.includes('진행') || status.includes('진행')
+      ) {
         return false;
       }
 
-      const hasMiddleSchool = Boolean(student.middle_school && student.middle_school.trim());
-      const company = (student.company || student.latest_training_company || '').trim();
-      const isEmployed = bType === '취업' || status === '취업' || (company !== '' && company !== '-' && company !== '미정');
-      return hasMiddleSchool || isEmployed;
+      const isEmployed = bType === '취업' || bType === '예' || status === '취업' || status === '예' || (company !== '' && company !== '-' && company !== '미정' && company !== '진학' && company !== '청솔반');
+      return isEmployed;
     });
   }, [initialStudents]);
 
