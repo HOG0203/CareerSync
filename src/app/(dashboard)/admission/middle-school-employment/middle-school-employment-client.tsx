@@ -88,13 +88,15 @@ export function MiddleSchoolEmploymentClient({
   const [isExcelModalOpen, setIsExcelModalOpen] = React.useState(false);
   const [editingStudent, setEditingStudent] = React.useState<StudentEmploymentData | null>(null);
 
-  // 취업된 학생들만 필터링 (business_type === '취업' || employment_status === '취업' || 회사명 존재)
+  // 출신 중학교 정보가 있거나 취업된 학생 목록 필터링
   const initialEmployedStudents = React.useMemo(() => {
     return initialStudents.filter((student) => {
+      const hasMiddleSchool = Boolean(student.middle_school && student.middle_school.trim());
       const bType = (student.business_type || '').trim();
       const status = (student.employment_status || '').trim();
       const company = (student.company || student.latest_training_company || '').trim();
-      return bType === '취업' || status === '취업' || (company !== '' && company !== '-' && company !== '미정');
+      const isEmployed = bType === '취업' || status === '취업' || (company !== '' && company !== '-' && company !== '미정');
+      return hasMiddleSchool || isEmployed;
     });
   }, [initialStudents]);
 
@@ -470,25 +472,10 @@ export function MiddleSchoolEmploymentClient({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {!isSearching ? (
+                {filteredStudents.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={isReadOnly ? 10 : 11} className="text-center py-16 text-slate-500 bg-slate-50/50">
-                      <div className="flex flex-col items-center justify-center gap-2.5 max-w-md mx-auto">
-                        <div className="h-12 w-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center border border-teal-100 shadow-xs">
-                          <Search className="h-6 w-6" />
-                        </div>
-                        <p className="text-sm font-bold text-slate-800">출신 중학교를 선택하거나 검색해 주세요</p>
-                        <p className="text-xs text-slate-500 text-center leading-relaxed">
-                          상단 드롭다운에서 중학교를 선택하시거나,<br />
-                          우측 검색창에 중학교명이나 학생명을 입력하시면 해당 학생 목록이 출력됩니다.
-                        </p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : filteredStudents.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={isReadOnly ? 10 : 11} className="text-center py-12 text-slate-400">
-                      일치하는 중학교 학생 데이터가 없습니다. 검색 조건을 변경해 보세요.
+                    <TableCell colSpan={isReadOnly ? 10 : 11} className="text-center py-16 text-slate-400">
+                      일치하는 중학교 학생 데이터가 없습니다. 검색 조건이나 학년도를 변경해 보세요.
                     </TableCell>
                   </TableRow>
                 ) : (
