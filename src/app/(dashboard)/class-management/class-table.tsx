@@ -338,7 +338,7 @@ export function ClassTable({
         <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
           <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-500">학반 학생수</p>
+              <p className="text-xs sm:text-sm font-bold text-slate-600">학반 학생수</p>
               <p className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">{stats.total}명</p>
             </div>
             <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600">
@@ -350,7 +350,7 @@ export function ClassTable({
         <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
           <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-500">취업 희망</p>
+              <p className="text-xs sm:text-sm font-bold text-slate-600">취업 희망</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
                 <span className="text-xl sm:text-2xl font-black text-blue-600">{stats.employCount}명</span>
                 <span className="text-xs font-bold text-slate-400">({stats.employRate}%)</span>
@@ -365,7 +365,7 @@ export function ClassTable({
         <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
           <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-500">진학 희망</p>
+              <p className="text-xs sm:text-sm font-bold text-slate-600">진학 희망</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
                 <span className="text-xl sm:text-2xl font-black text-emerald-600">{stats.academicCount}명</span>
                 <span className="text-xs font-bold text-slate-400">({stats.academicRate}%)</span>
@@ -380,7 +380,7 @@ export function ClassTable({
         <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
           <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-500">자격증 취득 학생</p>
+              <p className="text-xs sm:text-sm font-bold text-slate-600">자격증 취득 학생</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
                 <span className="text-xl sm:text-2xl font-black text-amber-600">{stats.certCount}명</span>
                 <span className="text-xs font-bold text-slate-400">({stats.total > 0 ? Math.round((stats.certCount / stats.total) * 100) : 0}%)</span>

@@ -333,21 +333,49 @@ export async function getCachedLaborEducationData(graduationYear: number): Promi
  */
 async function fetchAdminStudentData(graduationYear: number): Promise<StudentEmploymentData[]> {
   const supabase = createAdminClient();
-  const { data, error } = await supabase
+
+  const SELECT_WITH_ADMISSION = 'id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, labor_education_status, military_status, desired_work_area, parents_opinion, shoe_size, top_size, middle_school, admission_rank_percentile, admission_type, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks)';
+  const SELECT_BASE = 'id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, labor_education_status, military_status, desired_work_area, parents_opinion, shoe_size, top_size, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks)';
+
+  let { data, error } = await supabase
     .from('students')
-    .select('id, student_name, phone_number, graduation_year, major, class_info, student_number')
+    .select(SELECT_WITH_ADMISSION)
     .eq('graduation_year', graduationYear)
     .order('major')
     .order('class_info')
     .order('student_number')
     .range(0, 5000);
 
+  if (error && error.code === '42703') {
+    const fallback = await supabase
+      .from('students')
+      .select(SELECT_BASE)
+      .eq('graduation_year', graduationYear)
+      .order('major')
+      .order('class_info')
+      .order('student_number')
+      .range(0, 5000);
+    data = fallback.data as any;
+    error = fallback.error;
+  }
+
   if (error || !data) {
     console.error('Error fetching admin students:', error);
     return [];
   }
 
-  return data as StudentEmploymentData[];
+  const flattened = data.map((s: any) => {
+    const rawEmp = Array.isArray(s.student_employments) ? s.student_employments[0] : s.student_employments;
+    const { student_employments, ...studentBase } = s;
+    const emp = rawEmp || {};
+    return {
+      ...studentBase,
+      ...emp,
+      id: s.id,
+    };
+  });
+
+  return flattened as StudentEmploymentData[];
 }
 
 const adminStudentCacheMap = new Map<number, ReturnType<typeof unstable_cache>>();

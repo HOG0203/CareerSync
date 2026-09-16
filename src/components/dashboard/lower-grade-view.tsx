@@ -74,79 +74,63 @@ export default function LowerGradeView({
   const certRate = totalStudents > 0 ? ((certificateHolders / totalStudents) * 100).toFixed(1) : '0';
 
   return (
-    <div className="flex flex-col gap-5 lg:gap-6 animate-in fade-in duration-500">
-      {/* 4종 핵심 KPI 요약 카드 */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+    <div className="flex flex-col gap-2.5 sm:gap-3 animate-in fade-in duration-500">
+      {/* 4종 핵심 KPI 요약 카드 (class-management 스타일 통일) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 shrink-0">
         {/* 1. 총 학생 수 */}
-        <Card className="rounded-2xl border-slate-200/80 shadow-xs bg-white hover:border-indigo-200 transition-all overflow-hidden">
-          <CardContent className="p-4 sm:p-5 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-xs font-bold text-slate-500">총 학생 수</p>
-              <div className="flex items-baseline gap-1">
-                <span className="text-2xl sm:text-3xl font-black text-slate-900">{totalStudents}</span>
-                <span className="text-xs font-bold text-slate-500">명</span>
-              </div>
-              <p className="text-[11px] text-slate-400 font-medium">분석 대상 인원</p>
+        <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
+          <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs sm:text-sm font-bold text-slate-600">총 학생 수</p>
+              <p className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">{totalStudents}명</p>
             </div>
-            <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100/80 flex items-center justify-center shrink-0 shadow-3xs">
-              <Users className="h-5 w-5 sm:h-6 sm:w-6" />
+            <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+              <Users className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
         
         {/* 2. 진로 결정 학생 */}
-        <Card className="rounded-2xl border-slate-200/80 shadow-xs bg-white hover:border-purple-200 transition-all overflow-hidden">
-          <CardContent className="p-4 sm:p-5 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-xs font-bold text-slate-500">진로 결정 학생</p>
-              <div className="flex items-baseline gap-1">
-                <span className="text-2xl sm:text-3xl font-black text-purple-600">{decidedCareerStudents}</span>
-                <span className="text-xs font-bold text-purple-600">명</span>
-              </div>
-              <p className="text-[11px] text-purple-600/80 font-bold">
-                설정률 {decidedRate}%
+        <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
+          <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs sm:text-sm font-bold text-slate-600">
+                진로 결정 학생 <span className="text-[11px] sm:text-xs font-normal text-slate-400">({decidedRate}%)</span>
               </p>
+              <p className="text-xl sm:text-2xl font-black text-purple-600 mt-0.5">{decidedCareerStudents}명</p>
             </div>
-            <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-purple-50 text-purple-600 border border-purple-100/80 flex items-center justify-center shrink-0 shadow-3xs">
-              <Target className="h-5 w-5 sm:h-6 sm:w-6" />
+            <div className="p-2.5 rounded-xl bg-purple-50 text-purple-600 border border-purple-100">
+              <Target className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
 
         {/* 3. 취업 희망 */}
-        <Card className="rounded-2xl border-slate-200/80 shadow-xs bg-white hover:border-emerald-200 transition-all overflow-hidden">
-          <CardContent className="p-4 sm:p-5 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-xs font-bold text-slate-500">취업 희망자</p>
-              <div className="flex items-baseline gap-1">
-                <span className="text-2xl sm:text-3xl font-black text-emerald-600">{employmentDesireStudents}</span>
-                <span className="text-xs font-bold text-emerald-600">명</span>
-              </div>
-              <p className="text-[11px] text-emerald-600/80 font-bold">
-                비율 {employmentRate}%
+        <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
+          <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs sm:text-sm font-bold text-slate-600">
+                취업 희망자 <span className="text-[11px] sm:text-xs font-normal text-slate-400">({employmentRate}%)</span>
               </p>
+              <p className="text-xl sm:text-2xl font-black text-emerald-600 mt-0.5">{employmentDesireStudents}명</p>
             </div>
-            <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100/80 flex items-center justify-center shrink-0 shadow-3xs">
-              <Briefcase className="h-5 w-5 sm:h-6 sm:w-6" />
+            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+              <Briefcase className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
 
         {/* 4. 자격증 보유자 */}
-        <Card className="rounded-2xl border-slate-200/80 shadow-xs bg-white hover:border-blue-200 transition-all overflow-hidden">
-          <CardContent className="p-4 sm:p-5 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-xs font-bold text-slate-500">자격증 보유자</p>
-              <div className="flex items-baseline gap-1">
-                <span className="text-2xl sm:text-3xl font-black text-blue-600">{certificateHolders}</span>
-                <span className="text-xs font-bold text-blue-600">명</span>
-              </div>
-              <p className="text-[11px] text-blue-600/80 font-bold">
-                취득률 {certRate}%
+        <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
+          <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs sm:text-sm font-bold text-slate-600">
+                자격증 보유자 <span className="text-[11px] sm:text-xs font-normal text-slate-400">({certRate}%)</span>
               </p>
+              <p className="text-xl sm:text-2xl font-black text-blue-600 mt-0.5">{certificateHolders}명</p>
             </div>
-            <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-blue-50 text-blue-600 border border-blue-100/80 flex items-center justify-center shrink-0 shadow-3xs">
-              <Award className="h-5 w-5 sm:h-6 sm:w-6" />
+            <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+              <Award className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>

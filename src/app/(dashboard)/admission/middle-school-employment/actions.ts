@@ -137,10 +137,25 @@ export async function batchUpdateAdmissionFromExcelAction(
         if (row.admissionRankPercentile !== undefined) updateData.admission_rank_percentile = row.admissionRankPercentile;
         if (row.admissionType !== undefined) updateData.admission_type = row.admissionType?.trim() || null;
 
-        const { error: updateErr } = await supabase
+        let { error: updateErr } = await supabase
           .from('students')
           .update(updateData)
           .eq('id', matched.id);
+
+        if (updateErr && (updateErr.message.includes('middle_school') || updateErr.message.includes('admission_rank_percentile') || updateErr.message.includes('admission_type'))) {
+          delete updateData.middle_school;
+          delete updateData.admission_rank_percentile;
+          delete updateData.admission_type;
+          if (Object.keys(updateData).length > 0) {
+            const retry = await supabase
+              .from('students')
+              .update(updateData)
+              .eq('id', matched.id);
+            updateErr = retry.error;
+          } else {
+            updateErr = null;
+          }
+        }
 
         if (updateErr) {
           errors.push(`[업데이트 실패] ${cleanName}: ${updateErr.message}`);

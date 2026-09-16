@@ -5,6 +5,7 @@ import {
   getCurrentUserProfile,
 } from '@/lib/data';
 import { LayoutDashboard } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import DashboardFilters from '@/components/dashboard/dashboard-filters';
 import DashboardViewWrapper from '@/components/dashboard/dashboard-view-wrapper';
 import { getSystemSettings, getDashboardChartLayout } from '@/app/(dashboard)/admin/settings/actions';
@@ -112,27 +113,20 @@ export default async function DashboardPage({
   const employmentRate = analysisTargetCount > 0 ? (employedStudents / analysisTargetCount) * 100 : 0;
 
   return (
-    <div className="flex flex-col gap-5 lg:gap-6">
-      {/* 1. 상단 모던 헤더 & 필터 바 영역 */}
-      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between shrink-0 gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="flex flex-col gap-1.5 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="bg-indigo-50 text-indigo-700 border border-indigo-100/80 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full">
-              {ay}학년도
-            </span>
-            <span className="bg-slate-100 text-slate-700 text-[11px] font-bold px-2 py-0.5 rounded-full">
-              {grade}학년 분석
-            </span>
-          </div>
-
-          <h2 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-slate-900 flex items-center gap-2.5">
-            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
-              <LayoutDashboard className="h-5 w-5 sm:h-6 sm:w-6" />
+    <div className="flex flex-col h-auto min-h-full max-h-none overflow-visible lg:h-full lg:min-h-0 lg:overflow-hidden gap-2.5 pb-12 lg:pb-0">
+      {/* 1. 상단 타이틀 헤더 */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 px-1">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
+            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-indigo-50 flex items-center justify-center border border-indigo-100 shrink-0">
+              <LayoutDashboard className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-600" />
             </div>
-            <span>종합 통계 대시보드</span>
+            종합 통계 대시보드
+            <span className="text-[11px] bg-indigo-600 text-white px-2.5 py-0.5 rounded-full font-black whitespace-nowrap">
+              {ay}학년도 {grade}학년 분석
+            </span>
           </h2>
-
-          <p className="text-xs text-slate-500 font-medium">
+          <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed">
             전교생 진로 희망, 취업률 및 현장실습/도제OJT 지표를 실시간으로 분석합니다.
             {selectedMajor !== 'all' && (
               <span className="ml-1.5 font-bold text-indigo-600">[{selectedMajor}]</span>
@@ -142,10 +136,13 @@ export default async function DashboardPage({
             )}
           </p>
         </div>
+      </div>
 
-        <div className="shrink-0 overflow-x-auto w-full xl:w-auto pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-100">
-          <div className="flex justify-start xl:justify-end">
-            <React.Suspense fallback={<div className="h-10 w-[450px] bg-slate-50 animate-pulse rounded-xl" />}>
+      {/* 2. 모던 통합 필터 툴바 (class-management 스타일) */}
+      <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl shrink-0">
+        <CardContent className="p-3 sm:p-3.5">
+          <div className="flex flex-col sm:flex-row gap-2.5 items-center justify-between flex-wrap">
+            <React.Suspense fallback={<div className="h-9 w-[450px] bg-slate-50 animate-pulse rounded-xl" />}>
               <DashboardFilters 
                 graduationYears={graduationYears} 
                 majors={majors} 
@@ -154,14 +151,15 @@ export default async function DashboardPage({
                 defaultYear={selectedYear}
                 baseYear={settings.baseYear}
                 hideGrade={false}
+                hideStatus={true}
                 defaultGrade={defaultGrade}
               />
             </React.Suspense>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* 학년별 조건부 뷰 전환 (로딩 스켈레톤 관리 래퍼 도입) */}
+      {/* 학년별 조건부 뷰 전환 */}
       <DashboardViewWrapper
         filteredData={filteredData}
         selectedMajor={selectedMajor}

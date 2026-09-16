@@ -115,7 +115,22 @@ export function ExcelImportModal({
 
     try {
       const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: 'array' });
+      let wb: XLSX.WorkBook;
+      
+      if (file.name.endsWith('.csv')) {
+        let content = '';
+        try {
+          const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
+          content = utf8Decoder.decode(buffer);
+        } catch {
+          const euckrDecoder = new TextDecoder('euc-kr');
+          content = euckrDecoder.decode(buffer);
+        }
+        wb = XLSX.read(content, { type: 'string' });
+      } else {
+        wb = XLSX.read(buffer, { type: 'array' });
+      }
+
       const wsName = wb.SheetNames[0];
       const ws = wb.Sheets[wsName];
 

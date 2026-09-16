@@ -24,7 +24,8 @@ const normalizeDate = (dateStr: string | null | undefined): string | null => {
 const BASIC_INFO_FIELDS = [
   'student_id', 'student_name', 'phone_number', 'graduation_year', 'major', 'class_info', 
   'student_number', 'shoe_size', 'top_size', 'personal_remarks', 'certificates',
-  'career_aspiration', 'military_status', 'special_notes', 'career_course', 'labor_education_status'
+  'career_aspiration', 'military_status', 'special_notes', 'career_course', 'labor_education_status',
+  'middle_school', 'admission_rank_percentile', 'admission_type'
 ];
 
 const FIELD_TRAINING_EDITABLE_FIELDS = [

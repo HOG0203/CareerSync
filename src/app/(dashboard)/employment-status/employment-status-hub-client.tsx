@@ -331,7 +331,7 @@ export function EmploymentStatusHubClient({
         <Card className="border-slate-200/80 shadow-2xs hover:shadow-sm transition-all rounded-2xl bg-white">
           <CardContent className="p-4 sm:p-5 flex items-center justify-between">
             <div className="space-y-1">
-              <p className="text-[11px] sm:text-xs font-bold text-slate-500">
+              <p className="text-xs sm:text-sm font-bold text-slate-600">
                 {customMatchedCount !== null 
                   ? '조건 조합 일치 학생수' 
                   : searchMatchedCount !== null 
@@ -369,7 +369,7 @@ export function EmploymentStatusHubClient({
         <Card className="border-slate-200/80 shadow-2xs hover:shadow-sm transition-all rounded-2xl bg-white">
           <CardContent className="p-4 sm:p-5 flex items-center justify-between">
             <div className="space-y-1">
-              <p className="text-[11px] sm:text-xs font-bold text-slate-500">
+              <p className="text-xs sm:text-sm font-bold text-slate-600">
                 {isLowerGrade ? '취업 희망 (희망률)' : '취업 확정·진행 (취업률)'}
               </p>
               <div className="flex items-baseline gap-2">
@@ -391,7 +391,7 @@ export function EmploymentStatusHubClient({
         <Card className="border-slate-200/80 shadow-2xs hover:shadow-sm transition-all rounded-2xl bg-white">
           <CardContent className="p-4 sm:p-5 flex items-center justify-between">
             <div className="space-y-1">
-              <p className="text-[11px] sm:text-xs font-bold text-slate-500">
+              <p className="text-xs sm:text-sm font-bold text-slate-600">
                 {isLowerGrade ? '진학 희망' : '대·공기업·공직 취업'}
               </p>
               <div className="flex items-baseline gap-1.5">
@@ -411,7 +411,7 @@ export function EmploymentStatusHubClient({
         <Card className="border-slate-200/80 shadow-2xs hover:shadow-sm transition-all rounded-2xl bg-white">
           <CardContent className="p-4 sm:p-5 flex items-center justify-between">
             <div className="space-y-1">
-              <p className="text-[11px] sm:text-xs font-bold text-slate-500">
+              <p className="text-xs sm:text-sm font-bold text-slate-600">
                 {isLowerGrade ? '진로 미정' : '중견기업 취업'}
               </p>
               <div className="flex items-baseline gap-1.5">

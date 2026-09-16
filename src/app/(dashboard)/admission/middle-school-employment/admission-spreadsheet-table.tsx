@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import * as XLSX from 'xlsx';
 import {
   Search,
   School,
@@ -287,6 +288,25 @@ export function AdmissionSpreadsheetTable({
     }
   };
 
+  const handleExportSpreadsheetExcel = () => {
+    const exportData = filteredStudents.map((s, idx) => ({
+      '연번': idx + 1,
+      '학년': getStudentGrade(s) ? `${getStudentGrade(s)}학년` : '-',
+      '학번': s.student_number || '',
+      '성명': s.student_name,
+      '학과': s.major || '',
+      '반': s.class_info ? `${s.class_info}반` : '',
+      '출신중학교': getCellValue(s, 'middle_school') || '미입력',
+      '입학 석차백분율(%)': getCellValue(s, 'admission_rank_percentile') ? `${getCellValue(s, 'admission_rank_percentile')}%` : '-',
+      '입학 전형구분': getCellValue(s, 'admission_type') || '-',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '스프레드시트_편집목록');
+    XLSX.writeFile(wb, `CareerSync_출신중학교_스프레드시트_목록.xlsx`);
+  };
+
   const pendingCount = Object.keys(pendingEdits).length;
   const missingCount = students.filter(s => !(s.middle_school || '').trim()).length;
 
@@ -319,8 +339,18 @@ export function AdmissionSpreadsheetTable({
             </div>
           </div>
 
-          {/* 저장 및 초기화 버튼 */}
+          {/* 저장 및 초기화 / 엑셀 내보내기 버튼 */}
           <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleExportSpreadsheetExcel}
+              className="h-8.5 px-3 text-xs font-bold border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl cursor-pointer"
+            >
+              <Download className="h-3.5 w-3.5 mr-1 text-slate-500" />
+              엑셀 내보내기
+            </Button>
             {pendingCount > 0 && (
               <Button
                 type="button"

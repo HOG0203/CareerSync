@@ -129,7 +129,9 @@ export function AdminStudentHub({
       (s.student_number || '').includes(q) ||
       (s.major || '').toLowerCase().includes(q) ||
       (s.class_info || '').includes(q) ||
-      (s.phone_number || '').includes(q)
+      (s.phone_number || '').includes(q) ||
+      (s.middle_school || '').toLowerCase().includes(q) ||
+      (s.admission_rank_percentile != null ? String(s.admission_rank_percentile) : '').includes(q)
     );
   }, [processedData, search]);
 
@@ -282,6 +284,18 @@ export function AdminStudentHub({
       key: 'phone_number',
       label: '휴대전화번호',
       width: 140,
+      type: 'text',
+    },
+    {
+      key: 'middle_school',
+      label: '출신중학교',
+      width: 130,
+      type: 'text',
+    },
+    {
+      key: 'admission_rank_percentile',
+      label: '입학성적',
+      width: 100,
       type: 'text',
     },
   ], [majors]);

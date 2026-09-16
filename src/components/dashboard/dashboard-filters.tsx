@@ -44,7 +44,7 @@ export default function DashboardFilters({
   baseUrl = '/dashboard', 
   hideYear = false,
   hideGrade = false,
-  hideStatus = false,
+  hideStatus = true,
   hideMajor = false,
   hideClass = false,
   baseYear,

@@ -57,7 +57,7 @@ export function StudentsHubClient({
   const [searchTerm, setSearchTerm] = React.useState('');
   const [selectedMajor, setSelectedMajor] = React.useState<string>('all');
   const [selectedClass, setSelectedClass] = React.useState<string>('all');
-  const [selectedStatus, setSelectedStatus] = React.useState<string>('all');
+  const [selectedStatus, setSelectedStatus] = React.useState<string>('취업');
 
   const handleAYChange = (newAYStr: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -138,7 +138,16 @@ export function StudentsHubClient({
     return initialData.filter((student) => {
       if (selectedMajor !== 'all' && student.major !== selectedMajor) return false;
       if (selectedClass !== 'all' && student.class_info !== selectedClass) return false;
-      if (selectedStatus !== 'all' && (student.business_type || '미취업') !== selectedStatus) return false;
+      if (selectedStatus !== 'all') {
+        const bType = (student.business_type || '미취업').trim();
+        const empStatus = (student.employment_status || '').trim();
+        const hasCompany = Boolean(student.company && student.company !== '-' && student.company !== '미정');
+        if (selectedStatus === '취업') {
+          if (bType !== '취업' && empStatus !== '취업' && !hasCompany) return false;
+        } else if (bType !== selectedStatus) {
+          return false;
+        }
+      }
       return true;
     });
   }, [initialData, selectedMajor, selectedClass, selectedStatus]);
@@ -184,7 +193,7 @@ export function StudentsHubClient({
         <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
           <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-500">조회 학생수</p>
+              <p className="text-xs sm:text-sm font-bold text-slate-600">조회 학생수</p>
               <p className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">{stats.total}명</p>
             </div>
             <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
@@ -196,7 +205,7 @@ export function StudentsHubClient({
         <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
           <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-500">취업 ({stats.employmentRate}%)</p>
+              <p className="text-xs sm:text-sm font-bold text-slate-600">취업 ({stats.employmentRate}%)</p>
               <p className="text-xl sm:text-2xl font-black text-emerald-600 mt-0.5">{stats.employedCount}명</p>
             </div>
             <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
@@ -208,7 +217,7 @@ export function StudentsHubClient({
         <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
           <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-500">현장실습 참여</p>
+              <p className="text-xs sm:text-sm font-bold text-slate-600">현장실습 참여</p>
               <p className="text-xl sm:text-2xl font-black text-blue-600 mt-0.5">{stats.trainingCount}명</p>
             </div>
             <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
@@ -220,7 +229,7 @@ export function StudentsHubClient({
         <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
           <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-500">미연계 학생</p>
+              <p className="text-xs sm:text-sm font-bold text-slate-600">미연계 학생</p>
               <p className="text-xl sm:text-2xl font-black text-amber-600 mt-0.5">{stats.seekingUnemployedCount}명</p>
             </div>
             <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
