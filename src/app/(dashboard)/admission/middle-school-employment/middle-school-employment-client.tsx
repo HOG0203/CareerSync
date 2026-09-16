@@ -88,24 +88,14 @@ export function MiddleSchoolEmploymentClient({
   const [isExcelModalOpen, setIsExcelModalOpen] = React.useState(false);
   const [editingStudent, setEditingStudent] = React.useState<StudentEmploymentData | null>(null);
 
-  // 취업 완료된 학생 목록만 필터링 (청솔반, 진학, 미취업, 제외인정자, 채용진행중 등 제외)
+  // 학생 정보(students) 페이지의 취업현황 드롭다운 항목이 '취업'으로 선택된 학생들만 필터링
   const initialEmployedStudents = React.useMemo(() => {
     return initialStudents.filter((student) => {
       const bType = (student.business_type || '').trim();
       const status = (student.employment_status || '').trim();
-      const company = (student.company || student.latest_training_company || '').trim();
 
-      // 미취업, 진학, 청솔반, 제외인정자, 채용진행중 등 비취업 학생 제외
-      if (
-        ['미취업', '진학', '청솔반', '제외인정자', '채용진행중', '아니오', '미결정'].includes(bType) ||
-        ['미취업', '진학', '청솔반', '제외인정자', '채용진행중', '아니오', '미결정'].includes(status) ||
-        bType.includes('진행') || status.includes('진행')
-      ) {
-        return false;
-      }
-
-      const isEmployed = bType === '취업' || bType === '예' || status === '취업' || status === '예' || (company !== '' && company !== '-' && company !== '미정' && company !== '진학' && company !== '청솔반');
-      return isEmployed;
+      // 취업현황 드롭다운 값이 '취업' 또는 '예'로 등록된 학생만 명시적 필터링
+      return bType === '취업' || status === '취업' || bType === '예' || status === '예';
     });
   }, [initialStudents]);
 
