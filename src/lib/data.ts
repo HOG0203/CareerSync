@@ -105,7 +105,7 @@ export async function getFilteredStudentData(graduationYear: string, baseYear?: 
   const gradYearInt = parseInt(graduationYear);
 
   const STUDENT_FIELDS_WITH_ADMISSION = 'id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, labor_education_status, military_status, desired_work_area, parents_opinion, shoe_size, top_size, middle_school, admission_rank_percentile, admission_type, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks)';
-  const STUDENT_FIELDS_BASE = 'id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, labor_education_status, military_status, desired_work_area, parents_opinion, shoe_size, top_size, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks)';
+  const STUDENT_FIELDS_BASE = 'id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, labor_education_status, military_status, desired_work_area, parents_opinion, shoe_size, top_size, middle_school, admission_rank_percentile, admission_type, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks)';
 
   let students: any[] = [];
   let useAdmissionFields = true;
@@ -264,7 +264,7 @@ export async function getCachedFilteredStudentData(graduationYear: string, baseY
   if (!filteredStudentDataCacheMap.has(cacheKey)) {
     const cachedFn = unstable_cache(
       async () => getFilteredStudentData(graduationYear, baseYear),
-      [`filtered-student-data-${cacheKey}`],
+      [`filtered-student-data-v2-${cacheKey}`],
       {
         revalidate: 86400,
         tags: graduationYear === 'all' ? ['students', 'teachers'] : [`emp-status-${graduationYear}`, 'students', 'teachers']
