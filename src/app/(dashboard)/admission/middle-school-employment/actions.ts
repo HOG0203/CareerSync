@@ -204,3 +204,60 @@ export async function batchUpdateMultipleStudentsInlineAction(
   revalidatePath('/employment-status');
   return { success: true, count: successCount };
 }
+
+/**
+ * 등록된 출신 중학교 고유 목록(Distinct List) 조회
+ */
+export async function getRegisteredMiddleSchoolsAction(): Promise<string[]> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from('students')
+    .select('middle_school')
+    .not('middle_school', 'is', null);
+
+  if (error || !data) return [];
+  const schools = Array.from(
+    new Set(
+      data
+        .map(d => (d.middle_school || '').trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, 'ko'));
+
+  return schools;
+}
+
+/**
+ * 다수 학생의 출신 중학교 일괄 변경 (빠른 할당)
+ */
+export async function bulkAssignMiddleSchoolAction(
+  studentIds: string[],
+  middleSchool: string
+) {
+  const profile = await getCurrentUserProfile();
+  if (!profile || profile.role === 'student') {
+    return { success: false, error: '권한이 없습니다.' };
+  }
+
+  if (!studentIds || studentIds.length === 0) {
+    return { success: false, error: '선택된 학생이 없습니다.' };
+  }
+
+  const supabase = createAdminClient();
+  const cleanSchool = middleSchool.trim();
+
+  const { error, count } = await supabase
+    .from('students')
+    .update({ middle_school: cleanSchool || null })
+    .in('id', studentIds);
+
+  if (error) {
+    console.error('Failed bulkAssignMiddleSchoolAction:', error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/admission/middle-school-employment');
+  revalidatePath('/employment-status');
+  return { success: true, count: count || studentIds.length };
+}
+

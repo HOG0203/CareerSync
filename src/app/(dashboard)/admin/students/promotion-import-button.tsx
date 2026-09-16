@@ -71,7 +71,7 @@ export function PromotionImportButton({ currentData, baseYear }: PromotionImport
 
 
   const downloadTemplate = () => {
-    const headers = ["성명", "기존 학과", "기존 반", "기존 번호", "진급 후 학과", "진급 후 반", "진급 후 번호"];
+    const headers = ["성명", "기존 학과", "기존 반", "기존 번호", "진급 후 학과", "진급 후 반", "진급 후 번호", "출신중학교"];
     
     // 현재 필터링된 데이터만 내보내기
     const rows = currentData.map(s => [
@@ -81,7 +81,8 @@ export function PromotionImportButton({ currentData, baseYear }: PromotionImport
       s.student_number || '',
       '', // 진급 후 학과 (빈칸)
       '', // 진급 후 반 (빈칸)
-      ''  // 진급 후 번호 (빈칸)
+      '', // 진급 후 번호 (빈칸)
+      s.middle_school || '' // 출신중학교
     ]);
 
     const csvContent = [
@@ -93,7 +94,7 @@ export function PromotionImportButton({ currentData, baseYear }: PromotionImport
     const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
-    link.download = `${baseYear}학년도_진급처리_양식.csv`
+    link.download = `${baseYear}학년도_진급및입학_양식.csv`
     link.click()
   }
 
@@ -103,7 +104,7 @@ export function PromotionImportButton({ currentData, baseYear }: PromotionImport
       <DialogTrigger asChild>
         <Button size="sm" className="h-8 sm:h-9 px-1.5 sm:px-3 text-[11px] sm:text-xs font-bold bg-emerald-600 hover:bg-emerald-700 shadow-xs shrink-0">
           <ArrowRight className="mr-1 sm:mr-1.5 h-3.5 w-3.5 shrink-0" />
-          <span><span className="hidden xs:inline">엑셀 </span>일괄진급</span>
+          <span><span className="hidden xs:inline">엑셀 </span>일괄진급/신입생등록</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[450px] rounded-2xl p-0 overflow-hidden border-none shadow-2xl flex flex-col">
@@ -114,10 +115,10 @@ export function PromotionImportButton({ currentData, baseYear }: PromotionImport
             </div>
             <div className="flex flex-col text-left min-w-0">
               <DialogTitle className="text-base sm:text-lg font-black flex items-center gap-2 text-slate-900 truncate">
-                학생 일괄 진급 처리
+                학생 일괄 진급 및 출신중학교 등록
               </DialogTitle>
               <DialogDescription className="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
-                엑셀 데이터 기반 신규 학반 일괄 진급 업로드
+                엑셀 데이터 기반 신규 학반 진급 및 출신중학교 업로드
               </DialogDescription>
             </div>
           </div>
@@ -125,10 +126,10 @@ export function PromotionImportButton({ currentData, baseYear }: PromotionImport
         <div className="grid gap-4 p-6">
           <div className="flex items-center justify-between p-4 border rounded-md bg-emerald-50 border-emerald-100">
             <div className="space-y-1">
-              <p className="text-sm font-bold text-emerald-800">1. 진급 서식 다운로드</p>
-              <p className="text-xs text-emerald-600">현재 화면의 학생 목록이 포함된 서식을 받습니다.</p>
+              <p className="text-sm font-bold text-emerald-800">1. 서식 다운로드</p>
+              <p className="text-xs text-emerald-600">현재 학생 목록 및 출신중학교 항목이 포함된 서식을 받습니다.</p>
             </div>
-            <Button size="sm" variant="secondary" onClick={downloadTemplate} className="bg-white hover:bg-emerald-100 text-emerald-700 border-emerald-200">
+            <Button size="sm" variant="secondary" onClick={downloadTemplate} className="bg-white hover:bg-emerald-100 text-emerald-700 border-emerald-200 cursor-pointer">
               <Download className="mr-2 h-3 w-3" />
               서식 받기
             </Button>
@@ -150,9 +151,9 @@ export function PromotionImportButton({ currentData, baseYear }: PromotionImport
           </div>
           <div className="bg-slate-50 p-3 rounded-md border border-slate-100 mt-2">
             <ul className="text-[10px] text-slate-500 space-y-1 list-disc pl-4">
-              <li><b>주의:</b> A열(학번)은 학생을 식별하는 고유 키이므로 임의로 수정하지 마세요.</li>
-              <li>F, G, H열(진급 후 정보)만 정확히 기입하여 업로드해주세요.</li>
-              <li>빈칸으로 남겨둔 학생은 진급 처리가 누락되니 주의하세요.</li>
+              <li><b>진급 정보:</b> E, F, G열(진급 후 학과, 반, 번호)을 기입하면 신규 학반이 지정됩니다.</li>
+              <li><b>출신중학교:</b> H열(출신중학교)을 기입하면 1학년 신입생 배치 및 출신중학교 데이터가 일괄 반영됩니다.</li>
+              <li><b>주의:</b> 학번/이름이 일치하는 학생 정보가 갱신됩니다.</li>
             </ul>
           </div>
         </div>

@@ -41,7 +41,8 @@ export function AddStudentModal({ isOpen, onClose, baseYear, majors }: AddStuden
     major: '',
     class_info: '',
     student_number: '',
-    graduation_year: (baseYear + 1).toString()
+    graduation_year: (baseYear + 1).toString(),
+    middle_school: ''
   })
 
   React.useEffect(() => {
@@ -51,7 +52,8 @@ export function AddStudentModal({ isOpen, onClose, baseYear, majors }: AddStuden
         major: majors[0] || '',
         class_info: '',
         student_number: '',
-        graduation_year: (baseYear + 1).toString()
+        graduation_year: (baseYear + 1).toString(),
+        middle_school: ''
       })
     }
   }, [isOpen, baseYear, majors])
@@ -167,6 +169,17 @@ export function AddStudentModal({ isOpen, onClose, baseYear, majors }: AddStuden
                   className="h-10 border-slate-200 focus:ring-indigo-500"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="middle_school" className="text-xs font-bold text-slate-500">출신 중학교 (선택)</Label>
+              <Input 
+                id="middle_school" 
+                placeholder="예: 옥천중학교" 
+                value={formData.middle_school}
+                onChange={(e) => setFormData(prev => ({ ...prev, middle_school: e.target.value }))}
+                className="h-10 border-slate-200 focus:ring-indigo-500 font-bold"
+              />
             </div>
           </div>
 

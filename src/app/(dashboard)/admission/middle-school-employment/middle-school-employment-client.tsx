@@ -48,6 +48,7 @@ import * as XLSX from 'xlsx';
 import { StudentEmploymentData } from '@/lib/data';
 import { ExcelImportModal } from './excel-import-modal';
 import { AdmissionEditModal } from './admission-edit-modal';
+import { AdmissionSpreadsheetTable } from './admission-spreadsheet-table';
 import { batchUpdateMultipleStudentsInlineAction } from './actions';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
@@ -70,7 +71,7 @@ export function MiddleSchoolEmploymentClient({
   const [selectedMiddleSchool, setSelectedMiddleSchool] = React.useState<string>('all');
   const [selectedMajor, setSelectedMajor] = React.useState<string>('all');
   const [selectedCompanyType, setSelectedCompanyType] = React.useState<string>('all');
-  const [activeTab, setActiveTab] = React.useState<'overview' | 'manage'>('overview');
+  const [activeTab, setActiveTab] = React.useState<'overview' | 'manage' | 'spreadsheet'>('overview');
 
   // 모달 상태
   const [isExcelModalOpen, setIsExcelModalOpen] = React.useState(false);
@@ -404,40 +405,60 @@ export function MiddleSchoolEmploymentClient({
         </Card>
       </div>
 
-      {/* 3. 모드 탭 (조회 대시보드 vs 직접 관리) 및 필터 바 */}
-      <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl overflow-hidden">
-        <CardContent className="p-4 sm:p-5 space-y-4">
-          {/* 상단 탭 스위처 & 필터 바 */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-            {/* 좌측 탭 */}
-            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl w-fit">
-              <button
-                type="button"
-                onClick={() => setActiveTab('overview')}
-                className={cn(
-                  'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5',
-                  activeTab === 'overview'
-                    ? 'bg-white text-slate-900 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                )}
-              >
-                <Building2 className="h-3.5 w-3.5 text-teal-600" />
-                중학교별 취업현황 조회
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('manage')}
-                className={cn(
-                  'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5',
-                  activeTab === 'manage'
-                    ? 'bg-white text-slate-900 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                )}
-              >
-                <Edit2 className="h-3.5 w-3.5 text-blue-600" />
-                출신교 및 성적 직접 수정
-              </button>
-            </div>
+      {/* 3. 모드 탭 스위처 바 */}
+      <div className="flex items-center gap-1.5 p-1.5 bg-slate-100 rounded-2xl w-fit border border-slate-200/80 shadow-2xs">
+        <button
+          type="button"
+          onClick={() => setActiveTab('overview')}
+          className={cn(
+            'px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer',
+            activeTab === 'overview'
+              ? 'bg-white text-slate-900 shadow-2xs'
+              : 'text-slate-600 hover:text-slate-900'
+          )}
+        >
+          <Building2 className="h-4 w-4 text-teal-600" />
+          중학교별 취업현황 조회
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('spreadsheet')}
+          className={cn(
+            'px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer',
+            activeTab === 'spreadsheet'
+              ? 'bg-purple-600 text-white shadow-2xs font-black'
+              : 'text-purple-700 hover:bg-purple-50'
+          )}
+        >
+          <FileSpreadsheet className="h-4 w-4 text-purple-200" />
+          📊 스프레드시트 일괄 편집
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('manage')}
+          className={cn(
+            'px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer',
+            activeTab === 'manage'
+              ? 'bg-white text-slate-900 shadow-2xs'
+              : 'text-slate-600 hover:text-slate-900'
+          )}
+        >
+          <Edit2 className="h-4 w-4 text-blue-600" />
+          출신교 및 성적 목록 수정
+        </button>
+      </div>
+
+      {activeTab === 'spreadsheet' ? (
+        <AdmissionSpreadsheetTable
+          students={initialStudents}
+          baseYear={baseYear}
+          onRefreshData={() => router.refresh()}
+        />
+      ) : (
+        <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl overflow-hidden">
+          <CardContent className="p-4 sm:p-5 space-y-4">
+            {/* 상단 필터 바 */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
 
             {/* 출신 중학교 빠른 선택 칩 (전체, 옥천중, 옥천여중 등) */}
             <div className="flex items-center gap-1.5 overflow-x-auto py-1 text-xs">
@@ -798,6 +819,7 @@ export function MiddleSchoolEmploymentClient({
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* 엑셀 일괄 등록 모달 */}
       <ExcelImportModal

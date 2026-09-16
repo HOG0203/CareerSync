@@ -224,9 +224,10 @@ export async function bulkPromoteFromExcel(csvData: string) {
     let next_major: string | null = null;
     let next_class: string | null = null;
     let next_number: string | null = null;
+    let middle_school: string | null = null;
 
-    if (values.length >= 8) {
-      // 8컬럼 서식: [0]학번, [1]성명, [2]기존학과, [3]기존반, [4]기존번호, [5]신규학과, [6]신규반, [7]신규번호
+    if (values.length >= 9) {
+      // 9컬럼 서식: [0]학번, [1]성명, [2]기존학과, [3]기존반, [4]기존번호, [5]신규학과, [6]신규반, [7]신규번호, [8]출신중학교
       student_id = values[0];
       student_name = values[1];
       prev_major = values[2];
@@ -235,6 +236,27 @@ export async function bulkPromoteFromExcel(csvData: string) {
       next_major = values[5];
       next_class = values[6];
       next_number = values[7];
+      middle_school = values[8]?.trim() || null;
+    } else if (values.length === 8) {
+      if (values[0] && values[0].length > 10) {
+        student_id = values[0];
+        student_name = values[1];
+        prev_major = values[2];
+        prev_class = values[3];
+        prev_number = values[4];
+        next_major = values[5];
+        next_class = values[6];
+        next_number = values[7];
+      } else {
+        student_name = values[0];
+        prev_major = values[1];
+        prev_class = values[2];
+        prev_number = values[3];
+        next_major = values[4];
+        next_class = values[5];
+        next_number = values[6];
+        middle_school = values[7]?.trim() || null;
+      }
     } else {
       // 7컬럼 최신 서식: [0]성명, [1]기존학과, [2]기존반, [3]기존번호, [4]신규학과, [5]신규반, [6]신규번호
       student_name = values[0];
@@ -276,15 +298,20 @@ export async function bulkPromoteFromExcel(csvData: string) {
       continue;
     }
 
-    // 인적사항 업데이트
+    // 인적사항 및 출신중학교 업데이트
+    const updatePayload: Record<string, any> = { 
+      major: next_major,
+      class_info: next_class,
+      student_number: next_number,
+      updated_at: new Date().toISOString()
+    };
+    if (middle_school !== null && middle_school !== undefined && middle_school.length > 0) {
+      updatePayload.middle_school = middle_school;
+    }
+
     const { error: updateError } = await supabase
       .from('students')
-      .update({ 
-        major: next_major,
-        class_info: next_class,
-        student_number: next_number,
-        updated_at: new Date().toISOString()
-      })
+      .update(updatePayload)
       .eq('id', student.id);
 
     if (!updateError) {
@@ -707,17 +734,22 @@ export async function bulkUpdateStudentData(updates: { id: string, field: string
   return { success: true }
 }
 
-export async function createStudent(data: { graduation_year: number, major: string, class_info: string, student_number: string, student_name: string }) {
+export async function createStudent(data: { graduation_year: number, major: string, class_info: string, student_number: string, student_name: string, middle_school?: string }) {
   const supabase = await createClient(); 
   const settings = await getSystemSettings();
 
+  const insertPayload: Record<string, any> = {
+    ...data,
+    student_id: crypto.randomUUID(),
+  };
+  if (data.middle_school !== undefined) {
+    insertPayload.middle_school = data.middle_school?.trim() || null;
+  }
+
   const { data: newStudent, error } = await supabase
     .from('students')
-    .insert([{
-      ...data,
-      student_id: crypto.randomUUID(),
-    }])
-    .select('id, graduation_year, major, class_info, student_number')
+    .insert([insertPayload])
+    .select('id, graduation_year, major, class_info, student_number, middle_school')
     .single();
 
   if (error || !newStudent) return { error: error?.message || '학생 등록에 실패했습니다.' };
