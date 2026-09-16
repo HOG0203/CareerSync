@@ -31,6 +31,16 @@ export async function createClient() {
 
 export function createAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
-  return createSupabaseClient(url, key);
+  const key = 
+    process.env.SUPABASE_SERVICE_ROLE_KEY || 
+    process.env.SUPABASE_SERVICE_KEY || 
+    process.env.SUPABASE_SECRET_KEY || 
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
+    'placeholder-key';
+  return createSupabaseClient(url, key, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  });
 }
