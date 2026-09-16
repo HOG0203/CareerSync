@@ -560,7 +560,7 @@ function flattenStudentData(students: any[], employments: any[], trainings: any[
 const getGraduationYearsCached = unstable_cache(
   async () => {
     const supabase = createAdminClient();
-    const { data } = await supabase.from('students').select('graduation_year').range(0, 9999);
+    const { data } = await supabase.from('students').select('graduation_year').range(0, 49999);
     const years = Array.from(new Set((data || []).map(d => d.graduation_year))).filter((y): y is number => y !== null);
     return years.sort((a, b) => b - a);
   },
