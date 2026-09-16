@@ -267,7 +267,12 @@ export function AcademicScheduleModal({
         list.unshift(currentTeacher);
       }
     }
-    return list;
+    const seen = new Set<string>();
+    return list.filter(t => {
+      if (!t || !t.teacherName || !t.teacherName.trim() || seen.has(t.teacherName)) return false;
+      seen.add(t.teacherName);
+      return true;
+    });
   }, [filteredTeachers, targetTeacherName, timetableData?.teachers]);
 
   // 학기 전체 주차 목록 생성
@@ -2793,7 +2798,7 @@ export function AcademicScheduleModal({
                           <SelectTrigger className="h-8 text-xs font-bold rounded-lg border-slate-200 bg-white">
                             <SelectValue placeholder={filteredTeachers.length > 0 ? "교사를 선택하세요..." : "검색 결과 없음"} />
                           </SelectTrigger>
-                          <SelectContent className="max-h-56">
+                          <SelectContent container={modalContainerRef.current} className="max-h-56">
                             {displayedTeachers.length === 0 ? (
                               <div className="p-3 text-center text-xs text-slate-400 font-medium">
                                 검색된 교사가 없습니다.
@@ -2884,7 +2889,7 @@ export function AcademicScheduleModal({
                           <SelectTrigger className="h-8.5 text-xs font-bold bg-white border-amber-300 text-slate-800">
                             <SelectValue placeholder="보강 주차 선택" />
                           </SelectTrigger>
-                          <SelectContent className="max-h-60">
+                          <SelectContent container={modalContainerRef.current} className="max-h-60">
                             {semesterWeeks.map(w => (
                               <SelectItem key={w.weekNum} value={String(w.weekNum)} className="text-xs font-medium">
                                 <span className="font-bold text-slate-900">{w.shortLabel}</span>
@@ -2918,7 +2923,7 @@ export function AcademicScheduleModal({
                           <SelectTrigger className="h-8 text-xs font-medium bg-white">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent container={modalContainerRef.current}>
                             <SelectItem value="hourly" className="text-xs">시간강사(시급제)</SelectItem>
                             <SelectItem value="contract" className="text-xs">계약제강사</SelectItem>
                             <SelectItem value="industry" className="text-xs">산학겸임강사</SelectItem>
@@ -3933,7 +3938,7 @@ export function AcademicScheduleModal({
                             <SelectTrigger className="h-10 text-xs bg-white border-slate-200 rounded-xl focus:ring-emerald-400">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent container={modalContainerRef.current}>
                               <SelectItem value="discretionary">재량휴업일</SelectItem>
                               <SelectItem value="holiday">공휴일 / 임시공휴일</SelectItem>
                               <SelectItem value="vacation">방학</SelectItem>
@@ -4384,7 +4389,7 @@ export function AcademicScheduleModal({
                             <SelectTrigger className="h-10 text-xs bg-white border-slate-200 rounded-xl focus:ring-rose-400">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent container={modalContainerRef.current}>
                               <SelectItem value="all">전학년 (1~3학년)</SelectItem>
                               <SelectItem value="1">1학년만</SelectItem>
                               <SelectItem value="2">2학년만</SelectItem>
@@ -4398,7 +4403,7 @@ export function AcademicScheduleModal({
                             <SelectTrigger className="h-10 text-xs bg-white border-slate-200 rounded-xl focus:ring-rose-400">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent container={modalContainerRef.current}>
                               <SelectItem value="dismiss">시험 후 하교 (수업 없음)</SelectItem>
                               <SelectItem value="regular_class">오후 정규 수업 진행</SelectItem>
                             </SelectContent>

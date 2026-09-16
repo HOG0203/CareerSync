@@ -101,41 +101,79 @@ export async function getDashboardStudentData(graduationYear: string): Promise<S
 export async function getFilteredStudentData(graduationYear: string, baseYear?: number): Promise<StudentEmploymentData[]> {
   const supabase = createAdminClient();
 
+  const isAllStudents = graduationYear === 'all';
   const gradYearInt = parseInt(graduationYear);
-  
-  // [최적화 1단계] 1차 대상 학생 목록 조회를 먼저 실행하여 ID 추출 (관계 테이블 무거운 !inner JOIN 제거)
-  const studentsResult = await supabase
-    .from('students')
-    .select('id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, labor_education_status, military_status, desired_work_area, parents_opinion, shoe_size, top_size, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks)')
-    .eq('graduation_year', gradYearInt)
 
-    .order('major')
-    .order('class_info')
-    .order('student_number')
-    .range(0, 5000);
+  const STUDENT_FIELDS_WITH_ADMISSION = 'id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, labor_education_status, military_status, desired_work_area, parents_opinion, shoe_size, top_size, middle_school, admission_rank_percentile, admission_type, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks)';
+  const STUDENT_FIELDS_BASE = 'id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, labor_education_status, military_status, desired_work_area, parents_opinion, shoe_size, top_size, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks)';
 
-  if (studentsResult.error) {
-    console.error('Error fetching students:', studentsResult.error);
-    return [];
+  let students: any[] = [];
+  let useAdmissionFields = true;
+
+  let from = 0;
+  const PAGE_SIZE = 1000;
+  while (true) {
+    let studentQuery = supabase
+      .from('students')
+      .select(useAdmissionFields ? STUDENT_FIELDS_WITH_ADMISSION : STUDENT_FIELDS_BASE)
+      .order('graduation_year', { ascending: false })
+      .order('major')
+      .order('class_info')
+      .order('student_number')
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (!isAllStudents && !isNaN(gradYearInt)) {
+      studentQuery = studentQuery.eq('graduation_year', gradYearInt);
+    }
+
+    const studentsResult = await studentQuery;
+    if (studentsResult.error) {
+      if (studentsResult.error.code === '42703' && useAdmissionFields) {
+        useAdmissionFields = false;
+        from = 0;
+        students = [];
+        continue;
+      }
+      console.error('Error fetching students:', studentsResult.error);
+      break;
+    }
+
+    if (!studentsResult.data || studentsResult.data.length === 0) break;
+    students.push(...studentsResult.data);
+    if (studentsResult.data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
   }
-  const students = studentsResult.data || [];
+
   const studentIds = students.map(s => s.id);
 
-  // [최적화 2단계] 추출한 studentIds로 실습 기록, 학적 이력, 담임 프로필을 ID 색인 기반 2차 병렬 쿼리 (속도 2.5배 향상)
+  // [최적화 2단계] 추출한 studentIds로 실습 기록, 학적 이력, 담임 프로필 병렬 쿼리
+  // 전체 학생 조회(isAllStudents) 시에는 URL 길이 제한을 피하기 위해 전체 대상 쿼리 실행
   const [trainingsResult, historyResult, teachersResult] = await Promise.all([
-    studentIds.length > 0
+    isAllStudents
       ? supabase
           .from('field_training_records')
           .select('id, student_id, training_order, company, start_date, end_date, stipend_status, hiring_status, conversion_date, return_reason')
-          .in('student_id', studentIds)
           .order('training_order', { ascending: false })
-      : Promise.resolve({ data: [] as any[], error: null }),
-    (baseYear && studentIds.length > 0)
-      ? supabase
-          .from('student_academic_history')
-          .select('id, student_id, major, class_info, student_number, teacher_name, grade')
-          .eq('academic_year', baseYear)
-          .in('student_id', studentIds)
+          .range(0, 5000)
+      : (studentIds.length > 0
+          ? supabase
+              .from('field_training_records')
+              .select('id, student_id, training_order, company, start_date, end_date, stipend_status, hiring_status, conversion_date, return_reason')
+              .in('student_id', studentIds)
+              .order('training_order', { ascending: false })
+          : Promise.resolve({ data: [] as any[], error: null })),
+    (baseYear && (isAllStudents || studentIds.length > 0))
+      ? (isAllStudents
+          ? supabase
+              .from('student_academic_history')
+              .select('id, student_id, major, class_info, student_number, teacher_name, grade')
+              .eq('academic_year', baseYear)
+              .range(0, 5000)
+          : supabase
+              .from('student_academic_history')
+              .select('id, student_id, major, class_info, student_number, teacher_name, grade')
+              .eq('academic_year', baseYear)
+              .in('student_id', studentIds))
       : Promise.resolve({ data: [] as any[], error: null }),
     supabase
       .from('profiles')
@@ -205,6 +243,9 @@ export async function getFilteredStudentData(graduationYear: string, baseYear?: 
   });
 
   return flattened.sort((a, b) => {
+    if (isAllStudents && a.graduation_year !== b.graduation_year) {
+      return (b.graduation_year || 0) - (a.graduation_year || 0);
+    }
     const indexA = MAJOR_SORT_ORDER.indexOf(a.major || '');
     const indexB = MAJOR_SORT_ORDER.indexOf(b.major || '');
     if (indexA !== indexB) return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
@@ -226,7 +267,7 @@ export async function getCachedFilteredStudentData(graduationYear: string, baseY
       [`filtered-student-data-${cacheKey}`],
       {
         revalidate: 86400,
-        tags: [`emp-status-${graduationYear}`, 'students', 'teachers']
+        tags: graduationYear === 'all' ? ['students', 'teachers'] : [`emp-status-${graduationYear}`, 'students', 'teachers']
       }
     );
     filteredStudentDataCacheMap.set(cacheKey, cachedFn);

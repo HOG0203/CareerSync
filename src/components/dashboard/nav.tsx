@@ -48,7 +48,9 @@ import {
   ArrowLeftRight,
   Plane,
   Trophy,
-  Calculator
+  Calculator,
+  School,
+  Building2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { handleClientLogout } from '@/lib/auth-helpers';
@@ -152,6 +154,13 @@ export default function Nav({
       ]
     },
     {
+      title: "입학지원",
+      icon: School,
+      items: [
+        { href: '/admission/middle-school-employment', label: '중학교별취업현황', icon: Building2 },
+      ]
+    },
+    {
       title: "학생 및 생활지도",
       icon: GraduationCap,
       items: [
@@ -211,6 +220,13 @@ export default function Nav({
       items: [
         { href: '/teaching-support/timetable', label: '시간표 조회/관리', icon: CalendarDays },
         { href: '/teaching-support/substitute', label: '결보강 처리', icon: ArrowLeftRight },
+      ]
+    },
+    {
+      title: "입학지원",
+      icon: School,
+      items: [
+        { href: '/admission/middle-school-employment', label: '중학교별취업현황', icon: Building2 },
       ]
     },
     {

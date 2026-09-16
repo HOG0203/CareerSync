@@ -37,6 +37,9 @@ export type StudentEmploymentData = {
   desired_work_area?: string;
   teacher_name?: string;
   grade?: number;
+  middle_school?: string;
+  admission_rank_percentile?: number | string;
+  admission_type?: string;
   training_records?: FieldTrainingRecord[];
 };
 

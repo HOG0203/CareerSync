@@ -16,7 +16,7 @@ async function getMasterAdminUsername(): Promise<string> {
 }
 
 /**
- * 교수학습지원 페이지 접근 권한 검사
+ * 교수학습지원 및 입학지원 페이지 접근 권한 검사
  * - 모든 교직원 및 관리자: 기본 접근 허용
  * - 사용자 관리에서 개별 권한이 지정된 경우 해당 설정 우선 준수
  * - 학생(student): 접근 불가

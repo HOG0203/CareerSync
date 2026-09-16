@@ -66,6 +66,7 @@ const ROUTE_MAP: Record<string, { group: string; label: string }> = {
   '/teaching-support/timetable': { group: '교수학습지원', label: '시간표 조회/관리' },
   '/teaching-support/substitute': { group: '교수학습지원', label: '결보강 처리' },
   '/teaching-support/substitute/admin': { group: '교수학습지원', label: '결보강 승인/관리' },
+  '/admission/middle-school-employment': { group: '입학지원', label: '중학교별취업현황' },
 };
 
 

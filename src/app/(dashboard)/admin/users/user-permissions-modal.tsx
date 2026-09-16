@@ -21,6 +21,7 @@ import {
   Award, 
   Settings,
   BookOpen,
+  School,
   Loader2,
   Info
 } from 'lucide-react';
@@ -51,6 +52,14 @@ export const ALL_SYSTEM_MENU_GROUPS = [
     items: [
       { href: '/teaching-support/timetable', label: '시간표 조회/관리', description: '전체/학급/교사별 주간 시간표 조회 및 관리' },
       { href: '/teaching-support/substitute', label: '결보강 처리', description: '대화형 결보강 배정, 교환 및 보강 신청/발급' },
+    ],
+  },
+  {
+    group: '입학지원',
+    icon: School,
+    color: 'text-teal-600',
+    items: [
+      { href: '/admission/middle-school-employment', label: '중학교별취업현황', description: '출신 중학교별 취업처 현황 및 입학성적 조회·관리' },
     ],
   },
   {

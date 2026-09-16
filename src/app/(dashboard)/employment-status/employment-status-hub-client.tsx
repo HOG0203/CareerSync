@@ -33,6 +33,9 @@ import { getMajorOrderIndex } from '@/lib/student-utils';
 import { cn } from '@/lib/utils';
 
 
+import { fetchYearlyRankings } from './actions';
+import { evaluateCustomRuleMatch } from '@/lib/custom-rule-evaluator';
+
 interface EmploymentStatusHubClientProps {
   initialData: StudentEmploymentData[];
   userProfile: any;
@@ -79,6 +82,26 @@ export function EmploymentStatusHubClient({
   // 자유 커스텀 조건 조합 검색 상태
   const [customRule, setCustomRule] = React.useState<CustomRule | null>(null);
   const [isCustomModalOpen, setIsCustomModalOpen] = React.useState(false);
+
+  // 성적/석차/출결 랭킹 요약 데이터 비동기 캐싱 (조건 조합 검색 출결/성적 평가용)
+  const [rankingMap, setRankingMap] = React.useState<Record<string, any>>({});
+
+  React.useEffect(() => {
+    if (!selectedYear) return;
+    let isMounted = true;
+    fetchYearlyRankings(parseInt(selectedYear), currentAY || 2026)
+      .then(rankings => {
+        if (isMounted) {
+          setRankingMap(rankings);
+        }
+      })
+      .catch(err => {
+        console.error('Failed to load yearly rankings for hub client:', err);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedYear, currentAY]);
 
   // 전체 데이터에서 고유 자격증 목록 추출 (모달 자동완성 힌트용)
   const allCertificates = React.useMemo(() => {
@@ -234,6 +257,15 @@ export function EmploymentStatusHubClient({
     }).length;
   }, [filteredData, searchQuery, isLowerGrade]);
 
+  // 4-2. 조건 조합 검색 시 매칭된 학생 수 계산
+  const customMatchedCount = React.useMemo(() => {
+    if (!customRule || !customRule.conditions || customRule.conditions.length === 0) return null;
+    return filteredData.filter((student) => {
+      const summary = rankingMap[student.id];
+      return evaluateCustomRuleMatch(student, customRule, summary);
+    }).length;
+  }, [filteredData, customRule, rankingMap]);
+
   // 5. 핵심 요약 통계 계산
   const stats = React.useMemo(() => {
     const total = filteredData.length;
@@ -295,28 +327,40 @@ export function EmploymentStatusHubClient({
         key={`stats-${currentAY}-${grade}-${selectedMajor}-${selectedClass}-${selectedStatus}`} 
         className="grid grid-cols-2 lg:grid-cols-4 gap-3 animate-in fade-in duration-200"
       >
-        {/* 카드 1: 조회 학생수 */}
+        {/* 카드 1: 조회 학생수 / 검색 및 조건조합 결과 학생수 */}
         <Card className="border-slate-200/80 shadow-2xs hover:shadow-sm transition-all rounded-2xl bg-white">
           <CardContent className="p-4 sm:p-5 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-[11px] sm:text-xs font-bold text-slate-500">
-                {searchMatchedCount !== null ? '검색 결과 학생수' : '조회 학생수'}
+                {customMatchedCount !== null 
+                  ? '조건 조합 일치 학생수' 
+                  : searchMatchedCount !== null 
+                    ? '검색 결과 학생수' 
+                    : '조회 학생수'}
               </p>
               <div className="flex items-baseline gap-1.5">
                 <span className="text-2xl sm:text-3xl font-black text-slate-900">
-                  {searchMatchedCount !== null ? searchMatchedCount : stats.total}
+                  {customMatchedCount !== null 
+                    ? customMatchedCount 
+                    : searchMatchedCount !== null 
+                      ? searchMatchedCount 
+                      : stats.total}
                 </span>
                 <span className="text-xs font-bold text-slate-500">
-                  명 {searchMatchedCount !== null && <span className="text-[11px] text-slate-400 font-normal">/ 전체 {stats.total}명</span>}
+                  명 {(customMatchedCount !== null || searchMatchedCount !== null) && (
+                    <span className="text-[11px] text-slate-400 font-normal">/ 전체 {stats.total}명</span>
+                  )}
                 </span>
               </div>
             </div>
             <div className={`h-10 w-10 sm:h-11 sm:w-11 rounded-2xl flex items-center justify-center border shrink-0 transition-colors ${
-              searchMatchedCount !== null 
-                ? 'bg-blue-600 text-white border-blue-600 shadow-xs' 
-                : 'bg-blue-50 text-blue-600 border-blue-100'
+              customMatchedCount !== null
+                ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                : searchMatchedCount !== null 
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-xs' 
+                  : 'bg-blue-50 text-blue-600 border-blue-100'
             }`}>
-              <Users className="h-5 w-5" />
+              {customMatchedCount !== null ? <Sparkles className="h-5 w-5" /> : <Users className="h-5 w-5" />}
             </div>
           </CardContent>
         </Card>
@@ -503,14 +547,17 @@ export function EmploymentStatusHubClient({
 
               {/* 조건 조합 활성화 시 배지 및 초기화 버튼 */}
               {customRule && (
-                <div className="flex items-center gap-1.5 bg-purple-50 px-2.5 py-1 rounded-xl border border-purple-200">
+                <div className="flex items-center gap-1.5 bg-purple-50 px-2.5 py-1 rounded-xl border border-purple-200 animate-in fade-in">
                   <span className="text-[11px] font-bold text-purple-800">
-                    ✨ {customRule.presetName ? `"${customRule.presetName}"` : `${customRule.conditions.length}개 조건 조합`} 강조 중
+                    ✨ {customRule.presetName ? `"${customRule.presetName}"` : `${customRule.conditions.length}개 조건 조합`} 강조 중:
+                  </span>
+                  <span className="text-[11px] font-extrabold text-purple-900 bg-purple-100/80 px-1.5 py-0.5 rounded-md">
+                    {customMatchedCount ?? 0}명
                   </span>
                   <button
                     type="button"
                     onClick={() => setCustomRule(null)}
-                    className="p-0.5 hover:bg-purple-200 rounded-full transition-colors text-purple-600"
+                    className="p-0.5 hover:bg-purple-200 rounded-full transition-colors text-purple-600 ml-0.5"
                     title="조건 조합 해제"
                   >
                     <X className="h-3 w-3" />
@@ -651,6 +698,8 @@ export function EmploymentStatusHubClient({
         allCertificates={allCertificates}
         allMajors={majorOptions}
         allCourses={courseOptions}
+        allStudents={filteredData}
+        rankingMap={rankingMap}
       />
     </div>
   );

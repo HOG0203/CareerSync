@@ -112,6 +112,10 @@ const DEFAULT_COURSES = [
   '일반취업', '기술사관', '군특성화', '운동부', '진학', '입대', '기타'
 ];
 
+import { StudentEmploymentData } from '@/lib/data';
+import { evaluateCustomRuleMatch } from '@/lib/custom-rule-evaluator';
+import { Users } from 'lucide-react';
+
 interface CustomCombinationModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -120,6 +124,8 @@ interface CustomCombinationModalProps {
   allCertificates?: string[];
   allMajors?: string[];
   allCourses?: string[];
+  allStudents?: StudentEmploymentData[];
+  rankingMap?: Record<string, any>;
 }
 
 export function CustomCombinationModal({
@@ -129,7 +135,9 @@ export function CustomCombinationModal({
   currentRule,
   allCertificates = [],
   allMajors = [],
-  allCourses = []
+  allCourses = [],
+  allStudents = [],
+  rankingMap = {}
 }: CustomCombinationModalProps) {
   const [operator, setOperator] = React.useState<'AND' | 'OR'>('AND');
   const [conditions, setConditions] = React.useState<ConditionItem[]>([]);
@@ -137,6 +145,18 @@ export function CustomCombinationModal({
   const [newPresetName, setNewPresetName] = React.useState('');
   const [isSavingPreset, setIsSavingPreset] = React.useState(false);
   const [directInputMap, setDirectInputMap] = React.useState<Record<string, boolean>>({});
+
+  // 실시간 조건 매칭 학생 수 계산
+  const previewMatchedCount = React.useMemo(() => {
+    if (!isOpen || allStudents.length === 0) return null;
+    const validConditions = conditions.filter(c => c.value && c.value.trim() !== '');
+    if (validConditions.length === 0) return null;
+    const tempRule: CustomRule = { operator, conditions: validConditions };
+    return allStudents.filter(student => {
+      const summary = rankingMap[student.id];
+      return evaluateCustomRuleMatch(student, tempRule, summary);
+    }).length;
+  }, [isOpen, allStudents, rankingMap, operator, conditions]);
 
   const effectiveMajors = React.useMemo(() => {
     if (allMajors && allMajors.length > 0) return allMajors;
@@ -733,14 +753,24 @@ export function CustomCombinationModal({
         </div>
 
         <DialogFooter className="p-4 bg-white border-t border-slate-100 flex flex-row items-center justify-between gap-2 shrink-0">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={handleReset}
-            className="text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100"
-          >
-            <RotateCcw className="h-3.5 w-3.5 mr-1" /> 필터 초기화
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleReset}
+              className="text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+            >
+              <RotateCcw className="h-3.5 w-3.5 mr-1" /> 필터 초기화
+            </Button>
+            {previewMatchedCount !== null && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-800 bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-xl animate-in fade-in">
+                <Users className="h-3.5 w-3.5 text-purple-600" />
+                <span>일치 학생:</span>
+                <span className="text-sm font-black text-purple-700">{previewMatchedCount}</span>명
+                <span className="text-[11px] text-slate-400 font-normal">/ 전체 {allStudents.length}명</span>
+              </span>
+            )}
+          </div>
           <div className="flex gap-2">
             <Button type="button" variant="outline" onClick={onClose} className="text-xs font-bold border-slate-200">
               취소
@@ -750,7 +780,8 @@ export function CustomCombinationModal({
               onClick={handleApply}
               className="text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-sm px-6"
             >
-              <Check className="h-4 w-4 mr-1" /> 하이라이트 적용
+              <Check className="h-4 w-4 mr-1" /> 
+              {previewMatchedCount !== null ? `${previewMatchedCount}명 하이라이트 적용` : '하이라이트 적용'}
             </Button>
           </div>
         </DialogFooter>
