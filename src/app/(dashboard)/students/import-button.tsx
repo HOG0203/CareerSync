@@ -95,10 +95,10 @@ export function ImportButton({ defaultMode = 'comprehensive' }: ImportButtonProp
     }
   }
 
-  // 1. 취업·실습 종합 서식 다운로드 (29개 컬럼 - 학번 제외)
+  // 1. 취업·실습 종합 서식 다운로드 (31개 컬럼 - 학번 제외)
   const downloadComprehensiveTemplate = () => {
-    const headers = "졸업연도,학과,반,번호,성명,휴대전화번호,진로희망,희망 기업유형,희망진로코스,병역희망,취업희망지역,학부모의견,신발사이즈,상의사이즈,비고,취업희망여부,최종진로코스,취업현황,기업구분,회사명,취득자격증,실습처(회사명),현장실습 시작일,현장실습 종료일,지원금 신청,채용전환,채용전환일,복교 유무,복교사유";
-    const sampleRow = "\n2027,자동화기계과,1,1,홍길동,010-1234-5678,대/공기업,공기업,청솔반,현역,대구,학생 의견 존중,270,100,성실함,예,청솔반,채용진행중,대기업,(주)한국정밀,전산응용기계제도기능사; 컴퓨터응용선반기능사,(주)한국정밀,2026-09-01,2026-12-31,O,O,2027-01-01,X,";
+    const headers = "졸업연도,학과,반,번호,성명,휴대전화번호,출신중학교,입학성적(석차백분율%),진로희망,희망 기업유형,희망진로코스,병역희망,취업희망지역,학부모의견,신발사이즈,상의사이즈,비고,취업희망여부,최종진로코스,취업현황,기업구분,회사명,취득자격증,실습처(회사명),현장실습 시작일,현장실습 종료일,지원금 신청,채용전환,채용전환일,복교 유무,복교사유";
+    const sampleRow = "\n2027,자동화기계과,1,1,홍길동,010-1234-5678,대구중학교,15.5,대/공기업,공기업,청솔반,현역,대구,학생 의견 존중,270,100,성실함,예,청솔반,채용진행중,대기업,(주)한국정밀,전산응용기계제도기능사; 컴퓨터응용선반기능사,(주)한국정밀,2026-09-01,2026-12-31,O,O,2027-01-01,X,";
 
     const BOM = '\uFEFF';
     const blob = new Blob([BOM + headers + sampleRow], { type: 'text/csv;charset=utf-8;' })
@@ -108,10 +108,10 @@ export function ImportButton({ defaultMode = 'comprehensive' }: ImportButtonProp
     link.click()
   }
 
-  // 2. 학생 기본 명부 서식 다운로드 (6개 간편 컬럼 - 학번 제외)
+  // 2. 학생 기본 명부 서식 다운로드 (8개 간편 컬럼 - 출신중, 입학성적 포함)
   const downloadBasicTemplate = () => {
-    const headers = "졸업연도,학과,반,번호,성명,휴대전화번호";
-    const sampleRow = "\n2027,자동화기계과,1,1,홍길동,010-1234-5678";
+    const headers = "졸업연도,학과,반,번호,성명,휴대전화번호,출신중학교,입학성적(석차백분율%)";
+    const sampleRow = "\n2027,자동화기계과,1,1,홍길동,010-1234-5678,대구중학교,15.5";
 
     const BOM = '\uFEFF';
     const blob = new Blob([BOM + headers + sampleRow], { type: 'text/csv;charset=utf-8;' })
@@ -176,7 +176,7 @@ export function ImportButton({ defaultMode = 'comprehensive' }: ImportButtonProp
                   취업·실습 종합 서식
                 </div>
                 <span className="text-[10px] text-slate-500 mt-0.5 font-medium">
-                  취업, 실습, 자격증 포함 (30개 항목)
+                  취업, 실습, 출신중, 입학성적 (31개 항목)
                 </span>
               </Button>
 
@@ -191,7 +191,7 @@ export function ImportButton({ defaultMode = 'comprehensive' }: ImportButtonProp
                   기본 명부 간편 서식
                 </div>
                 <span className="text-[10px] text-slate-500 mt-0.5 font-medium">
-                  학번, 성명, 학과, 연락처 (7개 항목)
+                  성명, 학과, 출신중, 입학성적 (8개 항목)
                 </span>
               </Button>
             </div>

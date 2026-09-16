@@ -104,7 +104,7 @@ export function PromotionImportButton({ currentData, baseYear }: PromotionImport
       <DialogTrigger asChild>
         <Button size="sm" className="h-8 sm:h-9 px-1.5 sm:px-3 text-[11px] sm:text-xs font-bold bg-emerald-600 hover:bg-emerald-700 shadow-xs shrink-0">
           <ArrowRight className="mr-1 sm:mr-1.5 h-3.5 w-3.5 shrink-0" />
-          <span><span className="hidden xs:inline">엑셀 </span>일괄진급/신입생등록</span>
+          <span><span className="hidden xs:inline">엑셀 </span>일괄진급</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[450px] rounded-2xl p-0 overflow-hidden border-none shadow-2xl flex flex-col">
@@ -115,10 +115,10 @@ export function PromotionImportButton({ currentData, baseYear }: PromotionImport
             </div>
             <div className="flex flex-col text-left min-w-0">
               <DialogTitle className="text-base sm:text-lg font-black flex items-center gap-2 text-slate-900 truncate">
-                학생 일괄 진급 및 출신중학교 등록
+                학생 일괄 진급
               </DialogTitle>
               <DialogDescription className="text-slate-500 text-[11px] sm:text-xs font-bold uppercase tracking-wide mt-0.5 truncate">
-                엑셀 데이터 기반 신규 학반 진급 및 출신중학교 업로드
+                엑셀 데이터 기반 신규 학반 진급 업로드
               </DialogDescription>
             </div>
           </div>

@@ -336,12 +336,15 @@ export async function bulkPromoteFromExcel(csvData: string) {
 
 
 /**
- * [취업·실습 종합 서식] 29개 컬럼 엑셀 CSV 업로드 (학번 불필요, 자동 매칭/채번)
+ * [취업·실습 종합 서식] 엑셀 CSV 업로드 (학번 불필요, 자동 매칭/채번, 출신중/입학성적 포함 지원)
  */
 export async function uploadStudentsCSV(csvData: string) {
   const supabase = await createClient()
   const parsedRows = parseCSVText(csvData);
   if (parsedRows.length <= 1) return { success: false, count: 0, error: '데이터 행이 없습니다.' };
+
+  const headerRow = parsedRows[0].map(h => h.trim());
+  const hasMiddleSchoolHeader = headerRow.some(h => h.includes('출신중'));
 
   const dataRows = parsedRows.slice(1);
   const settings = await getSystemSettings()
@@ -355,6 +358,14 @@ export async function uploadStudentsCSV(csvData: string) {
     const class_info = values[2] || null;
     const student_number = values[3] || null;
     const student_name = values[4] || null;
+
+    // 헤더에 출신중학교가 포함되어 있거나 31개 이상 컬럼인 경우 Offset 적용
+    const isExtended = values.length >= 31 || hasMiddleSchoolHeader;
+    const offset = isExtended ? 2 : 0;
+
+    const middle_school = isExtended ? (values[6]?.trim() || null) : null;
+    const rawPercentile = isExtended ? (values[7]?.trim() || null) : null;
+    const admission_rank_percentile = rawPercentile && !isNaN(parseFloat(rawPercentile)) ? parseFloat(rawPercentile) : null;
 
     // 기존 학생 조회 (졸업연도 + 학과 + 반 + 번호 기반 매칭)
     let matchedStudentId: string | null = null;
@@ -374,7 +385,7 @@ export async function uploadStudentsCSV(csvData: string) {
       }
     }
 
-    const certificates = values[20] ? values[20].split(';').map(c => c.trim()).filter(Boolean) : [];
+    const certificates = values[20 + offset] ? values[20 + offset].split(';').map(c => c.trim()).filter(Boolean) : [];
 
     const studentPayload: any = {
       graduation_year,
@@ -383,18 +394,25 @@ export async function uploadStudentsCSV(csvData: string) {
       student_number,
       student_name,
       phone_number: values[5] || null,
-      career_aspiration: values[6] || null,
-      special_notes: values[7] || null,
-      career_course: values[8] || null,
-      military_status: values[9] || null,
-      desired_work_area: values[10] || null,
-      parents_opinion: values[11] || null,
-      shoe_size: values[12] || null,
-      top_size: values[13] || null,
-      personal_remarks: values[14] || null,
+      career_aspiration: values[6 + offset] || null,
+      special_notes: values[7 + offset] || null,
+      career_course: values[8 + offset] || null,
+      military_status: values[9 + offset] || null,
+      desired_work_area: values[10 + offset] || null,
+      parents_opinion: values[11 + offset] || null,
+      shoe_size: values[12 + offset] || null,
+      top_size: values[13 + offset] || null,
+      personal_remarks: values[14 + offset] || null,
       certificates,
       updated_at: new Date().toISOString()
     };
+
+    if (middle_school !== null && middle_school !== undefined) {
+      studentPayload.middle_school = middle_school;
+    }
+    if (admission_rank_percentile !== null && admission_rank_percentile !== undefined) {
+      studentPayload.admission_rank_percentile = admission_rank_percentile;
+    }
 
     let student: any = null;
 
@@ -424,32 +442,32 @@ export async function uploadStudentsCSV(csvData: string) {
     // 취업 정보 업서트
     await supabase.from('student_employments').upsert({
       id: student.id,
-      is_desiring_employment: values[15] || '예',
-      employment_status: values[16] || null, // 최종진로코스
-      business_type: values[17] || '아니오',  // 취업현황
-      company_type: values[18] || null,
-      company: values[19] || null,
+      is_desiring_employment: values[15 + offset] || '예',
+      employment_status: values[16 + offset] || null, // 최종진로코스
+      business_type: values[17 + offset] || '아니오',  // 취업현황
+      company_type: values[18 + offset] || null,
+      company: values[19 + offset] || null,
       updated_at: new Date().toISOString()
     }, { onConflict: 'id' });
 
     // 실습 정보 업서트
-    const trainingCompany = values[21];
-    const startDate = normalizeDate(values[22]);
-    const endDate = normalizeDate(values[23]);
+    const trainingCompany = values[21 + offset];
+    const startDate = normalizeDate(values[22 + offset]);
+    const endDate = normalizeDate(values[23 + offset]);
     if (trainingCompany || startDate || endDate) {
-      const isConversion = values[25] === 'O' || values[25] === '예' || values[25] === '채용전환';
-      const isReturned = values[27] === 'O' || values[27] === '예' || values[27] === '복교';
+      const isConversion = values[25 + offset] === 'O' || values[25 + offset] === '예' || values[25 + offset] === '채용전환';
+      const isReturned = values[27 + offset] === 'O' || values[27 + offset] === '예' || values[27 + offset] === '복교';
 
       await supabase.from('field_training_records').upsert({
         student_id: student.id,
         training_order: 1,
-        company: trainingCompany || values[19] || '미지정',
+        company: trainingCompany || values[19 + offset] || '미지정',
         start_date: startDate,
         end_date: endDate,
-        stipend_status: values[24] || 'X',
+        stipend_status: values[24 + offset] || 'X',
         hiring_status: isConversion ? '채용전환' : (isReturned ? '복교' : '진행중'),
-        conversion_date: normalizeDate(values[26]),
-        return_reason: values[28] || null,
+        conversion_date: normalizeDate(values[26 + offset]),
+        return_reason: values[28 + offset] || null,
         updated_at: new Date().toISOString()
       }, { onConflict: 'student_id, training_order' });
     }
@@ -466,12 +484,16 @@ export async function uploadStudentsCSV(csvData: string) {
 }
 
 /**
- * [학생 기본 명부 서식] 6개 간편 컬럼 엑셀 CSV 업로드 (admin/students 전용, 학번 불필요)
+ * [학생 기본 명부 서식] 엑셀 CSV 업로드 (admin/students 전용, 학번 불필요, 출신중/입학성적 지원)
  */
 export async function uploadBasicStudentsCSV(csvData: string) {
   const supabase = await createClient()
   const parsedRows = parseCSVText(csvData);
   if (parsedRows.length <= 1) return { success: false, count: 0, error: '데이터 행이 없습니다.' };
+
+  const headerRow = parsedRows[0].map(h => h.trim());
+  const msHeaderIdx = headerRow.findIndex(h => h.includes('출신중'));
+  const rankHeaderIdx = headerRow.findIndex(h => h.includes('입학성적') || h.includes('석차백분율'));
 
   const dataRows = parsedRows.slice(1);
   const settings = await getSystemSettings()
@@ -486,6 +508,20 @@ export async function uploadBasicStudentsCSV(csvData: string) {
     const student_number = values[3] || null;
     const student_name = values[4] || null;
     const phone_number = values[5] || null;
+
+    let middle_school: string | null = null;
+    if (msHeaderIdx !== -1) {
+      middle_school = values[msHeaderIdx]?.trim() || null;
+    } else if (values.length >= 7) {
+      middle_school = values[6]?.trim() || null;
+    }
+
+    let admission_rank_percentile: number | null = null;
+    const rawRank = rankHeaderIdx !== -1 ? values[rankHeaderIdx]?.trim() : (values.length >= 8 ? values[7]?.trim() : null);
+    if (rawRank) {
+      const parsed = parseFloat(rawRank);
+      if (!isNaN(parsed)) admission_rank_percentile = parsed;
+    }
 
     // 기존 학생 매칭
     let matchedStudentId: string | null = null;
@@ -514,6 +550,13 @@ export async function uploadBasicStudentsCSV(csvData: string) {
       phone_number,
       updated_at: new Date().toISOString()
     };
+
+    if (middle_school !== null && middle_school !== undefined) {
+      studentPayload.middle_school = middle_school;
+    }
+    if (admission_rank_percentile !== null && admission_rank_percentile !== undefined) {
+      studentPayload.admission_rank_percentile = admission_rank_percentile;
+    }
 
     let student: any = null;
 
