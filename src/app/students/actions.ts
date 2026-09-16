@@ -417,15 +417,29 @@ export async function uploadStudentsCSV(csvData: string) {
     let student: any = null;
 
     if (matchedStudentId) {
-      const { data: updated, error: uError } = await supabase
+      let { data: updated, error: uError } = await supabase
         .from('students')
         .update(studentPayload)
         .eq('id', matchedStudentId)
         .select('id, graduation_year, major, class_info, student_number')
         .single();
+
+      if (uError && (uError.message.includes('middle_school') || uError.message.includes('admission_rank_percentile'))) {
+        delete studentPayload.middle_school;
+        delete studentPayload.admission_rank_percentile;
+        const retry = await supabase
+          .from('students')
+          .update(studentPayload)
+          .eq('id', matchedStudentId)
+          .select('id, graduation_year, major, class_info, student_number')
+          .single();
+        updated = retry.data;
+        uError = retry.error;
+      }
+
       if (!uError && updated) student = updated;
     } else {
-      const { data: inserted, error: iError } = await supabase
+      let { data: inserted, error: iError } = await supabase
         .from('students')
         .insert([{
           ...studentPayload,
@@ -433,6 +447,22 @@ export async function uploadStudentsCSV(csvData: string) {
         }])
         .select('id, graduation_year, major, class_info, student_number')
         .single();
+
+      if (iError && (iError.message.includes('middle_school') || iError.message.includes('admission_rank_percentile'))) {
+        delete studentPayload.middle_school;
+        delete studentPayload.admission_rank_percentile;
+        const retry = await supabase
+          .from('students')
+          .insert([{
+            ...studentPayload,
+            student_id: crypto.randomUUID(),
+          }])
+          .select('id, graduation_year, major, class_info, student_number')
+          .single();
+        inserted = retry.data;
+        iError = retry.error;
+      }
+
       if (!iError && inserted) student = inserted;
     }
 
@@ -561,19 +591,46 @@ export async function uploadBasicStudentsCSV(csvData: string) {
     let student: any = null;
 
     if (matchedStudentId) {
-      const { data: updated, error: uError } = await supabase
+      let { data: updated, error: uError } = await supabase
         .from('students')
         .update(studentPayload)
         .eq('id', matchedStudentId)
         .select('id, graduation_year, major, class_info, student_number')
         .single();
+
+      if (uError && (uError.message.includes('middle_school') || uError.message.includes('admission_rank_percentile'))) {
+        delete studentPayload.middle_school;
+        delete studentPayload.admission_rank_percentile;
+        const retry = await supabase
+          .from('students')
+          .update(studentPayload)
+          .eq('id', matchedStudentId)
+          .select('id, graduation_year, major, class_info, student_number')
+          .single();
+        updated = retry.data;
+        uError = retry.error;
+      }
+
       if (!uError && updated) student = updated;
     } else {
-      const { data: inserted, error: iError } = await supabase
+      let { data: inserted, error: iError } = await supabase
         .from('students')
         .insert([studentPayload])
         .select('id, graduation_year, major, class_info, student_number')
         .single();
+
+      if (iError && (iError.message.includes('middle_school') || iError.message.includes('admission_rank_percentile'))) {
+        delete studentPayload.middle_school;
+        delete studentPayload.admission_rank_percentile;
+        const retry = await supabase
+          .from('students')
+          .insert([studentPayload])
+          .select('id, graduation_year, major, class_info, student_number')
+          .single();
+        inserted = retry.data;
+        iError = retry.error;
+      }
+
       if (!iError && inserted) student = inserted;
     }
 
