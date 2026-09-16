@@ -609,6 +609,162 @@ export function BatchExchangeDrawer({
     });
   }, [items, timetableData.teachers, currentTeacher, selectedWeek, selectedWeekNum, currentTeacherName, effectiveExistingApplications, calendarConfig]);
 
+  // 보강 모드 드롭다운 교사 목록 (전체 교사 포함, 추천 교사 최상단 배치)
+  const allSubstituteTeachers = React.useMemo(() => {
+    if (items.length === 0) return [];
+
+    const targetDept = items[0]?.deptName;
+
+    const list = timetableData.teachers
+      .filter(t => t.teacherName !== currentTeacherName)
+      .map(t => {
+        const availableCoverCount = items.filter(it => {
+          return isTeacherFreeOnDateAndPeriod(
+            t.teacherName,
+            it.sourceDate,
+            it.sourcePeriod,
+            timetableData,
+            effectiveExistingApplications,
+            undefined,
+            calendarConfig
+          );
+        }).length;
+
+        const is100PercentFree = availableCoverCount === items.length && items.length > 0;
+
+        const isSameSubject = Boolean(
+          currentTeacher?.subjectGroup && t.subjectGroup && currentTeacher.subjectGroup === t.subjectGroup
+        );
+
+        const isSameDept = Boolean(
+          isSameSubject ||
+          (targetDept && (
+            (t.subjectGroup && targetDept.includes(t.subjectGroup)) ||
+            t.remarks?.includes(targetDept) || 
+            t.homeroomClass?.includes(targetDept.charAt(0))
+          ))
+        );
+
+        let score = availableCoverCount * 100;
+        if (is100PercentFree) score += 200;
+        if (isSameSubject) score += 500;
+        else if (isSameDept) score += 150;
+
+        return {
+          teacherName: t.teacherName,
+          subjectGroup: t.subjectGroup,
+          homeroomClass: t.homeroomClass,
+          isSameSubject,
+          isSameDept,
+          availableCoverCount,
+          is100PercentFree,
+          score,
+        };
+      });
+
+    return list.sort((a, b) => {
+      if (a.is100PercentFree && !b.is100PercentFree) return -1;
+      if (!a.is100PercentFree && b.is100PercentFree) return 1;
+      return b.availableCoverCount - a.availableCoverCount ||
+        (b.isSameSubject ? 1 : 0) - (a.isSameSubject ? 1 : 0) ||
+        b.score - a.score ||
+        a.teacherName.localeCompare(b.teacherName, 'ko');
+    });
+  }, [items, timetableData.teachers, currentTeacher, currentTeacherName, effectiveExistingApplications, calendarConfig]);
+
+  // 수업 교체 모드 드롭다운 교사 목록 (전체 교사 포함, 추천 교사 최상단 배치)
+  const allPartnerTeachers = React.useMemo(() => {
+    if (items.length === 0) return [];
+
+    const targetClassCodes = new Set(items.map(i => i.classCode).filter(Boolean));
+    const firstItem = items[0];
+
+    const list = timetableData.teachers
+      .filter(partner => partner.teacherName !== currentTeacherName)
+      .map(partner => {
+        const isFreeOnAllSource = items.every(it => {
+          return isTeacherFreeOnDateAndPeriod(
+            partner.teacherName,
+            it.sourceDate,
+            it.sourcePeriod,
+            timetableData,
+            effectiveExistingApplications,
+            undefined,
+            calendarConfig
+          );
+        });
+
+        let sameClassCount = 0;
+        let bestClass: string | undefined;
+
+        DAYS.forEach(d => {
+          const targetDate = selectedWeek.dates[d] || getDateForDayInSameWeek(baseDate, d);
+          const vacation = getVacationForDate(targetDate, calendarConfig);
+          if (vacation) return;
+
+          for (let p = 1; p <= 7; p++) {
+            const isCurrentFree = isTeacherFreeOnDateAndPeriod(
+              currentTeacherName,
+              targetDate,
+              p,
+              timetableData,
+              existingApplications,
+              undefined,
+              calendarConfig
+            );
+            if (!isCurrentFree) continue;
+
+            const pEff = getEffectiveSlotForTeacher(
+              partner.teacherName,
+              targetDate,
+              p,
+              timetableData,
+              existingApplications,
+              calendarConfig
+            );
+            if (!pEff.hasClass || pEff.isTeacherEvent || pEff.isClassEventFree || pEff.isInstructorAssigned) continue;
+
+            const examInfo = getExamSlotInfo(targetDate, p, pEff.classCode, calendarConfig);
+            if (examInfo?.isExamRunning || examInfo?.isDismissed) continue;
+
+            const isSameClass = targetClassCodes.has(pEff.classCode || '');
+            if (isSameClass) {
+              sameClassCount++;
+              if (!bestClass) bestClass = pEff.classCode;
+            }
+          }
+        });
+
+        const isSameSubject = checkIsSameSubject(firstItem?.subjectName, currentTeacher, partner);
+        const isSameDept = checkIsSameDept(firstItem?.deptName, firstItem?.classCode, currentTeacher, partner);
+        const hasSameClass = sameClassCount > 0;
+
+        let totalScore = sameClassCount * 10 + (isSameSubject ? 100 : 0) + (isSameDept ? 30 : 0) + (isFreeOnAllSource ? 50 : 0);
+
+        return {
+          teacherName: partner.teacherName,
+          homeroomClass: partner.homeroomClass,
+          isSameSubject,
+          isSameDept,
+          isFreeOnAllSource,
+          hasSameClass,
+          sameClassCount,
+          totalScore,
+        };
+      });
+
+    return list.sort((a, b) => {
+      if (a.hasSameClass && !b.hasSameClass) return -1;
+      if (!a.hasSameClass && b.hasSameClass) return 1;
+      if (a.isFreeOnAllSource && !b.isFreeOnAllSource) return -1;
+      if (!a.isFreeOnAllSource && b.isFreeOnAllSource) return 1;
+      if (a.isSameSubject && !b.isSameSubject) return -1;
+      if (!a.isSameSubject && b.isSameSubject) return 1;
+      return b.totalScore - a.totalScore || a.teacherName.localeCompare(b.teacherName, 'ko');
+    });
+  }, [items, timetableData.teachers, currentTeacher, selectedWeek, currentTeacherName, effectiveExistingApplications, calendarConfig, existingApplications, baseDate]);
+
+
   // 파트너 교사 변경 핸들러
   const handleSelectPartner = (teacherName: string) => {
     setPartnerTeacher(teacherName);
@@ -872,10 +1028,24 @@ export function BatchExchangeDrawer({
                     <SelectValue placeholder="선생님 선택..." />
                   </SelectTrigger>
                   <SelectContent className="max-h-60">
-                    {filteredPartnerTeachers.map(t => (
+                    {allPartnerTeachers.map(t => (
                       <SelectItem key={t.teacherName} value={t.teacherName} className="text-xs font-bold">
                         <span>{t.teacherName} 선생님</span>
+                        {t.hasSameClass ? (
+                          <span className="ml-1 text-[9.5px] px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-900 font-black border border-indigo-200">
+                            ★ 맞교환 가능({t.sameClassCount}개)
+                          </span>
+                        ) : t.isSameSubject ? (
+                          <span className="ml-1 text-[9.5px] px-1.5 py-0.2 rounded bg-blue-100 text-blue-900 font-black border border-blue-200">
+                            동일교과
+                          </span>
+                        ) : t.isSameDept ? (
+                          <span className="ml-1 text-[9.5px] px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-900 font-black border border-emerald-200">
+                            동일학과
+                          </span>
+                        ) : null}
                         {t.homeroomClass && <span className="ml-1 text-[10px] text-indigo-600 font-bold">({t.homeroomClass})</span>}
+                        {!t.isFreeOnAllSource && <span className="ml-1 text-[9.5px] text-rose-500 font-medium">(수업중)</span>}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1328,9 +1498,20 @@ export function BatchExchangeDrawer({
                     <SelectValue placeholder="보강 교사 선택..." />
                   </SelectTrigger>
                   <SelectContent className="max-h-60">
-                    {topSubstituteRecommendations.map(t => (
+                    {allSubstituteTeachers.map(t => (
                       <SelectItem key={t.teacherName} value={t.teacherName} className="text-xs font-bold">
                         <span>{t.teacherName} 선생님</span>
+                        {t.is100PercentFree ? (
+                          <span className="ml-1.5 text-[9.5px] px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-900 font-black border border-emerald-200">
+                            ★ 100% 공강 (추천)
+                          </span>
+                        ) : t.availableCoverCount > 0 ? (
+                          <span className="ml-1.5 text-[9.5px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 font-bold border border-amber-200">
+                            {t.availableCoverCount}/{items.length}교시 가능
+                          </span>
+                        ) : (
+                          <span className="ml-1.5 text-[9.5px] text-rose-500 font-medium">(수업/행사중)</span>
+                        )}
                         {t.homeroomClass && <span className="ml-1 text-[10px] text-emerald-600 font-bold">({t.homeroomClass})</span>}
                       </SelectItem>
                     ))}
