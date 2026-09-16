@@ -561,8 +561,11 @@ const getGraduationYearsCached = unstable_cache(
   async () => {
     const supabase = createAdminClient();
     const { data } = await supabase.from('students').select('graduation_year');
-    if (!data) return [];
-    const years = Array.from(new Set(data.map(d => d.graduation_year))).filter((y): y is number => y !== null);
+    const years = Array.from(new Set((data || []).map(d => d.graduation_year))).filter((y): y is number => y !== null);
+    // 기본 졸업연도 범위(2022년~2028년) 보장하여 과거/미래 학년도 조회가 항상 가능하도록 설정
+    for (let y = 2022; y <= 2028; y++) {
+      if (!years.includes(y)) years.push(y);
+    }
     return years.sort((a, b) => b - a);
   },
   ['graduation-years'],

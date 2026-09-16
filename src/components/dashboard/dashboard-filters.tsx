@@ -118,6 +118,11 @@ export default function DashboardFilters({
     const years = new Set<number>();
     graduationYears.forEach(gy => years.add(gy - 1));
     years.add(baseYear);
+    // 2021학년도부터 현재 baseYear까지 항상 선택 가능하도록 기본 연도 범위(baseYear - 5 ~ baseYear + 1) 보장
+    const minYear = Math.min(2021, baseYear - 5);
+    for (let y = minYear; y <= baseYear + 1; y++) {
+      years.add(y);
+    }
     return Array.from(years).sort((a, b) => b - a);
   }, [graduationYears, baseYear]);
 
