@@ -98,6 +98,9 @@ export async function updatePersonalDetail(id: string, field: string, value: any
     } catch (e) {}
   })();
 
+  const { clearAssignedStudentDetailsCache } = await import('@/lib/data');
+  await clearAssignedStudentDetailsCache();
+
   revalidateTag('students')
   revalidateTag('middle-school-employment')
   revalidatePath('/class-management')
@@ -138,6 +141,9 @@ export async function bulkUpdatePersonalDetails(updates: { id: string, field: st
     const chunk = studentRecords.slice(i, i + 100);
     await supabase.from('students').upsert(chunk, { onConflict: 'id' });
   }
+
+  const { clearAssignedStudentDetailsCache } = await import('@/lib/data');
+  await clearAssignedStudentDetailsCache();
 
   revalidateTag('students')
   revalidateTag('middle-school-employment')
