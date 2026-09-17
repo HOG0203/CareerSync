@@ -77,20 +77,8 @@ async function fetchDashboardStudentData(graduationYear: string): Promise<Studen
 
 const dashboardStudentDataCacheMap = new Map<string, ReturnType<typeof unstable_cache>>();
 
-export async function getDashboardStudentData(graduationYear: string): Promise<StudentEmploymentData[]> {
-  const cacheKey = graduationYear;
-  if (!dashboardStudentDataCacheMap.has(cacheKey)) {
-    const cachedFn = unstable_cache(
-      async () => fetchDashboardStudentData(graduationYear),
-      [`dashboard-student-data-${cacheKey}`],
-      {
-        revalidate: 86400,
-        tags: [`dashboard-${graduationYear}`, 'students']
-      }
-    );
-    dashboardStudentDataCacheMap.set(cacheKey, cachedFn);
-  }
-  return dashboardStudentDataCacheMap.get(cacheKey)!();
+export async function getDashboardStudentData(graduationYear: string, baseYear?: number): Promise<StudentEmploymentData[]> {
+  return getCachedFilteredStudentData(graduationYear, baseYear);
 }
 
 
