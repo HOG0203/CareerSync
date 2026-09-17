@@ -12,8 +12,9 @@ import { FieldTrainingModal } from './field-training-modal'
 const GET_CAREER_COURSE_OPTIONS = (rowData: any) => {
   const aspiration = rowData?.career_aspiration;
   
-  if (aspiration === '취업') {
+  if (aspiration === '취업' || !aspiration) {
     return [
+      { label: '(미지정/선택해제)', value: 'CLEARED' },
       { label: '대/공기업', value: '대/공기업' },
       { label: '공무원', value: '공무원' },
       { label: '중견/강소기업', value: '중견/강소기업' },
@@ -23,8 +24,10 @@ const GET_CAREER_COURSE_OPTIONS = (rowData: any) => {
     ];
   }
   
-  // 제외인정자나 진학일 경우 기업유형 선택 안함
-  return [];
+  return [
+    { label: '해당없음', value: 'CLEARED' },
+    { label: '기타(직접입력)', value: '기타(직접입력)' },
+  ];
 }
 
 // 행 데이터 기반 동적 세부 진로코스 옵션 생성 함수
@@ -33,6 +36,7 @@ const GET_SPECIFIC_COURSE_OPTIONS = (rowData: any) => {
 
   if (aspiration === '취업') {
     return [
+      { label: '(미지정/선택해제)', value: 'CLEARED' },
       { label: '청솔반', value: '청솔반' },
       { label: '취업맞춤반', value: '취업맞춤반' },
       { label: '중견기업반', value: '중견기업반' },
@@ -49,6 +53,7 @@ const GET_SPECIFIC_COURSE_OPTIONS = (rowData: any) => {
 
   if (aspiration === '제외인정자') {
     return [
+      { label: '(미지정/선택해제)', value: 'CLEARED' },
       { label: '군특성화', value: '군특성화' },
       { label: '기술사관', value: '기술사관' },
       { label: '운동부', value: '운동부' },
@@ -58,13 +63,30 @@ const GET_SPECIFIC_COURSE_OPTIONS = (rowData: any) => {
 
   if (aspiration === '진학') {
     return [
+      { label: '(미지정/선택해제)', value: 'CLEARED' },
       { label: '전문대학', value: '전문대학' },
       { label: '4년제대학', value: '4년제대학' },
       { label: '기타(직접입력)', value: '기타(직접입력)' },
     ];
   }
 
-  return [];
+  // 진로희망이 아직 비어있을 때도 전체 주요 코스 선택 지원
+  return [
+    { label: '(미지정/선택해제)', value: 'CLEARED' },
+    { label: '청솔반', value: '청솔반' },
+    { label: '취업맞춤반', value: '취업맞춤반' },
+    { label: '중견기업반', value: '중견기업반' },
+    { label: '반도체아카데미반', value: '반도체아카데미반' },
+    { label: '혁신인재반', value: '혁신인재반' },
+    { label: '부사관반', value: '부사관반' },
+    { label: '일학습병행', value: '일학습병행' },
+    { label: '도제반', value: '도제반' },
+    { label: '아우스빌둥', value: '아우스빌둥' },
+    { label: '군특성화', value: '군특성화' },
+    { label: '전문대학', value: '전문대학' },
+    { label: '4년제대학', value: '4년제대학' },
+    { label: '기타(직접입력)', value: '기타(직접입력)' },
+  ];
 }
 
 // 학생 관리 컬럼 정의
@@ -80,6 +102,7 @@ const COLUMNS: ColumnConfig[] = [
     width: 70, 
     type: 'select',
     options: [
+      { label: '(미지정/선택해제)', value: 'CLEARED' },
       { label: '취업', value: '취업' },
       { label: '진학', value: '진학' },
       { label: '제외인정자', value: '제외인정자' },

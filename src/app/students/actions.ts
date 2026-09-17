@@ -1001,12 +1001,17 @@ export async function bulkUpdateStudentData(updates: { id: string, field: string
     }
   }
 
-  // Chunk 단위 Bulk Upsert (students)
+  // Chunk 단위 학생 기본 정보 업데이트 (students) - not-null 제약조건 오류 방지 위해 update 적용
   if (studentsMap.size > 0) {
-    const studentRecords = Array.from(studentsMap.values());
-    for (let i = 0; i < studentRecords.length; i += 100) {
-      const chunk = studentRecords.slice(i, i + 100);
-      await supabase.from('students').upsert(chunk, { onConflict: 'id' });
+    const updatePromises = Array.from(studentsMap.entries()).map(([id, record]) => {
+      const { id: _, ...fields } = record;
+      return supabase.from('students').update(fields).eq('id', id);
+    });
+    const results = await Promise.all(updatePromises);
+    const err = results.find(r => r.error);
+    if (err?.error) {
+      console.error('Bulk update students error:', err.error);
+      return { success: false, error: err.error.message };
     }
   }
 
