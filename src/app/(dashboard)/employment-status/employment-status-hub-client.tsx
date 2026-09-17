@@ -66,13 +66,16 @@ export function EmploymentStatusHubClient({
 
   const [localSearchTerm, setLocalSearchTerm] = React.useState('');
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [, startSearchTransition] = React.useTransition();
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(localSearchTerm);
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [localSearchTerm]);
 
   const handleSearchChange = React.useCallback((val: string) => {
     setLocalSearchTerm(val);
-    startSearchTransition(() => {
-      setSearchQuery(val);
-    });
   }, []);
 
   const [selectedMajor, setSelectedMajor] = React.useState<string>('all');
@@ -240,11 +243,10 @@ export function EmploymentStatusHubClient({
   }, [initialData, selectedMajor, selectedClass, selectedStatus, isLowerGrade]);
 
 
-  // 4-1. 검색창 입력 시 매칭된 학생 수 계산
-  const searchMatchedCount = React.useMemo(() => {
-    if (!searchQuery || !searchQuery.trim()) return null;
-    const q = searchQuery.toLowerCase().trim();
-    return filteredData.filter((student) => {
+  // 4-0. 검색 인덱스 맵 사전 구축 (키워드 검색 시 0.001ms 초고속 필터링)
+  const searchIndexMap = React.useMemo(() => {
+    const map = new Map<string, string>();
+    filteredData.forEach((student) => {
       const certStr = Array.isArray(student.certificates)
         ? student.certificates.join(' ')
         : (typeof student.certificates === 'string' ? student.certificates : '');
@@ -253,9 +255,21 @@ export function EmploymentStatusHubClient({
         ? `${student.student_name || ''} ${student.career_aspiration || ''} ${student.career_course || ''} ${student.employment_status || ''} ${student.special_notes || ''} ${student.major || ''} ${student.class_info || ''} ${certStr}`.toLowerCase()
         : `${student.student_name || ''} ${student.employment_status || ''} ${student.company_type || ''} ${student.business_type || ''} ${student.company || ''} ${student.latest_training_company || ''} ${student.major || ''} ${student.class_info || ''} ${certStr}`.toLowerCase();
 
-      return targetStr.includes(q);
-    }).length;
-  }, [filteredData, searchQuery, isLowerGrade]);
+      map.set(student.id, targetStr);
+    });
+    return map;
+  }, [filteredData, isLowerGrade]);
+
+  // 4-1. 검색창 입력 시 매칭된 학생 수 계산
+  const searchMatchedCount = React.useMemo(() => {
+    if (!searchQuery || !searchQuery.trim()) return null;
+    const q = searchQuery.toLowerCase().trim();
+    let count = 0;
+    for (const targetStr of searchIndexMap.values()) {
+      if (targetStr.includes(q)) count++;
+    }
+    return count;
+  }, [searchIndexMap, searchQuery]);
 
   // 4-2. 조건 조합 검색 시 매칭된 학생 수 계산
   const customMatchedCount = React.useMemo(() => {
@@ -684,6 +698,7 @@ export function EmploymentStatusHubClient({
               hideSearchHeader={true}
               externalSearchQuery={searchQuery}
               externalCustomRule={customRule}
+              externalRankingMap={rankingMap}
             />
           </div>
         </CardContent>

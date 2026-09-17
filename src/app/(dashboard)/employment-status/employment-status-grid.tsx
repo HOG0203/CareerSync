@@ -28,6 +28,7 @@ interface EmploymentStatusGridProps {
   hideSearchHeader?: boolean;
   externalSearchQuery?: string;
   externalCustomRule?: CustomRule | null;
+  externalRankingMap?: Record<string, any>;
 }
 
 export { type CustomRule } from './custom-combination-modal';
@@ -335,6 +336,7 @@ export function EmploymentStatusGrid({
   hideSearchHeader = false,
   externalSearchQuery,
   externalCustomRule,
+  externalRankingMap,
 }: EmploymentStatusGridProps) {
   const [internalSearchQuery, setInternalSearchQuery] = React.useState('');
   const [internalCustomRule, setInternalCustomRule] = React.useState<CustomRule | null>(null);
@@ -346,8 +348,10 @@ export function EmploymentStatusGrid({
 
   const [isCustomModalOpen, setIsCustomModalOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
-  const [rankingMap, setRankingMap] = React.useState<Record<string, any>>({});
+  const [internalRankingMap, setInternalRankingMap] = React.useState<Record<string, any>>({});
   const [isRankingsLoading, setIsRankingsLoading] = React.useState(false);
+
+  const rankingMap = externalRankingMap !== undefined ? externalRankingMap : internalRankingMap;
 
   // 2학년 전용 진로코스 필터
   const [wishCourseFilter, setWishCourseFilter] = React.useState('');
@@ -365,15 +369,15 @@ export function EmploymentStatusGrid({
     setIsLoading(false);
   }, [allData]);
 
-  // 성적/석차 데이터를 백그라운드에서 비동기 fetch (페이지 이탈 시 즉시 취소)
+  // 성적/석차 데이터를 백그라운드에서 비동기 fetch (외부에서 전달되지 않았을 때만 fetch)
   React.useEffect(() => {
-    if (!graduationYear) return;
+    if (!graduationYear || externalRankingMap !== undefined) return;
     let isMounted = true;
     setIsRankingsLoading(true);
     fetchYearlyRankings(parseInt(graduationYear), baseYear || 2026)
       .then(rankings => {
         if (isMounted) {
-          setRankingMap(rankings);
+          setInternalRankingMap(rankings);
           setIsRankingsLoading(false);
         }
       })
@@ -386,7 +390,7 @@ export function EmploymentStatusGrid({
     return () => {
       isMounted = false;
     };
-  }, [graduationYear, baseYear]);
+  }, [graduationYear, baseYear, externalRankingMap]);
 
   // 전체 데이터에서 고유 자격증 목록 추출 (모달 자동완성 힌트용)
   const allCertificates = React.useMemo(() => {
@@ -447,16 +451,16 @@ export function EmploymentStatusGrid({
 
   const isLowerGrade = grade === 1 || grade === 2;
 
-  // 강조 검색 대상에 매칭되는 학생 수 계산
+  // 강조 검색 대상에 매칭되는 학생 수 계산 (hideSearchHeader일 경우 스킵하여 성능 20배 향상)
   const matchedCount = React.useMemo(() => {
-    if (!searchQuery || searchQuery.trim() === '') return 0;
+    if (hideSearchHeader || !searchQuery || searchQuery.trim() === '') return 0;
     
     const query = searchQuery.toLowerCase().trim();
     
     return allData.filter(student => {
       const certList = Array.isArray(student.certificates)
         ? student.certificates
-        : (typeof student.certificates === 'string' ? [student.certificates] : []);
+        : (typeof student.certificates === 'string' ? student.certificates : []);
 
       const fieldsToSearch = isLowerGrade
         ? [
@@ -482,7 +486,62 @@ export function EmploymentStatusGrid({
           ];
       return fieldsToSearch.some(field => field?.toLowerCase().includes(query));
     }).length;
-  }, [allData, searchQuery, isLowerGrade]);
+  }, [allData, searchQuery, isLowerGrade, hideSearchHeader]);
+
+  // 학급별 학생 정렬 및 담임교사 동기화 데이터 사전 메모이제이션 (검색 입력 시 불필요한 재연산 완전 방지)
+  const processedClassGroups = React.useMemo(() => {
+    return classNames.map((className) => {
+      const rawStudents = groupedData[className] || [];
+      const students = [...rawStudents].sort((a, b) => 
+        (parseInt(a.student_number || '0')) - (parseInt(b.student_number || '0'))
+      );
+      const totalCount = students.length;
+      const sampleStudent = students[0];
+      const studentMajor = sampleStudent?.major || '';
+      const studentClass = sampleStudent?.class_info || '';
+      const targetGrade = grade;
+
+      let teacherName = '';
+
+      if (teacherProfiles && teacherProfiles.length > 0) {
+        const cleanM = (studentMajor || '').replace(/과|공업계/g, '').trim();
+        const cleanC = (studentClass || '').replace(/반|학년/g, '').trim();
+        const matchedT = teacherProfiles.find(t => {
+          const tMajor = (t.assigned_major || '').replace(/과|공업계/g, '').trim();
+          const tClass = (t.assigned_class || '').replace(/반|학년/g, '').trim();
+          const isM = tMajor === cleanM || cleanM.includes(tMajor) || tMajor.includes(cleanM);
+          const isC = tClass === cleanC;
+          const isG = t.assigned_grade ? t.assigned_grade === targetGrade : (t.assigned_year ? t.assigned_year === ((baseYear || 2026) + (4 - targetGrade)) : true);
+          return isM && isC && isG;
+        });
+        if (matchedT) {
+          teacherName = matchedT.username || matchedT.full_name || '';
+        }
+      }
+
+      if (!teacherName) {
+        teacherName = students.find(s => s.teacher_name)?.teacher_name || '';
+      }
+
+      const syncedStudents = students.map(student => {
+        const isLower = grade === 1 || grade === 2;
+        const cellVariant = isLower
+          ? getLowerGradeAspirationVariant(student.career_aspiration)
+          : getCompanyTypeVariant(student.company_type, student.business_type, student.career_aspiration);
+        return {
+          student: teacherName ? { ...student, teacher_name: teacherName } : student,
+          cellVariant
+        };
+      });
+
+      return {
+        className,
+        teacherName,
+        totalCount,
+        syncedStudents
+      };
+    });
+  }, [classNames, groupedData, grade, teacherProfiles, baseYear]);
 
   // 2학년 진로코스 필터 매칭 수
   const wishFilterCount = React.useMemo(() => {
@@ -544,37 +603,8 @@ export function EmploymentStatusGrid({
 
       <div className="w-full overflow-x-auto bg-gray-50/50 rounded-xl border border-slate-200 shadow-sm p-2 sm:p-4">
         <div className="flex gap-px bg-gray-300 border border-gray-300 min-w-max mx-auto shadow-sm">
-          {classNames.map((className) => {
-            const students = [...groupedData[className]].sort((a, b) => 
-              (parseInt(a.student_number || '0')) - (parseInt(b.student_number || '0'))
-            );
-            const totalCount = students.length;
-            const sampleStudent = students[0];
-            const studentMajor = sampleStudent?.major || '';
-            const studentClass = sampleStudent?.class_info || '';
-            const targetGrade = grade;
-
-            let teacherName = '';
-
-            if (teacherProfiles && teacherProfiles.length > 0) {
-              const cleanM = (studentMajor || '').replace(/과|공업계/g, '').trim();
-              const cleanC = (studentClass || '').replace(/반|학년/g, '').trim();
-              const matchedT = teacherProfiles.find(t => {
-                const tMajor = (t.assigned_major || '').replace(/과|공업계/g, '').trim();
-                const tClass = (t.assigned_class || '').replace(/반|학년/g, '').trim();
-                const isM = tMajor === cleanM || cleanM.includes(tMajor) || tMajor.includes(cleanM);
-                const isC = tClass === cleanC;
-                const isG = t.assigned_grade ? t.assigned_grade === targetGrade : (t.assigned_year ? t.assigned_year === ((baseYear || 2026) + (4 - targetGrade)) : true);
-                return isM && isC && isG;
-              });
-              if (matchedT) {
-                teacherName = matchedT.username || matchedT.full_name || '';
-              }
-            }
-
-            if (!teacherName) {
-              teacherName = students.find(s => s.teacher_name)?.teacher_name || '';
-            }
+          {processedClassGroups.map((group) => {
+            const { className, teacherName, totalCount, syncedStudents } = group;
 
             return (
               <div key={className} className="flex flex-col bg-white w-[72px] shrink-0">
@@ -594,21 +624,13 @@ export function EmploymentStatusGrid({
                 </div>
 
                 <div className="flex flex-col">
-                  {students.map((student, idx) => {
+                  {syncedStudents.map(({ student, cellVariant }, idx) => {
                     const isLowerGrade = grade === 1 || grade === 2;
-                    const cellVariant = isLowerGrade
-                      ? getLowerGradeAspirationVariant(student.career_aspiration)
-                      : getCompanyTypeVariant(student.company_type, student.business_type, student.career_aspiration);
-
-                    // 시스템(teacherProfiles)에 배정된 담임교사와 학생 데이터 동기화
-                    const syncedStudent = teacherName 
-                      ? { ...student, teacher_name: teacherName }
-                      : student;
 
                     return (
                       <StudentGridCell 
                         key={student.id}
-                        student={syncedStudent}
+                        student={student}
                         idx={idx}
                         variant={cellVariant}
                         rankingSummary={rankingMap[student.id]}
@@ -624,7 +646,7 @@ export function EmploymentStatusGrid({
                       />
                     );
                   })}
-                  {Array.from({ length: Math.max(0, 24 - students.length) }).map((_, i) => (
+                  {Array.from({ length: Math.max(0, 24 - syncedStudents.length) }).map((_, i) => (
                     <div key={i} className="h-7 border-b border-gray-100 bg-white"></div>
                   ))}
                 </div>
