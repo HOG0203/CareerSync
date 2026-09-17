@@ -206,11 +206,8 @@ const COLUMNS: ColumnConfig[] = [
     type: 'select',
     options: [
       { label: '취업', value: '취업' },
-      { label: '미취업', value: '미취업' },
       { label: '제외인정자', value: '제외인정자' },
-      { label: '채용진행중', value: '채용진행중' },
-      { label: '현장실습중', value: '현장실습중' },
-      { label: '도제OJT', value: '도제OJT' }
+      { label: '채용진행중', value: '채용진행중' }
     ],
     variant: (val) => {
       switch (val) {

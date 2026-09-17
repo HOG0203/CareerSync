@@ -85,7 +85,11 @@ export async function logAuditAction(params: {
       });
     }
 
-    revalidateTag('audit-logs');
+    try {
+      revalidateTag('audit-logs');
+    } catch {
+      // ignore if revalidateTag is called outside request lifecycle
+    }
     return { success: true };
   } catch (error) {
     console.error('Audit log record error:', error);

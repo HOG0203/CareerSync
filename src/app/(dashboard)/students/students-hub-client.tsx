@@ -169,9 +169,9 @@ export function StudentsHubClient({
     const total = effectiveData.length;
     // 취업현황에서 '취업'인 학생수
     const employedCount = effectiveData.filter((s) => s.business_type === '취업').length;
-    // 제외인정자수 (취업현황 또는 진로희망이 제외인정자인 학생)
+    // 제외인정자수 (취업현황이 제외인정자인 학생)
     const excludedCount = effectiveData.filter(
-      (s) => s.business_type === '제외인정자' || s.career_aspiration === '제외인정자'
+      (s) => s.business_type === '제외인정자'
     ).length;
     // 유효 모수 (전체 학생수 - 제외인정자수)
     const validDenominator = Math.max(0, total - excludedCount);

@@ -8,7 +8,7 @@ import { getCurrentUserProfile } from '@/lib/data';
 import { getSubstitutePageData } from './actions';
 import { SubstituteClient } from './substitute-client';
 import { ParsedTimetableResult } from '@/lib/timetable/parser';
-import { Loader2 } from 'lucide-react';
+import { GlobalRotatingLoader } from '@/components/dashboard/loading-skeleton';
 import { redirect } from 'next/navigation';
 
 export const metadata = {
@@ -43,11 +43,7 @@ export default async function SubstitutePage() {
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5 w-full pb-20 sm:pb-16 min-h-full print:p-0 print:m-0 print:pb-0 print:block print:min-h-0">
-      <Suspense fallback={
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-        </div>
-      }>
+      <Suspense fallback={<GlobalRotatingLoader message="결보강 및 수업 교체 관리 데이터를 불러오는 중입니다..." />}>
         <SubstituteClient
           initialApplications={initialApplications}
           timetableData={timetableData || fallbackTimetableData}

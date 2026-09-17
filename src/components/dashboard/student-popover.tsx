@@ -49,6 +49,7 @@ interface StudentPopoverProps {
   baseYear?: number;
   isLowerGrade?: boolean;
   homeroomTeacher?: string;
+  onStudentUpdate?: (updatedStudent: StudentEmploymentData) => void;
 }
 
 export function StudentPopover({ 
@@ -61,7 +62,8 @@ export function StudentPopover({
   align,
   baseYear,
   isLowerGrade: propIsLowerGrade,
-  homeroomTeacher
+  homeroomTeacher,
+  onStudentUpdate
 }: StudentPopoverProps) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
@@ -158,6 +160,7 @@ export function StudentPopover({
     setCurrentEmploymentStatus(val);
     student.employment_status = val;
     setIsStatusDropdownOpen(false);
+    onStudentUpdate?.({ ...student, employment_status: val });
 
     void (async () => {
       try {
@@ -165,6 +168,7 @@ export function StudentPopover({
         if (res && !res.success) {
           setCurrentEmploymentStatus(prev);
           student.employment_status = prev;
+          onStudentUpdate?.({ ...student, employment_status: prev });
         } else {
           router.refresh();
         }
@@ -172,6 +176,7 @@ export function StudentPopover({
         console.error('Failed to update employment_status:', err);
         setCurrentEmploymentStatus(prev);
         student.employment_status = prev;
+        onStudentUpdate?.({ ...student, employment_status: prev });
       }
     })();
   };
@@ -180,6 +185,7 @@ export function StudentPopover({
     const prev = currentCompanyType;
     setCurrentCompanyType(val);
     student.company_type = val;
+    onStudentUpdate?.({ ...student, company_type: val });
 
     void (async () => {
       try {
@@ -187,6 +193,7 @@ export function StudentPopover({
         if (res && !res.success) {
           setCurrentCompanyType(prev);
           student.company_type = prev;
+          onStudentUpdate?.({ ...student, company_type: prev });
         } else {
           router.refresh();
         }
@@ -194,6 +201,7 @@ export function StudentPopover({
         console.error('Failed to update company_type:', err);
         setCurrentCompanyType(prev);
         student.company_type = prev;
+        onStudentUpdate?.({ ...student, company_type: prev });
       }
     })();
   };
@@ -202,6 +210,7 @@ export function StudentPopover({
     const prev = currentBusinessType;
     setCurrentBusinessType(val);
     student.business_type = val;
+    onStudentUpdate?.({ ...student, business_type: val });
 
     void (async () => {
       try {
@@ -209,6 +218,7 @@ export function StudentPopover({
         if (res && !res.success) {
           setCurrentBusinessType(prev);
           student.business_type = prev;
+          onStudentUpdate?.({ ...student, business_type: prev });
         } else {
           router.refresh();
         }
@@ -216,6 +226,7 @@ export function StudentPopover({
         console.error('Failed to update business_type:', err);
         setCurrentBusinessType(prev);
         student.business_type = prev;
+        onStudentUpdate?.({ ...student, business_type: prev });
       }
     })();
   };
@@ -224,6 +235,7 @@ export function StudentPopover({
     const prev = currentIsDesiring;
     setCurrentIsDesiring(val);
     student.is_desiring_employment = val;
+    onStudentUpdate?.({ ...student, is_desiring_employment: val });
 
     void (async () => {
       try {
@@ -231,6 +243,7 @@ export function StudentPopover({
         if (res && !res.success) {
           setCurrentIsDesiring(prev);
           student.is_desiring_employment = prev;
+          onStudentUpdate?.({ ...student, is_desiring_employment: prev });
         } else {
           router.refresh();
         }
@@ -238,6 +251,7 @@ export function StudentPopover({
         console.error('Failed to update is_desiring_employment:', err);
         setCurrentIsDesiring(prev);
         student.is_desiring_employment = prev;
+        onStudentUpdate?.({ ...student, is_desiring_employment: prev });
       }
     })();
   };
@@ -246,6 +260,7 @@ export function StudentPopover({
     const prev = currentCareerAspiration;
     setCurrentCareerAspiration(val);
     student.career_aspiration = val;
+    onStudentUpdate?.({ ...student, career_aspiration: val });
 
     void (async () => {
       try {
@@ -253,6 +268,7 @@ export function StudentPopover({
         if (res && !res.success) {
           setCurrentCareerAspiration(prev);
           student.career_aspiration = prev;
+          onStudentUpdate?.({ ...student, career_aspiration: prev });
         } else {
           router.refresh();
         }
@@ -260,6 +276,7 @@ export function StudentPopover({
         console.error('Failed to update career_aspiration:', err);
         setCurrentCareerAspiration(prev);
         student.career_aspiration = prev;
+        onStudentUpdate?.({ ...student, career_aspiration: prev });
       }
     })();
   };
@@ -268,6 +285,7 @@ export function StudentPopover({
     const prev = currentSpecialNotes;
     setCurrentSpecialNotes(val);
     student.special_notes = val;
+    onStudentUpdate?.({ ...student, special_notes: val });
 
     void (async () => {
       try {
@@ -275,6 +293,7 @@ export function StudentPopover({
         if (res && !res.success) {
           setCurrentSpecialNotes(prev);
           student.special_notes = prev;
+          onStudentUpdate?.({ ...student, special_notes: prev });
         } else {
           router.refresh();
         }
@@ -282,6 +301,7 @@ export function StudentPopover({
         console.error('Failed to update special_notes:', err);
         setCurrentSpecialNotes(prev);
         student.special_notes = prev;
+        onStudentUpdate?.({ ...student, special_notes: prev });
       }
     })();
   };
@@ -290,6 +310,7 @@ export function StudentPopover({
     const prev = currentCareerCourse;
     setCurrentCareerCourse(val);
     student.career_course = val;
+    onStudentUpdate?.({ ...student, career_course: val });
 
     void (async () => {
       try {
@@ -297,6 +318,7 @@ export function StudentPopover({
         if (res && !res.success) {
           setCurrentCareerCourse(prev);
           student.career_course = prev;
+          onStudentUpdate?.({ ...student, career_course: prev });
         } else {
           router.refresh();
         }
@@ -304,6 +326,7 @@ export function StudentPopover({
         console.error('Failed to update career_course:', err);
         setCurrentCareerCourse(prev);
         student.career_course = prev;
+        onStudentUpdate?.({ ...student, career_course: prev });
       }
     })();
   };
@@ -314,6 +337,7 @@ export function StudentPopover({
     const prev = currentCompany;
     setCurrentCompany(trimmed);
     student.company = trimmed;
+    onStudentUpdate?.({ ...student, company: trimmed });
 
     void (async () => {
       try {
@@ -321,6 +345,7 @@ export function StudentPopover({
         if (res && !res.success) {
           setCurrentCompany(prev);
           student.company = prev;
+          onStudentUpdate?.({ ...student, company: prev });
         } else {
           router.refresh();
         }
@@ -328,6 +353,7 @@ export function StudentPopover({
         console.error('Failed to update company:', err);
         setCurrentCompany(prev);
         student.company = prev;
+        onStudentUpdate?.({ ...student, company: prev });
       }
     })();
   };
@@ -341,17 +367,33 @@ export function StudentPopover({
   const handleUpdateRecords = (studentId: string, updatedRecords: any[]) => {
     setCurrentTrainingRecords(updatedRecords);
     student.training_records = updatedRecords;
+    let latestTrainingCompany = '';
+    let startDate = '';
+    let endDate = '';
+    let trainingStipendStatus = '-';
+    let isHiringConversion = 'X';
+    let isReturned = 'X';
+    let hasFieldTraining = 'X';
+
     if (updatedRecords && updatedRecords.length > 0) {
+      hasFieldTraining = 'O';
       student.has_field_training = 'O';
       const sorted = [...updatedRecords].sort((a, b) => (b.training_order || 0) - (a.training_order || 0));
       const latest = sorted[0];
       if (latest) {
-        student.latest_training_company = latest.company || '';
-        student.start_date = latest.start_date || '';
-        student.end_date = latest.end_date || '';
-        student.training_stipend_status = latest.stipend_status || '-';
-        student.is_hiring_conversion = latest.hiring_status === '채용전환' ? 'O' : 'X';
-        student.is_returned = latest.hiring_status === '복교' ? 'O' : 'X';
+        latestTrainingCompany = latest.company || '';
+        startDate = latest.start_date || '';
+        endDate = latest.end_date || '';
+        trainingStipendStatus = latest.stipend_status || '-';
+        isHiringConversion = latest.hiring_status === '채용전환' ? 'O' : 'X';
+        isReturned = latest.hiring_status === '복교' ? 'O' : 'X';
+
+        student.latest_training_company = latestTrainingCompany;
+        student.start_date = startDate;
+        student.end_date = endDate;
+        student.training_stipend_status = trainingStipendStatus;
+        student.is_hiring_conversion = isHiringConversion;
+        student.is_returned = isReturned;
       }
     } else {
       student.has_field_training = 'X';
@@ -362,6 +404,19 @@ export function StudentPopover({
       student.is_hiring_conversion = 'X';
       student.is_returned = 'X';
     }
+
+    onStudentUpdate?.({
+      ...student,
+      training_records: updatedRecords,
+      has_field_training: hasFieldTraining,
+      latest_training_company: latestTrainingCompany,
+      start_date: startDate,
+      end_date: endDate,
+      training_stipend_status: trainingStipendStatus,
+      is_hiring_conversion: isHiringConversion,
+      is_returned: isReturned,
+    });
+
     router.refresh();
   };
 
@@ -559,7 +614,7 @@ export function StudentPopover({
                     currentBusinessType === '채용진행중' ? "bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200" :
                     currentBusinessType === '현장실습중' ? "bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200" :
                     currentBusinessType === '도제OJT' ? "bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100" :
-                    (currentBusinessType === '제외인정자' || student.career_aspiration === '제외인정자') ? "bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200" :
+                    currentBusinessType === '제외인정자' ? "bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200" :
                     "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100"
                   )}
                 >
@@ -580,10 +635,10 @@ export function StudentPopover({
                 (currentBusinessType || student.business_type) === '채용진행중' ? "bg-amber-100 text-amber-700" :
                 (currentBusinessType || student.business_type) === '현장실습중' ? "bg-blue-100 text-blue-700" :
                 (currentBusinessType || student.business_type) === '도제OJT' ? "bg-emerald-50 text-emerald-600" :
-                ((currentBusinessType || student.business_type) === '제외인정자' || student.career_aspiration === '제외인정자') ? "bg-slate-100 text-slate-700" :
+                (currentBusinessType || student.business_type) === '제외인정자' ? "bg-slate-100 text-slate-700" :
                 "bg-slate-50 text-slate-400"
               )}>
-                현황: {currentBusinessType || student.business_type || (student.career_aspiration === '진학' ? '진학희망' : '미결정')}
+                현황: {currentBusinessType || student.business_type || '미결정'}
               </span>
             )
           )}

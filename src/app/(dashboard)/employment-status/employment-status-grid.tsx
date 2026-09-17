@@ -29,6 +29,7 @@ interface EmploymentStatusGridProps {
   externalSearchQuery?: string;
   externalCustomRule?: CustomRule | null;
   externalRankingMap?: Record<string, any>;
+  onStudentUpdate?: (updatedStudent: StudentEmploymentData) => void;
 }
 
 export { type CustomRule } from './custom-combination-modal';
@@ -81,8 +82,8 @@ const SORT_ORDER = [
   '섬유소재과'
 ];
 
-const getCompanyTypeVariant = (type?: string, businessType?: string, careerAspiration?: string) => {
-  if (businessType === '제외인정자' || careerAspiration === '제외인정자') {
+const getCompanyTypeVariant = (type?: string, businessType?: string) => {
+  if (businessType === '제외인정자') {
     return 'bg-slate-300 text-slate-800 border-slate-400 font-medium';
   }
   if (businessType === '채용진행중') return 'bg-amber-100 text-amber-950 border-amber-500 border-x';
@@ -337,6 +338,7 @@ export function EmploymentStatusGrid({
   externalSearchQuery,
   externalCustomRule,
   externalRankingMap,
+  onStudentUpdate,
 }: EmploymentStatusGridProps) {
   const [internalSearchQuery, setInternalSearchQuery] = React.useState('');
   const [internalCustomRule, setInternalCustomRule] = React.useState<CustomRule | null>(null);
@@ -527,7 +529,7 @@ export function EmploymentStatusGrid({
         const isLower = grade === 1 || grade === 2;
         const cellVariant = isLower
           ? getLowerGradeAspirationVariant(student.career_aspiration)
-          : getCompanyTypeVariant(student.company_type, student.business_type, student.career_aspiration);
+          : getCompanyTypeVariant(student.company_type, student.business_type);
         return {
           student: teacherName ? { ...student, teacher_name: teacherName } : student,
           cellVariant
@@ -643,6 +645,7 @@ export function EmploymentStatusGrid({
                         wishCourseFilter={wishCourseFilter}
                         currentCourseFilter={currentCourseFilter}
                         homeroomTeacher={teacherName}
+                        onStudentUpdate={onStudentUpdate}
                       />
                     );
                   })}

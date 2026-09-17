@@ -80,6 +80,7 @@ export function MiddleSchoolEmploymentClient({
 
   // 검색 및 필터 상태
   const [searchTerm, setSearchTerm] = React.useState('');
+  const deferredSearchTerm = React.useDeferredValue(searchTerm);
   const [selectedMiddleSchool, setSelectedMiddleSchool] = React.useState<string>('all');
   const [selectedMajor, setSelectedMajor] = React.useState<string>('all');
   const [selectedCompanyType, setSelectedCompanyType] = React.useState<string>('all');
@@ -120,7 +121,7 @@ export function MiddleSchoolEmploymentClient({
   }, [initialEmployedStudents]);
 
   const isSearching = Boolean(
-    (selectedMiddleSchool && selectedMiddleSchool !== 'all') || searchTerm.trim()
+    (selectedMiddleSchool && selectedMiddleSchool !== 'all') || deferredSearchTerm.trim()
   );
 
   // 필터링된 학생 데이터
@@ -151,15 +152,15 @@ export function MiddleSchoolEmploymentClient({
       }
 
       // 텍스트 검색 (이름, 출신중학교, 회사명, 자격증 등)
-      if (searchTerm.trim()) {
-        const q = searchTerm.toLowerCase().trim();
+      if (deferredSearchTerm.trim()) {
+        const q = deferredSearchTerm.toLowerCase().trim();
         const searchStr = `${student.student_name || ''} ${student.student_number || ''} ${student.middle_school || ''} ${student.company || ''} ${student.latest_training_company || ''} ${student.major || ''} ${student.class_info || ''}`.toLowerCase();
         if (!searchStr.includes(q)) return false;
       }
 
       return true;
     });
-  }, [initialEmployedStudents, selectedMiddleSchool, selectedMajor, selectedCompanyType, searchTerm, isSearching]);
+  }, [initialEmployedStudents, selectedMiddleSchool, selectedMajor, selectedCompanyType, deferredSearchTerm, isSearching]);
 
   // 상단 4대 핵심 통계 카드 계산
   const stats = React.useMemo(() => {
@@ -175,7 +176,7 @@ export function MiddleSchoolEmploymentClient({
 
     // 제외인정자 제외 유효 분모
     const excludedCount = filteredStudents.filter(
-      (s) => s.business_type === '제외인정자' || s.career_aspiration === '제외인정자'
+      (s) => s.business_type === '제외인정자'
     ).length;
     const validDenominator = Math.max(0, totalStudents - excludedCount);
     const employmentRate = validDenominator > 0 ? Math.round((employedCount / validDenominator) * 100) : 0;

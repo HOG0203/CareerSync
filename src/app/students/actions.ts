@@ -367,8 +367,13 @@ export async function bulkPromoteFromExcel(csvData: string) {
   }
 
   revalidateTag('students');
+  revalidateTag('middle-school-employment');
   revalidatePath('/class-management');
   revalidatePath('/admin/students');
+  revalidatePath('/students');
+  revalidatePath('/employment-status');
+  revalidatePath('/admission/middle-school-employment');
+  revalidatePath('/share/admission/middle-school-employment');
   
   return { success: true, count: successCount, errors: errors.length > 0 ? errors : null }
 }
@@ -857,11 +862,14 @@ export async function updateStudentField(id: string, field: string, value: any) 
     await clearAssignedStudentDetailsCache();
 
     revalidateTag('students');
+    revalidateTag('middle-school-employment');
     revalidatePath('/students'); 
     revalidatePath('/admin/students'); 
     revalidatePath('/class-management');
     revalidatePath('/employment-status');
     revalidatePath('/field-training');
+    revalidatePath('/admission/middle-school-employment');
+    revalidatePath('/share/admission/middle-school-employment');
     return { success: true };
   }
 
@@ -919,6 +927,7 @@ export async function updateStudentField(id: string, field: string, value: any) 
   await clearAssignedStudentDetailsCache();
 
   revalidateTag('students');
+  revalidateTag('middle-school-employment');
   revalidateTag('student-accounts');
   revalidatePath('/students');
   revalidatePath('/admin/students');
@@ -926,6 +935,8 @@ export async function updateStudentField(id: string, field: string, value: any) 
   revalidatePath('/employment-status');
   revalidatePath('/dashboard');
   revalidatePath('/field-training');
+  revalidatePath('/admission/middle-school-employment');
+  revalidatePath('/share/admission/middle-school-employment');
   return { success: true }
 }
 
@@ -1024,6 +1035,7 @@ export async function bulkUpdateStudentData(updates: { id: string, field: string
   await clearAssignedStudentDetailsCache();
 
   revalidateTag('students');
+  revalidateTag('middle-school-employment');
   revalidatePath('/students'); 
   revalidatePath('/admin/students'); 
   revalidatePath('/class-management');
@@ -1031,6 +1043,8 @@ export async function bulkUpdateStudentData(updates: { id: string, field: string
   revalidatePath('/labor-education');
   revalidatePath('/dashboard');
   revalidatePath('/field-training');
+  revalidatePath('/admission/middle-school-employment');
+  revalidatePath('/share/admission/middle-school-employment');
 
   return { success: true }
 }
@@ -1059,6 +1073,7 @@ export async function createStudent(data: { graduation_year: number, major: stri
   await syncAcademicHistory(supabase, newStudent.id, newStudent, settings.baseYear);
   
   revalidateTag('students');
+  revalidateTag('middle-school-employment');
   revalidateTag('student-accounts');
   revalidatePath('/admin/students'); 
   revalidatePath('/students'); 
@@ -1066,6 +1081,8 @@ export async function createStudent(data: { graduation_year: number, major: stri
   revalidatePath('/employment-status');
   revalidatePath('/labor-education');
   revalidatePath('/dashboard');
+  revalidatePath('/admission/middle-school-employment');
+  revalidatePath('/share/admission/middle-school-employment');
   return { success: true }
 }
 
@@ -1075,12 +1092,21 @@ export async function deleteStudents(ids: string[]) {
   await supabase.from('student_employments').delete().in('id', ids)
   const { error } = await supabase.from('students').delete().in('id', ids)
   if (error) return { error: error.message }
+
+  const { clearAssignedStudentDetailsCache } = await import('@/lib/data');
+  await clearAssignedStudentDetailsCache();
+
+  revalidateTag('students');
+  revalidateTag('middle-school-employment');
+  revalidateTag('student-accounts');
   revalidatePath('/admin/students'); 
   revalidatePath('/students'); 
   revalidatePath('/class-management');
   revalidatePath('/employment-status');
   revalidatePath('/labor-education');
   revalidatePath('/dashboard');
+  revalidatePath('/admission/middle-school-employment');
+  revalidatePath('/share/admission/middle-school-employment');
   return { success: true }
 }
 

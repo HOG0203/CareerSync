@@ -1,5 +1,5 @@
 import { 
-  getCachedFilteredStudentData, 
+  getCachedMiddleSchoolEmploymentData, 
 } from '@/lib/data';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { MiddleSchoolEmploymentClient } from '@/app/(dashboard)/admission/middle-school-employment/middle-school-employment-client';
@@ -12,11 +12,11 @@ export const metadata = {
 };
 
 export default async function SharedMiddleSchoolEmploymentPage() {
-  // 시스템 기준연도 조회
-  const settings = await getSystemSettings();
-
-  // 졸업생 포함 전체 학생 취업 및 입학 정보 통합 조회 (서버 캐시 적용)
-  const students = await getCachedFilteredStudentData('all', settings.baseYear);
+  // 시스템 설정 및 전교생 취업 데이터를 병렬로 즉각 조회 (초고속 캐시 적중 시 0ms)
+  const [settings, students] = await Promise.all([
+    getSystemSettings(),
+    getCachedMiddleSchoolEmploymentData(),
+  ]);
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">

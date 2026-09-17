@@ -6,7 +6,7 @@
 import { Suspense } from 'react';
 import { getGpaPresets, getGradeStudents } from './actions';
 import { GradeClient } from './grade-client';
-import { Loader2 } from 'lucide-react';
+import { GlobalRotatingLoader } from '@/components/dashboard/loading-skeleton';
 import { getCurrentUserProfile } from '@/lib/data';
 import { getUserCustomPermissionsMapAction } from '@/app/(dashboard)/admin/users/actions';
 import { redirect } from 'next/navigation';
@@ -47,13 +47,7 @@ export default async function GradePage() {
 
   return (
     <div className="p-3 sm:p-5 lg:p-6 w-full min-w-0 max-w-none pb-20 sm:pb-16 min-h-full">
-      <Suspense
-        fallback={
-          <div className="flex items-center justify-center min-h-[400px]">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          </div>
-        }
-      >
+      <Suspense fallback={<GlobalRotatingLoader message="내신등급 계산기 데이터를 불러오는 중입니다..." />}>
         <GradeClient initialPresets={presets} initialStudents={initialStudents} />
       </Suspense>
     </div>

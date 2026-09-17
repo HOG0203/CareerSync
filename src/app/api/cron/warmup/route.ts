@@ -5,7 +5,8 @@ import {
   getCachedTeacherProfiles, 
   getCachedClassStructureCombinations, 
   getCachedProfiles, 
-  getCachedAllStudentBaseData 
+  getCachedAllStudentBaseData,
+  getCachedMiddleSchoolEmploymentData 
 } from '@/lib/data';
 import { getSystemSettings, getCachedMasterCertificates } from '@/app/(dashboard)/admin/settings/actions';
 import { getCachedAuditLogs } from '@/lib/audit-logger';
@@ -33,7 +34,8 @@ export async function GET() {
       getCachedProfiles(),
       getCachedAllStudentBaseData(),
       getCachedAuditLogs(),
-      getCachedFilteredStudentData(currentGradYear, settings.baseYear)
+      getCachedFilteredStudentData(currentGradYear, settings.baseYear),
+      getCachedMiddleSchoolEmploymentData()
     ]);
 
     const duration = Date.now() - startTime;

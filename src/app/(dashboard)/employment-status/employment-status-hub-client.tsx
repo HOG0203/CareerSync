@@ -60,6 +60,19 @@ export function EmploymentStatusHubClient({
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // 로컬 학생 데이터 상태 (팝업 수정 시 0ms 즉각 화면 반영을 위한 낙관적 상태)
+  const [students, setStudents] = React.useState<StudentEmploymentData[]>(initialData);
+
+  React.useEffect(() => {
+    setStudents(initialData);
+  }, [initialData]);
+
+  const handleStudentUpdate = React.useCallback((updatedStudent: StudentEmploymentData) => {
+    setStudents((prev) =>
+      prev.map((s) => (s.id === updatedStudent.id ? { ...s, ...updatedStudent } : s))
+    );
+  }, []);
+
   // 서버 라우팅 상태 및 전환 피드백
   const [isRouting, startRouting] = React.useTransition();
   const [loadingTargetText, setLoadingTargetText] = React.useState<string>('');
@@ -109,7 +122,7 @@ export function EmploymentStatusHubClient({
   // 전체 데이터에서 고유 자격증 목록 추출 (모달 자동완성 힌트용)
   const allCertificates = React.useMemo(() => {
     const certSet = new Set<string>();
-    initialData.forEach((s) => {
+    students.forEach((s) => {
       const certs = Array.isArray(s.certificates)
         ? s.certificates
         : (typeof s.certificates === 'string' ? [s.certificates] : []);
@@ -118,7 +131,7 @@ export function EmploymentStatusHubClient({
       });
     });
     return Array.from(certSet).sort();
-  }, [initialData]);
+  }, [students]);
 
   const isLowerGrade = grade === 1 || grade === 2;
 
@@ -154,7 +167,7 @@ export function EmploymentStatusHubClient({
   // 1. 학과 옵션 추출 (공식 순서 정렬)
   const majorOptions = React.useMemo(() => {
     const set = new Set<string>();
-    initialData.forEach((s) => {
+    students.forEach((s) => {
       if (s.major && s.major.trim()) set.add(s.major.trim());
     });
     return Array.from(set).sort((a, b) => {
@@ -163,7 +176,7 @@ export function EmploymentStatusHubClient({
       if (orderA !== orderB) return orderA - orderB;
       return a.localeCompare(b, 'ko');
     });
-  }, [initialData]);
+  }, [students]);
 
   // 1.5 진로코스 옵션 추출
   const courseOptions = React.useMemo(() => {
@@ -173,21 +186,21 @@ export function EmploymentStatusHubClient({
       '일반취업', '기술사관', '군특성화', '운동부', '진학', '입대', '기타'
     ];
     const set = new Set<string>(DEFAULT_COURSES);
-    initialData.forEach((s) => {
+    students.forEach((s) => {
       if (s.career_course && s.career_course.trim()) set.add(s.career_course.trim());
     });
     return Array.from(set);
-  }, [initialData]);
+  }, [students]);
 
   // 2. 반 옵션 추출
   const classOptions = React.useMemo(() => {
     const set = new Set<string>();
-    initialData.forEach((s) => {
+    students.forEach((s) => {
       if (selectedMajor !== 'all' && s.major !== selectedMajor) return;
       if (s.class_info) set.add(s.class_info);
     });
     return Array.from(set).sort((a, b) => parseInt(a || '0') - parseInt(b || '0'));
-  }, [initialData, selectedMajor]);
+  }, [students, selectedMajor]);
 
   // 3. 상태 옵션 목록 (3학년 vs 1,2학년 분기)
   const statusOptions = React.useMemo(() => {
@@ -220,7 +233,7 @@ export function EmploymentStatusHubClient({
 
   // 4. 실시간 인메모리 필터링된 데이터 (학과, 반, 상태 필터 적용 시 목록 축소, 키워드 검색 시에는 바둑판 구조 유지)
   const filteredData = React.useMemo(() => {
-    return initialData.filter((student) => {
+    return students.filter((student) => {
       if (selectedMajor !== 'all' && student.major !== selectedMajor) return false;
       if (selectedClass !== 'all' && student.class_info !== selectedClass) return false;
 
@@ -240,7 +253,7 @@ export function EmploymentStatusHubClient({
 
       return true;
     });
-  }, [initialData, selectedMajor, selectedClass, selectedStatus, isLowerGrade]);
+  }, [students, selectedMajor, selectedClass, selectedStatus, isLowerGrade]);
 
 
   // 4-0. 검색 인덱스 맵 사전 구축 (키워드 검색 시 0.001ms 초고속 필터링)
@@ -308,7 +321,7 @@ export function EmploymentStatusHubClient({
       // 3학년 취업 통계
       const employedCount = filteredData.filter((s) => s.business_type === '취업').length;
       const excludedCount = filteredData.filter(
-        (s) => s.business_type === '제외인정자' || s.career_aspiration === '제외인정자'
+        (s) => s.business_type === '제외인정자'
       ).length;
       const validDenominator = Math.max(0, total - excludedCount);
       const employmentRate = validDenominator > 0 ? Math.round((employedCount / validDenominator) * 100) : 0;
@@ -699,6 +712,7 @@ export function EmploymentStatusHubClient({
               externalSearchQuery={searchQuery}
               externalCustomRule={customRule}
               externalRankingMap={rankingMap}
+              onStudentUpdate={handleStudentUpdate}
             />
           </div>
         </CardContent>

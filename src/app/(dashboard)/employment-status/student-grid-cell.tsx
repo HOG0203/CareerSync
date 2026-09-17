@@ -23,6 +23,7 @@ interface StudentGridCellProps {
   wishCourseFilter?: string;
   currentCourseFilter?: string;
   homeroomTeacher?: string;
+  onStudentUpdate?: (updatedStudent: StudentEmploymentData) => void;
 }
 
 export const StudentGridCell = React.memo(function StudentGridCell({ 
@@ -38,7 +39,8 @@ export const StudentGridCell = React.memo(function StudentGridCell({
   isLowerGrade, 
   wishCourseFilter, 
   currentCourseFilter,
-  homeroomTeacher
+  homeroomTeacher,
+  onStudentUpdate
 }: StudentGridCellProps) {
   // 1. 커스텀 동적 조합 매칭 평가 (AND / OR)
   const isCustomRuleMatched = React.useMemo(() => {
@@ -79,7 +81,7 @@ export const StudentGridCell = React.memo(function StudentGridCell({
     if (isDesiring === '예') return 'bg-emerald-500';
 
     // 제외인정자 기본 회색 표시
-    if (bType === '제외인정자' || aspiration === '제외인정자') {
+    if (bType === '제외인정자') {
       return 'bg-slate-400';
     }
 
@@ -116,6 +118,7 @@ export const StudentGridCell = React.memo(function StudentGridCell({
       userProfile={userProfile}
       baseYear={baseYear}
       homeroomTeacher={homeroomTeacher}
+      onStudentUpdate={onStudentUpdate}
     >
       <div
         className={cn(

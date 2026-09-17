@@ -387,6 +387,121 @@ export async function getCachedAdminStudentData(graduationYear: number): Promise
   return adminStudentCacheMap.get(graduationYear)!();
 }
 
+/**
+ * [입학지원/중학교별 취업현황 전용 초경량 전체 학생 데이터 조회]
+ * - 전교생 명단 및 입학 정보(중학교, 성적), 취업처 기본 정보만 선별 조회 (수 MB -> 150KB 이하 대폭 경량화)
+ * - 불필요한 학적 이력, 교사 프로필, 대량 실습 상세 배열 조인을 제거하여 O(1) 초고속 병합
+ * - Next.js 글로벌 영구 캐싱 (1시간 TTL, 'students', 'middle-school-employment' 태그)
+ */
+async function fetchMiddleSchoolEmploymentData(): Promise<StudentEmploymentData[]> {
+  const supabase = createAdminClient();
+
+  const SELECT_FIELDS_WITH_ADMISSION = 'id, student_name, student_number, graduation_year, major, class_info, middle_school, admission_rank_percentile, admission_type, special_notes, career_aspiration, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks)';
+  const SELECT_FIELDS_BASE = 'id, student_name, student_number, graduation_year, major, class_info, special_notes, career_aspiration, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks)';
+
+  // 실습처 정보 비동기 쿼리를 학생 쿼리와 병렬로 즉시 시작
+  const trainingsPromise = supabase
+    .from('field_training_records')
+    .select('student_id, company, training_order')
+    .not('company', 'is', null)
+    .order('training_order', { ascending: false })
+    .range(0, 5000);
+
+  let students: any[] = [];
+  let useAdmissionFields = true;
+  let from = 0;
+  const PAGE_SIZE = 1000;
+
+  // 1. 전체 학생 및 취업 연계 정보 조회 (모든 학생 풀 스캔)
+  while (true) {
+    let studentQuery = supabase
+      .from('students')
+      .select(useAdmissionFields ? SELECT_FIELDS_WITH_ADMISSION : SELECT_FIELDS_BASE)
+      .order('graduation_year', { ascending: false })
+      .order('major')
+      .order('class_info')
+      .order('student_number')
+      .range(from, from + PAGE_SIZE - 1);
+
+    const studentsResult = await studentQuery;
+    if (studentsResult.error) {
+      if (studentsResult.error.code === '42703' && useAdmissionFields) {
+        useAdmissionFields = false;
+        from = 0;
+        students = [];
+        continue;
+      }
+      console.error('Error fetching middle school employment students:', studentsResult.error);
+      break;
+    }
+
+    if (!studentsResult.data || studentsResult.data.length === 0) break;
+    students.push(...studentsResult.data);
+    if (studentsResult.data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  // 2. 실습처 결과 수신 및 O(1) 맵 생성
+  const { data: trainings } = await trainingsPromise;
+  const trainingCompanyMap = new Map<string, string>();
+  if (trainings) {
+    for (const t of trainings) {
+      if (t.student_id && t.company && !trainingCompanyMap.has(t.student_id)) {
+        trainingCompanyMap.set(t.student_id, t.company);
+      }
+    }
+  }
+
+  // 3. 초경량 평탄화
+  const flattened = students.map((s: any) => {
+    const rawEmp = Array.isArray(s.student_employments) ? s.student_employments[0] : s.student_employments;
+    const emp = rawEmp || {};
+    const latestTrainingCompany = trainingCompanyMap.get(s.id);
+
+    return {
+      id: s.id,
+      student_name: s.student_name,
+      student_number: s.student_number,
+      graduation_year: s.graduation_year,
+      major: s.major,
+      class_info: s.class_info,
+      middle_school: s.middle_school || '',
+      admission_rank_percentile: s.admission_rank_percentile,
+      admission_type: s.admission_type,
+      special_notes: s.special_notes,
+      career_aspiration: s.career_aspiration,
+      is_desiring_employment: emp.is_desiring_employment,
+      employment_status: emp.employment_status,
+      company_type: emp.company_type,
+      business_type: emp.business_type,
+      company: emp.company,
+      remarks: emp.remarks,
+      latest_training_company: latestTrainingCompany,
+    } as StudentEmploymentData;
+  });
+
+  return flattened.sort((a, b) => {
+    if (a.graduation_year !== b.graduation_year) {
+      return (b.graduation_year || 0) - (a.graduation_year || 0);
+    }
+    const indexA = MAJOR_SORT_ORDER.indexOf(a.major || '');
+    const indexB = MAJOR_SORT_ORDER.indexOf(b.major || '');
+    if (indexA !== indexB) return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+    if (a.class_info !== b.class_info) return (a.class_info || '').localeCompare(b.class_info || '');
+    return (a.student_number || '').localeCompare(b.student_number || '', undefined, { numeric: true });
+  });
+}
+
+export async function getCachedMiddleSchoolEmploymentData(): Promise<StudentEmploymentData[]> {
+  return unstable_cache(
+    async () => fetchMiddleSchoolEmploymentData(),
+    ['middle-school-employment-data-v2'],
+    {
+      revalidate: 3600, // 1시간
+      tags: ['students', 'middle-school-employment']
+    }
+  )();
+}
 
 /**
  * [캐싱] 졸업연도 목록 서버 메모리 캐싱

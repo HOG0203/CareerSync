@@ -63,7 +63,9 @@ export async function updateStudentAdmissionAction(
   })();
 
   revalidateTag('students');
+  revalidateTag('middle-school-employment');
   revalidatePath('/admission/middle-school-employment');
+  revalidatePath('/share/admission/middle-school-employment');
   revalidatePath('/employment-status');
   return { success: true };
 }
@@ -182,7 +184,9 @@ export async function batchUpdateAdmissionFromExcelAction(
   }
 
   revalidateTag('students');
+  revalidateTag('middle-school-employment');
   revalidatePath('/admission/middle-school-employment');
+  revalidatePath('/share/admission/middle-school-employment');
   revalidatePath('/employment-status');
 
   return {
@@ -232,7 +236,9 @@ export async function batchUpdateMultipleStudentsInlineAction(
   }
 
   revalidateTag('students');
+  revalidateTag('middle-school-employment');
   revalidatePath('/admission/middle-school-employment');
+  revalidatePath('/share/admission/middle-school-employment');
   revalidatePath('/employment-status');
   return { success: true, count: successCount };
 }
@@ -289,7 +295,9 @@ export async function bulkAssignMiddleSchoolAction(
   }
 
   revalidateTag('students');
+  revalidateTag('middle-school-employment');
   revalidatePath('/admission/middle-school-employment');
+  revalidatePath('/share/admission/middle-school-employment');
   revalidatePath('/employment-status');
   return { success: true, count: count || studentIds.length };
 }

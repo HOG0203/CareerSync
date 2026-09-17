@@ -99,10 +99,13 @@ export async function updatePersonalDetail(id: string, field: string, value: any
   })();
 
   revalidateTag('students')
+  revalidateTag('middle-school-employment')
   revalidatePath('/class-management')
   revalidatePath('/employment-status')
   revalidatePath('/students')
   revalidatePath('/admin/students')
+  revalidatePath('/admission/middle-school-employment')
+  revalidatePath('/share/admission/middle-school-employment')
   revalidatePath('/dashboard')
   return { success: true }
 }
@@ -137,10 +140,13 @@ export async function bulkUpdatePersonalDetails(updates: { id: string, field: st
   }
 
   revalidateTag('students')
+  revalidateTag('middle-school-employment')
   revalidatePath('/class-management')
   revalidatePath('/employment-status')
   revalidatePath('/students')
   revalidatePath('/admin/students')
+  revalidatePath('/admission/middle-school-employment')
+  revalidatePath('/share/admission/middle-school-employment')
   revalidatePath('/dashboard')
   return { success: true }
 }
@@ -196,11 +202,18 @@ export async function promoteStudents(updates: {
     return { error: error.message }
   }
 
-  revalidatePath('/class-management')
-  revalidatePath('/employment-status')
-  revalidatePath('/students')
-  revalidatePath('/admin/students')
-  revalidatePath('/dashboard')
+  const { clearAssignedStudentDetailsCache } = await import('@/lib/data');
+  await clearAssignedStudentDetailsCache();
+
+  revalidateTag('students');
+  revalidateTag('middle-school-employment');
+  revalidatePath('/class-management');
+  revalidatePath('/employment-status');
+  revalidatePath('/students');
+  revalidatePath('/admin/students');
+  revalidatePath('/admission/middle-school-employment');
+  revalidatePath('/share/admission/middle-school-employment');
+  revalidatePath('/dashboard');
   
   return { success: true }
 }

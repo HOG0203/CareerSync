@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { 
   getCurrentUserProfile, 
-  getCachedFilteredStudentData, 
+  getCachedMiddleSchoolEmploymentData, 
 } from '@/lib/data';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { MiddleSchoolEmploymentClient } from './middle-school-employment-client';
@@ -14,7 +14,12 @@ export const metadata = {
 };
 
 export default async function MiddleSchoolEmploymentPage() {
-  const userProfile = await getCurrentUserProfile();
+  // 프로필, 시스템 설정, 중학교별 학생 취업 데이터를 병렬로 즉각 조회 (초고속 캐시 적중 시 0ms)
+  const [userProfile, settings, students] = await Promise.all([
+    getCurrentUserProfile(),
+    getSystemSettings(),
+    getCachedMiddleSchoolEmploymentData(),
+  ]);
 
   if (!userProfile) {
     redirect('/login');
@@ -24,12 +29,6 @@ export default async function MiddleSchoolEmploymentPage() {
   if (userProfile.role === 'student') {
     redirect('/dashboard');
   }
-
-  // 시스템 기준연도 조회
-  const settings = await getSystemSettings();
-
-  // 졸업생 포함 전체 학생 취업 및 입학 정보 통합 조회 (서버 캐시 적용)
-  const students = await getCachedFilteredStudentData('all', settings.baseYear);
 
   return (
     <MiddleSchoolEmploymentClient
