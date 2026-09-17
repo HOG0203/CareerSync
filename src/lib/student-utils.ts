@@ -109,8 +109,9 @@ export function parseCSVLine(line: string): string[] {
  * 전체 CSV 텍스트를 행별로 파싱 (줄바꿈이 따옴표 안에 있는 경우도 안전하게 처리)
  */
 export function parseCSVText(csvText: string): string[][] {
+  const cleanText = csvText.replace(/^\uFEFF/, '');
   const rows: string[][] = [];
-  const lines = csvText.split(/\r?\n/).filter(line => line.trim() !== '');
+  const lines = cleanText.split(/\r?\n/).filter(line => line.trim() !== '');
 
   for (const line of lines) {
     const parsed = parseCSVLine(line);

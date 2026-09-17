@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath, revalidateTag } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions'
 
 /**
@@ -76,11 +76,11 @@ export async function updatePersonalDetail(id: string, field: string, value: any
     return { success: false, error: '허용되지 않은 수정 항목입니다.' }
   }
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const { error } = await supabase
     .from('students')
-    .update({ [field]: (value === '' || value === 'CLEARED') ? null : value })
+    .update({ [field]: (value === '' || value === 'CLEARED') ? null : value, updated_at: new Date().toISOString() })
     .eq('id', id)
 
   if (error) return { success: false, error: error.message }
@@ -111,18 +111,29 @@ export async function updatePersonalDetail(id: string, field: string, value: any
  * 학생 인적사항 일괄 수정 (students 테이블 대상)
  */
 export async function bulkUpdatePersonalDetails(updates: { id: string, field: string, value: any }[]) {
+  if (!updates || updates.length === 0) return { success: true };
+
   const invalidField = updates.find(u => !ALLOWED_PERSONAL_FIELDS.includes(u.field as any))
   if (invalidField) {
     return { success: false, error: `허용되지 않은 수정 항목입니다: ${invalidField.field}` }
   }
 
-  const supabase = await createClient()
+  const supabase = createAdminClient()
+  const studentsMap = new Map<string, Record<string, any>>();
 
   for (const update of updates) {
-    await supabase
-      .from('students')
-      .update({ [update.field]: (update.value === '' || update.value === 'CLEARED') ? null : update.value })
-      .eq('id', update.id)
+    let record = studentsMap.get(update.id);
+    if (!record) {
+      record = { id: update.id, updated_at: new Date().toISOString() };
+      studentsMap.set(update.id, record);
+    }
+    record[update.field] = (update.value === '' || update.value === 'CLEARED') ? null : update.value;
+  }
+
+  const studentRecords = Array.from(studentsMap.values());
+  for (let i = 0; i < studentRecords.length; i += 100) {
+    const chunk = studentRecords.slice(i, i + 100);
+    await supabase.from('students').upsert(chunk, { onConflict: 'id' });
   }
 
   revalidateTag('students')

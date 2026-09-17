@@ -2,7 +2,8 @@
 
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
-import { FileUp, Download, CheckCircle2, FileText, Table } from 'lucide-react'
+import { FileUp, Download, CheckCircle2, FileText, Table, Eye, UserPlus, UserCheck, Loader2 } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -14,10 +15,27 @@ import {
 } from '@/components/ui/dialog'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
-import { uploadStudentsCSV, uploadBasicStudentsCSV } from '@/app/students/actions'
+import { uploadStudentsCSV, uploadBasicStudentsCSV, previewStudentCSV } from '@/app/students/actions'
 
 interface ImportButtonProps {
   defaultMode?: 'basic' | 'comprehensive';
+}
+
+interface PreviewResult {
+  totalCount: number;
+  newCount: number;
+  updateCount: number;
+  rows: Array<{
+    status: 'new' | 'update';
+    graduationYear: number;
+    major: string;
+    classInfo: string;
+    studentNumber: string;
+    name: string;
+    phone: string;
+    middleSchool?: string;
+    admissionRank?: number;
+  }>;
 }
 
 export function ImportButton({ defaultMode = 'comprehensive' }: ImportButtonProps) {
@@ -25,48 +43,86 @@ export function ImportButton({ defaultMode = 'comprehensive' }: ImportButtonProp
   const [mounted, setMounted] = React.useState(false)
   const [isOpen, setIsOpen] = React.useState(false)
   const [isPending, setIsPending] = React.useState(false)
+  const [isParsing, setIsParsing] = React.useState(false)
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null)
+  const [fileContent, setFileContent] = React.useState<string>('')
+  const [preview, setPreview] = React.useState<PreviewResult | null>(null)
   const { toast } = useToast()
 
   React.useEffect(() => {
     setMounted(true)
   }, [])
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) setSelectedFile(file)
-  }
+    if (!file) {
+      setSelectedFile(null)
+      setFileContent('')
+      setPreview(null)
+      return
+    }
 
-  // UTF-8 및 EUC-KR 인코딩 자동 감지 스마트 업로드
-  const handleUpload = async () => {
-    if (!selectedFile) return
+    setSelectedFile(file)
+    setIsParsing(true)
+    setPreview(null)
 
-    setIsPending(true)
     try {
-      const buffer = await selectedFile.arrayBuffer();
-      
-      // 1. UTF-8로 디코딩 시도 (fatal: true로 에러 감지)
+      const buffer = await file.arrayBuffer();
       let content = '';
       try {
         const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
         content = utf8Decoder.decode(buffer);
-      } catch (e) {
-        // UTF-8 실패 시 EUC-KR 디코딩
+      } catch (err) {
         const euckrDecoder = new TextDecoder('euc-kr');
         content = euckrDecoder.decode(buffer);
       }
 
+      setFileContent(content);
+
+      // 미리보기 서버 액션 호출
+      const res = await previewStudentCSV(content);
+      if (res.success && res.rows) {
+        setPreview({
+          totalCount: res.totalCount,
+          newCount: res.newCount,
+          updateCount: res.updateCount,
+          rows: res.rows
+        });
+      } else if (res.error) {
+        toast({
+          variant: "destructive",
+          title: "파일 분석 오류",
+          description: res.error
+        });
+      }
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "파일 읽기 오류",
+        description: err.message || "파일을 읽는 중 오류가 발생했습니다."
+      });
+    } finally {
+      setIsParsing(false);
+    }
+  }
+
+  // UTF-8 및 EUC-KR 인코딩 자동 감지 스마트 업로드
+  const handleUpload = async () => {
+    if (!selectedFile || !fileContent) return
+
+    setIsPending(true)
+    try {
       // 첫 행(헤더)을 읽어 컬럼 수 판별
-      const firstLine = content.split(/\r?\n/)[0] || '';
+      const firstLine = fileContent.split(/\r?\n/)[0] || '';
       const columnCount = firstLine.split(',').length;
 
       let result: any;
       if (columnCount <= 10) {
         // 기본 7개 컬럼 간편 서식
-        result = await uploadBasicStudentsCSV(content);
+        result = await uploadBasicStudentsCSV(fileContent);
       } else {
         // 30개 종합 서식
-        result = await uploadStudentsCSV(content);
+        result = await uploadStudentsCSV(fileContent);
       }
       
       if (result.error) {
@@ -81,6 +137,8 @@ export function ImportButton({ defaultMode = 'comprehensive' }: ImportButtonProp
           description: `${result.count}명의 학생 데이터가 성공적으로 반영되었습니다.` 
         });
         setSelectedFile(null);
+        setFileContent('');
+        setPreview(null);
         setIsOpen(false);
         router.refresh();
       }
@@ -88,11 +146,17 @@ export function ImportButton({ defaultMode = 'comprehensive' }: ImportButtonProp
       toast({
         variant: "destructive",
         title: '파일 처리 오류',
-        description: err.message || '파일을 읽는 중 오류가 발생했습니다.'
+        description: err.message || '파일을 처리하는 중 오류가 발생했습니다.'
       });
     } finally {
       setIsPending(false);
     }
+  }
+
+  const resetModal = () => {
+    setSelectedFile(null);
+    setFileContent('');
+    setPreview(null);
   }
 
   // 1. 취업·실습 종합 서식 다운로드 (31개 컬럼 - 학번 제외)
@@ -133,15 +197,15 @@ export function ImportButton({ defaultMode = 'comprehensive' }: ImportButtonProp
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={(open) => { setIsOpen(open); if (!open) resetModal(); }}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="h-8 sm:h-9 px-2 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl shadow-2xs">
           <FileUp className="mr-1 sm:mr-1.5 h-3.5 w-3.5" />
           가져오기
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px] rounded-2xl p-0 overflow-hidden border border-slate-200 shadow-2xl">
-        <DialogHeader className="p-5 bg-slate-50/80 border-b border-slate-100">
+      <DialogContent className="sm:max-w-[620px] max-h-[90vh] flex flex-col rounded-2xl p-0 overflow-hidden border border-slate-200 shadow-2xl">
+        <DialogHeader className="p-5 bg-slate-50/80 border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-100">
               <FileUp className="h-5 w-5 text-blue-600" />
@@ -151,13 +215,13 @@ export function ImportButton({ defaultMode = 'comprehensive' }: ImportButtonProp
                 학생 데이터 엑셀(CSV) 일괄 등록
               </DialogTitle>
               <DialogDescription className="text-xs text-slate-500 mt-0.5">
-                정해진 양식에 맞춰 작성된 CSV 파일을 업로드하면 데이터가 즉시 반영됩니다.
+                CSV 파일을 선택하면 등록 전 신규/기존 데이터 매칭 상태를 미리 확인할 수 있습니다.
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 overflow-y-auto flex-1">
           {/* 서식 다운로드 선택 섹션 */}
           <div className="space-y-2">
             <p className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -208,26 +272,93 @@ export function ImportButton({ defaultMode = 'comprehensive' }: ImportButtonProp
                 type="file"
                 accept=".csv"
                 onChange={handleFileChange}
-                disabled={isPending}
+                disabled={isPending || isParsing}
                 className="w-full text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"
               />
-              {selectedFile && (
+              {selectedFile && !isParsing && (
                 <p className="text-xs text-blue-600 font-bold mt-2 flex items-center gap-1">
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   선택됨: {selectedFile.name}
                 </p>
               )}
             </div>
-            <p className="text-[11px] text-slate-400">
-              * 엑셀에서 'CSV(쉼표로 분리) (*.csv)' 형식으로 저장한 파일을 선택하세요.
-            </p>
           </div>
+
+          {/* 미리보기 및 매칭 분석 요약 카드 */}
+          {isParsing && (
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-center gap-2 text-xs font-bold text-slate-600">
+              <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+              데이터 매칭 미리보기 분석 중...
+            </div>
+          )}
+
+          {preview && (
+            <div className="space-y-3 pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Eye className="h-3.5 w-3.5 text-blue-600" />
+                  3. 데이터 매칭 미리보기
+                </p>
+                <div className="flex items-center gap-2 text-[11px] font-bold">
+                  <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 gap-1 px-2 py-0.5">
+                    <UserPlus className="h-3 w-3" />
+                    신규 {preview.newCount}건
+                  </Badge>
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 gap-1 px-2 py-0.5">
+                    <UserCheck className="h-3 w-3" />
+                    수정 {preview.updateCount}건
+                  </Badge>
+                  <span className="text-slate-500">(총 {preview.totalCount}건)</span>
+                </div>
+              </div>
+
+              {/* 미리보기 목록 테이블 */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+                <table className="w-full text-left border-collapse text-[11px]">
+                  <thead className="bg-slate-100 text-slate-600 font-bold sticky top-0 border-b border-slate-200">
+                    <tr>
+                      <th className="p-2 w-16 text-center">구분</th>
+                      <th className="p-2">성명</th>
+                      <th className="p-2">졸업연도</th>
+                      <th className="p-2">학과</th>
+                      <th className="p-2">반/번호</th>
+                      <th className="p-2">출신중</th>
+                      <th className="p-2">석차%</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {preview.rows.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="p-2 text-center">
+                          {row.status === 'new' ? (
+                            <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white text-[10px] px-1.5 py-0 rounded font-bold">
+                              신규
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-blue-600 hover:bg-blue-600 text-white text-[10px] px-1.5 py-0 rounded font-bold">
+                              수정
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="p-2 font-bold text-slate-900">{row.name || '-'}</td>
+                        <td className="p-2 text-slate-600">{row.graduationYear}년</td>
+                        <td className="p-2 text-slate-600">{row.major || '-'}</td>
+                        <td className="p-2 text-slate-600">{row.classInfo ? `${row.classInfo}반` : '-'} {row.studentNumber ? `${row.studentNumber}번` : ''}</td>
+                        <td className="p-2 text-slate-600">{row.middleSchool || '-'}</td>
+                        <td className="p-2 text-slate-600">{row.admissionRank !== undefined && row.admissionRank !== null ? `${row.admissionRank}%` : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
 
-        <DialogFooter className="p-4 bg-slate-50/80 border-t border-slate-100 flex sm:justify-end gap-2">
+        <DialogFooter className="p-4 bg-slate-50/80 border-t border-slate-100 flex sm:justify-end gap-2 shrink-0">
           <Button 
             variant="outline" 
-            onClick={() => { setIsOpen(false); setSelectedFile(null); }} 
+            onClick={() => { setIsOpen(false); resetModal(); }} 
             disabled={isPending}
             className="h-9 px-4 text-xs font-bold rounded-xl"
           >
@@ -235,7 +366,7 @@ export function ImportButton({ defaultMode = 'comprehensive' }: ImportButtonProp
           </Button>
           <Button 
             onClick={handleUpload} 
-            disabled={!selectedFile || isPending}
+            disabled={!selectedFile || !fileContent || isPending || isParsing}
             className="h-9 px-5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm"
           >
             {isPending ? '등록 진행 중...' : '일괄 등록 시작'}
@@ -245,4 +376,3 @@ export function ImportButton({ defaultMode = 'comprehensive' }: ImportButtonProp
     </Dialog>
   )
 }
-
