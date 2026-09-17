@@ -24,29 +24,42 @@ async function StudentsPageContent({
 }) {
   const params = searchParams;
 
-  // 1. 학사학년도(AY)와 학년(Grade) 기반 졸업연도 사전 계산
-  const ay = params.ay ? parseInt(params.ay) : 2026;
-  const grade = params.grade ? parseInt(params.grade) : 3;
-  const defaultGradYear = (ay + (4 - grade)).toString();
-  
-  // params.grade가 명시된 경우 학년 기반으로 정확한 졸업연도 산출
-  const selectedYear = params.grade 
-    ? (ay + (4 - grade)).toString() 
-    : (params.year || defaultGradYear);
-
-  // 2. 기반 설정, 마스터 정보, 프로필, 학생 데이터를 완전한 1회 병렬(Promise.all)로 동시 패칭 (속도 2배 향상)
-  const [settings, graduationYears, masterCertificates, masterCompanies, userProfile, rawStudentData] = await Promise.all([
+  // 1. 프로필 및 세팅 사전 패칭
+  const [settings, graduationYears, masterCertificates, masterCompanies, userProfile] = await Promise.all([
     getSystemSettings(),
     getCachedGraduationYears(),
     getCachedMasterCertificates(),
     getCachedRegisteredCompanies(),
     getCurrentUserProfile(),
-    getCachedFilteredStudentData(selectedYear, ay)
   ]);
 
   if (!userProfile) {
     redirect('/login');
   }
+
+  const ay = params.ay ? parseInt(params.ay) : settings.baseYear;
+
+  // 담임교사 접속 시 URL 파라미터가 없으면 본인 담당 학년으로 자동 기본값 설정
+  let effectiveGradeStr: string = params.grade || '';
+  if (!effectiveGradeStr) {
+    if (userProfile.role === 'teacher' && userProfile.assigned_grade) {
+      effectiveGradeStr = userProfile.assigned_grade.toString();
+    } else {
+      effectiveGradeStr = '3'; // 관리자는 3학년 기본값
+    }
+  }
+
+  // selectedYear 계산 ('all'인 경우 재학생 전원 'enrolled' 모드)
+  let selectedYear = 'all';
+  if (effectiveGradeStr === 'all') {
+    selectedYear = 'enrolled';
+  } else {
+    const gradeNum = parseInt(effectiveGradeStr) || 3;
+    selectedYear = (ay + (4 - gradeNum)).toString();
+  }
+
+  // 2. 해당 학년/졸업연도 학생 데이터 패칭
+  const rawStudentData = await getCachedFilteredStudentData(selectedYear, ay);
 
   const isAdmin = userProfile.role === 'admin';
   const isTeacher = userProfile.role === 'teacher';
@@ -54,13 +67,13 @@ async function StudentsPageContent({
 
   let allStudentData = rawStudentData;
 
-
   // 교직원일 경우 본인 담당 학반 데이터만 추출 (관리자는 전체)
   if (isTeacher && userProfile.assigned_grade) {
     const teacherGradYear = (ay + (4 - userProfile.assigned_grade)).toString();
-    if (selectedYear !== teacherGradYear) {
+    if (selectedYear !== 'enrolled' && selectedYear !== teacherGradYear) {
       allStudentData = [];
     } else {
+      allStudentData = allStudentData.filter(s => s.graduation_year === parseInt(teacherGradYear));
       if (userProfile.assigned_major) {
         allStudentData = allStudentData.filter(s => s.major === userProfile.assigned_major);
       }
@@ -107,7 +120,7 @@ async function StudentsPageContent({
             </div>
             학생 취업 현황
             <span className="text-[11px] bg-blue-600 text-white px-2.5 py-0.5 rounded-full font-black whitespace-nowrap">
-              {ay}학년도 {grade}학년
+              {ay}학년도 {effectiveGradeStr === 'all' ? '전체 학년' : `${effectiveGradeStr}학년`}
             </span>
           </h2>
           <p className="text-slate-500 text-xs font-medium">
@@ -128,7 +141,7 @@ async function StudentsPageContent({
           userProfile={userProfile}
           baseYear={settings.baseYear}
           currentAY={ay}
-          grade={grade}
+          grade={effectiveGradeStr}
           selectedYear={selectedYear}
           academicYears={academicYears}
         />

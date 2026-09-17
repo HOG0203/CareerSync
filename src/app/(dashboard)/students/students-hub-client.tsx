@@ -34,7 +34,7 @@ interface StudentsHubClientProps {
   userProfile: any;
   baseYear: number;
   currentAY: number;
-  grade: number;
+  grade: number | string;
   selectedYear: string;
   academicYears: number[];
 }
@@ -57,25 +57,33 @@ export function StudentsHubClient({
   const [searchTerm, setSearchTerm] = React.useState('');
   const [selectedMajor, setSelectedMajor] = React.useState<string>('all');
   const [selectedClass, setSelectedClass] = React.useState<string>('all');
-  const [selectedStatus, setSelectedStatus] = React.useState<string>('취업');
+  const [selectedStatus, setSelectedStatus] = React.useState<string>(searchParams.get('status') || 'all');
 
   const handleAYChange = (newAYStr: string) => {
     const params = new URLSearchParams(searchParams.toString());
     const newAY = parseInt(newAYStr);
-    const gradYear = newAY + (4 - grade);
     params.set('ay', newAYStr);
     params.set('grade', String(grade));
-    params.set('year', String(gradYear));
+    if (String(grade) === 'all') {
+      params.set('year', 'enrolled');
+    } else {
+      const gradeNum = typeof grade === 'number' ? grade : (parseInt(grade) || 3);
+      params.set('year', String(newAY + (4 - gradeNum)));
+    }
     router.push(`/students?${params.toString()}`);
   };
 
   const handleGradeChange = (newGradeStr: string) => {
     const params = new URLSearchParams(searchParams.toString());
-    const newGrade = parseInt(newGradeStr);
-    const gradYear = currentAY + (4 - newGrade);
     params.set('ay', String(currentAY));
     params.set('grade', newGradeStr);
-    params.set('year', String(gradYear));
+    if (newGradeStr === 'all') {
+      params.set('year', 'enrolled');
+    } else {
+      const newGrade = parseInt(newGradeStr);
+      const gradYear = currentAY + (4 - newGrade);
+      params.set('year', String(gradYear));
+    }
     router.push(`/students?${params.toString()}`);
   };
 
@@ -266,6 +274,7 @@ export function StudentsHubClient({
                   <SelectValue placeholder="학년" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
+                  <SelectItem value="all" className="text-xs font-bold text-slate-800">전체 학년</SelectItem>
                   <SelectItem value="3" className="text-xs font-bold text-slate-800">3학년</SelectItem>
                   <SelectItem value="2" className="text-xs font-bold text-slate-800">2학년</SelectItem>
                   <SelectItem value="1" className="text-xs font-bold text-slate-800">1학년</SelectItem>

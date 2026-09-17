@@ -89,7 +89,8 @@ export async function getDashboardStudentData(graduationYear: string, baseYear?:
 export async function getFilteredStudentData(graduationYear: string, baseYear?: number): Promise<StudentEmploymentData[]> {
   const supabase = createAdminClient();
 
-  const isAllStudents = graduationYear === 'all';
+  const isEnrolled = graduationYear === 'enrolled';
+  const isAllStudents = graduationYear === 'all' || isEnrolled;
   const gradYearInt = parseInt(graduationYear);
 
   const STUDENT_FIELDS_WITH_ADMISSION = 'id, student_name, phone_number, graduation_year, major, class_info, student_number, certificates, career_aspiration, career_course, special_notes, personal_remarks, labor_education_status, military_status, desired_work_area, parents_opinion, shoe_size, top_size, middle_school, admission_rank_percentile, admission_type, student_employments (id, is_desiring_employment, employment_status, company_type, business_type, company, remarks)';
@@ -110,7 +111,10 @@ export async function getFilteredStudentData(graduationYear: string, baseYear?: 
       .order('student_number')
       .range(from, from + PAGE_SIZE - 1);
 
-    if (!isAllStudents && !isNaN(gradYearInt)) {
+    if (isEnrolled) {
+      const by = baseYear || 2026;
+      studentQuery = studentQuery.in('graduation_year', [by + 1, by + 2, by + 3]);
+    } else if (!isAllStudents && !isNaN(gradYearInt)) {
       studentQuery = studentQuery.eq('graduation_year', gradYearInt);
     }
 
@@ -254,7 +258,7 @@ export async function getCachedFilteredStudentData(graduationYear: string, baseY
       async () => getFilteredStudentData(graduationYear, baseYear),
       [`filtered-student-data-v2-${cacheKey}`],
       {
-        revalidate: 86400,
+        revalidate: 60,
         tags: graduationYear === 'all' ? ['students', 'teachers'] : [`emp-status-${graduationYear}`, 'students', 'teachers']
       }
     );
@@ -307,7 +311,7 @@ export async function getCachedLaborEducationData(graduationYear: number): Promi
       async () => fetchLaborEducationData(graduationYear),
       [`labor-education-data-${graduationYear}`],
       {
-        revalidate: 86400,
+        revalidate: 60,
         tags: [`labor-${graduationYear}`, 'students']
       }
     );
@@ -374,7 +378,7 @@ export async function getCachedAdminStudentData(graduationYear: number): Promise
       async () => fetchAdminStudentData(graduationYear),
       [`admin-student-data-${graduationYear}`],
       {
-        revalidate: 86400,
+        revalidate: 60,
         tags: [`admin-students-${graduationYear}`, 'students']
       }
     );
@@ -505,7 +509,7 @@ export async function getCachedAssignedStudentDetails(major: string, classInfo: 
       async () => getAssignedStudentDetails(major, classInfo, graduationYear, baseYear),
       [`assigned-student-details-${cacheKey}`],
       {
-        revalidate: 86400,
+        revalidate: 60,
         tags: [`assigned-${graduationYear}-${classInfo}`, 'students']
       }
     );
@@ -891,7 +895,7 @@ export async function getCachedYearlyRankingsSummary(graduationYear: number, bas
       async () => getYearlyRankingsSummary(graduationYear, baseYear),
       [`yearly-rankings-summary-${cacheKey}`],
       {
-        revalidate: 86400,
+        revalidate: 60,
         tags: [`rankings-${graduationYear}`, 'students', 'student_scores']
       }
     );

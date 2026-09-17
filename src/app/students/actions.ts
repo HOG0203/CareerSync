@@ -497,16 +497,44 @@ export async function uploadStudentsCSV(csvData: string) {
       student_number
     });
 
-    // 취업 정보 페이로드
-    employmentsPayloads.push({
-      id: studentId,
-      is_desiring_employment: values[15 + offset] || '예',
-      employment_status: values[16 + offset] || null, // 최종진로코스
-      business_type: values[17 + offset] || '아니오',  // 취업현황
-      company_type: values[18 + offset] || null,
-      company: values[19 + offset] || null,
-      updated_at: new Date().toISOString()
-    });
+    // 취업 정보 페이로드 (신규 학생이거나, CSV 행에 취업 데이터가 포함된 경우만 반영)
+    if (isNew) {
+      employmentsPayloads.push({
+        id: studentId,
+        is_desiring_employment: values[15 + offset] || '예',
+        employment_status: values[16 + offset] || null, // 최종진로코스
+        business_type: (values[17 + offset] && values[17 + offset] !== '아니오') ? values[17 + offset] : '미취업',  // 취업현황
+        company_type: values[18 + offset] || null,
+        company: values[19 + offset] || null,
+        updated_at: new Date().toISOString()
+      });
+    } else {
+      const empUpdate: any = { id: studentId, updated_at: new Date().toISOString() };
+      let hasEmpField = false;
+      if (values[15 + offset] !== undefined && values[15 + offset] !== '') {
+        empUpdate.is_desiring_employment = values[15 + offset];
+        hasEmpField = true;
+      }
+      if (values[16 + offset] !== undefined && values[16 + offset] !== '') {
+        empUpdate.employment_status = values[16 + offset];
+        hasEmpField = true;
+      }
+      if (values[17 + offset] !== undefined && values[17 + offset] !== '' && values[17 + offset] !== '아니오') {
+        empUpdate.business_type = values[17 + offset];
+        hasEmpField = true;
+      }
+      if (values[18 + offset] !== undefined && values[18 + offset] !== '') {
+        empUpdate.company_type = values[18 + offset];
+        hasEmpField = true;
+      }
+      if (values[19 + offset] !== undefined && values[19 + offset] !== '') {
+        empUpdate.company = values[19 + offset];
+        hasEmpField = true;
+      }
+      if (hasEmpField) {
+        employmentsPayloads.push(empUpdate);
+      }
+    }
 
     // 실습 정보 페이로드
     const trainingCompany = values[21 + offset];
@@ -715,12 +743,15 @@ export async function uploadBasicStudentsCSV(csvData: string) {
       student_number
     });
 
-    employmentsPayloads.push({
-      id: studentId,
-      is_desiring_employment: '예',
-      business_type: '미취업',
-      updated_at: new Date().toISOString()
-    });
+    // 신규 학생인 경우에만 기본 취업 정보 페이로드 생성 (기존 학생의 취업희망/취업현황 데이터 보존)
+    if (isNew) {
+      employmentsPayloads.push({
+        id: studentId,
+        is_desiring_employment: '예',
+        business_type: '미취업',
+        updated_at: new Date().toISOString()
+      });
+    }
   }
 
   if (studentPayloads.length === 0) return { success: false, count: 0, error: '유효한 학생 데이터가 없습니다.' };
@@ -889,6 +920,12 @@ export async function updateStudentField(id: string, field: string, value: any) 
 
   revalidateTag('students');
   revalidateTag('student-accounts');
+  revalidatePath('/students');
+  revalidatePath('/admin/students');
+  revalidatePath('/class-management');
+  revalidatePath('/employment-status');
+  revalidatePath('/dashboard');
+  revalidatePath('/field-training');
   return { success: true }
 }
 
