@@ -647,111 +647,7 @@ export function InteractiveTeacherTimetable({
                     );
                   }
 
-                  // 1) 교사가 직접 인솔/담당하는 행사가 있는 경우 (행사 수업 진행)
-                  if (hasEvent) {
-                    const teacherHomeroom = selectedTeacher?.homeroomClass?.trim();
-
-                    // 🌟 행사 시 담당 교사의 학반 우선 결정:
-                    // 1순위: 담당 교사의 담임 학반 (예: 기11, 섬31, 화12 등)
-                    // 2순위: 행사에 특정 학반(targetClasses)이 지정되어 있는 경우
-                    // 3순위: 해당 시간표 슬롯의 원래 학반 (slot?.classCode)
-                    // 4순위: 학년별 행사 표기 (예: '1학년')
-                    // 5순위: 전교생 표기 ('전교생')
-                    let eventClassCode = '';
-                    if (teacherHomeroom) {
-                      eventClassCode = teacherHomeroom;
-                    } else if (mainEvent.targetScope === 'class' && mainEvent.targetClasses && mainEvent.targetClasses.length > 0) {
-                      eventClassCode = mainEvent.targetClasses.join(',');
-                    } else if (slot?.classCode && slot.classCode.trim() !== '') {
-                      eventClassCode = slot.classCode;
-                    } else if (mainEvent.targetScope === 'grade') {
-                      eventClassCode = `${mainEvent.targetGrades?.join(',') || '1'}학년`;
-                    } else if (mainEvent.targetScope === 'all') {
-                      eventClassCode = '전교생';
-                    } else {
-                      eventClassCode = '전체';
-                    }
-
-                    const eventSlot: TimetableSlot = {
-                      id: `event-${mainEvent.id}-${d.key}-${period}`,
-                      teacherName: selectedTeacherName,
-                      homeroomClass: selectedTeacher?.homeroomClass || '',
-                      day: d.key,
-                      period,
-                      subjectName: `[행사] ${mainEvent.title}`,
-                      classCode: eventClassCode,
-                      deptName: slot?.deptName || selectedTeacher?.remarks || '전체',
-                      grade: teacherHomeroom
-                        ? parseInt(teacherHomeroom.match(/\d/)?.[0] || '1', 10)
-                        : (mainEvent.targetGrades?.[0] || slot?.grade || 1),
-                      classNum: teacherHomeroom
-                        ? parseInt(teacherHomeroom.match(/\d+/)?.[0]?.slice(1) || '1', 10)
-                        : (slot?.classNum || 1),
-                      weight: 1,
-                      isActivity: true,
-                      activityType: '행사',
-                    };
-
-                    return (
-                      <td key={d.key} className="p-1 border-r last:border-r-0 border-slate-200">
-                        <button
-                          type="button"
-                          onClick={() => handleSlotClick(d.key, period, eventSlot)}
-                          className={cn(
-                            "w-full h-full min-h-[52px] p-2 rounded-xl border-[1.5px] transition-all flex flex-col items-center justify-between text-center relative group shadow-2xs cursor-pointer",
-                            isSelected
-                              ? "border-purple-600 bg-purple-600 text-white ring-2 ring-purple-600 ring-offset-2 scale-[1.03] shadow-md z-10"
-                              : "border-purple-300 bg-purple-50/90 hover:border-purple-400 hover:bg-purple-100/90 hover:scale-[1.01]"
-                          )}
-                        >
-                          {/* 선택 체크마크 뱃지 */}
-                          {isSelected && (
-                            <div className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-white text-purple-600 flex items-center justify-center shadow-xs text-xs font-black ring-1 ring-purple-600">
-                              ✓
-                            </div>
-                          )}
-
-                          <span className={cn(
-                            "font-black text-[11px] truncate max-w-full",
-                            isSelected ? "text-white" : "text-purple-950"
-                          )}>
-                            🎭 {mainEvent.title}
-                          </span>
-
-                          <div className={cn(
-                            "flex items-center gap-1 text-[9.5px] font-bold mt-0.5",
-                            isSelected ? "text-purple-100" : "text-purple-700"
-                          )}>
-                            <span>{eventClassCode}</span>
-                            {mainEvent.location && (
-                              <span className={isSelected ? "text-purple-200" : "text-purple-500"}>· {mainEvent.location}</span>
-                            )}
-                          </div>
-                        </button>
-                      </td>
-                    );
-                  }
-
-                  // 2) 교사는 인솔자가 아니나, 해당 학급 학생들이 행사에 참여하여 수업이 없어진 경우 (수업 취소 / 공강!)
-                  if (hasClassEvent) {
-                    return (
-                      <td key={d.key} className="p-1 border-r last:border-r-0 border-slate-200 h-14">
-                        <div 
-                          className="w-full h-full min-h-[48px] max-h-[48px] p-1 rounded-xl border border-dashed border-slate-300 bg-slate-50/80 flex flex-col items-center justify-center text-center shadow-2xs select-none"
-                          title={`${slot?.classCode || '학급'} 학생들이 '${mainClassEvent.title}' 행사에 참여하여 수업이 없습니다 (공강)`}
-                        >
-                          <span className="font-bold text-[10px] text-slate-500 truncate max-w-full line-through decoration-slate-400">
-                            {slot?.subjectName} ({slot?.classCode})
-                          </span>
-                          <span className="text-[8.5px] font-black text-amber-700 bg-amber-100/80 px-1.5 py-0.2 rounded-full border border-amber-200 mt-0.5 shadow-2xs">
-                            공강 ({mainClassEvent.title})
-                          </span>
-                        </div>
-                      </td>
-                    );
-                  }
-
-                  // 3. 결보강 / 교체 승인 또는 신청된 변동 슬롯이 존재하는 경우
+                  // 1. 🌟 결보강 / 교체 승인 또는 신청된 변동 슬롯이 존재하는 경우 (행사 슬롯보다 최우선 렌더링!)
                   if (effectiveInfo) {
                     const isApproved = effectiveInfo.status === 'approved';
                     const isPending = !isApproved;
@@ -766,7 +662,7 @@ export function InteractiveTeacherTimetable({
                       homeroomClass: selectedTeacher?.homeroomClass || '',
                       day: d.key,
                       period,
-                      subjectName: effectiveInfo.subjectName || slot?.subjectName || '',
+                      subjectName: effectiveInfo.subjectName || slot?.subjectName || (mainEvent ? `[행사] ${mainEvent.title}` : mainClassEvent ? `[행사공강] ${mainClassEvent.title}` : '수업'),
                       classCode: effectiveInfo.classCode || slot?.classCode || '',
                       deptName: effectiveInfo.deptName || slot?.deptName || '전체',
                       grade: 1,
@@ -866,7 +762,7 @@ export function InteractiveTeacherTimetable({
                               ? "text-indigo-950 font-black" 
                               : "text-slate-900 font-extrabold"
                           )}>
-                            {effectiveInfo.subjectName || slot?.subjectName || '수업'}
+                            {effectiveInfo.subjectName || slot?.subjectName || (mainEvent ? `[행사] ${mainEvent.title}` : '수업')}
                           </span>
 
                           {/* 학반 및 교체/보강 상대 교사 정보 (한 줄 인라인 콤팩트 배치) */}
@@ -905,6 +801,139 @@ export function InteractiveTeacherTimetable({
                               {isExchangeOut && `➔ ${effectiveInfo.partnerTeacher}`}
                             </span>
                           </div>
+                        </button>
+                      </td>
+                    );
+                  }
+
+                  // 2) 교사가 직접 인솔/담당하는 행사가 있는 경우 (클릭하여 결보강/교체 신청 가능)
+                  if (hasEvent) {
+                    const teacherHomeroom = selectedTeacher?.homeroomClass?.trim();
+
+                    let eventClassCode = '';
+                    if (teacherHomeroom) {
+                      eventClassCode = teacherHomeroom;
+                    } else if (mainEvent.targetScope === 'class' && mainEvent.targetClasses && mainEvent.targetClasses.length > 0) {
+                      eventClassCode = mainEvent.targetClasses.join(',');
+                    } else if (slot?.classCode && slot.classCode.trim() !== '') {
+                      eventClassCode = slot.classCode;
+                    } else if (mainEvent.targetScope === 'grade') {
+                      eventClassCode = `${mainEvent.targetGrades?.join(',') || '1'}학년`;
+                    } else if (mainEvent.targetScope === 'all') {
+                      eventClassCode = '전교생';
+                    } else {
+                      eventClassCode = '전체';
+                    }
+
+                    const eventSlot: TimetableSlot = {
+                      id: `event-${mainEvent.id}-${d.key}-${period}`,
+                      teacherName: selectedTeacherName,
+                      homeroomClass: selectedTeacher?.homeroomClass || '',
+                      day: d.key,
+                      period,
+                      subjectName: slot?.subjectName ? `${slot.subjectName} ([행사] ${mainEvent.title})` : `[행사] ${mainEvent.title}`,
+                      classCode: eventClassCode || slot?.classCode || '',
+                      deptName: slot?.deptName || selectedTeacher?.remarks || '전체',
+                      grade: teacherHomeroom
+                        ? parseInt(teacherHomeroom.match(/\d/)?.[0] || '1', 10)
+                        : (mainEvent.targetGrades?.[0] || slot?.grade || 1),
+                      classNum: teacherHomeroom
+                        ? parseInt(teacherHomeroom.match(/\d+/)?.[0]?.slice(1) || '1', 10)
+                        : (slot?.classNum || 1),
+                      weight: 1,
+                      isActivity: true,
+                      activityType: '행사',
+                    };
+
+                    return (
+                      <td key={d.key} className="p-1 border-r last:border-r-0 border-slate-200">
+                        <button
+                          type="button"
+                          onClick={() => handleSlotClick(d.key, period, eventSlot)}
+                          className={cn(
+                            "w-full h-full min-h-[52px] p-2 rounded-xl border-[1.5px] transition-all flex flex-col items-center justify-between text-center relative group shadow-2xs cursor-pointer",
+                            isSelected
+                              ? "border-purple-600 bg-purple-600 text-white ring-2 ring-purple-600 ring-offset-2 scale-[1.03] shadow-md z-10"
+                              : "border-purple-300 bg-purple-50/90 hover:border-purple-400 hover:bg-purple-100/90 hover:scale-[1.01]"
+                          )}
+                        >
+                          {/* 선택 체크마크 뱃지 */}
+                          {isSelected && (
+                            <div className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-white text-purple-600 flex items-center justify-center shadow-xs text-xs font-black ring-1 ring-purple-600">
+                              ✓
+                            </div>
+                          )}
+
+                          <span className={cn(
+                            "font-black text-[11px] truncate max-w-full",
+                            isSelected ? "text-white" : "text-purple-950"
+                          )}>
+                            🎭 {mainEvent.title}
+                          </span>
+
+                          <div className={cn(
+                            "flex items-center gap-1 text-[9.5px] font-bold mt-0.5",
+                            isSelected ? "text-purple-100" : "text-purple-700"
+                          )}>
+                            <span>{eventClassCode}</span>
+                            {mainEvent.location && (
+                              <span className={isSelected ? "text-purple-200" : "text-purple-500"}>· {mainEvent.location}</span>
+                            )}
+                          </div>
+                        </button>
+                      </td>
+                    );
+                  }
+
+                  // 3) 교사는 인솔자가 아니나, 해당 학급 학생들이 행사에 참여하여 수업이 없어진 경우 (클릭하여 결보강/교체 신청 가능)
+                  if (hasClassEvent) {
+                    const classEventSlot: TimetableSlot = {
+                      id: `classevent-${mainClassEvent.id}-${d.key}-${period}`,
+                      teacherName: selectedTeacherName,
+                      homeroomClass: slot?.classCode || selectedTeacher?.homeroomClass || '',
+                      day: d.key,
+                      period,
+                      subjectName: slot?.subjectName || `[행사] ${mainClassEvent.title}`,
+                      classCode: slot?.classCode || '',
+                      deptName: slot?.deptName || '전체',
+                      grade: slot?.grade || 1,
+                      classNum: slot?.classNum || 1,
+                      weight: 1,
+                      isActivity: true,
+                      activityType: '행사공강',
+                    };
+
+                    return (
+                      <td key={d.key} className="p-1 border-r last:border-r-0 border-slate-200 h-14">
+                        <button
+                          type="button"
+                          onClick={() => handleSlotClick(d.key, period, classEventSlot)}
+                          className={cn(
+                            "w-full h-full min-h-[48px] max-h-[48px] p-1.5 rounded-xl border-[1.5px] transition-all flex flex-col items-center justify-between text-center relative group shadow-2xs cursor-pointer",
+                            isSelected
+                              ? "border-amber-600 bg-amber-600 text-white ring-2 ring-amber-600 ring-offset-2 scale-[1.03] shadow-md z-10"
+                              : "border-dashed border-amber-300 bg-amber-50/70 hover:border-amber-400 hover:bg-amber-100/80"
+                          )}
+                          title={`${slot?.classCode || '학급'} 학생들이 '${mainClassEvent.title}' 행사에 참여함 (클릭하여 결보강/교체 신청 가능)`}
+                        >
+                          {isSelected && (
+                            <div className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-white text-amber-600 flex items-center justify-center shadow-xs text-xs font-black ring-1 ring-amber-600">
+                              ✓
+                            </div>
+                          )}
+
+                          <span className={cn(
+                            "font-bold text-[10.5px] truncate max-w-full leading-tight",
+                            isSelected ? "text-white line-through decoration-white/70" : "text-slate-600 line-through decoration-slate-400"
+                          )}>
+                            {slot?.subjectName || '수업'} ({slot?.classCode})
+                          </span>
+                          <span className={cn(
+                            "text-[8.5px] font-black px-1.5 py-0.2 rounded-full border mt-0.5 shadow-2xs",
+                            isSelected ? "bg-white text-amber-900 border-white" : "bg-amber-100 text-amber-800 border-amber-200"
+                          )}>
+                            공강 ({mainClassEvent.title})
+                          </span>
                         </button>
                       </td>
                     );
