@@ -156,6 +156,7 @@ export function useSpreadsheet({
   const [history, setHistory] = React.useState<{ id: string; field: string; oldValue: any }[][]>([])
   const [redoStack, setRedoStack] = React.useState<{ id: string; field: string; newValue: any }[][]>([])
   const isSyncingRef = React.useRef(false)
+  const recentEditsRef = React.useRef<Map<string, { field: string; value: any; timestamp: number }>>(new Map())
 
   const recordHistory = React.useCallback((updates: { id: string; field: string; oldValue: any }[]) => {
     if (isSyncingRef.current) return;
@@ -207,7 +208,33 @@ export function useSpreadsheet({
     setTimeout(() => { isSyncingRef.current = false; }, 500);
   }, [redoStack, data, onBulkSave, toast, router])
 
-  React.useEffect(() => { if (!isSyncingRef.current) { setData(initialData); } }, [initialData])
+  React.useEffect(() => {
+    if (isSyncingRef.current) return;
+
+    // 최근 5초 이내 사용자가 수정한 항목이 있으면 서버의 stale initialData로 인한 롤백 차단
+    const now = Date.now();
+    const cleanEdits = new Map<string, { field: string; value: any; timestamp: number }>();
+    recentEditsRef.current.forEach((val, key) => {
+      if (now - val.timestamp < 5000) {
+        cleanEdits.set(key, val);
+      }
+    });
+    recentEditsRef.current = cleanEdits;
+
+    if (cleanEdits.size > 0) {
+      setData(initialData.map(student => {
+        let merged = { ...student };
+        cleanEdits.forEach((edit, key) => {
+          if (key.startsWith(`${student.id}-`)) {
+            merged[edit.field] = edit.value;
+          }
+        });
+        return merged;
+      }));
+    } else {
+      setData(initialData);
+    }
+  }, [initialData])
   React.useEffect(() => { setInternalSelectedRowIds([]); setSelectionStart(null); setSelectionEnd(null); }, [initialData])
 
   // Filter options (faceted) - Optimized Linear Pass
@@ -558,8 +585,13 @@ export function useSpreadsheet({
       }
       if (updates.length > 0) {
         recordHistory(historyUpdates); setData(newData);
+        updates.forEach(u => {
+          recentEditsRef.current.set(`${u.id}-${u.field}`, { field: u.field, value: u.value, timestamp: Date.now() });
+        });
+        isSyncingRef.current = true;
         const result = await onBulkSave(updates);
         if (result.success) toast({ title: '붙여넣기 완료' }); else toast({ variant: 'destructive', title: '저장 실패', description: result.error });
+        setTimeout(() => { isSyncingRef.current = false; }, 1500);
       }
     } catch { toast({ variant: 'destructive', title: '붙여넣기 실패' }); }
   }, [selectionStart, selectionEnd, filteredData, columns, data, onBulkSave, toast, recordHistory])
@@ -585,8 +617,13 @@ export function useSpreadsheet({
     }
     if (updates.length > 0) {
       recordHistory(hUpdates); setData(newData);
+      updates.forEach(u => {
+        recentEditsRef.current.set(`${u.id}-${u.field}`, { field: u.field, value: u.value, timestamp: Date.now() });
+      });
+      isSyncingRef.current = true;
       const result = await onBulkSave(updates);
       if (result.success) toast({ title: '셀 지우기 완료' }); else toast({ variant: 'destructive', title: '삭제 실패' });
+      setTimeout(() => { isSyncingRef.current = false; }, 1500);
     }
   }, [editingCell, selectionStart, selectionEnd, filteredData, columns, data, onBulkSave, toast, recordHistory])
 
@@ -618,19 +655,34 @@ export function useSpreadsheet({
 
     // 1. 즉시 0ms 낙관적 UI 업데이트 (편집 상자 바로 닫기 및 화면 즉시 변경)
     setEditingCell(null);
+    isSyncingRef.current = true;
+    recentEditsRef.current.set(`${id}-${field}`, { field, value: finalValue, timestamp: Date.now() });
+
     if (student) recordHistory([{ id, field, oldValue }]);
     setData(prev => prev.map(s => s.id === id ? { ...s, [field]: finalValue, ...optimisticTraining } : s));
     setDetailData((prev: any) => (prev && prev.id === id) ? { ...prev, [field]: finalValue, ...optimisticTraining } : prev);
 
     // 2. 백그라운드 서버 DB 저장
-    const result = await onSave(id, field, finalValue);
+    let result: any;
+    try {
+      result = await onSave(id, field, finalValue);
+    } catch (err: any) {
+      result = { success: false, error: err?.message || '네트워크 통신 오류가 발생했습니다.' };
+    }
 
     // 3. 서버 저장 실패 시 원래 값으로 롤백 및 알림
     if (!result || !result.success) {
+      recentEditsRef.current.delete(`${id}-${field}`);
       setData(prev => prev.map(s => s.id === id ? { ...s, [field]: oldValue, ...optimisticOldTraining } : s));
-      toast({ variant: 'destructive', title: '저장 실패', description: result?.error || '서버 저증 중 오류가 발생했습니다.' });
+      toast({ variant: 'destructive', title: '저장 실패', description: result?.error || '서버 저장 중 오류가 발생했습니다.' });
+      isSyncingRef.current = false;
       return result || { success: false };
     }
+
+    // 성공 시: 잠시 sync lock을 유지하여 revalidatePath로 인한 stale initialData 유입 차단
+    setTimeout(() => {
+      isSyncingRef.current = false;
+    }, 1500);
 
     return result;
   }, [onSave, filteredData, columns, data, recordHistory, toast])

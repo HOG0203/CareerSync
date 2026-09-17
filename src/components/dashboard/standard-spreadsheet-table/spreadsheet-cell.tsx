@@ -157,7 +157,7 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
               }
             }}
             onOpenChange={(open) => {
-              if (!open && !isManualRef.current) {
+              if (!open && !isManualRef.current && !isCommittingRef.current) {
                 onEndEdit();
               }
             }}
@@ -173,7 +173,7 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
               collisionPadding={8}
               className="z-[9999] max-h-60 !duration-0 !animate-none !transition-none transform-none border border-slate-200 shadow-xl bg-white min-w-[var(--radix-select-trigger-width)] text-[11px]"
             >
-              {resolvedOptions?.map((opt: any) => (
+              {resolvedOptions?.filter((opt: any) => opt && opt.value !== '' && opt.value !== undefined && opt.value !== null).map((opt: any) => (
                 <SelectItem key={opt.value} value={opt.value} className="text-[11px] py-1.5 cursor-pointer focus:bg-blue-50 focus:text-blue-700 font-medium">
                   {opt.label}
                 </SelectItem>
@@ -399,7 +399,9 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
   p.onMouseDown === n.onMouseDown &&
   p.onMouseEnter === n.onMouseEnter &&
   p.disableNamePopover === n.disableNamePopover &&
-  p.masterCompanies === n.masterCompanies
+  p.masterCompanies === n.masterCompanies &&
+  p.rowData === n.rowData &&
+  p.config === n.config
 );
 SpreadsheetCell.displayName = 'SpreadsheetCell';
 

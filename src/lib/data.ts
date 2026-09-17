@@ -520,27 +520,11 @@ export async function getCachedGraduationYears(): Promise<number[]> {
 
 
 
-// 학반 관리 전용 학생 상세 데이터 인메모리 캐시 (0ms 초고속 응답용, 5분 TTL)
-const assignedStudentDetailsMemoryCache: Record<string, { data: StudentEmploymentData[]; timestamp: number }> = {};
-const ASSIGNED_CACHE_TTL_MS = 5 * 60 * 1000;
-
 export async function clearAssignedStudentDetailsCache(major?: string, classInfo?: string, graduationYear?: number) {
-  if (major && classInfo && graduationYear) {
-    const key = `${major}-${classInfo}-${graduationYear}`;
-    delete assignedStudentDetailsMemoryCache[key];
-  } else {
-    Object.keys(assignedStudentDetailsMemoryCache).forEach(k => delete assignedStudentDetailsMemoryCache[k]);
-  }
+  // 인메모리 캐시 완전 제거됨 - Vercel 다중 컨테이너 환경 데이터 불일치 방지
 }
 
 export async function getAssignedStudentDetails(major: string, classInfo: string, graduationYear: number, baseYear?: number) {
-  const cacheKey = `${major}-${classInfo}-${graduationYear}-${baseYear || 2026}`;
-  const now = Date.now();
-  const cached = assignedStudentDetailsMemoryCache[cacheKey];
-  if (cached && (now - cached.timestamp < ASSIGNED_CACHE_TTL_MS)) {
-    return cached.data;
-  }
-
   const supabase = createAdminClient();
 
   // 1. 해당 학반 학생 기본 정보 초고속 조회 (20~25명)
@@ -608,7 +592,6 @@ export async function getAssignedStudentDetails(major: string, classInfo: string
     };
   }).sort((a, b) => (a.student_number || '').localeCompare(b.student_number || '', undefined, { numeric: true }));
 
-  assignedStudentDetailsMemoryCache[cacheKey] = { data: results, timestamp: now };
   return results;
 }
 

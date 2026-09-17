@@ -136,10 +136,15 @@ export async function bulkUpdatePersonalDetails(updates: { id: string, field: st
     record[update.field] = (update.value === '' || update.value === 'CLEARED') ? null : update.value;
   }
 
-  const studentRecords = Array.from(studentsMap.values());
-  for (let i = 0; i < studentRecords.length; i += 100) {
-    const chunk = studentRecords.slice(i, i + 100);
-    await supabase.from('students').upsert(chunk, { onConflict: 'id' });
+  const updatePromises = Array.from(studentsMap.entries()).map(([id, record]) => {
+    const { id: _, ...fields } = record;
+    return supabase.from('students').update(fields).eq('id', id);
+  });
+
+  const results = await Promise.all(updatePromises);
+  const errorResult = results.find(r => r.error);
+  if (errorResult?.error) {
+    return { success: false, error: errorResult.error.message };
   }
 
   const { clearAssignedStudentDetailsCache } = await import('@/lib/data');

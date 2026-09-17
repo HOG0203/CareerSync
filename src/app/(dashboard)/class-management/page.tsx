@@ -1,4 +1,4 @@
-import { getCachedAssignedStudentDetails, getCachedGraduationYears, getCachedFilteredStudentData, getCachedClassStructureCombinations, getCurrentUserProfile, getCachedRegisteredCompanies } from '@/lib/data';
+import { getAssignedStudentDetails, getFilteredStudentData, getCachedGraduationYears, getCachedClassStructureCombinations, getCurrentUserProfile, getCachedRegisteredCompanies } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -131,30 +131,41 @@ async function ClassManagementPageContent({
   let studentData: any[] = [];
 
   if (isAdmin) {
-    // 관리자: 해당 학년 전체 학생 로드 후 선택된 학과/반으로 필터링
-    const rawGradeData = await getCachedFilteredStudentData(calculatedYear.toString(), settings.baseYear);
-    let filtered = [...(rawGradeData || [])];
-    if (targetMajor && targetMajor !== 'all') {
-      filtered = filtered.filter(s => s.major === targetMajor);
+    if (targetMajor && targetMajor !== 'all' && targetClass && targetClass !== 'all') {
+      // 관리자라도 특정 학과/반을 선택한 경우: 담임교사와 동일하게 최신 학반 데이터를 직접 조회 (Vercel Data Cache 롤백 방지)
+      const rawData = await getAssignedStudentDetails(targetMajor, targetClass, calculatedYear, settings.baseYear);
+      studentData = [...(rawData || [])].sort((a, b) => {
+        const numA = parseInt((a.student_number || '').replace(/[^0-9]/g, ''), 10) || 0;
+        const numB = parseInt((b.student_number || '').replace(/[^0-9]/g, ''), 10) || 0;
+        if (numA !== numB) return numA - numB;
+        return (a.student_name || '').localeCompare(b.student_name || '', 'ko');
+      });
+    } else {
+      // 관리자가 전체 학과 또는 전체 반을 조회하는 경우
+      const rawGradeData = await getFilteredStudentData(calculatedYear.toString(), settings.baseYear);
+      let filtered = [...(rawGradeData || [])];
+      if (targetMajor && targetMajor !== 'all') {
+        filtered = filtered.filter(s => s.major === targetMajor);
+      }
+      if (targetClass && targetClass !== 'all') {
+        filtered = filtered.filter(s => s.class_info === targetClass);
+      }
+      studentData = filtered.sort((a, b) => {
+        const orderA = getMajorOrderIndex(a.major || '');
+        const orderB = getMajorOrderIndex(b.major || '');
+        if (orderA !== orderB) return orderA - orderB;
+        const classNumA = parseInt((a.class_info || '').replace(/[^0-9]/g, ''), 10) || 0;
+        const classNumB = parseInt((b.class_info || '').replace(/[^0-9]/g, ''), 10) || 0;
+        if (classNumA !== classNumB) return classNumA - classNumB;
+        const numA = parseInt((a.student_number || '').replace(/[^0-9]/g, ''), 10) || 0;
+        const numB = parseInt((b.student_number || '').replace(/[^0-9]/g, ''), 10) || 0;
+        if (numA !== numB) return numA - numB;
+        return (a.student_name || '').localeCompare(b.student_name || '', 'ko');
+      });
     }
-    if (targetClass && targetClass !== 'all') {
-      filtered = filtered.filter(s => s.class_info === targetClass);
-    }
-    studentData = filtered.sort((a, b) => {
-      const orderA = getMajorOrderIndex(a.major || '');
-      const orderB = getMajorOrderIndex(b.major || '');
-      if (orderA !== orderB) return orderA - orderB;
-      const classNumA = parseInt((a.class_info || '').replace(/[^0-9]/g, ''), 10) || 0;
-      const classNumB = parseInt((b.class_info || '').replace(/[^0-9]/g, ''), 10) || 0;
-      if (classNumA !== classNumB) return classNumA - classNumB;
-      const numA = parseInt((a.student_number || '').replace(/[^0-9]/g, ''), 10) || 0;
-      const numB = parseInt((b.student_number || '').replace(/[^0-9]/g, ''), 10) || 0;
-      if (numA !== numB) return numA - numB;
-      return (a.student_name || '').localeCompare(b.student_name || '', 'ko');
-    });
   } else if (isViewable) {
-    // 담임교사: 본인 담당 학반 데이터만 핀포인트 패칭
-    const rawData = await getCachedAssignedStudentDetails(targetMajor!, targetClass!, calculatedYear, settings.baseYear);
+    // 담임교사: 본인 담당 학반 데이터만 최신 실시간 패칭
+    const rawData = await getAssignedStudentDetails(targetMajor!, targetClass!, calculatedYear, settings.baseYear);
     studentData = [...(rawData || [])].sort((a, b) => {
       const numA = parseInt((a.student_number || '').replace(/[^0-9]/g, ''), 10) || 0;
       const numB = parseInt((b.student_number || '').replace(/[^0-9]/g, ''), 10) || 0;
