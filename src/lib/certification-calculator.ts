@@ -127,6 +127,196 @@ export interface CertificationEvaluationData {
 
 export type CertificationRank = 'S' | 'A' | 'B' | 'C' | 'D';
 
+export const RANK_WEIGHT: Record<CertificationRank, number> = {
+  'S': 4,
+  'A': 3,
+  'B': 2,
+  'C': 1,
+  'D': 0,
+};
+
+export interface StudentRewardRecord {
+  id: string;
+  studentId: string;
+  rewardType: 'prize' | 'certificate_award';
+  academicYear: number;
+  semester?: number;
+  certifiedScore: number;
+  certifiedRank: CertificationRank;
+  itemName: string;
+  status: 'awarded' | 'cancelled';
+  awardedDate: string;
+  awardedBy?: string;
+  remarks?: string;
+  snapshotData?: {
+    totalScore: number;
+    rank: CertificationRank;
+    isCertified: boolean;
+    vocationalCommonScore: number;
+    majorScore: number;
+    employmentScore: number;
+    characterScore: number;
+    studentInfo?: {
+      name: string;
+      studentNumber: string;
+      major: string;
+      classInfo: string;
+    };
+    detailsSummary?: string;
+  };
+  createdAt?: string;
+}
+
+export interface RewardEligibility {
+  prize: {
+    eligible: boolean;
+    currentRank: CertificationRank;
+    highestAwardedRank?: CertificationRank;
+    isUpgrade: boolean;
+    reason: string;
+    recommendedPrizeName: string;
+  };
+  certificateAward: {
+    eligible: boolean;
+    alreadyAwarded: boolean;
+    awardedDate?: string;
+    reason: string;
+    recommendedAwardName: string;
+  };
+}
+
+export interface CertificationPrizeConfig {
+  rankS: string;
+  rankA: string;
+  rankB: string;
+  rankC: string;
+  certificateAward: string;
+}
+
+export const DEFAULT_CERTIFICATION_PRIZE_CONFIG: CertificationPrizeConfig = {
+  rankS: 'S등급 상품 (문화상품권 5만원권)',
+  rankA: 'A등급 상품 (문화상품권 3만원권)',
+  rankB: 'B등급 상품 (문화상품권 1만원권)',
+  rankC: 'C등급 상품 (문화상품권 5천원권/기념품)',
+  certificateAward: '옥저인재인증상',
+};
+
+export function getDefaultPrizeName(rank: CertificationRank, prizeConfig?: CertificationPrizeConfig): string {
+  const cfg = prizeConfig || DEFAULT_CERTIFICATION_PRIZE_CONFIG;
+  switch (rank) {
+    case 'S':
+      return cfg.rankS || DEFAULT_CERTIFICATION_PRIZE_CONFIG.rankS;
+    case 'A':
+      return cfg.rankA || DEFAULT_CERTIFICATION_PRIZE_CONFIG.rankA;
+    case 'B':
+      return cfg.rankB || DEFAULT_CERTIFICATION_PRIZE_CONFIG.rankB;
+    case 'C':
+      return cfg.rankC || DEFAULT_CERTIFICATION_PRIZE_CONFIG.rankC;
+    default:
+      return '상품 지급 대상 아님';
+  }
+}
+
+export function evaluateRewardEligibility(
+  currentRank: CertificationRank,
+  totalScore: number,
+  isCertified: boolean,
+  rewardsHistory: StudentRewardRecord[] = [],
+  prizeConfig?: CertificationPrizeConfig
+): RewardEligibility {
+  // 1. 등급별 상품 (방식 2: 동일 등급 1회 / 상위 승급 시에만 지급)
+  const activePrizes = rewardsHistory.filter(r => r.rewardType === 'prize' && r.status !== 'cancelled');
+  let prizeEligible = false;
+  let isUpgrade = false;
+  let highestAwardedRank: CertificationRank | undefined;
+  let prizeReason = '';
+  let recommendedPrize = '';
+
+  if (activePrizes.length === 0) {
+    if (currentRank === 'D') {
+      prizeEligible = false;
+      isUpgrade = false;
+      prizeReason = 'D등급은 상품 지급 기준 미달(20점 이하)입니다.';
+      recommendedPrize = '';
+    } else {
+      prizeEligible = true;
+      isUpgrade = true;
+      prizeReason = `${currentRank}등급 최초 달성 (지급 대상)`;
+      recommendedPrize = getDefaultPrizeName(currentRank, prizeConfig);
+    }
+  } else {
+    // 과거 수령한 최고 등급 찾기
+    let maxWeight = -1;
+    for (const p of activePrizes) {
+      const w = RANK_WEIGHT[p.certifiedRank] ?? 0;
+      if (w > maxWeight) {
+        maxWeight = w;
+        highestAwardedRank = p.certifiedRank;
+      }
+    }
+
+    const currentWeight = RANK_WEIGHT[currentRank] ?? 0;
+    if (currentWeight > maxWeight && currentWeight > 0) {
+      prizeEligible = true;
+      isUpgrade = true;
+      prizeReason = `${highestAwardedRank}등급에서 ${currentRank}등급으로 승급 (지급 가능)`;
+      recommendedPrize = getDefaultPrizeName(currentRank, prizeConfig);
+    } else if (currentWeight === maxWeight) {
+      prizeEligible = false;
+      isUpgrade = false;
+      prizeReason = `이미 ${currentRank}등급 상품을 수령하였습니다. (동일 등급 중복 제외)`;
+      recommendedPrize = '';
+    } else {
+      prizeEligible = false;
+      isUpgrade = false;
+      prizeReason = `과거 상위 등급(${highestAwardedRank}) 상품 기수령으로 중복 제외됩니다.`;
+      recommendedPrize = '';
+    }
+  }
+
+  // 2. 옥저인재인증상 (방식 3: 70점 이상 최초 달성 시 재학 중 1회만 수여)
+  const activeCertAward = rewardsHistory.find(r => r.rewardType === 'certificate_award' && r.status !== 'cancelled');
+  let certEligible = false;
+  let certAlreadyAwarded = false;
+  let certAwardedDate: string | undefined;
+  let certReason = '';
+
+  if (activeCertAward) {
+    certEligible = false;
+    certAlreadyAwarded = true;
+    certAwardedDate = activeCertAward.awardedDate;
+    certReason = `옥저인재인증상 수여 완료 (${activeCertAward.awardedDate}, 재학 중 1회 한정)`;
+  } else {
+    if (totalScore >= 70 || isCertified) {
+      certEligible = true;
+      certAlreadyAwarded = false;
+      certReason = '종합 70점 이상 최초 달성 (옥저인재인증상 수여 대상)';
+    } else {
+      certEligible = false;
+      certAlreadyAwarded = false;
+      certReason = '인증 기준 70점 미달 (수여 대상 아님)';
+    }
+  }
+
+  return {
+    prize: {
+      eligible: prizeEligible,
+      currentRank,
+      highestAwardedRank,
+      isUpgrade,
+      reason: prizeReason,
+      recommendedPrizeName: recommendedPrize,
+    },
+    certificateAward: {
+      eligible: certEligible,
+      alreadyAwarded: certAlreadyAwarded,
+      awardedDate: certAwardedDate,
+      reason: certReason,
+      recommendedAwardName: prizeConfig?.certificateAward || DEFAULT_CERTIFICATION_PRIZE_CONFIG.certificateAward,
+    }
+  };
+}
+
 export interface ScoreItemDetail {
   category: string;
   name: string;
@@ -192,6 +382,10 @@ export interface FullStudentEvaluation {
     outUnexcused: number;
     totalPenaltyPoints: number;
   };
+
+  // 상품 및 인증상 수령 이력 & 현재 시점 자격 판정 결과
+  rewardsHistory?: StudentRewardRecord[];
+  rewardEligibility?: RewardEligibility;
 }
 
 // -------------------------------------------------------------
@@ -571,9 +765,11 @@ export function calculateStudentFullEvaluation(params: {
   };
   attendanceRecords?: any[];
   evalData?: CertificationEvaluationData;
+  rewardsHistory?: StudentRewardRecord[];
   baseYear: number;
+  prizeConfig?: CertificationPrizeConfig;
 }): FullStudentEvaluation {
-  const { student, attendanceRecords = [], evalData = { student_id: student.id }, baseYear } = params;
+  const { student, attendanceRecords = [], evalData = { student_id: student.id }, rewardsHistory = [], baseYear, prizeConfig } = params;
 
   const currentGrade = Math.max(1, Math.min(3, baseYear + 4 - student.graduation_year));
 
@@ -840,6 +1036,10 @@ export function calculateStudentFullEvaluation(params: {
 
     rawEvaluationData: evalData,
     certificatesList: student.certificates || [],
-    attendanceSummary: attRes.summary
+    attendanceSummary: attRes.summary,
+
+    // 상품 및 인증상 수령 내역과 실시간 자격 판정 결과
+    rewardsHistory,
+    rewardEligibility: evaluateRewardEligibility(rank, totalScore, isCertified, rewardsHistory, prizeConfig)
   };
 }

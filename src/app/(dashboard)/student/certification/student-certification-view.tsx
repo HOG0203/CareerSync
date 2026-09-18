@@ -18,7 +18,8 @@ import {
   Trophy, 
   Briefcase, 
   ShieldCheck,
-  ChevronRight
+  ChevronRight,
+  Gift,
 } from 'lucide-react';
 import { EvaluationSheetModal } from '@/app/(dashboard)/admin/certification/evaluation-sheet-modal';
 import { ChangePasswordDialog } from './change-password-dialog';
@@ -34,6 +35,10 @@ export function StudentCertificationView({ evaluation, baseYear }: StudentCertif
 
   const d = evaluation.details;
   const isPassed = evaluation.isCertified;
+
+  const confirmedRewards = (evaluation.rewardsHistory || []).filter(r => r.status !== 'cancelled');
+  const prizeRewards = confirmedRewards.filter(r => r.rewardType === 'prize');
+  const awardRewards = confirmedRewards.filter(r => r.rewardType === 'certificate_award');
 
   const domains = [
     {
@@ -196,6 +201,99 @@ export function StudentCertificationView({ evaluation, baseYear }: StudentCertif
         </Card>
       </div>
 
+      {/* 상품 및 인증상 공식 수령 현황 카드 */}
+      <Card className="border-slate-200 shadow-sm overflow-hidden">
+        <CardHeader className="bg-slate-50/60 pb-3 border-b border-slate-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
+                <Gift className="h-4 w-4" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-bold text-slate-900">
+                  상품 및 옥저인재인증상 공식 수령 확인
+                </CardTitle>
+                <CardDescription className="text-[11px] text-slate-500">
+                  학교에서 공식 지급 및 수령 확정된 내역입니다.
+                </CardDescription>
+              </div>
+            </div>
+            {confirmedRewards.length > 0 && (
+              <Badge className="bg-emerald-600 text-white font-bold text-xs px-2.5 py-0.5">
+                수령 확인됨 ({confirmedRewards.length}건)
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 sm:p-5 space-y-3">
+          {confirmedRewards.length === 0 ? (
+            <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/60 text-center text-xs text-slate-500 leading-relaxed">
+              <p className="font-semibold text-slate-700">현재 등록된 공식 수령 내역이 없습니다.</p>
+              <p className="text-[11px] text-slate-400 mt-1">
+                학기말 인증 심사 및 포상 지급이 완료되면 이곳에 공식 수령 기록이 영구 보존됩니다.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* 등급별 상품 수령 내역 */}
+              {prizeRewards.map((r, i) => (
+                <div key={i} className="p-3.5 rounded-xl border border-blue-200 bg-blue-50/50 flex flex-col justify-between gap-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-lg bg-blue-600 text-white shrink-0">
+                        <Gift className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-blue-900 block">
+                          {r.academicYear}학년도 {r.semester}학기 등급 상품
+                        </span>
+                        <span className="text-sm font-extrabold text-blue-950">
+                          {r.itemName}
+                        </span>
+                      </div>
+                    </div>
+                    <Badge className="bg-blue-600 text-white font-bold text-[10px] shrink-0">
+                      수령 완료
+                    </Badge>
+                  </div>
+                  <div className="text-[11px] text-slate-500 pt-1.5 border-t border-blue-100 flex items-center justify-between">
+                    <span>수령 일시: {r.awardedDate || (r.createdAt ? r.createdAt.slice(0, 10) : '확정')}</span>
+                    {r.remarks && <span className="text-blue-700 font-medium">({r.remarks})</span>}
+                  </div>
+                </div>
+              ))}
+
+              {/* 옥저인재인증상 수여 내역 */}
+              {awardRewards.map((r, i) => (
+                <div key={i} className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/50 flex flex-col justify-between gap-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-lg bg-amber-500 text-white shrink-0">
+                        <Trophy className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-amber-900 block">
+                          {r.academicYear}학년도 {r.semester ? `${r.semester}학기 ` : ''}인증상
+                        </span>
+                        <span className="text-sm font-extrabold text-amber-950">
+                          옥저인재인증상 수여
+                        </span>
+                      </div>
+                    </div>
+                    <Badge className="bg-amber-500 text-white font-bold text-[10px] shrink-0">
+                      수여 완료
+                    </Badge>
+                  </div>
+                  <div className="text-[11px] text-slate-500 pt-1.5 border-t border-amber-100 flex items-center justify-between">
+                    <span>수여 일시: {r.awardedDate || (r.createdAt ? r.createdAt.slice(0, 10) : '확정')}</span>
+                    {r.remarks && <span className="text-amber-700 font-medium">({r.remarks})</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* 세부 안내 및 인쇄 배너 */}
       <Card className="border-blue-100 bg-blue-50/50 shadow-sm">

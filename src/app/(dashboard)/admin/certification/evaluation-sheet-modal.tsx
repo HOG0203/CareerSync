@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { deleteStudentEvaluationItemAction } from './actions';
-import { Printer, Edit3, Award, CheckSquare, Square, Info, Trash2, Lock, User, RefreshCw } from 'lucide-react';
+import { Printer, Edit3, Award, CheckSquare, Square, Info, Trash2, Lock, User, RefreshCw, Gift, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface EvidenceStructuredItem {
@@ -40,7 +40,7 @@ interface EvaluationSheetModalProps {
 }
 
 export function EvaluationSheetModal({
-  evaluation,
+  evaluation: rawEvaluation,
   open,
   onOpenChange,
   onEditClick,
@@ -49,6 +49,12 @@ export function EvaluationSheetModal({
   isAdmin = false,
   onDataMutated,
 }: EvaluationSheetModalProps) {
+  const lastEvalRef = React.useRef<FullStudentEvaluation | null>(rawEvaluation);
+  if (rawEvaluation) {
+    lastEvalRef.current = rawEvaluation;
+  }
+  const evaluation = rawEvaluation || lastEvalRef.current;
+
   const { toast } = useToast();
   const [isDeleting, setIsDeleting] = React.useState<string | null>(null);
 
@@ -66,6 +72,9 @@ export function EvaluationSheetModal({
   if (!evaluation) return null;
 
   const d = evaluation.details;
+  const prizeRewards = (evaluation.rewardsHistory || []).filter(r => r.rewardType === 'prize' && r.status !== 'cancelled');
+  const latestPrize = prizeRewards[prizeRewards.length - 1];
+  const awardRecord = (evaluation.rewardsHistory || []).find(r => r.rewardType === 'certificate_award' && r.status !== 'cancelled');
 
   const handlePrint = () => {
     const printContent = document.getElementById('printable-evaluation-sheet');
@@ -411,6 +420,18 @@ export function EvaluationSheetModal({
                 <Badge className={cn("text-[10px] sm:text-xs font-black px-2 py-0.5 rounded-full shadow-2xs", getRankBadgeClass(evaluation.rank))}>
                   {evaluation.rank}랭크 ({evaluation.totalScore}점)
                 </Badge>
+                {latestPrize && (
+                  <Badge className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] sm:text-xs gap-1 px-2 py-0.5 rounded-full shadow-2xs">
+                    <Gift className="h-3 w-3" />
+                    <span>{latestPrize.itemName} 수령</span>
+                  </Badge>
+                )}
+                {awardRecord && (
+                  <Badge className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-[10px] sm:text-xs gap-1 px-2 py-0.5 rounded-full shadow-2xs">
+                    <Trophy className="h-3 w-3" />
+                    <span>옥저인재인증상</span>
+                  </Badge>
+                )}
               </div>
               <p className="text-slate-500 text-[11px] sm:text-xs font-bold mt-0.5 truncate">
                 {evaluation.studentName} • {evaluation.major} {evaluation.classInfo} {evaluation.studentNumber}번
@@ -513,6 +534,34 @@ export function EvaluationSheetModal({
                     <span className="font-extrabold text-slate-800 text-xs">{evaluation.characterScore}점</span>
                   </div>
                 </div>
+
+                {/* 포상 수령 완료 현황 (있을 경우 표시) */}
+                {(latestPrize || awardRecord) && (
+                  <div className="pt-2 border-t border-slate-100 flex flex-col gap-1 text-[11px]">
+                    {latestPrize && (
+                      <div className="flex items-center justify-between bg-blue-50/80 px-2.5 py-1.5 rounded-lg border border-blue-100">
+                        <span className="font-bold text-blue-900 flex items-center gap-1">
+                          <Gift className="h-3.5 w-3.5 text-blue-600" />
+                          <span>{latestPrize.itemName} 수령 완료</span>
+                        </span>
+                        <span className="text-[10px] text-blue-600">
+                          {latestPrize.academicYear}년 {latestPrize.semester}학기
+                        </span>
+                      </div>
+                    )}
+                    {awardRecord && (
+                      <div className="flex items-center justify-between bg-amber-50/80 px-2.5 py-1.5 rounded-lg border border-amber-100">
+                        <span className="font-bold text-amber-900 flex items-center gap-1">
+                          <Trophy className="h-3.5 w-3.5 text-amber-600" />
+                          <span>옥저인재인증상 수여 완료</span>
+                        </span>
+                        <span className="text-[10px] text-amber-700">
+                          {awardRecord.academicYear}년 {awardRecord.semester}학기
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* 1. 직업공통능력 (25점) */}
@@ -944,6 +993,26 @@ export function EvaluationSheetModal({
                   evaluation.isCertified ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700"
                 )}>
                   {evaluation.isCertified ? "✨ 옥저인재 인증 대상" : "미달 (70점 미만)"}
+                </span>
+              </div>
+
+              {/* 상품 및 인증상 수령 확인란 (A4 공문서 규격 반영) */}
+              <div className="col-span-2 pt-1.5 mt-0.5 border-t border-slate-200 flex items-center justify-between">
+                <span className="text-slate-500 font-semibold text-[10px]">등급별 상품 수령 여부:</span>
+                <span className={cn(
+                  "font-bold text-xs",
+                  latestPrize ? "text-blue-700" : "text-slate-500"
+                )}>
+                  {latestPrize ? `🎁 ${latestPrize.itemName} 수령완료 (${latestPrize.awardedDate || (latestPrize.createdAt ? latestPrize.createdAt.slice(0, 10) : '확정')})` : '미수령'}
+                </span>
+              </div>
+              <div className="col-span-2 pt-1.5 mt-0.5 border-t border-slate-200 flex items-center justify-between">
+                <span className="text-slate-500 font-semibold text-[10px]">옥저인재인증상 수여 여부:</span>
+                <span className={cn(
+                  "font-bold text-xs",
+                  awardRecord ? "text-amber-700" : "text-slate-500"
+                )}>
+                  {awardRecord ? `🏆 옥저인재인증상 수여완료 (${awardRecord.awardedDate || (awardRecord.createdAt ? awardRecord.createdAt.slice(0, 10) : '확정')})` : '미수여'}
                 </span>
               </div>
             </div>

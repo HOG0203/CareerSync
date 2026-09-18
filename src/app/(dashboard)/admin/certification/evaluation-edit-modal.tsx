@@ -67,13 +67,19 @@ const ALL_TERMS = ['1-1', '1-2', '2-1', '2-2', '3-1', '3-2'] as const;
 const ALL_YEARS = ['1', '2', '3'] as const;
 
 export function EvaluationEditModal({
-  evaluation,
+  evaluation: rawEvaluation,
   baseYear,
   open,
   onOpenChange,
   onSaveSuccess,
   masterCertificates = [],
 }: EvaluationEditModalProps) {
+  const lastEvalRef = React.useRef<FullStudentEvaluation | null>(rawEvaluation);
+  if (rawEvaluation) {
+    lastEvalRef.current = rawEvaluation;
+  }
+  const evaluation = rawEvaluation || lastEvalRef.current;
+
   const { toast } = useToast();
   const [isSaving, setIsSaving] = React.useState(false);
 
@@ -386,6 +392,8 @@ export function EvaluationEditModal({
       setIsSaving(false);
     }
   };
+
+  if (!evaluation) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

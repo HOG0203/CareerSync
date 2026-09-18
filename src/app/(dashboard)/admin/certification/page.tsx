@@ -1,7 +1,7 @@
 import { getCurrentUserProfile } from '@/lib/data';
 import { getSystemSettings, getCachedMasterCertificates } from '@/app/(dashboard)/admin/settings/actions';
 import { redirect } from 'next/navigation';
-import { getCachedCertificationSummaryList } from './actions';
+import { getCachedCertificationSummaryList, getCertificationPrizeConfig } from './actions';
 import { CertificationSummaryClient } from './certification-summary-client';
 
 export const metadata = {
@@ -15,11 +15,12 @@ export default async function CertificationMainPage({
 }: {
   searchParams: Promise<{ grade?: string }>;
 }) {
-  // 1. 프로필, 시스템 설정, 마스터 자격증, searchParams 1회 완전 동시 병렬 패칭
-  const [profile, settings, masterCertificates, params] = await Promise.all([
+  // 1. 프로필, 시스템 설정, 마스터 자격증, 상품 설정, searchParams 1회 완전 동시 병렬 패칭
+  const [profile, settings, masterCertificates, prizeConfig, params] = await Promise.all([
     getCurrentUserProfile(),
     getSystemSettings(),
     getCachedMasterCertificates(),
+    getCertificationPrizeConfig(),
     searchParams,
   ]);
 
@@ -46,6 +47,7 @@ export default async function CertificationMainPage({
       isAdmin={profile.role === 'admin'}
       userProfile={profile}
       masterCertificates={masterCertificates}
+      initialPrizeConfig={prizeConfig}
     />
   );
 }

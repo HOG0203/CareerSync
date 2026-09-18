@@ -9,12 +9,111 @@ import {
   calculateStudentFullEvaluation, 
   FullStudentEvaluation,
   evaluateContestList,
-  RecordAuditMeta
+  RecordAuditMeta,
+  StudentRewardRecord,
+  CertificationRank,
+  getDefaultPrizeName,
+  CertificationPrizeConfig,
+  DEFAULT_CERTIFICATION_PRIZE_CONFIG,
 } from '@/lib/certification-calculator';
+import { generateRewardLedgerExcelBuffer } from '@/lib/cert-reward-excel-generator';
 import { logAuditAction } from '@/lib/audit-logger';
 import { formatExcelDate } from '@/lib/employment-parser';
 
 const EVAL_SETTINGS_KEY = 'certification_evaluations_store';
+const REWARD_SETTINGS_KEY = 'certification_rewards_store';
+const CERT_PRIZE_CONFIG_KEY = 'cert_prize_config';
+
+// 상품 및 포상 설정 인메모리 캐시 (10분 TTL)
+let certPrizeConfigMemoryCache: { data: CertificationPrizeConfig; timestamp: number } | null = null;
+const CERT_PRIZE_CACHE_TTL_MS = 10 * 60 * 1000;
+
+export async function clearCertPrizeConfigCache() {
+  certPrizeConfigMemoryCache = null;
+}
+
+/**
+ * 옥저인재인증제 등급별 상품 및 인증상 명칭 설정 조회
+ */
+export async function getCertificationPrizeConfig(): Promise<CertificationPrizeConfig> {
+  const now = Date.now();
+  if (certPrizeConfigMemoryCache && (now - certPrizeConfigMemoryCache.timestamp) < CERT_PRIZE_CACHE_TTL_MS) {
+    return certPrizeConfigMemoryCache.data;
+  }
+
+  const supabase = createAdminClient();
+  try {
+    const { data, error } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', CERT_PRIZE_CONFIG_KEY)
+      .maybeSingle();
+
+    if (error || !data || !data.value) {
+      certPrizeConfigMemoryCache = { data: DEFAULT_CERTIFICATION_PRIZE_CONFIG, timestamp: now };
+      return DEFAULT_CERTIFICATION_PRIZE_CONFIG;
+    }
+
+    const merged: CertificationPrizeConfig = {
+      ...DEFAULT_CERTIFICATION_PRIZE_CONFIG,
+      ...data.value,
+    };
+    certPrizeConfigMemoryCache = { data: merged, timestamp: now };
+    return merged;
+  } catch (err) {
+    console.warn('Error reading cert_prize_config, using default:', err);
+    return DEFAULT_CERTIFICATION_PRIZE_CONFIG;
+  }
+}
+
+export async function getCachedCertificationPrizeConfig(): Promise<CertificationPrizeConfig> {
+  return getCertificationPrizeConfig();
+}
+
+/**
+ * 옥저인재인증제 등급별 상품 및 인증상 명칭 설정 저장 (관리자 전용)
+ */
+export async function updateCertificationPrizeConfigAction(config: CertificationPrizeConfig): Promise<{ success: boolean; error?: string }> {
+  try {
+    const profile = await getCurrentUserProfile();
+    if (!profile || profile.role !== 'admin') {
+      return { success: false, error: '관리자 권한이 필요합니다.' };
+    }
+
+    const supabase = createAdminClient();
+    const nowIso = new Date().toISOString();
+
+    const { error } = await supabase
+      .from('system_settings')
+      .upsert({
+        key: CERT_PRIZE_CONFIG_KEY,
+        value: config,
+        updated_at: nowIso,
+      }, { onConflict: 'key' });
+
+    if (error) {
+      console.error('Error updating cert_prize_config in DB:', error);
+      return { success: false, error: '상품 설정 저장에 실패했습니다.' };
+    }
+
+    certPrizeConfigMemoryCache = null;
+    clearCertificationSummaryCache();
+    revalidateTag('cert-eval');
+    revalidatePath('/admin/certification');
+
+    await logAuditAction({
+      actor_name: profile.full_name || profile.username || '관리자',
+      action_type: 'SYSTEM_SETTING_UPDATE',
+      target_name: '[인증제 설정] 등급별 상품 및 포상 명칭 설정 변경',
+      details: config,
+    });
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error in updateCertificationPrizeConfigAction:', err);
+    return { success: false, error: err?.message || '상품 설정 저장 중 오류가 발생했습니다.' };
+  }
+}
 
 // 평가 데이터 저장소 인메모리 캐시 (0ms 응답용, 5분 TTL)
 let evalStoreMemoryCache: { data: Record<string, CertificationEvaluationData>; timestamp: number } | null = null;
@@ -127,12 +226,104 @@ export async function getEvaluationsStore(): Promise<Record<string, Certificatio
   }
 }
 
+// 상품 및 인증상 수령 대장 인메모리 캐시 (5분 TTL)
+let rewardsMemoryCache: { data: Record<string, StudentRewardRecord[]>; timestamp: number } | null = null;
+const REWARDS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+export async function clearStudentRewardsCache() {
+  rewardsMemoryCache = null;
+}
+
+/**
+ * 학생별 상품 및 인증상 수령 이력 전체 조회 (Map: studentId -> StudentRewardRecord[])
+ * 1순위: student_cert_rewards 전용 RDB 테이블
+ * 2순위(폴백): system_settings
+ */
+export async function getAllStudentRewards(): Promise<Record<string, StudentRewardRecord[]>> {
+  const now = Date.now();
+  if (rewardsMemoryCache && (now - rewardsMemoryCache.timestamp < REWARDS_CACHE_TTL_MS)) {
+    return rewardsMemoryCache.data;
+  }
+
+  try {
+    const supabase = createAdminClient();
+
+    // 1순위: student_cert_rewards 전용 RDB 테이블 조회
+    const { data: rows, error: tableErr } = await supabase
+      .from('student_cert_rewards')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!tableErr && rows) {
+      const map: Record<string, StudentRewardRecord[]> = {};
+      for (const r of rows) {
+        const item: StudentRewardRecord = {
+          id: r.id,
+          studentId: r.student_id,
+          rewardType: r.reward_type,
+          academicYear: r.academic_year,
+          semester: r.semester,
+          certifiedScore: Number(r.certified_score || 0),
+          certifiedRank: r.certified_rank,
+          itemName: r.item_name,
+          status: r.status,
+          awardedDate: r.awarded_date,
+          awardedBy: r.awarded_by,
+          remarks: r.remarks,
+          snapshotData: r.snapshot_data || {},
+          createdAt: r.created_at,
+        };
+        if (!map[r.student_id]) map[r.student_id] = [];
+        map[r.student_id].push(item);
+      }
+      rewardsMemoryCache = { data: map, timestamp: now };
+      return map;
+    }
+
+    // 2순위 (폴백): system_settings 조회
+    const { data: settingRow } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', REWARD_SETTINGS_KEY)
+      .maybeSingle();
+
+    const list: any[] = settingRow?.value || [];
+    const map: Record<string, StudentRewardRecord[]> = {};
+    for (const r of list) {
+      const item: StudentRewardRecord = {
+        id: r.id,
+        studentId: r.student_id,
+        rewardType: r.reward_type,
+        academicYear: r.academic_year,
+        semester: r.semester,
+        certifiedScore: Number(r.certified_score || 0),
+        certifiedRank: r.certified_rank,
+        itemName: r.item_name,
+        status: r.status,
+        awardedDate: r.awarded_date,
+        awardedBy: r.awarded_by,
+        remarks: r.remarks,
+        snapshotData: r.snapshot_data || {},
+        createdAt: r.created_at,
+      };
+      if (!map[r.student_id]) map[r.student_id] = [];
+      map[r.student_id].push(item);
+    }
+    rewardsMemoryCache = { data: map, timestamp: now };
+    return map;
+  } catch (err) {
+    console.error('Error fetching student rewards:', err);
+    return {};
+  }
+}
+
 // 옥저인재인증제 종합평가 서버 인메모리 캐시 (0ms 초고속 응답용, 5분 TTL)
 const certSummaryMemoryCache: Record<number, { data: FullStudentEvaluation[]; timestamp: number }> = {};
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5분
 
 export async function clearCertificationSummaryCache(gradeNum?: number) {
   evalStoreMemoryCache = null;
+  clearStudentRewardsCache();
   if (gradeNum) {
     delete certSummaryMemoryCache[gradeNum];
   } else {
@@ -154,8 +345,8 @@ export async function getCertificationSummaryList(gradeNum: number, preloadedBas
   const baseYear = preloadedBaseYear || (await getSystemSettings()).baseYear;
   const targetGradYear = baseYear + (4 - gradeNum);
 
-  // 1. [1-Shot 동시 병렬화] 학생 목록, 3개년 출결, 평가 스토어를 단 1번에 동시 병렬 패칭
-  const [studentsRes, attendanceRes, evalStore] = await Promise.all([
+  // 1. [1-Shot 동시 병렬화] 학생 목록, 3개년 출결, 평가 스토어, 포상 이력, 상품 설정을 단 1번에 동시 병렬 패칭
+  const [studentsRes, attendanceRes, evalStore, rewardsMap, prizeConfig] = await Promise.all([
     supabase
       .from('students')
       .select('id, student_name, student_number, major, class_info, graduation_year, certificates, career_course')
@@ -168,7 +359,9 @@ export async function getCertificationSummaryList(gradeNum: number, preloadedBas
       .select('student_id, grade, absent_unexcused, late_unexcused, early_unexcused, out_unexcused, students!inner(graduation_year)')
       .eq('students.graduation_year', targetGradYear)
       .range(0, 5000),
-    getEvaluationsStore()
+    getEvaluationsStore(),
+    getAllStudentRewards(),
+    getCachedCertificationPrizeConfig(),
   ]);
 
   const students = studentsRes.data;
@@ -191,7 +384,9 @@ export async function getCertificationSummaryList(gradeNum: number, preloadedBas
       student: s,
       attendanceRecords: attendanceMap[s.id] || [],
       evalData: studentEvalData,
-      baseYear
+      rewardsHistory: rewardsMap[s.id] || [],
+      baseYear,
+      prizeConfig,
     });
   });
 
@@ -202,25 +397,13 @@ export async function getCertificationSummaryList(gradeNum: number, preloadedBas
 }
 
 /**
- * [캐싱 최적화] 학년별 옥저인재인증제 종합 평가 목록 Next.js 글로벌 영구 캐시 조회 (Vercel 전역 0.01초 공유)
+ * [캐싱 최적화] 학년별 옥저인재인증제 종합 평가 목록 조회 (인메모리 초고속 캐싱)
+ * Next.js unstable_cache의 2MB 크기 제한(items over 2MB can not be cached)을 방지하고
+ * Node.js 서버 프로세스 인메모리 캐시(certSummaryMemoryCache)로 0ms 초고속 서빙합니다.
  */
-const certSummaryCacheMap = new Map<string, ReturnType<typeof unstable_cache>>();
-
 export async function getCachedCertificationSummaryList(gradeNum: number, preloadedBaseYear?: number): Promise<FullStudentEvaluation[]> {
   const baseYear = preloadedBaseYear || 2026;
-  const cacheKey = `${gradeNum}-${baseYear}`;
-  if (!certSummaryCacheMap.has(cacheKey)) {
-    const cachedFn = unstable_cache(
-      async () => getCertificationSummaryList(gradeNum, baseYear),
-      [`cert-summary-list-${cacheKey}`],
-      {
-        revalidate: 86400,
-        tags: [`cert-eval-grade-${gradeNum}`, 'cert-eval', 'students']
-      }
-    );
-    certSummaryCacheMap.set(cacheKey, cachedFn);
-  }
-  return certSummaryCacheMap.get(cacheKey)!();
+  return getCertificationSummaryList(gradeNum, baseYear);
 }
 
 
@@ -253,18 +436,19 @@ export async function getStudentSingleEvaluation(studentId: string): Promise<Ful
   const settings = await getSystemSettings();
   const baseYear = settings.baseYear;
 
-  const [studentRes, attendanceRes, evalStore] = await Promise.all([
+  const [studentRes, attendanceRes, evalStore, rewardsMap, prizeConfig] = await Promise.all([
     supabase
       .from('students')
       .select('id, student_name, student_number, major, class_info, graduation_year, certificates, career_course, phone_number')
       .eq('id', studentId)
-
       .maybeSingle(),
     supabase
       .from('student_attendance')
       .select('student_id, grade, absent_unexcused, late_unexcused, early_unexcused, out_unexcused')
       .eq('student_id', studentId),
-    getEvaluationsStore()
+    getEvaluationsStore(),
+    getAllStudentRewards(),
+    getCachedCertificationPrizeConfig(),
   ]);
 
   if (studentRes.error || !studentRes.data) {
@@ -279,7 +463,9 @@ export async function getStudentSingleEvaluation(studentId: string): Promise<Ful
     student,
     attendanceRecords,
     evalData,
-    baseYear
+    rewardsHistory: rewardsMap[studentId] || [],
+    baseYear,
+    prizeConfig,
   });
 }
 
@@ -2194,6 +2380,717 @@ export async function deleteMyImportedRecordsAction(
     deletedItemsCount,
   };
 }
+
+/**
+ * 단일 학생 상품 또는 옥저인재인증상 수령 확정 등록 (영구 스냅샷 보존)
+ */
+export async function awardStudentItemAction(params: {
+  studentId: string;
+  rewardType: 'prize' | 'certificate_award';
+  academicYear: number;
+  semester?: number;
+  gradeNum?: number;
+  itemName?: string;
+  remarks?: string;
+}): Promise<{ success: boolean; error?: string; reward?: StudentRewardRecord }> {
+  try {
+    const profile = await getCurrentUserProfile();
+    if (!profile) {
+      return { success: false, error: '로그인이 필요합니다.' };
+    }
+
+    const supabase = createAdminClient();
+    const { data: student, error: stuErr } = await supabase
+      .from('students')
+      .select('id, student_name, student_number, major, class_info, graduation_year, certificates')
+      .eq('id', params.studentId)
+      .single();
+
+    if (stuErr || !student) {
+      return { success: false, error: '학생 정보를 찾을 수 없습니다.' };
+    }
+
+    // 학생의 전체 평가 및 포상 이력 로드
+    const allRewards = await getAllStudentRewards();
+    const studentRewards = allRewards[params.studentId] || [];
+    const evalStore = await getEvaluationsStore();
+    const studentEvalData = evalStore[params.studentId] || { student_id: params.studentId };
+    const prizeConfig = await getCachedCertificationPrizeConfig();
+
+    const { data: attData } = await supabase
+      .from('student_attendance')
+      .select('*')
+      .eq('student_id', params.studentId);
+
+    const fullEval = calculateStudentFullEvaluation({
+      student,
+      attendanceRecords: attData || [],
+      evalData: studentEvalData,
+      rewardsHistory: studentRewards,
+      baseYear: params.academicYear,
+      prizeConfig,
+    });
+
+    // 중복 방지 자격 검증
+    if (params.rewardType === 'prize') {
+      if (!fullEval.rewardEligibility?.prize.eligible) {
+        return { success: false, error: fullEval.rewardEligibility?.prize.reason || '상품 지급 대상이 아닙니다.' };
+      }
+    } else {
+      if (!fullEval.rewardEligibility?.certificateAward.eligible) {
+        return { success: false, error: fullEval.rewardEligibility?.certificateAward.reason || '옥저인재인증상 수여 대상이 아닙니다.' };
+      }
+    }
+
+    const itemName = params.itemName || 
+      (params.rewardType === 'prize'
+        ? (fullEval.rewardEligibility?.prize.recommendedPrizeName || getDefaultPrizeName(fullEval.rank, prizeConfig))
+        : (prizeConfig.certificateAward || '옥저인재인증상'));
+
+    // 확정 시점의 평가 전체 스냅샷 생성
+    const snapshotData = {
+      totalScore: fullEval.totalScore,
+      rank: fullEval.rank,
+      isCertified: fullEval.isCertified,
+      vocationalCommonScore: fullEval.vocationalCommonScore,
+      majorScore: fullEval.majorScore,
+      employmentScore: fullEval.employmentScore,
+      characterScore: fullEval.characterScore,
+      studentInfo: {
+        name: student.student_name,
+        studentNumber: student.student_number || '',
+        major: student.major || '',
+        classInfo: student.class_info || '',
+      },
+      detailsSummary: `직업공통(${fullEval.vocationalCommonScore}) / 전공(${fullEval.majorScore}) / 취업(${fullEval.employmentScore}) / 인성(${fullEval.characterScore})`,
+      awardedBy: {
+        name: profile.full_name || profile.username || '교사',
+        role: profile.role,
+      }
+    };
+
+    const newId = crypto.randomUUID();
+    const todayStr = new Date().toISOString().split('T')[0];
+    const nowIso = new Date().toISOString();
+
+    const record: StudentRewardRecord = {
+      id: newId,
+      studentId: params.studentId,
+      rewardType: params.rewardType,
+      academicYear: params.academicYear,
+      semester: params.semester || 1,
+      certifiedScore: fullEval.totalScore,
+      certifiedRank: fullEval.rank,
+      itemName,
+      status: 'awarded',
+      awardedDate: todayStr,
+      awardedBy: profile.full_name || profile.username || '교사',
+      remarks: params.remarks || (params.rewardType === 'prize' && fullEval.rewardEligibility?.prize.isUpgrade ? '승급 지급' : ''),
+      snapshotData,
+      createdAt: nowIso,
+    };
+
+    const dbPayload = {
+      id: newId,
+      student_id: params.studentId,
+      reward_type: params.rewardType,
+      academic_year: params.academicYear,
+      semester: params.semester || 1,
+      certified_score: fullEval.totalScore,
+      certified_rank: fullEval.rank,
+      item_name: itemName,
+      status: 'awarded',
+      awarded_date: todayStr,
+      awarded_by: profile.full_name || profile.username || '교사',
+      remarks: record.remarks,
+      snapshot_data: snapshotData,
+      created_at: nowIso,
+      updated_at: nowIso,
+    };
+
+    // 1순위: student_cert_rewards 테이블 INSERT
+    const { error: insertErr } = await supabase.from('student_cert_rewards').insert(dbPayload);
+
+    // 2순위 (테이블 미생성 시): system_settings fallback 저장
+    if (insertErr) {
+      console.warn('Fallback to system_settings for student_cert_rewards:', insertErr);
+      const { data: settingRow } = await supabase.from('system_settings').select('value').eq('key', REWARD_SETTINGS_KEY).maybeSingle();
+      const currentList: any[] = settingRow?.value || [];
+      currentList.push(dbPayload);
+      await supabase.from('system_settings').upsert({
+        key: REWARD_SETTINGS_KEY,
+        value: currentList,
+        updated_at: nowIso
+      }, { onConflict: 'key' });
+    }
+
+    // 캐시 무효화
+    clearCertificationSummaryCache(params.gradeNum);
+    revalidateTag('cert-eval');
+    if (params.gradeNum) {
+      revalidateTag(`cert-eval-grade-${params.gradeNum}`);
+    }
+    revalidatePath('/admin/certification');
+    revalidatePath('/student/certification');
+
+    await logAuditAction({
+      actor_name: profile.full_name || profile.username || '교사',
+      action_type: 'STUDENT_UPDATE',
+      target_name: `[옥저인증 포상 확정] ${student.student_name} - ${itemName}`,
+      details: {
+        studentId: params.studentId,
+        rewardType: params.rewardType,
+        score: fullEval.totalScore,
+        rank: fullEval.rank,
+        itemName
+      }
+    });
+
+    return { success: true, reward: record };
+  } catch (err: any) {
+    console.error('Error in awardStudentItemAction:', err);
+    return { success: false, error: err?.message || '포상 확정 처리에 실패했습니다.' };
+  }
+}
+
+/**
+ * 다수 학생 일괄 수령 확정 처리 (자격 대상자만 자동 선별 및 스냅샷 보존)
+ */
+export async function bulkAwardItemsAction(params: {
+  studentIds: string[];
+  rewardType: 'prize' | 'certificate_award';
+  academicYear: number;
+  semester?: number;
+  gradeNum?: number;
+}): Promise<{ success: boolean; count: number; skippedCount: number; error?: string }> {
+  try {
+    const profile = await getCurrentUserProfile();
+    if (!profile) {
+      return { success: false, count: 0, skippedCount: 0, error: '로그인이 필요합니다.' };
+    }
+
+    if (!params.studentIds || params.studentIds.length === 0) {
+      return { success: false, count: 0, skippedCount: 0, error: '선택된 학생이 없습니다.' };
+    }
+
+    const supabase = createAdminClient();
+    const { data: students, error: stuErr } = await supabase
+      .from('students')
+      .select('id, student_name, student_number, major, class_info, graduation_year, certificates')
+      .in('id', params.studentIds);
+
+    if (stuErr || !students || students.length === 0) {
+      return { success: false, count: 0, skippedCount: 0, error: '학생 정보를 불러오지 못했습니다.' };
+    }
+
+    const allRewards = await getAllStudentRewards();
+    const evalStore = await getEvaluationsStore();
+    const prizeConfig = await getCachedCertificationPrizeConfig();
+
+    const { data: attendanceData } = await supabase
+      .from('student_attendance')
+      .select('*')
+      .in('student_id', params.studentIds);
+
+    const attMap: Record<string, any[]> = {};
+    (attendanceData || []).forEach(r => {
+      if (!attMap[r.student_id]) attMap[r.student_id] = [];
+      attMap[r.student_id].push(r);
+    });
+
+    const nowIso = new Date().toISOString();
+    const todayStr = nowIso.split('T')[0];
+    const payloadsToInsert: any[] = [];
+    let skippedCount = 0;
+
+    for (const student of students) {
+      const studentRewards = allRewards[student.id] || [];
+      const studentEvalData = evalStore[student.id] || { student_id: student.id };
+
+      const fullEval = calculateStudentFullEvaluation({
+        student,
+        attendanceRecords: attMap[student.id] || [],
+        evalData: studentEvalData,
+        rewardsHistory: studentRewards,
+        baseYear: params.academicYear,
+        prizeConfig,
+      });
+
+      // 자격 검증
+      let isEligible = false;
+      let itemName = '';
+      let isUpgrade = false;
+
+      if (params.rewardType === 'prize') {
+        isEligible = Boolean(fullEval.rewardEligibility?.prize.eligible);
+        itemName = fullEval.rewardEligibility?.prize.recommendedPrizeName || getDefaultPrizeName(fullEval.rank, prizeConfig);
+        isUpgrade = Boolean(fullEval.rewardEligibility?.prize.isUpgrade);
+      } else {
+        isEligible = Boolean(fullEval.rewardEligibility?.certificateAward.eligible);
+        itemName = prizeConfig.certificateAward || '옥저인재인증상';
+      }
+
+      if (!isEligible) {
+        skippedCount++;
+        continue;
+      }
+
+      const snapshotData = {
+        totalScore: fullEval.totalScore,
+        rank: fullEval.rank,
+        isCertified: fullEval.isCertified,
+        vocationalCommonScore: fullEval.vocationalCommonScore,
+        majorScore: fullEval.majorScore,
+        employmentScore: fullEval.employmentScore,
+        characterScore: fullEval.characterScore,
+        studentInfo: {
+          name: student.student_name,
+          studentNumber: student.student_number || '',
+          major: student.major || '',
+          classInfo: student.class_info || '',
+        },
+        detailsSummary: `직업공통(${fullEval.vocationalCommonScore}) / 전공(${fullEval.majorScore}) / 취업(${fullEval.employmentScore}) / 인성(${fullEval.characterScore})`,
+        awardedBy: {
+          name: profile.full_name || profile.username || '교사',
+          role: profile.role,
+        }
+      };
+
+      payloadsToInsert.push({
+        id: crypto.randomUUID(),
+        student_id: student.id,
+        reward_type: params.rewardType,
+        academic_year: params.academicYear,
+        semester: params.semester,
+        certified_score: fullEval.totalScore,
+        certified_rank: fullEval.rank,
+        item_name: itemName,
+        status: 'awarded',
+        awarded_date: todayStr,
+        awarded_by: profile.full_name || profile.username || '교사',
+        remarks: isUpgrade ? '승급 지급' : '',
+        snapshot_data: snapshotData,
+        created_at: nowIso,
+        updated_at: nowIso,
+      });
+    }
+
+    if (payloadsToInsert.length > 0) {
+      const { error: insertErr } = await supabase.from('student_cert_rewards').insert(payloadsToInsert);
+      if (insertErr) {
+        console.warn('Fallback to system_settings for bulk insert:', insertErr);
+        const { data: settingRow } = await supabase.from('system_settings').select('value').eq('key', REWARD_SETTINGS_KEY).maybeSingle();
+        const currentList: any[] = settingRow?.value || [];
+        currentList.push(...payloadsToInsert);
+        await supabase.from('system_settings').upsert({
+          key: REWARD_SETTINGS_KEY,
+          value: currentList,
+          updated_at: nowIso
+        }, { onConflict: 'key' });
+      }
+    }
+
+    clearCertificationSummaryCache(params.gradeNum);
+    revalidateTag('cert-eval');
+    if (params.gradeNum) {
+      revalidateTag(`cert-eval-grade-${params.gradeNum}`);
+    }
+    revalidatePath('/admin/certification');
+    revalidatePath('/student/certification');
+
+    return {
+      success: true,
+      count: payloadsToInsert.length,
+      skippedCount
+    };
+  } catch (err: any) {
+    console.error('Error in bulkAwardItemsAction:', err);
+    return { success: false, count: 0, skippedCount: 0, error: err?.message || '일괄 확정에 실패했습니다.' };
+  }
+}
+
+/**
+ * 수령 확정 취소 및 롤백 액션
+ */
+export async function cancelRewardAction(params: {
+  rewardId: string;
+  gradeNum?: number;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const profile = await getCurrentUserProfile();
+    if (!profile) {
+      return { success: false, error: '로그인이 필요합니다.' };
+    }
+
+    const supabase = createAdminClient();
+
+    // 1순위: student_cert_rewards 삭제
+    const { error: delErr } = await supabase
+      .from('student_cert_rewards')
+      .delete()
+      .eq('id', params.rewardId);
+
+    // 2순위: system_settings fallback 동기화
+    const { data: settingRow } = await supabase.from('system_settings').select('value').eq('key', REWARD_SETTINGS_KEY).maybeSingle();
+    if (settingRow?.value && Array.isArray(settingRow.value)) {
+      const filtered = settingRow.value.filter((r: any) => r.id !== params.rewardId);
+      await supabase.from('system_settings').upsert({
+        key: REWARD_SETTINGS_KEY,
+        value: filtered,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'key' });
+    }
+
+    clearCertificationSummaryCache(params.gradeNum);
+    revalidateTag('cert-eval');
+    if (params.gradeNum) {
+      revalidateTag(`cert-eval-grade-${params.gradeNum}`);
+    }
+    revalidatePath('/admin/certification');
+    revalidatePath('/student/certification');
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error in cancelRewardAction:', err);
+    return { success: false, error: err?.message || '수령 취소에 실패했습니다.' };
+  }
+}
+
+/**
+ * 행정실 제출 및 공문서 첨부용 옥저인재인증제 상품 및 인증상 수령 대장 엑셀 내보내기 액션
+ */
+export async function exportRewardLedgerExcelAction(params: {
+  academicYear: number;
+  semester?: number;
+  grade: number;
+  selectedClass?: string;
+}): Promise<{ success: boolean; data?: string; fileName?: string; error?: string }> {
+  try {
+    const profile = await getCurrentUserProfile();
+    if (!profile || profile.role !== 'admin') {
+      return { success: false, error: '관리자 권한이 필요합니다.' };
+    }
+
+    const evaluations = await getCertificationSummaryList(params.grade, params.academicYear);
+    const buffer = await generateRewardLedgerExcelBuffer({
+      academicYear: params.academicYear,
+      semester: params.semester,
+      grade: params.grade,
+      selectedClass: params.selectedClass || 'all',
+      evaluations
+    });
+
+    const classLabel = params.selectedClass && params.selectedClass !== 'all' ? params.selectedClass : '전체';
+    const semesterPart = params.semester ? `${params.semester}학기_` : '';
+    const fileName = `${params.academicYear}학년도_${semesterPart}${params.grade}학년_${classLabel}_옥저인재인증_수령대장.xlsx`;
+
+    return {
+      success: true,
+      data: buffer.toString('base64'),
+      fileName
+    };
+  } catch (err: any) {
+    console.error('Error in exportRewardLedgerExcelAction:', err);
+    return { success: false, error: err?.message || '엑셀 대장 파일 생성에 실패했습니다.' };
+  }
+}
+
+/**
+ * 과거 오프라인 기지급 내역 단건 소급 등록 액션
+ */
+export async function recordPastRewardAction(params: {
+  studentId: string;
+  rewardType: 'prize' | 'certificate_award';
+  academicYear: number;
+  semester?: number;
+  certifiedRank?: CertificationRank;
+  itemName?: string;
+  awardedDate?: string;
+  remarks?: string;
+  gradeNum?: number;
+}): Promise<{ success: boolean; error?: string; reward?: StudentRewardRecord }> {
+  try {
+    const profile = await getCurrentUserProfile();
+    if (!profile) {
+      return { success: false, error: '로그인이 필요합니다.' };
+    }
+    if (profile.role !== 'admin') {
+      return { success: false, error: '관리자 권한이 필요합니다.' };
+    }
+
+    const supabase = createAdminClient();
+    const { data: student, error: stuErr } = await supabase
+      .from('students')
+      .select('id, student_name, student_number, major, class_info')
+      .eq('id', params.studentId)
+      .single();
+
+    if (stuErr || !student) {
+      return { success: false, error: '학생 정보를 찾을 수 없습니다.' };
+    }
+
+    const defaultItemName = params.rewardType === 'prize'
+      ? (getDefaultPrizeName(params.certifiedRank || 'C') || '등급별 상품')
+      : '옥저인재인증상';
+    const itemName = params.itemName || defaultItemName;
+    const nowIso = new Date().toISOString();
+    const todayStr = nowIso.split('T')[0];
+    const awardedDate = params.awardedDate || todayStr;
+    const newId = crypto.randomUUID();
+
+    const snapshotData = {
+      totalScore: 0,
+      rank: params.certifiedRank || 'D',
+      isCertified: params.rewardType === 'certificate_award',
+      vocationalCommonScore: 0,
+      majorScore: 0,
+      employmentScore: 0,
+      characterScore: 0,
+      isRetroactive: true,
+      studentInfo: {
+        name: student.student_name,
+        studentNumber: student.student_number || '',
+        major: student.major || '',
+        classInfo: student.class_info || '',
+      },
+      detailsSummary: '과거 오프라인 지급 내역 수동 소급 등록',
+      awardedBy: {
+        name: profile.full_name || profile.username || '교사',
+        role: profile.role,
+      }
+    };
+
+    const record: StudentRewardRecord = {
+      id: newId,
+      studentId: params.studentId,
+      rewardType: params.rewardType,
+      academicYear: params.academicYear,
+      semester: params.semester || 1,
+      certifiedScore: 0,
+      certifiedRank: params.certifiedRank || 'D',
+      itemName,
+      status: 'awarded',
+      awardedDate,
+      awardedBy: profile.full_name || profile.username || '교사',
+      remarks: params.remarks || '과거 이력 소급 등록',
+      snapshotData,
+      createdAt: nowIso,
+    };
+
+    const dbPayload = {
+      id: newId,
+      student_id: params.studentId,
+      reward_type: params.rewardType,
+      academic_year: params.academicYear,
+      semester: params.semester || 1,
+      certified_score: 0,
+      certified_rank: params.certifiedRank || 'D',
+      item_name: itemName,
+      status: 'awarded',
+      awarded_date: awardedDate,
+      awarded_by: profile.full_name || profile.username || '교사',
+      remarks: record.remarks,
+      snapshot_data: snapshotData,
+      created_at: nowIso,
+      updated_at: nowIso,
+    };
+
+    // 1순위: student_cert_rewards
+    const { error: insertErr } = await supabase.from('student_cert_rewards').insert(dbPayload);
+    if (insertErr) {
+      console.warn('Fallback to system_settings for past reward:', insertErr);
+      const { data: settingRow } = await supabase.from('system_settings').select('value').eq('key', REWARD_SETTINGS_KEY).maybeSingle();
+      const currentList: any[] = settingRow?.value || [];
+      currentList.push(dbPayload);
+      await supabase.from('system_settings').upsert({
+        key: REWARD_SETTINGS_KEY,
+        value: currentList,
+        updated_at: nowIso
+      }, { onConflict: 'key' });
+    }
+
+    clearCertificationSummaryCache(params.gradeNum);
+    revalidateTag('cert-eval');
+    if (params.gradeNum) {
+      revalidateTag(`cert-eval-grade-${params.gradeNum}`);
+    }
+    revalidatePath('/admin/certification');
+    revalidatePath('/student/certification');
+
+    await logAuditAction({
+      actor_name: profile.full_name || profile.username || '교사',
+      action_type: 'STUDENT_UPDATE',
+      target_name: `[과거 수령 소급 등록] ${student.student_name} - ${itemName}`,
+      details: {
+        studentId: params.studentId,
+        rewardType: params.rewardType,
+        certifiedRank: params.certifiedRank,
+        itemName,
+        awardedDate
+      }
+    });
+
+    return { success: true, reward: record };
+  } catch (err: any) {
+    console.error('Error in recordPastRewardAction:', err);
+    return { success: false, error: err?.message || '소급 등록에 실패했습니다.' };
+  }
+}
+
+/**
+ * 과거 오프라인 기지급 내역 다건 일괄(엑셀) 소급 등록 액션
+ */
+export async function batchImportPastRewardsAction(params: {
+  academicYear: number;
+  rewards: Array<{
+    studentId: string;
+    rewardType: 'prize' | 'certificate_award';
+    semester?: number;
+    certifiedRank?: CertificationRank;
+    itemName?: string;
+    awardedDate?: string;
+    remarks?: string;
+  }>;
+  gradeNum?: number;
+}): Promise<{ success: boolean; count: number; error?: string }> {
+  try {
+    const profile = await getCurrentUserProfile();
+    if (!profile) {
+      return { success: false, count: 0, error: '로그인이 필요합니다.' };
+    }
+    if (profile.role !== 'admin') {
+      return { success: false, count: 0, error: '관리자 권한이 필요합니다.' };
+    }
+
+    if (!params.rewards || params.rewards.length === 0) {
+      return { success: false, count: 0, error: '등록할 수령 이력 목록이 없습니다.' };
+    }
+
+    const supabase = createAdminClient();
+    const studentIds = Array.from(new Set(params.rewards.map(r => r.studentId)));
+
+    const { data: students, error: stuErr } = await supabase
+      .from('students')
+      .select('id, student_name, student_number, major, class_info')
+      .in('id', studentIds);
+
+    if (stuErr || !students) {
+      return { success: false, count: 0, error: '학생 정보를 불러오지 못했습니다.' };
+    }
+
+    const stuMap = new Map<string, any>();
+    students.forEach(s => stuMap.set(s.id, s));
+
+    const nowIso = new Date().toISOString();
+    const todayStr = nowIso.split('T')[0];
+    const payloadsToInsert: any[] = [];
+
+    for (const item of params.rewards) {
+      const student = stuMap.get(item.studentId);
+      if (!student) continue;
+
+      const defaultItemName = item.rewardType === 'prize'
+        ? (getDefaultPrizeName(item.certifiedRank || 'C') || '등급별 상품')
+        : '옥저인재인증상';
+      const itemName = item.itemName || defaultItemName;
+      const awardedDate = item.awardedDate || todayStr;
+
+      const snapshotData = {
+        totalScore: 0,
+        rank: item.certifiedRank || 'D',
+        isCertified: item.rewardType === 'certificate_award',
+        vocationalCommonScore: 0,
+        majorScore: 0,
+        employmentScore: 0,
+        characterScore: 0,
+        isRetroactive: true,
+        studentInfo: {
+          name: student.student_name,
+          studentNumber: student.student_number || '',
+          major: student.major || '',
+          classInfo: student.class_info || '',
+        },
+        detailsSummary: '과거 오프라인 지급 내역 일괄 소급 등록',
+        awardedBy: {
+          name: profile.full_name || profile.username || '교사',
+          role: profile.role,
+        }
+      };
+
+      payloadsToInsert.push({
+        id: crypto.randomUUID(),
+        student_id: item.studentId,
+        reward_type: item.rewardType,
+        academic_year: params.academicYear,
+        semester: item.semester || 1,
+        certified_score: 0,
+        certified_rank: item.certifiedRank || 'D',
+        item_name: itemName,
+        status: 'awarded',
+        awarded_date: awardedDate,
+        awarded_by: profile.full_name || profile.username || '교사',
+        remarks: item.remarks || '과거 이력 일괄 소급 등록',
+        snapshot_data: snapshotData,
+        created_at: nowIso,
+        updated_at: nowIso,
+      });
+    }
+
+    if (payloadsToInsert.length > 0) {
+      const { error: insertErr } = await supabase.from('student_cert_rewards').insert(payloadsToInsert);
+      if (insertErr) {
+        console.warn('Fallback to system_settings for batch past rewards:', insertErr);
+        const { data: settingRow } = await supabase.from('system_settings').select('value').eq('key', REWARD_SETTINGS_KEY).maybeSingle();
+        const currentList: any[] = settingRow?.value || [];
+        currentList.push(...payloadsToInsert);
+        await supabase.from('system_settings').upsert({
+          key: REWARD_SETTINGS_KEY,
+          value: currentList,
+          updated_at: nowIso
+        }, { onConflict: 'key' });
+      }
+    }
+
+    // 모든 학년(1, 2, 3학년) 캐시 및 태그 무효화 (전 학년 대상 일괄 소급 지원)
+    [1, 2, 3].forEach(g => {
+      clearCertificationSummaryCache(g);
+      revalidateTag(`cert-eval-grade-${g}`);
+    });
+    clearCertificationSummaryCache();
+    revalidateTag('cert-eval');
+    revalidateTag('students');
+    revalidatePath('/admin/certification');
+    revalidatePath('/student/certification');
+
+    return {
+      success: true,
+      count: payloadsToInsert.length,
+    };
+  } catch (err: any) {
+    console.error('Error in batchImportPastRewardsAction:', err);
+    return { success: false, count: 0, error: err?.message || '일괄 소급 등록에 실패했습니다.' };
+  }
+}
+
+/**
+ * 전 학년(1, 2, 3학년) 옥저인재인증제 종합 평가 목록 동시 병렬 조회
+ * (엑셀 일괄 소급 등록 등 전교생 대상 매칭 및 검색 시 활용)
+ */
+export async function getAllGradesEvaluationsAction(preloadedBaseYear?: number): Promise<FullStudentEvaluation[]> {
+  try {
+    const baseYear = preloadedBaseYear || (await getSystemSettings()).baseYear;
+    const [g1, g2, g3] = await Promise.all([
+      getCachedCertificationSummaryList(1, baseYear),
+      getCachedCertificationSummaryList(2, baseYear),
+      getCachedCertificationSummaryList(3, baseYear),
+    ]);
+    return [...g1, ...g2, ...g3];
+  } catch (err) {
+    console.error('Error in getAllGradesEvaluationsAction:', err);
+    return [];
+  }
+}
+
 
 
 

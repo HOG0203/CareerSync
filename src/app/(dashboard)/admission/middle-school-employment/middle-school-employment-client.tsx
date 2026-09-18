@@ -294,12 +294,12 @@ export function MiddleSchoolEmploymentClient({
       {/* 2. 요약 통계 카드 4종 (class-management 스타일 - 모바일 노랩 최적화) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 shrink-0">
         <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
-          <CardContent className="p-2.5 sm:p-4 flex items-center justify-between gap-1.5">
+          <CardContent className="p-3 sm:p-4 flex items-center justify-between gap-1.5">
             <div className="min-w-0">
-              <p className="text-[11px] sm:text-xs font-bold text-slate-600 whitespace-nowrap truncate">
+              <p className="text-xs sm:text-sm font-bold text-slate-600 whitespace-nowrap truncate">
                 {selectedMiddleSchool !== 'all' ? `${selectedMiddleSchool} 출신` : '조회 취업자수'}
               </p>
-              <p className="text-base sm:text-2xl font-black text-slate-900 mt-0.5 whitespace-nowrap">
+              <p className="text-lg sm:text-2xl font-black text-slate-900 mt-0.5 whitespace-nowrap">
                 {stats.totalStudents}명
               </p>
             </div>
@@ -310,13 +310,13 @@ export function MiddleSchoolEmploymentClient({
         </Card>
 
         <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
-          <CardContent className="p-2.5 sm:p-4 flex items-center justify-between gap-1.5">
+          <CardContent className="p-3 sm:p-4 flex items-center justify-between gap-1.5">
             <div className="min-w-0">
-              <p className="text-[11px] sm:text-xs font-bold text-slate-600 whitespace-nowrap truncate">
+              <p className="text-xs sm:text-sm font-bold text-slate-600 whitespace-nowrap truncate">
                 우수기업 취업률
               </p>
-              <p className="text-base sm:text-2xl font-black text-emerald-600 mt-0.5 whitespace-nowrap">
-                {stats.excellentRate}% <span className="text-[10px] sm:text-xs font-bold text-slate-500">({stats.excellentCount}명)</span>
+              <p className="text-lg sm:text-2xl font-black text-emerald-600 mt-0.5 whitespace-nowrap">
+                {stats.excellentRate}% <span className="text-xs font-bold text-slate-500">({stats.excellentCount}명)</span>
               </p>
             </div>
             <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-50 text-emerald-600 shrink-0">
@@ -326,13 +326,13 @@ export function MiddleSchoolEmploymentClient({
         </Card>
 
         <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
-          <CardContent className="p-2.5 sm:p-4 flex items-center justify-between gap-1.5">
+          <CardContent className="p-3 sm:p-4 flex items-center justify-between gap-1.5">
             <div className="min-w-0">
-              <p className="text-[11px] sm:text-xs font-bold text-slate-600 whitespace-nowrap truncate">
+              <p className="text-xs sm:text-sm font-bold text-slate-600 whitespace-nowrap truncate">
                 우수기업 취업자
               </p>
-              <p className="text-base sm:text-2xl font-black text-purple-700 mt-0.5 whitespace-nowrap">
-                {stats.excellentCount}명 <span className="text-[10px] sm:text-xs font-bold text-slate-500">({stats.excellentRate}%)</span>
+              <p className="text-lg sm:text-2xl font-black text-purple-700 mt-0.5 whitespace-nowrap">
+                {stats.excellentCount}명 <span className="text-xs font-bold text-slate-500">({stats.excellentRate}%)</span>
               </p>
             </div>
             <div className="p-2 sm:p-2.5 rounded-xl bg-purple-50 text-purple-600 shrink-0">
@@ -342,12 +342,12 @@ export function MiddleSchoolEmploymentClient({
         </Card>
 
         <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
-          <CardContent className="p-2.5 sm:p-4 flex items-center justify-between gap-1.5">
+          <CardContent className="p-3 sm:p-4 flex items-center justify-between gap-1.5">
             <div className="min-w-0">
-              <p className="text-[11px] sm:text-xs font-bold text-slate-600 whitespace-nowrap truncate">
+              <p className="text-xs sm:text-sm font-bold text-slate-600 whitespace-nowrap truncate">
                 평균 입학 석차
               </p>
-              <p className="text-base sm:text-2xl font-black text-slate-900 mt-0.5 whitespace-nowrap">
+              <p className="text-lg sm:text-2xl font-black text-slate-900 mt-0.5 whitespace-nowrap">
                 {stats.avgRankPercentile !== null ? `상위 ${stats.avgRankPercentile}%` : '-'}
               </p>
             </div>
@@ -365,13 +365,13 @@ export function MiddleSchoolEmploymentClient({
             <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full md:w-auto">
               {/* 중학교 전체 드롭다운 */}
               <Select value={selectedMiddleSchool} onValueChange={setSelectedMiddleSchool}>
-                <SelectTrigger className="w-full sm:w-[155px] h-9 text-xs font-bold rounded-xl border-slate-200 bg-white">
+                <SelectTrigger className="w-full sm:w-[170px] h-9 text-xs sm:text-sm font-bold rounded-xl border-slate-200 bg-white">
                   <SelectValue placeholder="출신 중학교 전체" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl max-h-[280px]">
-                  <SelectItem value="all" className="text-xs font-bold">전체 중학교</SelectItem>
+                  <SelectItem value="all" className="text-xs sm:text-sm font-bold">전체 중학교</SelectItem>
                   {allMiddleSchools.map((sch) => (
-                    <SelectItem key={sch} value={sch} className="text-xs">
+                    <SelectItem key={sch} value={sch} className="text-xs sm:text-sm">
                       {sch}
                     </SelectItem>
                   ))}
@@ -380,18 +380,18 @@ export function MiddleSchoolEmploymentClient({
 
               {/* 기업 구분 필터 */}
               <Select value={selectedCompanyType} onValueChange={setSelectedCompanyType}>
-                <SelectTrigger className="w-full sm:w-[155px] h-9 text-xs font-bold rounded-xl border-slate-200 bg-white">
+                <SelectTrigger className="w-full sm:w-[170px] h-9 text-xs sm:text-sm font-bold rounded-xl border-slate-200 bg-white">
                   <SelectValue placeholder="기업구분 전체" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  <SelectItem value="all" className="text-xs font-bold">전체 기업구분</SelectItem>
-                  <SelectItem value="우수기업" className="text-xs font-bold text-purple-700">🏆 우수기업 (대·공·중견·공무원)</SelectItem>
-                  <SelectItem value="대기업" className="text-xs">대기업</SelectItem>
-                  <SelectItem value="공기업" className="text-xs">공기업</SelectItem>
-                  <SelectItem value="공무원" className="text-xs">공무원</SelectItem>
-                  <SelectItem value="중견기업" className="text-xs">중견기업</SelectItem>
-                  <SelectItem value="강소기업" className="text-xs">강소기업</SelectItem>
-                  <SelectItem value="중소기업" className="text-xs">중소기업</SelectItem>
+                  <SelectItem value="all" className="text-xs sm:text-sm font-bold">전체 기업구분</SelectItem>
+                  <SelectItem value="우수기업" className="text-xs sm:text-sm font-bold text-purple-700">🏆 우수기업 (대·공·중견·공무원)</SelectItem>
+                  <SelectItem value="대기업" className="text-xs sm:text-sm">대기업</SelectItem>
+                  <SelectItem value="공기업" className="text-xs sm:text-sm">공기업</SelectItem>
+                  <SelectItem value="공무원" className="text-xs sm:text-sm">공무원</SelectItem>
+                  <SelectItem value="중견기업" className="text-xs sm:text-sm">중견기업</SelectItem>
+                  <SelectItem value="강소기업" className="text-xs sm:text-sm">강소기업</SelectItem>
+                  <SelectItem value="중소기업" className="text-xs sm:text-sm">중소기업</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -406,7 +406,7 @@ export function MiddleSchoolEmploymentClient({
                     setSelectedCompanyType('all');
                     setSearchTerm('');
                   }}
-                  className="h-9 px-2.5 text-xs text-slate-500 hover:text-slate-800 col-span-2 sm:col-span-1 justify-center sm:justify-start"
+                  className="h-9 px-2.5 text-xs sm:text-sm text-slate-500 hover:text-slate-800 col-span-2 sm:col-span-1 justify-center sm:justify-start"
                 >
                   <RotateCcw className="h-3.5 w-3.5 mr-1" />
                   초기화
@@ -416,13 +416,13 @@ export function MiddleSchoolEmploymentClient({
 
             {/* 우측 키워드 검색창 및 액션 버튼 툴바 */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto justify-end">
-              <div className="relative w-full sm:w-56">
+              <div className="relative w-full sm:w-60">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
                 <Input
                   placeholder="학생명, 출신교, 취업처..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 h-9 text-xs rounded-xl border-slate-200 bg-white"
+                  className="pl-8 h-9 text-xs sm:text-sm rounded-xl border-slate-200 bg-white"
                 />
               </div>
 
@@ -460,26 +460,26 @@ export function MiddleSchoolEmploymentClient({
         <CardContent className="h-auto overflow-visible lg:flex-1 lg:overflow-hidden p-0 relative flex flex-col lg:min-h-0">
           {/* [데스크톱 / 태블릿 뷰] 데이블 (md:block) */}
           <div className="hidden md:block w-full h-auto lg:h-full flex-col lg:min-h-0 overflow-auto">
-            <Table className="text-xs">
+            <Table className="text-sm">
               <TableHeader className="bg-slate-50 sticky top-0 z-10 shadow-2xs">
                 <TableRow>
-                  <TableHead className="py-3 font-bold text-slate-700 w-12 text-center">No</TableHead>
-                  <TableHead className="py-3 font-bold text-slate-700">졸업년도</TableHead>
-                  <TableHead className="py-3 font-bold text-slate-700">성명</TableHead>
-                  <TableHead className="py-3 font-bold text-slate-700">학과</TableHead>
-                  <TableHead className="py-3 font-bold text-teal-800 bg-teal-50/50">출신 중학교</TableHead>
-                  <TableHead className="py-3 font-bold text-slate-700 text-right">입학 석차백분율</TableHead>
-                  <TableHead className="py-3 font-bold text-slate-700">전형 구분</TableHead>
-                  <TableHead className="py-3 font-bold text-slate-700">취업 현황</TableHead>
-                  <TableHead className="py-3 font-bold text-slate-900">취업처 (기업명)</TableHead>
-                  <TableHead className="py-3 font-bold text-slate-700">기업 구분</TableHead>
-                  {!isReadOnly && <TableHead className="py-3 font-bold text-center text-slate-700 w-16">관리</TableHead>}
+                  <TableHead className="py-3.5 px-3 font-bold text-slate-700 w-14 text-center text-xs sm:text-sm">No</TableHead>
+                  <TableHead className="py-3.5 px-3 font-bold text-slate-700 text-xs sm:text-sm whitespace-nowrap">졸업년도</TableHead>
+                  <TableHead className="py-3.5 px-3 font-bold text-slate-700 text-xs sm:text-sm whitespace-nowrap">성명</TableHead>
+                  <TableHead className="py-3.5 px-3 font-bold text-slate-700 text-xs sm:text-sm whitespace-nowrap">학과</TableHead>
+                  <TableHead className="py-3.5 px-3 font-bold text-teal-900 bg-teal-50/70 text-xs sm:text-sm whitespace-nowrap">출신 중학교</TableHead>
+                  <TableHead className="py-3.5 px-3 font-bold text-slate-700 text-right text-xs sm:text-sm whitespace-nowrap">입학 석차백분율</TableHead>
+                  <TableHead className="py-3.5 px-3 font-bold text-slate-700 text-xs sm:text-sm whitespace-nowrap">전형 구분</TableHead>
+                  <TableHead className="py-3.5 px-3 font-bold text-slate-700 text-xs sm:text-sm whitespace-nowrap">취업 현황</TableHead>
+                  <TableHead className="py-3.5 px-3 font-bold text-slate-900 text-xs sm:text-sm whitespace-nowrap">취업처 (기업명)</TableHead>
+                  <TableHead className="py-3.5 px-3 font-bold text-slate-700 text-xs sm:text-sm whitespace-nowrap">기업 구분</TableHead>
+                  {!isReadOnly && <TableHead className="py-3.5 px-3 font-bold text-center text-slate-700 w-16 text-xs sm:text-sm">관리</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredStudents.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={isReadOnly ? 10 : 11} className="text-center py-16 text-slate-400">
+                    <TableCell colSpan={isReadOnly ? 10 : 11} className="text-center py-16 text-slate-400 text-sm">
                       일치하는 중학교 학생 데이터가 없습니다. 검색 조건이나 학년도를 변경해 보세요.
                     </TableCell>
                   </TableRow>
@@ -489,36 +489,36 @@ export function MiddleSchoolEmploymentClient({
                     const isTopCompany = ['대기업', '공기업', '공무원', '중견기업'].includes(student.company_type || '');
 
                     return (
-                      <TableRow key={student.id} className="hover:bg-slate-50/70 transition-colors">
-                        <TableCell className="text-center font-mono text-[11px] text-slate-400">
+                      <TableRow key={student.id} className="hover:bg-slate-50/80 transition-colors">
+                        <TableCell className="text-center font-mono text-xs sm:text-sm text-slate-500 py-3.5 px-3">
                           {idx + 1}
                         </TableCell>
-                        <TableCell className="text-[11px] font-semibold text-slate-700">
+                        <TableCell className="text-xs sm:text-sm font-semibold text-slate-700 py-3.5 px-3 whitespace-nowrap">
                           {student.graduation_year ? `${student.graduation_year}년` : '-'}
                         </TableCell>
-                        <TableCell className="font-bold text-slate-900">
+                        <TableCell className="font-bold text-slate-900 text-sm sm:text-base py-3.5 px-3 whitespace-nowrap">
                           {student.student_name}
                         </TableCell>
-                        <TableCell className="text-slate-600">
+                        <TableCell className="text-slate-700 font-medium text-xs sm:text-sm py-3.5 px-3 whitespace-nowrap">
                           {student.major || '-'}
                         </TableCell>
 
                         {/* 출신 중학교 */}
-                        <TableCell className="font-bold text-teal-800 bg-teal-50/30">
+                        <TableCell className="font-bold text-teal-900 bg-teal-50/40 text-sm sm:text-base py-3.5 px-3 whitespace-nowrap">
                           {student.middle_school ? (
-                            <span className="inline-flex items-center gap-1">
-                              <School className="h-3 w-3 text-teal-600" />
+                            <span className="inline-flex items-center gap-1.5">
+                              <School className="h-4 w-4 text-teal-600 shrink-0" />
                               {student.middle_school}
                             </span>
                           ) : (
-                            <span className="text-slate-300 italic">미입력</span>
+                            <span className="text-slate-300 italic font-normal text-xs sm:text-sm">미입력</span>
                           )}
                         </TableCell>
 
                         {/* 입학 석차 백분율 */}
-                        <TableCell className="text-right font-mono text-slate-700">
+                        <TableCell className="text-right font-mono text-slate-800 text-sm sm:text-base py-3.5 px-3 whitespace-nowrap">
                           {student.admission_rank_percentile !== undefined && student.admission_rank_percentile !== null ? (
-                            <span className="font-bold text-slate-800">
+                            <span className="font-black text-slate-900">
                               {student.admission_rank_percentile}%
                             </span>
                           ) : (
@@ -527,40 +527,45 @@ export function MiddleSchoolEmploymentClient({
                         </TableCell>
 
                         {/* 전형 구분 */}
-                        <TableCell className="text-slate-500 text-[11px]">
+                        <TableCell className="text-slate-600 font-medium text-xs sm:text-sm py-3.5 px-3 whitespace-nowrap">
                           {student.admission_type || '-'}
                         </TableCell>
 
-                        <TableCell>
+                        {/* 취업 현황 */}
+                        <TableCell className="py-3.5 px-3 whitespace-nowrap">
                           {isEmployed ? (
-                            <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+                            <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-xs font-bold px-2.5 py-0.5">
                               취업완료
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="text-slate-400 border-slate-200 text-[10px]">
+                            <Badge variant="outline" className="text-slate-500 border-slate-300 text-xs px-2.5 py-0.5">
                               {student.business_type || student.employment_status || '미취업'}
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell className="font-extrabold text-slate-900">
+
+                        {/* 취업처 (기업명) */}
+                        <TableCell className="font-black text-slate-900 text-sm sm:text-base py-3.5 px-3 whitespace-nowrap">
                           {student.company || student.latest_training_company ? (
                             <div className="flex items-center gap-1.5">
-                              {isTopCompany && <Trophy className="h-3.5 w-3.5 text-purple-600 shrink-0" />}
+                              {isTopCompany && <Trophy className="h-4 w-4 text-purple-600 shrink-0" />}
                               <span>{student.company || student.latest_training_company}</span>
                             </div>
                           ) : (
                             <span className="text-slate-300 font-normal">-</span>
                           )}
                         </TableCell>
-                        <TableCell>
+
+                        {/* 기업 구분 */}
+                        <TableCell className="py-3.5 px-3 whitespace-nowrap">
                           {student.company_type ? (
                             <Badge
                               variant="secondary"
                               className={cn(
-                                'text-[10px] font-bold',
+                                'text-xs font-bold px-2.5 py-0.5',
                                 isTopCompany
-                                  ? 'bg-purple-100 text-purple-800 border-purple-200'
-                                  : 'bg-slate-100 text-slate-700'
+                                  ? 'bg-purple-100 text-purple-900 border-purple-300'
+                                  : 'bg-slate-100 text-slate-800 border-slate-200'
                               )}
                             >
                               {student.company_type}
@@ -569,17 +574,19 @@ export function MiddleSchoolEmploymentClient({
                             <span className="text-slate-300">-</span>
                           )}
                         </TableCell>
+
+                        {/* 관리 */}
                         {!isReadOnly && (
-                          <TableCell className="text-center">
+                          <TableCell className="text-center py-3.5 px-3 whitespace-nowrap">
                             <Button
                               type="button"
                               variant="ghost"
                               size="sm"
                               onClick={() => setEditingStudent(student)}
-                              className="h-7 w-7 p-0 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100"
+                              className="h-8 w-8 p-0 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100"
                               title="입학 정보 상세 수정"
                             >
-                              <Edit2 className="h-3.5 w-3.5" />
+                              <Edit2 className="h-4 w-4" />
                             </Button>
                           </TableCell>
                         )}
@@ -594,7 +601,7 @@ export function MiddleSchoolEmploymentClient({
           {/* [모바일 전용 뷰] 초컴팩트 고밀도 카드 리스트 (md:hidden) */}
           <div className="block md:hidden divide-y divide-slate-100 p-2 space-y-2 overflow-y-auto">
             {filteredStudents.length === 0 ? (
-              <div className="text-center py-10 text-slate-400 text-xs">
+              <div className="text-center py-10 text-slate-400 text-xs sm:text-sm">
                 일치하는 중학교 학생 데이터가 없습니다. 검색 조건이나 학년도를 변경해 보세요.
               </div>
             ) : (
@@ -603,15 +610,15 @@ export function MiddleSchoolEmploymentClient({
                 const isTopCompany = ['대기업', '공기업', '공무원', '중견기업'].includes(student.company_type || '');
 
                 return (
-                  <div key={student.id} className="p-2.5 bg-white border border-slate-200/80 rounded-xl space-y-1.5 shadow-2xs">
+                  <div key={student.id} className="p-3 bg-white border border-slate-200/80 rounded-xl space-y-2 shadow-2xs">
                     {/* 상단 라인: 번호, 성명, 학과, 졸업년도, 수정버튼 */}
                     <div className="flex items-center justify-between gap-1.5">
-                      <div className="flex items-center gap-1.5 text-xs truncate">
-                        <span className="text-[10px] font-bold text-slate-400 font-mono shrink-0">#{idx + 1}</span>
-                        <span className="font-bold text-slate-900 text-sm">{student.student_name}</span>
-                        <span className="text-slate-500 text-[11px] truncate">({student.major || '-'})</span>
+                      <div className="flex items-center gap-2 text-sm truncate">
+                        <span className="text-xs font-bold text-slate-400 font-mono shrink-0">#{idx + 1}</span>
+                        <span className="font-extrabold text-slate-900 text-base">{student.student_name}</span>
+                        <span className="text-slate-600 text-xs font-medium truncate">({student.major || '-'})</span>
                         {student.graduation_year && (
-                          <span className="text-[10px] text-slate-400 font-mono shrink-0">[{student.graduation_year}년]</span>
+                          <span className="text-xs text-slate-400 font-mono shrink-0">[{student.graduation_year}년]</span>
                         )}
                       </div>
                       {!isReadOnly && (
@@ -620,30 +627,30 @@ export function MiddleSchoolEmploymentClient({
                           variant="ghost"
                           size="sm"
                           onClick={() => setEditingStudent(student)}
-                          className="h-6 w-6 p-0 text-slate-400 hover:text-teal-700 hover:bg-teal-50 rounded-md shrink-0"
+                          className="h-7 w-7 p-0 text-slate-500 hover:text-teal-700 hover:bg-teal-50 rounded-lg shrink-0"
                           title="수정"
                         >
-                          <Edit2 className="h-3 w-3" />
+                          <Edit2 className="h-3.5 w-3.5" />
                         </Button>
                       )}
                     </div>
 
                     {/* 중단 강조 라인: 출신중학교 & 취업처 기업명 */}
-                    <div className="flex items-center justify-between gap-2 text-xs bg-slate-50/80 px-2.5 py-1.5 rounded-lg border border-slate-100">
-                      <div className="flex items-center gap-1 min-w-0">
-                        <School className="h-3.5 w-3.5 text-teal-600 shrink-0" />
-                        <span className="font-bold text-teal-900 truncate">
+                    <div className="flex items-center justify-between gap-2 text-sm bg-slate-50/80 px-3 py-2 rounded-lg border border-slate-100">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <School className="h-4 w-4 text-teal-600 shrink-0" />
+                        <span className="font-extrabold text-teal-950 text-sm sm:text-base truncate">
                           {student.middle_school || <span className="text-slate-300 font-normal italic">중학교 미입력</span>}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0 font-bold text-slate-900">
-                        {isTopCompany && <Trophy className="h-3.5 w-3.5 text-purple-600 shrink-0" />}
+                      <div className="flex items-center gap-1 shrink-0 font-extrabold text-slate-900 text-sm sm:text-base">
+                        {isTopCompany && <Trophy className="h-4 w-4 text-purple-600 shrink-0" />}
                         <span>{student.company || student.latest_training_company || '-'}</span>
                         {student.company_type && (
                           <Badge
                             variant="secondary"
                             className={cn(
-                              'text-[9px] font-bold py-0 px-1.5',
+                              'text-[10px] font-bold py-0.5 px-2 ml-1',
                               isTopCompany ? 'bg-purple-100 text-purple-800 border-purple-200' : 'bg-slate-200/80 text-slate-700'
                             )}
                           >
@@ -654,12 +661,12 @@ export function MiddleSchoolEmploymentClient({
                     </div>
 
                     {/* 하단 세부 라인: 입학석차 백분율 & 전형 구분 */}
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 px-0.5 pt-0.5">
+                    <div className="flex items-center justify-between text-xs text-slate-600 px-1 pt-0.5">
                       <span>
-                        입학석차: <strong className="text-slate-800">{student.admission_rank_percentile !== undefined && student.admission_rank_percentile !== null ? `${student.admission_rank_percentile}%` : '-'}</strong>
+                        입학석차: <strong className="text-slate-900 font-bold">{student.admission_rank_percentile !== undefined && student.admission_rank_percentile !== null ? `${student.admission_rank_percentile}%` : '-'}</strong>
                       </span>
                       <span>
-                        전형: <strong className="text-slate-700">{student.admission_type || '-'}</strong>
+                        전형: <strong className="text-slate-800 font-medium">{student.admission_type || '-'}</strong>
                       </span>
                     </div>
                   </div>
