@@ -24,6 +24,7 @@ import { ImportButton } from './import-button';
 import { ExportButton } from './export-button';
 import { MasterCertificate } from '@/app/(dashboard)/admin/settings/actions';
 import { getMajorOrderIndex } from '@/lib/student-utils';
+import { StudentsTableSkeleton } from './students-skeleton';
 
 interface StudentsHubClientProps {
   initialData: any[];
@@ -59,7 +60,39 @@ export function StudentsHubClient({
   const [selectedClass, setSelectedClass] = React.useState<string>('all');
   const [selectedStatus, setSelectedStatus] = React.useState<string>(searchParams.get('status') || 'all');
 
+  // 스켈레톤 로딩 상태 (학년도/학년 서버 라우팅 및 학과/반/취업현황 필터링 공통)
+  const [isPending, startTransition] = React.useTransition();
+  const [isNavigating, setIsNavigating] = React.useState(false);
+  const [isFiltering, setIsFiltering] = React.useState(false);
+  const filterTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const [sheetFilteredData, setSheetFilteredData] = React.useState<any[] | null>(null);
+
+  // 데이터, 학년도, 학년 변경 완료 시 스켈레톤 해제
+  React.useEffect(() => {
+    setIsNavigating(false);
+    setIsFiltering(false);
+    setSheetFilteredData(null);
+  }, [grade, currentAY, initialData]);
+
+  // 언마운트 시 타이머 정리
+  React.useEffect(() => {
+    return () => {
+      if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
+    };
+  }, []);
+
+  const triggerClientFilter = (filterFn: () => void) => {
+    if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
+    setIsFiltering(true);
+    filterFn();
+    filterTimerRef.current = setTimeout(() => {
+      setIsFiltering(false);
+    }, 250);
+  };
+
   const handleAYChange = (newAYStr: string) => {
+    setIsNavigating(true);
     const params = new URLSearchParams(searchParams.toString());
     const newAY = parseInt(newAYStr);
     params.set('ay', newAYStr);
@@ -70,10 +103,13 @@ export function StudentsHubClient({
       const gradeNum = typeof grade === 'number' ? grade : (parseInt(grade) || 3);
       params.set('year', String(newAY + (4 - gradeNum)));
     }
-    router.push(`/students?${params.toString()}`);
+    startTransition(() => {
+      router.push(`/students?${params.toString()}`);
+    });
   };
 
   const handleGradeChange = (newGradeStr: string) => {
+    setIsNavigating(true);
     const params = new URLSearchParams(searchParams.toString());
     params.set('ay', String(currentAY));
     params.set('grade', newGradeStr);
@@ -84,15 +120,30 @@ export function StudentsHubClient({
       const gradYear = currentAY + (4 - newGrade);
       params.set('year', String(gradYear));
     }
-    router.push(`/students?${params.toString()}`);
+    startTransition(() => {
+      router.push(`/students?${params.toString()}`);
+    });
   };
 
-  const [sheetFilteredData, setSheetFilteredData] = React.useState<any[] | null>(null);
+  const handleMajorChange = (newMajor: string) => {
+    triggerClientFilter(() => {
+      setSelectedMajor(newMajor);
+    });
+  };
 
-  // 학사 학년도나 학년 변경 시에만 시트 필터 상태 초기화
-  React.useEffect(() => {
-    setSheetFilteredData(null);
-  }, [grade, currentAY]);
+  const handleClassChange = (newClass: string) => {
+    triggerClientFilter(() => {
+      setSelectedClass(newClass);
+    });
+  };
+
+  const handleStatusChange = (newStatus: string) => {
+    triggerClientFilter(() => {
+      setSelectedStatus(newStatus);
+    });
+  };
+
+  const isLoading = isNavigating || isPending || isFiltering;
 
   const handleFilteredDataChange = React.useCallback((data: any[] | null) => {
     setSheetFilteredData(data);
@@ -202,7 +253,11 @@ export function StudentsHubClient({
           <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
             <div>
               <p className="text-xs sm:text-sm font-bold text-slate-600">조회 학생수</p>
-              <p className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">{stats.total}명</p>
+              {isLoading ? (
+                <div className="h-7 w-16 bg-slate-200 animate-pulse rounded mt-1" />
+              ) : (
+                <p className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">{stats.total}명</p>
+              )}
             </div>
             <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
               <Users className="h-5 w-5" />
@@ -213,8 +268,14 @@ export function StudentsHubClient({
         <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl">
           <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs sm:text-sm font-bold text-slate-600">취업 ({stats.employmentRate}%)</p>
-              <p className="text-xl sm:text-2xl font-black text-emerald-600 mt-0.5">{stats.employedCount}명</p>
+              <p className="text-xs sm:text-sm font-bold text-slate-600">
+                {isLoading ? '취업률' : `취업 (${stats.employmentRate}%)`}
+              </p>
+              {isLoading ? (
+                <div className="h-7 w-20 bg-slate-200 animate-pulse rounded mt-1" />
+              ) : (
+                <p className="text-xl sm:text-2xl font-black text-emerald-600 mt-0.5">{stats.employedCount}명</p>
+              )}
             </div>
             <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
               <CheckCircle2 className="h-5 w-5" />
@@ -226,7 +287,11 @@ export function StudentsHubClient({
           <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
             <div>
               <p className="text-xs sm:text-sm font-bold text-slate-600">현장실습 참여</p>
-              <p className="text-xl sm:text-2xl font-black text-blue-600 mt-0.5">{stats.trainingCount}명</p>
+              {isLoading ? (
+                <div className="h-7 w-16 bg-slate-200 animate-pulse rounded mt-1" />
+              ) : (
+                <p className="text-xl sm:text-2xl font-black text-blue-600 mt-0.5">{stats.trainingCount}명</p>
+              )}
             </div>
             <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
               <Building2 className="h-5 w-5" />
@@ -238,16 +303,18 @@ export function StudentsHubClient({
           <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
             <div>
               <p className="text-xs sm:text-sm font-bold text-slate-600">미연계 학생</p>
-              <p className="text-xl sm:text-2xl font-black text-amber-600 mt-0.5">{stats.seekingUnemployedCount}명</p>
+              {isLoading ? (
+                <div className="h-7 w-16 bg-slate-200 animate-pulse rounded mt-1" />
+              ) : (
+                <p className="text-xl sm:text-2xl font-black text-amber-600 mt-0.5">{stats.seekingUnemployedCount}명</p>
+              )}
             </div>
             <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
               <HelpCircle className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
-
       </div>
-
 
       {/* 2. 모던 통합 필터 & 검색 & 툴바 (student-accounts 스타일) */}
       <Card className="border-slate-200/80 shadow-2xs bg-white rounded-2xl shrink-0">
@@ -281,10 +348,8 @@ export function StudentsHubClient({
                 </SelectContent>
               </Select>
 
-
-
               {/* 학과 셀렉트 */}
-              <Select value={selectedMajor} onValueChange={setSelectedMajor}>
+              <Select value={selectedMajor} onValueChange={handleMajorChange}>
                 <SelectTrigger className="w-[130px] h-9 text-xs font-bold rounded-xl border-slate-200">
                   <SelectValue placeholder="학과" />
                 </SelectTrigger>
@@ -300,7 +365,7 @@ export function StudentsHubClient({
               </Select>
 
               {/* 반 셀렉트 */}
-              <Select value={selectedClass} onValueChange={setSelectedClass}>
+              <Select value={selectedClass} onValueChange={handleClassChange}>
                 <SelectTrigger className="w-[100px] h-9 text-xs font-bold rounded-xl border-slate-200">
                   <SelectValue placeholder="반" />
                 </SelectTrigger>
@@ -315,7 +380,7 @@ export function StudentsHubClient({
               </Select>
 
               {/* 취업 현황 셀렉트 */}
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <Select value={selectedStatus} onValueChange={handleStatusChange}>
                 <SelectTrigger className="w-[130px] h-9 text-xs font-bold rounded-xl border-slate-200">
                   <SelectValue placeholder="취업현황" />
                 </SelectTrigger>
@@ -358,18 +423,22 @@ export function StudentsHubClient({
       <Card className="h-auto overflow-visible lg:flex-1 lg:min-h-0 lg:overflow-hidden shadow-sm border border-slate-200/80 bg-white flex flex-col rounded-2xl min-w-full mb-0">
         <CardContent className="h-auto overflow-visible lg:flex-1 lg:overflow-hidden p-0 relative flex flex-col lg:min-h-0">
           <div className="w-full h-auto lg:h-full flex flex-col lg:min-h-0">
-            <StudentTable
-              initialData={filteredData}
-              isAdmin={isAdmin}
-              masterCertificates={masterCertificates}
-              masterCompanies={masterCompanies}
-              rankingMap={rankingMap}
-              userProfile={userProfile}
-              baseYear={baseYear}
-              graduationYear={selectedYear}
-              externalSearchTerm={searchTerm}
-              onFilteredDataChange={handleFilteredDataChange}
-            />
+            {isLoading ? (
+              <StudentsTableSkeleton />
+            ) : (
+              <StudentTable
+                initialData={filteredData}
+                isAdmin={isAdmin}
+                masterCertificates={masterCertificates}
+                masterCompanies={masterCompanies}
+                rankingMap={rankingMap}
+                userProfile={userProfile}
+                baseYear={baseYear}
+                graduationYear={selectedYear}
+                externalSearchTerm={searchTerm}
+                onFilteredDataChange={handleFilteredDataChange}
+              />
+            )}
           </div>
         </CardContent>
       </Card>

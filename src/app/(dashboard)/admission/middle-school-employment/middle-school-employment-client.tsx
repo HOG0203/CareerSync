@@ -318,6 +318,9 @@ export function MiddleSchoolEmploymentClient({
               <p className="text-lg sm:text-2xl font-black text-emerald-600 mt-0.5 whitespace-nowrap">
                 {stats.excellentRate}% <span className="text-xs font-bold text-slate-500">({stats.excellentCount}명)</span>
               </p>
+              <p className="text-[11px] sm:text-xs font-medium text-slate-400 mt-0.5 whitespace-nowrap">
+                (대·공·공무·중견)
+              </p>
             </div>
             <div className="p-2 sm:p-2.5 rounded-xl bg-emerald-50 text-emerald-600 shrink-0">
               <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -333,6 +336,9 @@ export function MiddleSchoolEmploymentClient({
               </p>
               <p className="text-lg sm:text-2xl font-black text-purple-700 mt-0.5 whitespace-nowrap">
                 {stats.excellentCount}명 <span className="text-xs font-bold text-slate-500">({stats.excellentRate}%)</span>
+              </p>
+              <p className="text-[11px] sm:text-xs font-medium text-slate-400 mt-0.5 whitespace-nowrap">
+                (대·공·공무·중견)
               </p>
             </div>
             <div className="p-2 sm:p-2.5 rounded-xl bg-purple-50 text-purple-600 shrink-0">
