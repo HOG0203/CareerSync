@@ -58,21 +58,28 @@ export async function logAuditAction(params: {
     const { error: tableErr } = await supabase
       .from('audit_logs')
       .insert({
+        id: newLog.id,
         actor_id: actorId || null,
-        actor_name: actorName,
+        actor_name: finalActorName,
         action_type: params.action_type,
         target_name: params.target_name,
         details: typeof params.details === 'object' ? params.details : { message: params.details },
         created_at: newLog.created_at
       });
 
-    // 2. 만약 audit_logs 테이블이 없으면 system_settings 저장소에 폴백 기록
+    // 2. 만약 audit_logs 테이블이 없으면 중요한 시스템 작업에 한해 system_settings 저장소에 폴백 기록
     if (tableErr) {
+      // ⚠️ PAGE_VIEW(단순 페이지 조회)는 초당 수회 발생하는 텔레메트리이므로,
+      // 전용 테이블이 없을 때 300KB 대용량 JSON을 매번 system_settings에 읽고 쓰지 않도록 스킵하여 DB 락 방지
+      if (params.action_type === 'PAGE_VIEW') {
+        return { success: true };
+      }
+
       const { data: existing } = await supabase
         .from('system_settings')
         .select('value')
         .eq('key', AUDIT_SETTINGS_KEY)
-        .single();
+        .maybeSingle();
 
       let currentLogs: AuditLogEntry[] = existing?.value ? (existing.value as any).logs || [] : [];
       // 최대 1000건 유지
@@ -85,10 +92,13 @@ export async function logAuditAction(params: {
       });
     }
 
-    try {
-      revalidateTag('audit-logs');
-    } catch {
-      // ignore if revalidateTag is called outside request lifecycle
+    // 중요한 상태 변경 작업에 한해서만 감사 로그 캐시 무효화 (PAGE_VIEW 시에는 캐시 유지)
+    if (params.action_type !== 'PAGE_VIEW') {
+      try {
+        revalidateTag('audit-logs');
+      } catch {
+        // ignore if revalidateTag is called outside request lifecycle
+      }
     }
     return { success: true };
   } catch (error) {

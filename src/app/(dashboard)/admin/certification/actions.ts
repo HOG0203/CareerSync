@@ -230,8 +230,11 @@ export async function getEvaluationsStore(): Promise<Record<string, Certificatio
 let rewardsMemoryCache: { data: Record<string, StudentRewardRecord[]>; timestamp: number } | null = null;
 const REWARDS_CACHE_TTL_MS = 5 * 60 * 1000;
 
+let isStudentCertRewardsTableAvailable: boolean | null = null;
+
 export async function clearStudentRewardsCache() {
   rewardsMemoryCache = null;
+  isStudentCertRewardsTableAvailable = null;
 }
 
 /**
@@ -248,36 +251,42 @@ export async function getAllStudentRewards(): Promise<Record<string, StudentRewa
   try {
     const supabase = createAdminClient();
 
-    // 1순위: student_cert_rewards 전용 RDB 테이블 조회
-    const { data: rows, error: tableErr } = await supabase
-      .from('student_cert_rewards')
-      .select('*')
-      .order('created_at', { ascending: false });
+    // 1순위: student_cert_rewards 전용 RDB 테이블 조회 (테이블 부재 확인 시 불필요한 실패 쿼리 스킵)
+    if (isStudentCertRewardsTableAvailable !== false) {
+      const { data: rows, error: tableErr } = await supabase
+        .from('student_cert_rewards')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    if (!tableErr && rows) {
-      const map: Record<string, StudentRewardRecord[]> = {};
-      for (const r of rows) {
-        const item: StudentRewardRecord = {
-          id: r.id,
-          studentId: r.student_id,
-          rewardType: r.reward_type,
-          academicYear: r.academic_year,
-          semester: r.semester,
-          certifiedScore: Number(r.certified_score || 0),
-          certifiedRank: r.certified_rank,
-          itemName: r.item_name,
-          status: r.status,
-          awardedDate: r.awarded_date,
-          awardedBy: r.awarded_by,
-          remarks: r.remarks,
-          snapshotData: r.snapshot_data || {},
-          createdAt: r.created_at,
-        };
-        if (!map[r.student_id]) map[r.student_id] = [];
-        map[r.student_id].push(item);
+      if (!tableErr && rows) {
+        isStudentCertRewardsTableAvailable = true;
+        const map: Record<string, StudentRewardRecord[]> = {};
+        for (const r of rows) {
+          const item: StudentRewardRecord = {
+            id: r.id,
+            studentId: r.student_id,
+            rewardType: r.reward_type,
+            academicYear: r.academic_year,
+            semester: r.semester,
+            certifiedScore: Number(r.certified_score || 0),
+            certifiedRank: r.certified_rank,
+            itemName: r.item_name,
+            status: r.status,
+            awardedDate: r.awarded_date,
+            awardedBy: r.awarded_by,
+            remarks: r.remarks,
+            snapshotData: r.snapshot_data || {},
+            createdAt: r.created_at,
+          };
+          if (!map[r.student_id]) map[r.student_id] = [];
+          map[r.student_id].push(item);
+        }
+        rewardsMemoryCache = { data: map, timestamp: now };
+        return map;
+      } else if (tableErr) {
+        // 테이블이 존재하지 않는 경우 플래그 기억
+        isStudentCertRewardsTableAvailable = false;
       }
-      rewardsMemoryCache = { data: map, timestamp: now };
-      return map;
     }
 
     // 2순위 (폴백): system_settings 조회

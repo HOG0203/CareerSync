@@ -13,6 +13,7 @@ import { PageViewTracker } from '@/components/dashboard/page-view-tracker';
 import { redirect } from 'next/navigation';
 import { getCurrentUserProfile } from '@/lib/data';
 import { getMasterAdminInfo, getSubAdminList } from '@/app/(dashboard)/admin/users/actions';
+import { getCachedCustomPermissionsMap } from '@/lib/permissions';
 
 export default async function DashboardLayout({ children }: PropsWithChildren) {
   const supabase = await createClient();
@@ -23,57 +24,36 @@ export default async function DashboardLayout({ children }: PropsWithChildren) {
     redirect('/login');
   }
 
-  // 2. 프로필 정보 조회
-  const userProfile = await getCurrentUserProfile();
+  // 2. 프로필, 관리자 권한, 개별 메뉴 권한 1회 완전 동시 병렬 패칭 (Next.js 캐시 적용)
+  const [userProfile, masterInfo, subAdminList, permMap] = await Promise.all([
+    getCurrentUserProfile(),
+    getMasterAdminInfo(),
+    getSubAdminList(),
+    getCachedCustomPermissionsMap(),
+  ]);
   
   const isAdmin = userProfile?.role === 'admin';
 
-  // 3. 메인관리자 및 서브관리자 여부 조회
-  let isMasterAdmin = false;
-  let isSubAdmin = false;
-  try {
-    const [masterInfo, subAdminList] = await Promise.all([
-      getMasterAdminInfo(),
-      getSubAdminList(),
-    ]);
+  // 3. 메인관리자 및 서브관리자 여부 동기 판별 (0ms 계산)
+  const masterUsername = masterInfo?.username || '이호중';
+  const masterName = masterInfo?.name || '이호중';
 
-    const masterUsername = masterInfo?.username || '이호중';
-    const masterName = masterInfo?.name || '이호중';
+  const isMasterAdmin = Boolean(
+    isAdmin && (
+      (masterUsername && userProfile?.username === masterUsername) ||
+      (masterName && userProfile?.full_name === masterName) ||
+      userProfile?.username === '이호중' ||
+      userProfile?.full_name === '이호중'
+    )
+  );
 
-    isMasterAdmin = Boolean(
-      isAdmin && (
-        (masterUsername && userProfile?.username === masterUsername) ||
-        (masterName && userProfile?.full_name === masterName) ||
-        userProfile?.username === '이호중' ||
-        userProfile?.full_name === '이호중'
-      )
-    );
+  const subList = Array.isArray(subAdminList) ? subAdminList : [];
+  const isSubAdmin = Boolean(isMasterAdmin || (isAdmin && userProfile?.username && subList.includes(userProfile.username)));
 
-    const subList = Array.isArray(subAdminList) ? subAdminList : [];
-    isSubAdmin = Boolean(isMasterAdmin || (isAdmin && userProfile?.username && subList.includes(userProfile.username)));
-  } catch (err) {
-    isMasterAdmin = Boolean(
-      isAdmin && (userProfile?.username === '이호중' || userProfile?.full_name === '이호중')
-    );
-    isSubAdmin = isMasterAdmin;
-  }
-
-  // 4. 사용자별 개별 메뉴 권한 조회 (system_settings)
-  let customPermissions: string[] | null = null;
-  if (userProfile?.id) {
-    const { data: permSetting } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'user_custom_permissions')
-      .maybeSingle();
-
-    if (permSetting?.value && typeof permSetting.value === 'object') {
-      const permMap = permSetting.value as Record<string, string[]>;
-      if (permMap[userProfile.id] && Array.isArray(permMap[userProfile.id])) {
-        customPermissions = permMap[userProfile.id];
-      }
-    }
-  }
+  // 4. 사용자별 개별 메뉴 권한 도출 (동기 즉각 계산)
+  const customPermissions = (userProfile?.id && permMap[userProfile.id] && Array.isArray(permMap[userProfile.id]))
+    ? permMap[userProfile.id]
+    : null;
 
   return (
     <SidebarProvider>

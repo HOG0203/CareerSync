@@ -1,19 +1,32 @@
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 import { getCurrentUserProfile } from '@/lib/data';
+import { unstable_cache } from 'next/cache';
+import { getMasterAdminInfo } from '@/app/(dashboard)/admin/users/actions';
 
-async function getMasterAdminUsername(): Promise<string> {
-  try {
-    const supabase = await createClient();
-    const { data } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'master_admin_info')
-      .maybeSingle();
-    return (data?.value as any)?.username ?? '이호중';
-  } catch {
-    return '이호중';
-  }
-}
+/**
+ * 사용자별 개별 메뉴 권한 맵 조회 (Next.js 캐시 적용)
+ */
+export const getCachedCustomPermissionsMap = unstable_cache(
+  async (): Promise<Record<string, string[]>> => {
+    try {
+      const supabase = createAdminClient();
+      const { data: permSetting } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'user_custom_permissions')
+        .maybeSingle();
+
+      if (permSetting?.value && typeof permSetting.value === 'object') {
+        return permSetting.value as Record<string, string[]>;
+      }
+    } catch (err) {
+      console.error('Failed to get cached custom permissions:', err);
+    }
+    return {};
+  },
+  ['user-custom-permissions-map'],
+  { revalidate: 3600, tags: ['system_settings'] }
+);
 
 /**
  * 교수학습지원 및 입학지원 페이지 접근 권한 검사
@@ -26,7 +39,8 @@ export async function checkTeachingSupportPermission(targetPath: string): Promis
   if (!profile) return false;
   if (profile.role === 'student') return false;
 
-  const masterUsername = await getMasterAdminUsername();
+  const masterInfo = await getMasterAdminInfo();
+  const masterUsername = masterInfo.username;
   const isMaster = Boolean(
     profile.role === 'admin' && (
       (masterUsername && profile.username === masterUsername) ||
@@ -38,23 +52,14 @@ export async function checkTeachingSupportPermission(targetPath: string): Promis
   if (isMaster) return true;
 
   try {
-    const supabase = await createClient();
-    const { data: permSetting } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'user_custom_permissions')
-      .maybeSingle();
-
-    if (permSetting?.value && typeof permSetting.value === 'object') {
-      const permMap = permSetting.value as Record<string, string[]>;
-      const userPerms = permMap[profile.id];
-      // 관리자가 해당 사용자에게 개별 커스텀 권한 목록을 설정해 둔 경우 해당 권한 준수
-      if (Array.isArray(userPerms)) {
-        if (targetPath === '/teaching-support/substitute/admin') {
-          return userPerms.includes('/teaching-support/substitute');
-        }
-        return userPerms.includes(targetPath);
+    const permMap = await getCachedCustomPermissionsMap();
+    const userPerms = permMap[profile.id];
+    // 관리자가 해당 사용자에게 개별 커스텀 권한 목록을 설정해 둔 경우 해당 권한 준수
+    if (Array.isArray(userPerms)) {
+      if (targetPath === '/teaching-support/substitute/admin') {
+        return userPerms.includes('/teaching-support/substitute');
       }
+      return userPerms.includes(targetPath);
     }
   } catch (err) {
     console.error('Permission check error:', err);

@@ -1,6 +1,6 @@
 import {
   getDashboardStudentData,
-  getGraduationYears,
+  getCachedGraduationYears,
   MAJOR_SORT_ORDER,
   getCurrentUserProfile,
 } from '@/lib/data';
@@ -21,9 +21,9 @@ export default async function DashboardPage({
 }) {
   const params = await searchParams;
 
-  // 1. 기반 설정 및 사용자 프로필 패칭
+  // 1. 기반 설정 및 사용자 프로필 패칭 (서버 캐시 적용)
   const [graduationYears, settings, profile, chartLayout] = await Promise.all([
-    getGraduationYears(),
+    getCachedGraduationYears(),
     getSystemSettings(),
     getCurrentUserProfile(),
     getDashboardChartLayout()

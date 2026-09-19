@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath, revalidateTag } from 'next/cache'
+import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 
@@ -19,9 +19,9 @@ async function checkIsAdmin() {
 }
 
 /**
- * 메인관리자(최고 관리자) 식별 정보 조회 (초기값: '이호중')
+ * 메인관리자(최고 관리자) 식별 정보 내부 조회
  */
-export async function getMasterAdminInfo(): Promise<{ username: string; name: string }> {
+async function fetchMasterAdminInfo(): Promise<{ username: string; name: string }> {
   try {
     const { data } = await supabaseAdmin
       .from('system_settings')
@@ -56,6 +56,17 @@ export async function getMasterAdminInfo(): Promise<{ username: string; name: st
 }
 
 /**
+ * 메인관리자(최고 관리자) 식별 정보 조회 (Next.js 캐시 적용)
+ */
+export async function getMasterAdminInfo(): Promise<{ username: string; name: string }> {
+  return unstable_cache(
+    fetchMasterAdminInfo,
+    ['master-admin-info-cache'],
+    { revalidate: 3600, tags: ['system_settings'] }
+  )();
+}
+
+/**
  * 현재 로그인한 사용자가 메인관리자(최고 관리자)인지 검증
  */
 export async function checkIsMasterAdmin(): Promise<boolean> {
@@ -85,9 +96,9 @@ export async function checkIsMasterAdmin(): Promise<boolean> {
 }
 
 /**
- * 서브관리자(Sub-Admin) 목록 조회
+ * 서브관리자(Sub-Admin) 목록 내부 조회
  */
-export async function getSubAdminList(): Promise<string[]> {
+async function fetchSubAdminList(): Promise<string[]> {
   try {
     const { data } = await supabaseAdmin
       .from('system_settings')
@@ -103,6 +114,17 @@ export async function getSubAdminList(): Promise<string[]> {
     console.error('Failed to get sub admin list:', err);
     return [];
   }
+}
+
+/**
+ * 서브관리자(Sub-Admin) 목록 조회 (Next.js 캐시 적용)
+ */
+export async function getSubAdminList(): Promise<string[]> {
+  return unstable_cache(
+    fetchSubAdminList,
+    ['sub-admin-list-cache'],
+    { revalidate: 3600, tags: ['system_settings'] }
+  )();
 }
 
 /**
