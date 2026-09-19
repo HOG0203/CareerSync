@@ -6,9 +6,7 @@
 import { Suspense } from 'react';
 import { createClient } from '@/lib/supabase/server';
 import { 
-  getSubstituteApplications, 
-  getTimetableForSubstitute, 
-  getAcademicCalendarConfig 
+  getSubstitutePageData,
 } from '../actions';
 import { AdminClient } from './admin-client';
 import { ParsedTimetableResult } from '@/lib/timetable/parser';
@@ -57,16 +55,8 @@ export default async function SubstituteAdminPage() {
     currentUsername = profile?.username || '';
   }
 
-  // 데이터 로드
-  const [appsRes, timetableRes, calendarRes] = await Promise.all([
-    getSubstituteApplications(),
-    getTimetableForSubstitute(),
-    getAcademicCalendarConfig(),
-  ]);
-
-  const initialApplications = appsRes.success ? appsRes.data : [];
-  const timetableData = timetableRes.success && timetableRes.data ? timetableRes.data : fallbackTimetableData;
-  const initialCalendarConfig = calendarRes.success ? calendarRes.data : undefined;
+  // 통합 로더로 학년도 및 활성 학기 자동 감지 로드
+  const { initialApplications, timetableData, initialCalendarConfig } = await getSubstitutePageData();
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5 w-full pb-20 sm:pb-16 min-h-full">

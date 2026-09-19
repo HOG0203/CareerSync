@@ -484,22 +484,41 @@ export async function saveAcademicCalendarConfig(
 }
 
 /**
- * 결보강 페이지 통합 데이터 로더 (병렬 패칭 + 캐시)
+ * 결보강 페이지 통합 데이터 로더 (기준년도 및 학사일정 활성 학기 자동 감지 연동)
  */
 export async function getSubstitutePageData(
-  year = DEFAULT_YEAR,
-  semester = DEFAULT_SEMESTER
+  targetYear?: number,
+  targetSemester?: number
 ) {
-  const [appsRes, timetableRes, calendarRes] = await Promise.all([
+  // 1. 학년도 결정: 인자값 -> 시스템 설정(baseYear) -> 기본값(2026)
+  let year = targetYear;
+  if (!year) {
+    try {
+      const { getSystemSettings } = await import('@/app/(dashboard)/admin/settings/actions');
+      const settings = await getSystemSettings();
+      year = settings.baseYear || DEFAULT_YEAR;
+    } catch {
+      year = DEFAULT_YEAR;
+    }
+  }
+
+  // 2. 해당 학년도의 연간 학사일정 로드
+  const calendarRes = await getAcademicCalendarConfig(year);
+  const calendarConfig = calendarRes.success && calendarRes.data ? calendarRes.data : DEFAULT_ACADEMIC_CALENDAR_2026_2;
+
+  // 3. 활성 학기 결정: 인자값 -> 학사일정에 저장된 활성 학기(config.semester) -> 기본값(2)
+  const semester = targetSemester || calendarConfig.semester || DEFAULT_SEMESTER;
+
+  // 4. 결정된 학년도/학기로 신청서 및 시간표 동시 패칭
+  const [appsRes, timetableRes] = await Promise.all([
     getSubstituteApplications(year, semester),
     getTimetableForSubstitute(year, semester),
-    getAcademicCalendarConfig(year, semester),
   ]);
 
   return {
     initialApplications: appsRes.success ? appsRes.data : [],
     timetableData: timetableRes.success && timetableRes.data ? timetableRes.data : undefined,
-    initialCalendarConfig: calendarRes.success ? calendarRes.data : DEFAULT_ACADEMIC_CALENDAR_2026_2,
+    initialCalendarConfig: calendarConfig,
   };
 }
 
