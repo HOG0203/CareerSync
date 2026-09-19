@@ -23,8 +23,50 @@ function getTimetableKey(year = DEFAULT_YEAR, semester = DEFAULT_SEMESTER) {
   return `timetable_store_${year}_${semester}`;
 }
 
+function toSubstituteApplication(row: any): SubstituteApplication {
+  return {
+    id: row.id,
+    applicationNumber: row.application_number || row.applicationNumber || '',
+    academicYear: row.academic_year ?? row.academicYear ?? DEFAULT_YEAR,
+    semester: row.semester ?? row.semester ?? DEFAULT_SEMESTER,
+    applicantTeacher: row.applicant_teacher || row.applicantTeacher || '',
+    reason: row.reason || '',
+    periodStart: row.period_start || row.periodStart || '',
+    periodEnd: row.period_end || row.periodEnd || '',
+    applicationDate: row.application_date || row.applicationDate || '',
+    status: (row.status || 'submitted') as ApplicationStatus,
+    items: Array.isArray(row.items) ? row.items : [],
+    createdAt: row.created_at || row.createdAt || new Date().toISOString(),
+    updatedAt: row.updated_at || row.updatedAt || new Date().toISOString(),
+    submittedAt: row.submitted_at || row.submittedAt,
+    approvedAt: row.approved_at || row.approvedAt,
+    approvedBy: row.approved_by || row.approvedBy,
+  };
+}
+
+function toDbRow(app: SubstituteApplication) {
+  return {
+    id: app.id,
+    application_number: app.applicationNumber || '',
+    academic_year: app.academicYear || DEFAULT_YEAR,
+    semester: app.semester || DEFAULT_SEMESTER,
+    applicant_teacher: app.applicantTeacher || '',
+    reason: app.reason || '',
+    period_start: app.periodStart || '',
+    period_end: app.periodEnd || '',
+    application_date: app.applicationDate || '',
+    status: app.status || 'submitted',
+    items: app.items || [],
+    created_at: app.createdAt || new Date().toISOString(),
+    updated_at: app.updatedAt || new Date().toISOString(),
+    submitted_at: app.submittedAt || null,
+    approved_at: app.approvedAt || null,
+    approved_by: app.approvedBy || null,
+  };
+}
+
 /**
- * 1. 결보강 신청 목록 조회
+ * 1. 결보강 신청 목록 조회 (substitute_applications 전용 테이블 우선, 하위 호환 폴백)
  */
 export async function getSubstituteApplications(
   year = DEFAULT_YEAR,
@@ -32,8 +74,24 @@ export async function getSubstituteApplications(
 ): Promise<{ success: boolean; data: SubstituteApplication[]; error?: string }> {
   try {
     const supabase = createAdminClient();
-    const storeKey = getStoreKey(year, semester);
 
+    // 1순위: substitute_applications 전용 RDB 테이블 조회 (초고속 인덱스 쿼리)
+    const { data: tableData, error: tableError } = await supabase
+      .from('substitute_applications')
+      .select('*')
+      .eq('academic_year', year)
+      .eq('semester', semester)
+      .order('created_at', { ascending: false });
+
+    if (!tableError && tableData) {
+      return {
+        success: true,
+        data: tableData.map(toSubstituteApplication)
+      };
+    }
+
+    // 2순위 (하위 호환 폴백): 테이블이 아직 없거나 에러 시 기존 system_settings 조회
+    const storeKey = getStoreKey(year, semester);
     const { data, error } = await supabase
       .from('system_settings')
       .select('value')
@@ -41,7 +99,7 @@ export async function getSubstituteApplications(
       .maybeSingle();
 
     if (error) {
-      console.error('[getSubstituteApplications] Error:', error);
+      console.error('[getSubstituteApplications] Fallback Error:', error);
       return { success: false, data: [], error: error.message };
     }
 
@@ -54,7 +112,7 @@ export async function getSubstituteApplications(
 }
 
 /**
- * 2. 결보강 신청서 저장 (신규 등록 or 수정)
+ * 2. 결보강 신청서 저장 (substitute_applications 원자적 UPSERT — Race Condition 원천 차단)
  */
 export async function saveSubstituteApplication(
   application: SubstituteApplication
@@ -63,9 +121,49 @@ export async function saveSubstituteApplication(
     const supabase = createAdminClient();
     const year = application.academicYear || DEFAULT_YEAR;
     const semester = application.semester || DEFAULT_SEMESTER;
-    const storeKey = getStoreKey(year, semester);
+    const now = new Date().toISOString();
+    application.updatedAt = now;
+    if (!application.createdAt) {
+      application.createdAt = now;
+    }
 
-    // 기존 목록 가져오기
+    // 문서 번호 자동 발급 (신규 등록인 경우)
+    if (!application.applicationNumber) {
+      const { count } = await supabase
+        .from('substitute_applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('academic_year', year)
+        .eq('semester', semester);
+
+      if (count !== null && count !== undefined) {
+        application.applicationNumber = `${year}-${semester}-${String(count + 1).padStart(3, '0')}`;
+      } else {
+        const storeKey = getStoreKey(year, semester);
+        const { data: existingData } = await supabase
+          .from('system_settings')
+          .select('value')
+          .eq('key', storeKey)
+          .maybeSingle();
+        const list: SubstituteApplication[] = (existingData?.value as SubstituteApplication[]) || [];
+        const currentYearCount = list.filter(a => a.academicYear === year && a.semester === semester).length;
+        application.applicationNumber = `${year}-${semester}-${String(currentYearCount + 1).padStart(3, '0')}`;
+      }
+    }
+
+    // 1순위: substitute_applications 전용 테이블에 원자적 UPSERT
+    const dbRow = toDbRow(application);
+    const { error: upsertTableError } = await supabase
+      .from('substitute_applications')
+      .upsert(dbRow, { onConflict: 'id' });
+
+    if (!upsertTableError) {
+      revalidatePath('/teaching-support/substitute');
+      revalidatePath('/teaching-support/timetable');
+      return { success: true, data: application };
+    }
+
+    // 2순위 (하위 호환 폴백): 테이블이 아직 없는 경우 system_settings JSON 덮어쓰기
+    const storeKey = getStoreKey(year, semester);
     const { data: existingData } = await supabase
       .from('system_settings')
       .select('value')
@@ -73,19 +171,6 @@ export async function saveSubstituteApplication(
       .maybeSingle();
 
     let list: SubstituteApplication[] = (existingData?.value as SubstituteApplication[]) || [];
-
-    // 문서 번호 자동 발급 (신규 등록인 경우)
-    if (!application.applicationNumber) {
-      const currentYearCount = list.filter(a => a.academicYear === year && a.semester === semester).length;
-      application.applicationNumber = `${year}-${semester}-${String(currentYearCount + 1).padStart(3, '0')}`;
-    }
-
-    const now = new Date().toISOString();
-    application.updatedAt = now;
-    if (!application.createdAt) {
-      application.createdAt = now;
-    }
-
     const index = list.findIndex(a => a.id === application.id);
     if (index >= 0) {
       list[index] = application;
@@ -115,7 +200,7 @@ export async function saveSubstituteApplication(
 }
 
 /**
- * 3. 신청서 상태 변경 (승인 / 반려 / 제출)
+ * 3. 신청서 상태 변경 (substitute_applications 단일 Row 핀포인트 UPDATE)
  */
 export async function updateApplicationStatus(
   id: string,
@@ -126,8 +211,33 @@ export async function updateApplicationStatus(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = createAdminClient();
-    const storeKey = getStoreKey(year, semester);
+    const now = new Date().toISOString();
 
+    const updatePayload: Record<string, any> = {
+      status,
+      updated_at: now,
+    };
+    if (status === 'approved') {
+      updatePayload.approved_at = now;
+      updatePayload.approved_by = approvedBy || '수업계';
+    } else if (status === 'submitted') {
+      updatePayload.submitted_at = now;
+    }
+
+    // 1순위: substitute_applications 전용 테이블 원자적 UPDATE
+    const { error: tableUpdateError, count } = await supabase
+      .from('substitute_applications')
+      .update(updatePayload)
+      .eq('id', id);
+
+    if (!tableUpdateError && count !== 0) {
+      revalidatePath('/teaching-support/substitute');
+      revalidatePath('/teaching-support/timetable');
+      return { success: true };
+    }
+
+    // 2순위 (하위 호환 폴백): system_settings
+    const storeKey = getStoreKey(year, semester);
     const { data: existingData } = await supabase
       .from('system_settings')
       .select('value')
@@ -141,10 +251,8 @@ export async function updateApplicationStatus(
       return { success: false, error: '해당 신청서를 찾을 수 없습니다.' };
     }
 
-    const now = new Date().toISOString();
     list[index].status = status;
     list[index].updatedAt = now;
-
     if (status === 'approved') {
       list[index].approvedAt = now;
       list[index].approvedBy = approvedBy || '수업계';
@@ -174,7 +282,7 @@ export async function updateApplicationStatus(
 }
 
 /**
- * 4. 신청서 삭제
+ * 4. 신청서 삭제 (substitute_applications 단일 Row 핀포인트 DELETE)
  */
 export async function deleteSubstituteApplication(
   id: string,
@@ -183,8 +291,36 @@ export async function deleteSubstituteApplication(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = createAdminClient();
-    const storeKey = getStoreKey(year, semester);
 
+    // 1순위: substitute_applications 전용 테이블에서 승인 여부 확인 및 원자적 DELETE
+    const { data: targetApp, error: fetchErr } = await supabase
+      .from('substitute_applications')
+      .select('id, status')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (!fetchErr && targetApp) {
+      if (targetApp.status === 'approved') {
+        return {
+          success: false,
+          error: '승인 완료된 신청서는 삭제할 수 없습니다. (수업계에 문의하시거나 승인 취소 후 삭제해 주세요.)',
+        };
+      }
+
+      const { error: delError } = await supabase
+        .from('substitute_applications')
+        .delete()
+        .eq('id', id);
+
+      if (!delError) {
+        revalidatePath('/teaching-support/substitute');
+        revalidatePath('/teaching-support/timetable');
+        return { success: true };
+      }
+    }
+
+    // 2순위 (하위 호환 폴백): system_settings
+    const storeKey = getStoreKey(year, semester);
     const { data: existingData } = await supabase
       .from('system_settings')
       .select('value')
@@ -192,9 +328,8 @@ export async function deleteSubstituteApplication(
       .maybeSingle();
 
     let list: SubstituteApplication[] = (existingData?.value as SubstituteApplication[]) || [];
-    
-    const targetApp = list.find(a => a.id === id);
-    if (targetApp && targetApp.status === 'approved') {
+    const fallbackTarget = list.find(a => a.id === id);
+    if (fallbackTarget && fallbackTarget.status === 'approved') {
       return {
         success: false,
         error: '승인 완료된 신청서는 삭제할 수 없습니다. (수업계에 문의하시거나 승인 취소 후 삭제해 주세요.)',
@@ -202,7 +337,6 @@ export async function deleteSubstituteApplication(
     }
 
     list = list.filter(a => a.id !== id);
-
     const { error: updateError } = await supabase
       .from('system_settings')
       .upsert({
