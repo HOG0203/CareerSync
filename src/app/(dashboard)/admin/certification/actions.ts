@@ -129,8 +129,8 @@ export async function clearEvaluationsStoreCache() {
 async function upsertStudentCertEvaluations(
   supabase: any,
   records: Array<{ studentId: string; data: CertificationEvaluationData; academicYear: number }>
-) {
-  if (!records || records.length === 0) return;
+): Promise<{ success: boolean; error?: any }> {
+  if (!records || records.length === 0) return { success: true };
   const now = new Date().toISOString();
 
   const payloads = records.map(r => ({
@@ -156,12 +156,18 @@ async function upsertStudentCertEvaluations(
     const CHUNK_SIZE = 500;
     for (let i = 0; i < payloads.length; i += CHUNK_SIZE) {
       const chunk = payloads.slice(i, i + CHUNK_SIZE);
-      await supabase
+      const { error } = await supabase
         .from('student_cert_evaluations')
         .upsert(chunk, { onConflict: 'student_id' });
+      if (error) {
+        console.error('Error upserting chunk to student_cert_evaluations:', error);
+        return { success: false, error };
+      }
     }
+    return { success: true };
   } catch (err) {
     console.error('Error upserting to student_cert_evaluations:', err);
+    return { success: false, error: err };
   }
 }
 
@@ -584,24 +590,26 @@ export async function saveStudentEvaluationAction(
   };
 
   // 3-1. student_cert_evaluations 전용 테이블에 원자적 UPSERT (동시성 보장)
-  await upsertStudentCertEvaluations(supabase, [{
+  const upsertRes = await upsertStudentCertEvaluations(supabase, [{
     studentId,
     data: updatedStudentData,
     academicYear: settings.baseYear,
   }]);
 
-  // 3-2. system_settings 백업 동기화
-  const { error: saveErr } = await supabase
-    .from('system_settings')
-    .upsert({
-      key: EVAL_SETTINGS_KEY,
-      value: currentStore,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'key' });
+  // 3-2. 전용 테이블 실패 시에만 system_settings 폴백 저장 (대용량 JSON 방지)
+  if (!upsertRes.success) {
+    const { error: saveErr } = await supabase
+      .from('system_settings')
+      .upsert({
+        key: EVAL_SETTINGS_KEY,
+        value: currentStore,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'key' });
 
-  if (saveErr) {
-    console.error('Failed to save evaluation data:', saveErr);
-    return { success: false, error: '데이터 저장에 실패했습니다.' };
+    if (saveErr) {
+      console.error('Failed to save evaluation data:', saveErr);
+      return { success: false, error: '데이터 저장에 실패했습니다.' };
+    }
   }
 
   // 4. Audit Log 기록
@@ -681,6 +689,8 @@ export async function batchImportEvaluationsAction(
   const cleanNum = (n: any) => String(n || '').replace(/[^0-9]/g, '');
   const cleanName = (n: any) => String(n || '').trim().replace(/\s+/g, '');
 
+  const recordsToUpsert: Array<{ studentId: string; data: CertificationEvaluationData; academicYear: number }> = [];
+
   for (const row of rows) {
     // 매칭
     const matched = allStudents.find(s => {
@@ -691,26 +701,34 @@ export async function batchImportEvaluationsAction(
     });
 
     if (matched) {
-      currentStore[matched.id] = {
+      const studentEval = {
         ...(currentStore[matched.id] || { student_id: matched.id }),
         ...row.evalData,
         student_id: matched.id,
         academic_year: settings.baseYear
       };
+      currentStore[matched.id] = studentEval;
+      recordsToUpsert.push({ studentId: matched.id, data: studentEval, academicYear: settings.baseYear });
       updatedCount++;
     }
   }
 
-  const { error: saveErr } = await supabase
-    .from('system_settings')
-    .upsert({
-      key: EVAL_SETTINGS_KEY,
-      value: currentStore,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'key' });
+  // 1. student_cert_evaluations 전용 테이블에 원자적 UPSERT (동시성 보장)
+  const upsertRes = await upsertStudentCertEvaluations(supabase, recordsToUpsert);
 
-  if (saveErr) {
-    return { success: false, error: '일괄 저장 중 오류가 발생했습니다.' };
+  // 2. 전용 테이블 실패 시에만 system_settings 폴백 저장
+  if (!upsertRes.success) {
+    const { error: saveErr } = await supabase
+      .from('system_settings')
+      .upsert({
+        key: EVAL_SETTINGS_KEY,
+        value: currentStore,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'key' });
+
+    if (saveErr) {
+      return { success: false, error: '일괄 저장 중 오류가 발생했습니다.' };
+    }
   }
 
   await logAuditAction({
@@ -827,19 +845,21 @@ export async function batchImportVolunteerAction(studentsList: VolunteerImportSt
   }
 
   // 1. student_cert_evaluations 전용 테이블에 원자적 UPSERT (Race Condition 원천 차단)
-  await upsertStudentCertEvaluations(supabase, updatedRecordsForDb);
+  const upsertRes = await upsertStudentCertEvaluations(supabase, updatedRecordsForDb);
 
-  // 2. system_settings 백업 동기화
-  const { error: saveErr } = await supabase
-    .from('system_settings')
-    .upsert({
-      key: EVAL_SETTINGS_KEY,
-      value: currentStore,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'key' });
+  // 2. 전용 테이블 실패 시에만 system_settings 폴백 저장 (대용량 JSON 방지)
+  if (!upsertRes.success) {
+    const { error: saveErr } = await supabase
+      .from('system_settings')
+      .upsert({
+        key: EVAL_SETTINGS_KEY,
+        value: currentStore,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
 
-  if (saveErr) {
-    return { success: false, error: 'DB 저장 중 오류가 발생했습니다.' };
+    if (saveErr) {
+      return { success: false, error: 'DB 저장 중 오류가 발생했습니다.' };
+    }
   }
 
   await logAuditAction({
@@ -996,19 +1016,21 @@ export async function batchImportVocationalAction(studentsList: VocationalImport
   }
 
   // 1. student_cert_evaluations 전용 테이블에 원자적 UPSERT (Race Condition 원천 차단)
-  await upsertStudentCertEvaluations(supabase, updatedRecordsForDb);
+  const upsertRes = await upsertStudentCertEvaluations(supabase, updatedRecordsForDb);
 
-  // 2. system_settings 백업 동기화
-  const { error: saveErr } = await supabase
-    .from('system_settings')
-    .upsert({
-      key: EVAL_SETTINGS_KEY,
-      value: currentStore,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'key' });
+  // 2. 전용 테이블 실패 시에만 system_settings 폴백 저장 (대용량 JSON 방지)
+  if (!upsertRes.success) {
+    const { error: saveErr } = await supabase
+      .from('system_settings')
+      .upsert({
+        key: EVAL_SETTINGS_KEY,
+        value: currentStore,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
 
-  if (saveErr) {
-    return { success: false, error: 'DB 저장 중 오류가 발생했습니다.' };
+    if (saveErr) {
+      return { success: false, error: 'DB 저장 중 오류가 발생했습니다.' };
+    }
   }
 
   await logAuditAction({
@@ -1178,19 +1200,21 @@ export async function batchImportEmploymentAction(
   }
 
   // 1. student_cert_evaluations 전용 테이블에 원자적 UPSERT (Race Condition 원천 차단)
-  await upsertStudentCertEvaluations(supabase, updatedRecordsForDb);
+  const upsertRes = await upsertStudentCertEvaluations(supabase, updatedRecordsForDb);
 
-  // 2. system_settings 백업 동기화
-  const { error: saveErr } = await supabase
-    .from('system_settings')
-    .upsert({
-      key: EVAL_SETTINGS_KEY,
-      value: currentStore,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'key' });
+  // 2. 전용 테이블 실패 시에만 system_settings 폴백 저장 (대용량 JSON 방지)
+  if (!upsertRes.success) {
+    const { error: saveErr } = await supabase
+      .from('system_settings')
+      .upsert({
+        key: EVAL_SETTINGS_KEY,
+        value: currentStore,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
 
-  if (saveErr) {
-    return { success: false, error: 'DB 저장 중 오류가 발생했습니다.' };
+    if (saveErr) {
+      return { success: false, error: 'DB 저장 중 오류가 발생했습니다.' };
+    }
   }
 
   await logAuditAction({
@@ -1308,19 +1332,21 @@ export async function batchImportArtsContestAction(
   }
 
   // 1. student_cert_evaluations 전용 테이블에 원자적 UPSERT (Race Condition 원천 차단)
-  await upsertStudentCertEvaluations(supabase, updatedRecordsForDb);
+  const upsertRes = await upsertStudentCertEvaluations(supabase, updatedRecordsForDb);
 
-  // 2. system_settings 백업 동기화
-  const { error: saveErr } = await supabase
-    .from('system_settings')
-    .upsert({
-      key: EVAL_SETTINGS_KEY,
-      value: currentStore,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'key' });
+  // 2. 전용 테이블 실패 시에만 system_settings 폴백 저장 (대용량 JSON 방지)
+  if (!upsertRes.success) {
+    const { error: saveErr } = await supabase
+      .from('system_settings')
+      .upsert({
+        key: EVAL_SETTINGS_KEY,
+        value: currentStore,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
 
-  if (saveErr) {
-    return { success: false, error: 'DB 저장 중 오류가 발생했습니다.' };
+    if (saveErr) {
+      return { success: false, error: 'DB 저장 중 오류가 발생했습니다.' };
+    }
   }
 
   await logAuditAction({
@@ -1532,16 +1558,36 @@ export async function deleteStudentEvaluationItemAction(
     at: new Date().toISOString(),
   };
 
-  const { error: saveErr } = await supabase
-    .from('system_settings')
-    .upsert({
-      key: EVAL_SETTINGS_KEY,
-      value: currentStore,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'key' });
+  // 2-1. student_cert_evaluations 전용 테이블 동기화 (전체 초기화면 delete, 부분 초기화면 upsert)
+  let dbSuccess = true;
+  if (category === 'all') {
+    const { error: delErr } = await supabase.from('student_cert_evaluations').delete().eq('student_id', studentId);
+    if (delErr) {
+      console.error('Error deleting from student_cert_evaluations:', delErr);
+      dbSuccess = false;
+    }
+  } else {
+    const upsertRes = await upsertStudentCertEvaluations(supabase, [{
+      studentId,
+      data: evalData,
+      academicYear: evalData.academic_year || 2026,
+    }]);
+    dbSuccess = upsertRes.success;
+  }
 
-  if (saveErr) {
-    return { success: false, error: '삭제 후 DB 저장 중 오류가 발생했습니다.' };
+  // 2-2. 전용 테이블 실패 시에만 system_settings 폴백 저장
+  if (!dbSuccess) {
+    const { error: saveErr } = await supabase
+      .from('system_settings')
+      .upsert({
+        key: EVAL_SETTINGS_KEY,
+        value: currentStore,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'key' });
+
+    if (saveErr) {
+      return { success: false, error: '삭제 후 DB 저장 중 오류가 발생했습니다.' };
+    }
   }
 
   await logAuditAction({
@@ -2085,26 +2131,28 @@ export async function updateSingleImportedRecordAction(
   }
 
   // 1. student_cert_evaluations 전용 테이블에 원자적 UPSERT (동시성 보장)
-  await upsertStudentCertEvaluations(supabase, [{
+  const upsertRes = await upsertStudentCertEvaluations(supabase, [{
     studentId,
     data: currentStore[studentId],
     academicYear: baseYear,
   }]);
 
-  // 2. system_settings 백업 동기화
-  const { error: saveErr } = await supabase
-    .from('system_settings')
-    .upsert(
-      {
-        key: EVAL_SETTINGS_KEY,
-        value: currentStore,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'key' }
-    );
+  // 2. 전용 테이블 실패 시에만 system_settings 폴백 저장 (대용량 JSON 방지)
+  if (!upsertRes.success) {
+    const { error: saveErr } = await supabase
+      .from('system_settings')
+      .upsert(
+        {
+          key: EVAL_SETTINGS_KEY,
+          value: currentStore,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'key' }
+      );
 
-  if (saveErr) {
-    return { success: false, error: 'DB 저장 중 오류가 발생했습니다.' };
+    if (saveErr) {
+      return { success: false, error: 'DB 저장 중 오류가 발생했습니다.' };
+    }
   }
 
   await logAuditAction({
@@ -2352,19 +2400,22 @@ export async function deleteMyImportedRecordsAction(
         data: currentStore[sid],
         academicYear: currentStore[sid].academic_year || 2026,
       }));
-    await upsertStudentCertEvaluations(supabase, modifiedRecords);
+    // 1. student_cert_evaluations 전용 테이블에 변경된 학생들 원자적 UPSERT (Race Condition 차단)
+    const upsertRes = await upsertStudentCertEvaluations(supabase, modifiedRecords);
 
-    // 2. system_settings 백업 동기화
-    const { error: saveErr } = await supabase
-      .from('system_settings')
-      .upsert({
-        key: EVAL_SETTINGS_KEY,
-        value: currentStore,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'key' });
+    // 2. 전용 테이블 실패 시에만 system_settings 폴백 저장 (대용량 JSON 방지)
+    if (!upsertRes.success) {
+      const { error: saveErr } = await supabase
+        .from('system_settings')
+        .upsert({
+          key: EVAL_SETTINGS_KEY,
+          value: currentStore,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'key' });
 
-    if (saveErr) {
-      return { success: false, deletedStudentsCount: 0, deletedItemsCount: 0, error: '삭제 후 DB 저장 중 오류가 발생했습니다.' };
+      if (saveErr) {
+        return { success: false, deletedStudentsCount: 0, deletedItemsCount: 0, error: '삭제 후 DB 저장 중 오류가 발생했습니다.' };
+      }
     }
 
     await logAuditAction({
