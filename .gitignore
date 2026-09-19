@@ -52,3 +52,6 @@ firestore-debug.log
 
 # scratch
 scratch/
+
+# backups
+/backups/
