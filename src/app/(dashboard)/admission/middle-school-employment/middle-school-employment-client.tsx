@@ -27,7 +27,6 @@ import {
   Target,
   Search,
   School,
-  FileSpreadsheet,
   Download,
   Edit2,
   RotateCcw,
@@ -43,7 +42,6 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { StudentEmploymentData } from '@/lib/data';
-import { ExcelImportModal } from './excel-import-modal';
 import { AdmissionEditModal } from './admission-edit-modal';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
@@ -86,7 +84,6 @@ export function MiddleSchoolEmploymentClient({
   const [selectedCompanyType, setSelectedCompanyType] = React.useState<string>('all');
 
   // 모달 상태
-  const [isExcelModalOpen, setIsExcelModalOpen] = React.useState(false);
   const [editingStudent, setEditingStudent] = React.useState<StudentEmploymentData | null>(null);
 
   // 학생 정보(students) 페이지의 취업현황 드롭다운 항목이 '취업'으로 선택된 학생들만 필터링
@@ -433,7 +430,7 @@ export function MiddleSchoolEmploymentClient({
               </div>
 
               {!isReadOnly && (
-                <div className="grid grid-cols-2 sm:flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <Button
                     type="button"
                     variant="outline"
@@ -443,16 +440,6 @@ export function MiddleSchoolEmploymentClient({
                   >
                     <Download className="h-3.5 w-3.5 mr-1.5 text-slate-500" />
                     엑셀 내보내기
-                  </Button>
-
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => setIsExcelModalOpen(true)}
-                    className="h-9 px-3.5 text-xs font-bold rounded-xl bg-teal-600 hover:bg-teal-700 text-white shadow-xs justify-center"
-                  >
-                    <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" />
-                    엑셀 일괄 등록
                   </Button>
                 </div>
               )}
@@ -683,18 +670,7 @@ export function MiddleSchoolEmploymentClient({
         </CardContent>
       </Card>
 
-      {/* 엑셀 일괄 등록 모달 */}
-      {!isReadOnly && (
-        <ExcelImportModal
-          isOpen={isExcelModalOpen}
-          onClose={() => setIsExcelModalOpen(false)}
-          onSuccess={() => {
-            router.refresh();
-          }}
-          targetGraduationYear={undefined}
-          students={initialStudents}
-        />
-      )}
+
 
       {/* 학생 단일 입학 정보 수정 모달 */}
       {!isReadOnly && (
