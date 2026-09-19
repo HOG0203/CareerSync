@@ -1,5 +1,5 @@
 import { StudentEmploymentData } from '@/lib/data';
-import { CustomRule } from '@/app/(dashboard)/employment-status/custom-combination-modal';
+import { CustomRule } from '@/types/custom-rule';
 
 /**
  * 학생 1명에 대해 CustomRule 조건 일치 여부를 판별하는 공통 평가 함수
@@ -35,14 +35,25 @@ export function evaluateCustomRuleMatch(
       });
     }
 
-    // 0.1 희망진로코스 대분류 (단일 및 다중 선택 지원)
+    // 0.1 희망진로코스 / 현재진로코스 대분류 (단일 및 다중 선택 지원)
     if (cond.mainCategory === 'course' || (cond as any).category === 'course') {
-      if (!cond.value || cond.value.trim() === '') return true;
+      if (!cond.value || cond.value.trim() === '') return false;
       const selectedCourses = cond.value.split(',').map(c => c.trim()).filter(Boolean);
-      if (selectedCourses.length === 0) return true;
+      if (selectedCourses.length === 0) return false;
       const studentCourse = (student.career_course || '').trim();
       return selectedCourses.some(
-        c => studentCourse === c || studentCourse.includes(c) || c.includes(studentCourse)
+        c => studentCourse === c || (c && studentCourse.includes(c))
+      );
+    }
+
+    // 0.2 현재진로코스 대분류 (단일 및 다중 선택 지원)
+    if (cond.mainCategory === 'current_course' || (cond as any).category === 'current_course') {
+      if (!cond.value || cond.value.trim() === '') return false;
+      const selectedCourses = cond.value.split(',').map(c => c.trim()).filter(Boolean);
+      if (selectedCourses.length === 0) return false;
+      const studentCurrentCourse = (student.employment_status || '').trim();
+      return selectedCourses.some(
+        c => studentCurrentCourse === c || (c && studentCurrentCourse.includes(c))
       );
     }
 

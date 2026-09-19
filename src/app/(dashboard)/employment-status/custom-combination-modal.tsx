@@ -32,27 +32,11 @@ import {
   GraduationCap 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-export type MainCategory = 'major' | 'course' | 'cert' | 'attendance' | 'status' | 'rank';
-
-export interface ConditionItem {
-  id: string;
-  mainCategory: MainCategory;
-  subType: string; // major: 'select'; course: 'select'; cert: 'name' | 'count'; attendance: 'perfect' | 'unexcused' | 'disease'; status: 'main'; rank: 'main'
-  value: string;
-}
-
-export interface CustomRule {
-  operator: 'AND' | 'OR';
-  conditions: ConditionItem[];
-  presetName?: string;
-}
-
-export interface PresetItem {
-  id: string;
-  name: string;
-  rule: CustomRule;
-}
+import { MainCategory, ConditionItem, CustomRule, PresetItem } from '@/types/custom-rule';
+import { StudentEmploymentData } from '@/lib/data';
+import { evaluateCustomRuleMatch } from '@/lib/custom-rule-evaluator';
+import { Users } from 'lucide-react';
+export type { MainCategory, ConditionItem, CustomRule, PresetItem };
 
 const PRESET_STORAGE_KEY = 'careersync_combination_presets';
 
@@ -111,10 +95,6 @@ const DEFAULT_COURSES = [
   '부사관반', '일학습병행', '계약학과', '도제반', '아우스빌둥',
   '일반취업', '기술사관', '군특성화', '운동부', '진학', '입대', '기타'
 ];
-
-import { StudentEmploymentData } from '@/lib/data';
-import { evaluateCustomRuleMatch } from '@/lib/custom-rule-evaluator';
-import { Users } from 'lucide-react';
 
 interface CustomCombinationModalProps {
   isOpen: boolean;
@@ -181,14 +161,12 @@ export function CustomCombinationModal({
           }
         });
       } else {
+        // 최초 진입 시 빈 상태로 시작하여 사용자가 원하는 조건만 명시적으로 추가하도록 유도
         const id1 = `c_${Date.now()}_1`;
-        const id2 = `c_${Date.now()}_2`;
         setOperator('AND');
         setConditions([
-          { id: id1, mainCategory: 'cert', subType: 'name', value: '' },
-          { id: id2, mainCategory: 'attendance', subType: 'perfect', value: '0' }
+          { id: id1, mainCategory: 'course', subType: 'select', value: '' }
         ]);
-        initDirectMap[id1] = true;
       }
       setDirectInputMap(initDirectMap);
 
@@ -212,12 +190,11 @@ export function CustomCombinationModal({
     const newId = `c_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
     const newCond: ConditionItem = {
       id: newId,
-      mainCategory: 'cert',
-      subType: 'name',
+      mainCategory: 'course',
+      subType: 'select',
       value: ''
     };
     setConditions([...conditions, newCond]);
-    setDirectInputMap(prev => ({ ...prev, [newId]: true }));
   };
 
   // 조건 행 삭제
@@ -230,9 +207,11 @@ export function CustomCombinationModal({
     setConditions(conditions.map(c => {
       if (c.id === id) {
         if (mainCat === 'major') {
-          return { ...c, mainCategory: mainCat, subType: 'select', value: effectiveMajors.length > 0 ? effectiveMajors[0] : '' };
+          return { ...c, mainCategory: mainCat, subType: 'select', value: '' };
         } else if (mainCat === 'course') {
-          return { ...c, mainCategory: mainCat, subType: 'select', value: effectiveCourses.length > 0 ? effectiveCourses[0] : '' };
+          return { ...c, mainCategory: mainCat, subType: 'select', value: '' };
+        } else if (mainCat === 'current_course') {
+          return { ...c, mainCategory: mainCat, subType: 'select', value: '' };
         } else if (mainCat === 'cert') {
           setDirectInputMap(prev => ({ ...prev, [id]: true }));
           return { ...c, mainCategory: mainCat, subType: 'name', value: '' };
@@ -466,6 +445,7 @@ export function CustomCombinationModal({
                       <SelectContent>
                         <SelectItem value="major" className="text-xs font-bold">🏫 학과 (다중선택)</SelectItem>
                         <SelectItem value="course" className="text-xs font-bold">🎯 희망진로코스</SelectItem>
+                        <SelectItem value="current_course" className="text-xs font-bold">📍 현재진로코스</SelectItem>
                         <SelectItem value="cert" className="text-xs font-bold">📜 자격증</SelectItem>
                         <SelectItem value="attendance" className="text-xs font-bold">⏰ 출결</SelectItem>
                         <SelectItem value="status" className="text-xs font-bold">💼 취업/진로</SelectItem>
@@ -574,21 +554,62 @@ export function CustomCombinationModal({
 
                       {/* 희망진로코스 단일 드롭다운 선택 */}
                       {cond.mainCategory === 'course' && (
-                        <Select
-                          value={cond.value || (effectiveCourses.length > 0 ? effectiveCourses[0] : '')}
-                          onValueChange={val => handleValueChange(cond.id, val)}
-                        >
-                          <SelectTrigger className="w-full sm:w-[220px] h-9 text-xs font-bold bg-white border-slate-200">
-                            <SelectValue placeholder="희망진로코스 선택" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {effectiveCourses.map(course => (
-                              <SelectItem key={course} value={course} className="text-xs font-bold">
-                                {course}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={cond.value || ''}
+                            onValueChange={val => handleValueChange(cond.id, val)}
+                          >
+                            <SelectTrigger className="w-full sm:w-[240px] h-9 text-xs font-bold bg-white border-slate-200">
+                              <SelectValue placeholder="희망진로코스 선택 (단일)" />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-[260px]">
+                              {effectiveCourses.map(course => (
+                                <SelectItem key={course} value={course} className="text-xs font-bold">
+                                  {course}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {cond.value && (
+                            <button
+                              type="button"
+                              onClick={() => handleValueChange(cond.id, '')}
+                              className="text-[11px] text-slate-400 hover:text-slate-600 font-bold px-2 py-1 rounded hover:bg-slate-100"
+                            >
+                              선택취소
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* 현재진로코스 단일 드롭다운 선택 */}
+                      {cond.mainCategory === 'current_course' && (
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={cond.value || ''}
+                            onValueChange={val => handleValueChange(cond.id, val)}
+                          >
+                            <SelectTrigger className="w-full sm:w-[240px] h-9 text-xs font-bold bg-white border-slate-200">
+                              <SelectValue placeholder="현재진로코스 선택 (단일)" />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-[260px]">
+                              {effectiveCourses.map(course => (
+                                <SelectItem key={course} value={course} className="text-xs font-bold">
+                                  {course}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {cond.value && (
+                            <button
+                              type="button"
+                              onClick={() => handleValueChange(cond.id, '')}
+                              className="text-[11px] text-slate-400 hover:text-slate-600 font-bold px-2 py-1 rounded hover:bg-slate-100"
+                            >
+                              선택취소
+                            </button>
+                          )}
+                        </div>
                       )}
 
                       {/* 자격증 명칭 (기본값: 직접입력 창, 버튼 클릭 시 등록 자격증 목록 선택) */}

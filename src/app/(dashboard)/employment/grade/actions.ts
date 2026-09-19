@@ -294,9 +294,9 @@ export const getGradeStudents = unstable_cache(
         const { data: setting } = await supabase
           .from('system_settings')
           .select('value')
-          .eq('key', 'general')
+          .eq('key', 'base_year')
           .maybeSingle();
-        const baseYear = setting?.value?.baseYear ? Number(setting.value.baseYear) : 2026;
+        const baseYear = setting?.value?.year ? Number(setting.value.year) : 2026;
         targetYear = baseYear + 1; // 2026년 기준 3학년은 2027년 2월 졸업
       }
 
@@ -312,37 +312,32 @@ export const getGradeStudents = unstable_cache(
         return { success: false, data: [], error: error?.message || '학생 목록을 불러올 수 없습니다.' };
       }
 
-      // 학생들의 성적 데이터 청크(18명 최적 단위) 조회
       const studentIds = students.map(s => s.id);
-      const chunkSize = 18;
-      const chunks: string[][] = [];
-      for (let i = 0; i < studentIds.length; i += chunkSize) {
-        chunks.push(studentIds.slice(i, i + chunkSize));
-      }
-
-      const scorePromises = chunks.map(chunk =>
-        supabase
-          .from('student_scores')
-          .select('student_id, grade, semester, subject, credits, achievement, rank_grade')
-          .in('student_id', chunk)
-      );
-
-      const scoreResults = await Promise.all(scorePromises);
       const scoresByStudent: Record<string, RawScoreItem[]> = {};
 
-      scoreResults.forEach(r => {
-        (r.data || []).forEach((sc: any) => {
-          if (!scoresByStudent[sc.student_id]) scoresByStudent[sc.student_id] = [];
-          scoresByStudent[sc.student_id].push({
-            grade: sc.grade,
-            semester: sc.semester,
-            subject: sc.subject,
-            credits: sc.credits,
-            achievement: sc.achievement,
-            rank_grade: sc.rank_grade,
+      if (studentIds.length > 0) {
+        // Vercel 네트워크 지연 최소화를 위해 1회 통합 쿼리로 모든 학생 성적 패칭
+        const { data: allScores, error: scoreErr } = await supabase
+          .from('student_scores')
+          .select('student_id, grade, semester, subject, credits, achievement, rank_grade')
+          .in('student_id', studentIds);
+
+        if (scoreErr) {
+          console.error('Failed to fetch student scores:', scoreErr);
+        } else if (allScores) {
+          allScores.forEach((sc: any) => {
+            if (!scoresByStudent[sc.student_id]) scoresByStudent[sc.student_id] = [];
+            scoresByStudent[sc.student_id].push({
+              grade: sc.grade,
+              semester: sc.semester,
+              subject: sc.subject,
+              credits: sc.credits,
+              achievement: sc.achievement,
+              rank_grade: sc.rank_grade,
+            });
           });
-        });
-      });
+        }
+      }
 
       const studentsWithScores: GradeStudentListItem[] = students.map(st => ({
         ...st,
