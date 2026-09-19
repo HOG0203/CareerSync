@@ -103,6 +103,9 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
     return counts;
   }, [logs]);
 
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(50);
+
   // 브라우저 0ms 메모이제이션 클라이언트 필터링
   const filteredLogs = React.useMemo(() => {
     let list = logs;
@@ -121,8 +124,19 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
     return list;
   }, [logs, activeType, search]);
 
+  const totalItems = filteredLogs.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (safeCurrentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+
+  const paginatedLogs = React.useMemo(() => {
+    return filteredLogs.slice(startIndex, endIndex);
+  }, [filteredLogs, startIndex, endIndex]);
+
   const handleTypeChange = (type: string) => {
     setActiveType(type);
+    setCurrentPage(1);
     const params = new URLSearchParams(window.location.search);
     if (type !== 'all') {
       params.set('type', type);
@@ -134,6 +148,7 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
 
   const handleSearchChange = (val: string) => {
     setSearch(val);
+    setCurrentPage(1);
     const params = new URLSearchParams(window.location.search);
     if (val.trim() !== '') {
       params.set('search', val);
@@ -249,7 +264,7 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
-                    {filteredLogs.map((log) => {
+                    {paginatedLogs.map((log) => {
                       const typeCfg = ACTION_TYPE_CONFIG[log.action_type] || { label: log.action_type, color: 'bg-slate-100 text-slate-700 border-slate-200' };
                       return (
                         <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
@@ -301,7 +316,7 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
 
               {/* 모바일 슬림 스마트 카드 뷰 (md 미만) */}
               <div className="md:hidden flex flex-col gap-2 p-2 bg-slate-50/50">
-                {filteredLogs.map((log) => {
+                {paginatedLogs.map((log) => {
                   const typeCfg = ACTION_TYPE_CONFIG[log.action_type] || { label: log.action_type, color: 'bg-slate-100 text-slate-700 border-slate-200' };
                   const shortDate = formatDateShort(log.created_at);
                   const detailsObj = (log.details && typeof log.details === 'object' && !Array.isArray(log.details)) ? log.details as Record<string, any> : null;
@@ -358,6 +373,97 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
                     </div>
                   );
                 })}
+              </div>
+
+              {/* 하단 페이지네이션 컨트롤 바 */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 py-3 border-t border-slate-200/80 bg-slate-50/70 text-xs text-slate-600">
+                <div className="flex items-center gap-2">
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="h-8 px-2 rounded-lg border border-slate-200 bg-white font-medium text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-2xs"
+                  >
+                    <option value={25}>25개씩 보기</option>
+                    <option value={50}>50개씩 보기</option>
+                    <option value={100}>100개씩 보기</option>
+                  </select>
+                  <span className="text-slate-400">|</span>
+                  <span className="font-medium text-slate-600">
+                    총 <strong className="text-slate-900 font-bold">{totalItems.toLocaleString()}</strong>건 중{' '}
+                    <strong className="text-indigo-600 font-bold">{totalItems === 0 ? 0 : startIndex + 1} - {endIndex}</strong>건 표시
+                  </span>
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={safeCurrentPage <= 1}
+                      onClick={() => setCurrentPage(1)}
+                      className="h-8 px-2.5 text-xs rounded-lg border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40"
+                    >
+                      처음
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={safeCurrentPage <= 1}
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      className="h-8 px-2.5 text-xs rounded-lg border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40"
+                    >
+                      이전
+                    </Button>
+
+                    <div className="flex items-center gap-1 mx-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(p => p === 1 || p === totalPages || Math.abs(p - safeCurrentPage) <= 2)
+                        .map((p, idx, arr) => {
+                          const showEllipsis = idx > 0 && p - arr[idx - 1] > 1;
+                          return (
+                            <React.Fragment key={p}>
+                              {showEllipsis && <span className="px-1 text-slate-400 font-bold">...</span>}
+                              <Button
+                                size="sm"
+                                variant={safeCurrentPage === p ? 'default' : 'outline'}
+                                onClick={() => setCurrentPage(p)}
+                                className={cn(
+                                  "h-8 min-w-[32px] px-2 text-xs font-bold rounded-lg transition-all",
+                                  safeCurrentPage === p 
+                                    ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs" 
+                                    : "border-slate-200 bg-white hover:bg-slate-100 text-slate-700"
+                                )}
+                              >
+                                {p}
+                              </Button>
+                            </React.Fragment>
+                          );
+                        })}
+                    </div>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={safeCurrentPage >= totalPages}
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      className="h-8 px-2.5 text-xs rounded-lg border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40"
+                    >
+                      다음
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={safeCurrentPage >= totalPages}
+                      onClick={() => setCurrentPage(totalPages)}
+                      className="h-8 px-2.5 text-xs rounded-lg border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40"
+                    >
+                      끝
+                    </Button>
+                  </div>
+                )}
               </div>
             </>
           )}

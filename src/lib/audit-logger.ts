@@ -142,22 +142,38 @@ export async function recordPageViewAction(path: string, pageName: string) {
 /**
  * [캐싱] Audit Log 전체 목록 서버 메모리 캐싱 조회
  */
-export async function getCachedAuditLogs() {
+export async function getCachedAuditLogs(maxLimit: number = 3000) {
   return unstable_cache(
     async () => {
       const supabase = createAdminClient();
       
-      // 1. audit_logs 테이블에서 먼저 시도
-      const { data: tableLogs, error: tableErr } = await supabase
-        .from('audit_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(500);
+      // 1. audit_logs 테이블에서 청크 페이징 조회 (최대 maxLimit건)
+      let allTableLogs: any[] = [];
+      let from = 0;
+      const CHUNK = 1000;
+      let hasTableErr = false;
+
+      while (allTableLogs.length < maxLimit) {
+        const { data, error } = await supabase
+          .from('audit_logs')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(from, from + CHUNK - 1);
+
+        if (error) {
+          hasTableErr = true;
+          break;
+        }
+        if (!data || data.length === 0) break;
+        allTableLogs.push(...data);
+        if (data.length < CHUNK) break;
+        from += CHUNK;
+      }
 
       let logs: AuditLogEntry[] = [];
 
-      if (!tableErr && tableLogs) {
-        logs = tableLogs.map(l => ({
+      if (!hasTableErr && allTableLogs.length > 0) {
+        logs = allTableLogs.map(l => ({
           id: l.id,
           actor_id: l.actor_id,
           actor_name: l.actor_name,
@@ -166,7 +182,7 @@ export async function getCachedAuditLogs() {
           details: l.details,
           created_at: l.created_at
         }));
-      } else {
+      } else if (hasTableErr) {
         // 폴백: system_settings에서 조회
         const { data: fallbackData } = await supabase
           .from('system_settings')
@@ -179,7 +195,7 @@ export async function getCachedAuditLogs() {
 
       return logs;
     },
-    ['audit-logs-list-all-500'],
+    ['audit-logs-list-all-v3'],
     {
       revalidate: 86400,
       tags: ['audit-logs']
