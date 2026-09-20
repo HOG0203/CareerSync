@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { FullStudentEvaluation } from '@/lib/certification-calculator';
+import { FullStudentEvaluation, getDefaultPrizeName } from '@/lib/certification-calculator';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,9 +20,12 @@ import {
   ShieldCheck,
   ChevronRight,
   Gift,
+  Clock,
+  Info,
 } from 'lucide-react';
 import { EvaluationSheetModal } from '@/app/(dashboard)/admin/certification/evaluation-sheet-modal';
 import { ChangePasswordDialog } from './change-password-dialog';
+import { cn } from '@/lib/utils';
 
 interface StudentCertificationViewProps {
   evaluation: FullStudentEvaluation;
@@ -33,12 +36,47 @@ export function StudentCertificationView({ evaluation, baseYear }: StudentCertif
   const [sheetModalOpen, setSheetModalOpen] = React.useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = React.useState(false);
 
+  const getRankBadge = (rank?: string) => {
+    if (!rank) return null;
+    let colorClass = 'bg-slate-500 hover:bg-slate-600 text-white';
+    if (rank === 'S') colorClass = 'bg-amber-500 hover:bg-amber-600 text-white';
+    else if (rank === 'A') colorClass = 'bg-blue-600 hover:bg-blue-700 text-white';
+    else if (rank === 'B') colorClass = 'bg-emerald-600 hover:bg-emerald-700 text-white';
+    else if (rank === 'C') colorClass = 'bg-slate-600 hover:bg-slate-700 text-white';
+    else if (rank === 'D') colorClass = 'bg-rose-500 hover:bg-rose-600 text-white';
+
+    return (
+      <Badge className={cn("text-[10px] sm:text-[11px] font-black px-1.5 py-0.5 rounded-md shrink-0 shadow-2xs", colorClass)}>
+        {rank}등급
+      </Badge>
+    );
+  };
+
+  const cleanItemName = (itemName?: string, rank?: string) => {
+    if (!itemName) return '';
+    if (!rank) return itemName;
+    const match = itemName.match(new RegExp(`^${rank}등급\\s*상품\\s*\\((.+)\\)$`));
+    if (match && match[1]) return match[1];
+    const matchBracket = itemName.match(new RegExp(`^\\[${rank}등급\\]\\s*(.+)$`));
+    if (matchBracket && matchBracket[1]) return matchBracket[1];
+    return itemName;
+  };
+
   const d = evaluation.details;
   const isPassed = evaluation.isCertified;
 
   const confirmedRewards = (evaluation.rewardsHistory || []).filter(r => r.status !== 'cancelled');
   const prizeRewards = confirmedRewards.filter(r => r.rewardType === 'prize');
   const awardRewards = confirmedRewards.filter(r => r.rewardType === 'certificate_award');
+
+  // 승급 또는 신규 달성에 따른 상품 수령 예정 정보
+  const prizeEligibility = evaluation.rewardEligibility?.prize;
+  const isPendingPrize = !!prizeEligibility?.eligible;
+  const isUpgrade = !!(prizeEligibility?.isUpgrade && prizeEligibility?.highestAwardedRank);
+  const scheduledPrizeName = cleanItemName(
+    prizeEligibility?.recommendedPrizeName || getDefaultPrizeName(evaluation.rank),
+    evaluation.rank
+  );
 
   const domains = [
     {
@@ -205,91 +243,171 @@ export function StudentCertificationView({ evaluation, baseYear }: StudentCertif
       <Card className="border-slate-200 shadow-sm overflow-hidden">
         <CardHeader className="bg-slate-50/60 pb-3 border-b border-slate-100">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
-                <Gift className="h-4 w-4" />
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 shrink-0">
+                <Gift className="h-5 w-5" />
               </div>
               <div>
-                <CardTitle className="text-sm font-bold text-slate-900">
-                  상품 및 옥저인재인증상 공식 수령 확인
+                <CardTitle className="text-lg font-bold text-slate-900">
+                  포상 및 인증상 수령 현황
                 </CardTitle>
-                <CardDescription className="text-[11px] text-slate-500">
-                  학교에서 공식 지급 및 수령 확정된 내역입니다.
+                <CardDescription className="text-xs text-slate-500">
+                  학교 공식 지급 완료 내역 및 등급 상향에 따른 지급 예정 내역입니다.
                 </CardDescription>
               </div>
             </div>
-            {confirmedRewards.length > 0 && (
-              <Badge className="bg-emerald-600 text-white font-bold text-xs px-2.5 py-0.5">
-                수령 확인됨 ({confirmedRewards.length}건)
-              </Badge>
-            )}
+            <div className="flex items-center gap-1.5 flex-wrap justify-end">
+              {confirmedRewards.length > 0 && (
+                <Badge className="bg-emerald-600 text-white font-bold text-xs px-2.5 py-0.5">
+                  수령 확인됨 ({confirmedRewards.length}건)
+                </Badge>
+              )}
+              {isPendingPrize && (
+                <Badge className="bg-amber-500 text-white font-bold text-xs px-2.5 py-0.5 gap-1 shadow-2xs">
+                  <Clock className="h-3 w-3" />
+                  수령 예정 (1건)
+                </Badge>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-4 sm:p-5 space-y-3">
-          {confirmedRewards.length === 0 ? (
+          {confirmedRewards.length === 0 && !isPendingPrize ? (
             <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/60 text-center text-xs text-slate-500 leading-relaxed">
-              <p className="font-semibold text-slate-700">현재 등록된 공식 수령 내역이 없습니다.</p>
+              <p className="font-semibold text-slate-700">현재 등록된 공식 수령 및 지급 예정 내역이 없습니다.</p>
               <p className="text-[11px] text-slate-400 mt-1">
                 학기말 인증 심사 및 포상 지급이 완료되면 이곳에 공식 수령 기록이 영구 보존됩니다.
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* 등급별 상품 수령 내역 */}
-              {prizeRewards.map((r, i) => (
-                <div key={i} className="p-3.5 rounded-xl border border-blue-200 bg-blue-50/50 flex flex-col justify-between gap-2">
+              {/* 등급 상향/달성에 따른 수령 예정 카드 */}
+              {isPendingPrize && (
+                <div className={cn(
+                  "p-3.5 sm:p-4 rounded-xl border-2 border-indigo-300/80 bg-gradient-to-br from-indigo-50/90 via-blue-50/40 to-white flex flex-col justify-between gap-2.5 shadow-xs relative",
+                  confirmedRewards.length === 0 && "sm:col-span-2"
+                )}>
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 rounded-lg bg-blue-600 text-white shrink-0">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-lg bg-indigo-600 text-white shrink-0 shadow-2xs">
                         <Gift className="h-4 w-4" />
                       </div>
                       <div>
-                        <span className="text-[11px] font-bold text-blue-900 block">
-                          {r.academicYear}학년도 {r.semester}학기 등급 상품
-                        </span>
-                        <span className="text-sm font-extrabold text-blue-950">
-                          {r.itemName}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[11px] font-bold text-indigo-900">
+                            {isUpgrade ? (
+                              <span className="inline-flex items-center gap-1 font-extrabold text-indigo-950">
+                                <span>{prizeEligibility?.highestAwardedRank}등급</span>
+                                <span className="text-indigo-400 font-normal">➔</span>
+                                <span className="text-indigo-600">{evaluation.rank}등급 승급 달성</span>
+                              </span>
+                            ) : (
+                              <span>{evaluation.rank}등급 최초 달성</span>
+                            )}
+                          </span>
+                          <span className="text-[10px] text-indigo-500 font-semibold">(포상 대상)</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          {getRankBadge(evaluation.rank)}
+                          <span className="text-sm font-extrabold text-slate-900">
+                            {scheduledPrizeName}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <Badge className="bg-blue-600 text-white font-bold text-[10px] shrink-0">
-                      수령 완료
+                    <Badge className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[10px] shrink-0 gap-1 px-2 py-0.5 shadow-2xs">
+                      <Clock className="h-3 w-3" />
+                      <span>수령 예정</span>
                     </Badge>
                   </div>
-                  <div className="text-[11px] text-slate-500 pt-1.5 border-t border-blue-100 flex items-center justify-between">
-                    <span>수령 일시: {r.awardedDate || (r.createdAt ? r.createdAt.slice(0, 10) : '확정')}</span>
-                    {r.remarks && <span className="text-blue-700 font-medium">({r.remarks})</span>}
+
+                  {/* 다듬은 학기말 공식 지급 안내 문구 */}
+                  <div className="p-2.5 rounded-lg bg-white/95 border border-indigo-100/90 text-[11px] leading-relaxed flex items-start gap-2 shadow-2xs">
+                    <Info className="h-4 w-4 text-indigo-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-indigo-950 text-xs">
+                        학기말 등급 확정 시 상품 지급 안내
+                      </p>
+                      <p className="text-slate-600 text-[11px] mt-0.5 leading-normal">
+                        학기말 최종 심사에서 등급이 최종 확정되면, 해당 달성 등급에 맞추어 공식 상품이 정식 지급됩니다.
+                      </p>
+                      <p className="text-[10px] text-indigo-600 font-semibold mt-1">
+                        ※ 학기 중 추가 점수 취득 시 더 높은 상위 등급 상품으로 상향 수령이 가능합니다.
+                      </p>
+                    </div>
                   </div>
                 </div>
-              ))}
+              )}
+
+              {/* 등급별 상품 수령 내역 */}
+              {prizeRewards.map((r, i) => {
+                const rank = r.certifiedRank || r.snapshotData?.rank || evaluation.rank;
+                const cleanName = cleanItemName(r.itemName, rank);
+
+                return (
+                  <div key={i} className="p-3.5 rounded-xl border border-blue-200 bg-blue-50/50 flex flex-col justify-between gap-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 rounded-lg bg-blue-600 text-white shrink-0">
+                          <Gift className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <span className="text-[11px] font-bold text-blue-900 block">
+                            {r.academicYear}학년도 등급 상품
+                          </span>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            {rank && getRankBadge(rank)}
+                            <span className="text-sm font-extrabold text-blue-950">
+                              {cleanName}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <Badge className="bg-blue-600 text-white font-bold text-[10px] shrink-0">
+                        수령 완료
+                      </Badge>
+                    </div>
+                    <div className="text-[11px] text-slate-500 pt-1.5 border-t border-blue-100 flex items-center justify-between">
+                      <span>수령 일시: {r.awardedDate || (r.createdAt ? r.createdAt.slice(0, 10) : '확정')}</span>
+                      {r.remarks && <span className="text-blue-700 font-medium">({r.remarks})</span>}
+                    </div>
+                  </div>
+                );
+              })}
 
               {/* 옥저인재인증상 수여 내역 */}
-              {awardRewards.map((r, i) => (
-                <div key={i} className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/50 flex flex-col justify-between gap-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 rounded-lg bg-amber-500 text-white shrink-0">
-                        <Trophy className="h-4 w-4" />
+              {awardRewards.map((r, i) => {
+                const awardRank = r.certifiedRank || r.snapshotData?.rank;
+                return (
+                  <div key={i} className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/50 flex flex-col justify-between gap-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 rounded-lg bg-amber-500 text-white shrink-0">
+                          <Trophy className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <span className="text-[11px] font-bold text-amber-900 block">
+                            {r.academicYear}학년도 옥저인재인증상
+                          </span>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            {awardRank && getRankBadge(awardRank)}
+                            <span className="text-sm font-extrabold text-amber-950">
+                              옥저인재인증상 수여
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-[11px] font-bold text-amber-900 block">
-                          {r.academicYear}학년도 {r.semester ? `${r.semester}학기 ` : ''}인증상
-                        </span>
-                        <span className="text-sm font-extrabold text-amber-950">
-                          옥저인재인증상 수여
-                        </span>
-                      </div>
+                      <Badge className="bg-amber-500 text-white font-bold text-[10px] shrink-0">
+                        수여 완료
+                      </Badge>
                     </div>
-                    <Badge className="bg-amber-500 text-white font-bold text-[10px] shrink-0">
-                      수여 완료
-                    </Badge>
+                    <div className="text-[11px] text-slate-500 pt-1.5 border-t border-amber-100 flex items-center justify-between">
+                      <span>수령 일시: {r.awardedDate || (r.createdAt ? r.createdAt.slice(0, 10) : '확정')}</span>
+                      {r.remarks && <span className="text-amber-700 font-medium">({r.remarks})</span>}
+                    </div>
                   </div>
-                  <div className="text-[11px] text-slate-500 pt-1.5 border-t border-amber-100 flex items-center justify-between">
-                    <span>수여 일시: {r.awardedDate || (r.createdAt ? r.createdAt.slice(0, 10) : '확정')}</span>
-                    {r.remarks && <span className="text-amber-700 font-medium">({r.remarks})</span>}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -303,7 +421,7 @@ export function StudentCertificationView({ evaluation, baseYear }: StudentCertif
               <FileText className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">종합인증평가표 정식 출력본 확인</h3>
+              <h3 className="text-lg font-bold text-slate-900">종합인증평가표 정식 출력본 확인</h3>
               <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
                 학교 공식 A4 양식의 <strong>종합인증평가표</strong>를 확인하고 PDF로 다운로드하거나 인쇄할 수 있습니다.
               </p>

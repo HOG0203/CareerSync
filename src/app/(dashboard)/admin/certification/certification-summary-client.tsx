@@ -1261,7 +1261,6 @@ export function CertificationSummaryClient({
                   <TableHead className="font-extrabold text-slate-700 w-[160px]">학생 정보</TableHead>
                   <TableHead className="font-extrabold text-slate-700 text-center w-[85px]">종합 점수</TableHead>
                   <TableHead className="font-extrabold text-slate-700 text-center w-[80px]">인증 등급</TableHead>
-                  <TableHead className="font-extrabold text-slate-700 text-center w-[95px]">인증서 발급</TableHead>
                   <TableHead className="font-extrabold text-slate-700 text-center w-[230px]">4대 영역별 점수</TableHead>
                   <TableHead className="font-extrabold text-slate-700 text-center w-[160px]">🎁 등급별 상품</TableHead>
                   <TableHead className="font-extrabold text-slate-700 text-center w-[130px]">🏆 옥저인재인증상</TableHead>
@@ -1271,7 +1270,7 @@ export function CertificationSummaryClient({
               <TableBody>
                 {paginatedList.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={isAdmin ? 9 : 8} className="text-center py-12 text-slate-400">
+                    <TableCell colSpan={isAdmin ? 8 : 7} className="text-center py-12 text-slate-400">
                       조회된 학생 평가 데이터가 없습니다.
                     </TableCell>
                   </TableRow>
@@ -1344,21 +1343,7 @@ export function CertificationSummaryClient({
                           {getRankBadge(student.rank)}
                         </TableCell>
 
-                        {/* 4. 인증서 발급 */}
-                        <TableCell className="text-center">
-                          {student.isCertified ? (
-                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 font-bold text-[11px] gap-1 px-2 py-0.5">
-                              <CheckCircle2 className="h-3 w-3" />
-                              <span>발급 대상</span>
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="bg-slate-100 text-slate-500 border-slate-200 font-semibold text-[11px] px-2 py-0.5">
-                              미달
-                            </Badge>
-                          )}
-                        </TableCell>
-
-                        {/* 5. 4대 영역별 점수 */}
+                        {/* 4. 4대 영역별 점수 */}
                         <TableCell>
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 text-center text-[10px]">
                             <div className="bg-slate-50 p-1 rounded-md border border-slate-200/60">
