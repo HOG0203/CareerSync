@@ -30,7 +30,7 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
   const isCompanyField = field === 'company' || config.key === 'company';
   const filteredCompanies = React.useMemo(() => {
     if (!isEditing || !isCompanyField || !masterCompanies || masterCompanies.length === 0) return [];
-    const search = (localValue || '').trim().toLowerCase();
+    const search = String(localValue ?? '').trim().toLowerCase();
     if (!search) {
       return masterCompanies.slice(0, 8);
     }
