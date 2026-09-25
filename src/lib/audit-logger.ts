@@ -1,6 +1,6 @@
 'use server';
 
-import { unstable_cache, revalidateTag } from 'next/cache';
+import { revalidateTag } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/server';
 import { getCurrentUserProfile } from '@/lib/data';
 
@@ -140,65 +140,57 @@ export async function recordPageViewAction(path: string, pageName: string) {
 }
 
 /**
- * [캐싱] Audit Log 전체 목록 서버 메모리 캐싱 조회
+ * Audit Log 전체 목록 실시간 직접 DB 조회 (최대 maxLimit건)
+ * 관리자 이력 및 감사 로그 페이지의 실시간성 확보를 위해 캐시를 거치지 않고 DB에서 직접 최신 데이터를 가져옵니다.
  */
-export async function getCachedAuditLogs(maxLimit: number = 3000) {
-  return unstable_cache(
-    async () => {
-      const supabase = createAdminClient();
-      
-      // 1. audit_logs 테이블에서 청크 페이징 조회 (최대 maxLimit건)
-      let allTableLogs: any[] = [];
-      let from = 0;
-      const CHUNK = 1000;
-      let hasTableErr = false;
+export async function getCachedAuditLogs(maxLimit: number = 3000): Promise<AuditLogEntry[]> {
+  const supabase = createAdminClient();
+  
+  // 1. audit_logs 테이블에서 청크 페이징 조회 (최대 maxLimit건)
+  let allTableLogs: any[] = [];
+  let from = 0;
+  const CHUNK = 1000;
+  let hasTableErr = false;
 
-      while (allTableLogs.length < maxLimit) {
-        const { data, error } = await supabase
-          .from('audit_logs')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .range(from, from + CHUNK - 1);
+  while (allTableLogs.length < maxLimit) {
+    const { data, error } = await supabase
+      .from('audit_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(from, from + CHUNK - 1);
 
-        if (error) {
-          hasTableErr = true;
-          break;
-        }
-        if (!data || data.length === 0) break;
-        allTableLogs.push(...data);
-        if (data.length < CHUNK) break;
-        from += CHUNK;
-      }
-
-      let logs: AuditLogEntry[] = [];
-
-      if (!hasTableErr && allTableLogs.length > 0) {
-        logs = allTableLogs.map(l => ({
-          id: l.id,
-          actor_id: l.actor_id,
-          actor_name: l.actor_name,
-          action_type: l.action_type,
-          target_name: l.target_name,
-          details: l.details,
-          created_at: l.created_at
-        }));
-      } else if (hasTableErr) {
-        // 폴백: system_settings에서 조회
-        const { data: fallbackData } = await supabase
-          .from('system_settings')
-          .select('value')
-          .eq('key', AUDIT_SETTINGS_KEY)
-          .single();
-
-        logs = fallbackData?.value ? (fallbackData.value as any).logs || [] : [];
-      }
-
-      return logs;
-    },
-    ['audit-logs-list-all-v3'],
-    {
-      revalidate: 86400,
-      tags: ['audit-logs']
+    if (error) {
+      hasTableErr = true;
+      break;
     }
-  )();
+    if (!data || data.length === 0) break;
+    allTableLogs.push(...data);
+    if (data.length < CHUNK) break;
+    from += CHUNK;
+  }
+
+  let logs: AuditLogEntry[] = [];
+
+  if (!hasTableErr && allTableLogs.length > 0) {
+    logs = allTableLogs.map(l => ({
+      id: l.id,
+      actor_id: l.actor_id,
+      actor_name: l.actor_name,
+      action_type: l.action_type,
+      target_name: l.target_name,
+      details: l.details,
+      created_at: l.created_at
+    }));
+  } else if (hasTableErr) {
+    // 폴백: system_settings에서 조회
+    const { data: fallbackData } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', AUDIT_SETTINGS_KEY)
+      .single();
+
+    logs = fallbackData?.value ? (fallbackData.value as any).logs || [] : [];
+  }
+
+  return logs;
 }

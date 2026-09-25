@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import { AuditLogEntry } from '@/lib/audit-logger';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -75,6 +76,17 @@ interface LoginSessionItem {
 }
 
 export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
+  const router = useRouter();
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    router.refresh();
+    setTimeout(() => {
+      setIsRefreshing(false);
+    }, 600);
+  };
+
   const [selectedUser, setSelectedUser] = React.useState<string>('all');
   const [dateFilter, setDateFilter] = React.useState<'all' | 'today' | '7days' | '30days'>('all');
   const [activityFilter, setActivityFilter] = React.useState<'all' | 'work_only' | 'view_only'>('all');
@@ -548,8 +560,19 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
             </div>
           </div>
 
-          {/* 모두 펼치기 / 접기 */}
+          {/* 새로고침 및 전체 펼치기 / 접기 */}
           <div className="flex items-center gap-1.5 shrink-0 self-end md:self-auto">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="h-8 px-2.5 text-xs font-bold text-slate-700 border-slate-200 hover:bg-slate-50 rounded-lg shadow-2xs transition-all"
+            >
+              <RotateCcw className={cn("h-3.5 w-3.5 mr-1 text-slate-500", isRefreshing && "animate-spin text-indigo-600")} />
+              새로고침
+            </Button>
             <Button
               type="button"
               variant="ghost"

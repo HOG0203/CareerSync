@@ -13,7 +13,7 @@ import {
   DialogDescription, 
   DialogFooter 
 } from '@/components/ui/dialog';
-import { Search, Filter, History, Eye, Info, Clock, User, ShieldCheck, ChevronRight } from 'lucide-react';
+import { Search, Filter, History, Eye, Info, Clock, User, ShieldCheck, ChevronRight, RotateCcw } from 'lucide-react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
@@ -91,8 +91,17 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
   const [search, setSearch] = React.useState(currentSearch);
   const [activeType, setActiveType] = React.useState(currentType);
   const [selectedLog, setSelectedLog] = React.useState<AuditLogEntry | null>(null);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
   const router = useRouter();
   const pathname = usePathname();
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    router.refresh();
+    setTimeout(() => {
+      setIsRefreshing(false);
+    }, 600);
+  };
 
   // 각 유형별 개수 집계 (0ms 메모이제이션)
   const typeCounts = React.useMemo(() => {
@@ -242,6 +251,17 @@ export function AuditLogsClient({ logs, currentType, currentSearch }: AuditLogsC
               시스템 주요 작업 이력입니다. (필터링: {filteredLogs.length}건 / 전체 {logs.length}건)
             </CardDescription>
           </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="h-8 px-2.5 text-xs font-bold text-slate-700 border-slate-200 hover:bg-slate-50 rounded-lg shadow-2xs transition-all"
+          >
+            <RotateCcw className={cn("h-3.5 w-3.5 mr-1 text-slate-500", isRefreshing && "animate-spin text-indigo-600")} />
+            새로고침
+          </Button>
         </CardHeader>
         <CardContent className="p-0">
           {filteredLogs.length === 0 ? (
