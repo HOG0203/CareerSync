@@ -104,6 +104,20 @@ export function LoginHistoryClient({ logs }: LoginHistoryClientProps) {
   const formatTargetName = (targetName?: string) => {
     if (!targetName) return '';
     return targetName
+      .replace(/\[teaching-support\/substitute\/admin\]/g, '[결보강 승인/관리]')
+      .replace(/teaching-support\/substitute\/admin/g, '결보강 승인/관리')
+      .replace(/\[teaching-support\/substitute\]/g, '[결보강 처리]')
+      .replace(/teaching-support\/substitute/g, '결보강 처리')
+      .replace(/\[teaching-support\/timetable\]/g, '[시간표 조회/관리]')
+      .replace(/teaching-support\/timetable/g, '시간표 조회/관리')
+      .replace(/\[admission\/middle-school-employment\]/g, '[중학교별취업현황]')
+      .replace(/admission\/middle-school-employment/g, '중학교별취업현황')
+      .replace(/\[employment\/recommendation\]/g, '[학교장 추천 선발]')
+      .replace(/employment\/recommendation/g, '학교장 추천 선발')
+      .replace(/\[employment\/grade\]/g, '[내신등급 계산]')
+      .replace(/employment\/grade/g, '내신등급 계산')
+      .replace(/\[employment\/kai-grade\]/g, '[내신등급 계산]')
+      .replace(/employment\/kai-grade/g, '내신등급 계산')
       .replace(/\[admin\/certification\/import\]/g, '[인증제 엑셀 일괄 등록]')
       .replace(/admin\/certification\/import/g, '인증제 엑셀 일괄 등록')
       .replace(/\[admin\/certification\/grades\]/g, '[인증제 성적현황]')
