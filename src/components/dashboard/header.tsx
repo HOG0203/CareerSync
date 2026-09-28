@@ -41,7 +41,7 @@ function toTitleCase(str: string) {
 const ROUTE_MAP: Record<string, { group: string; label: string }> = {
   '/dashboard': { group: '', label: '대시보드' },
   '/employment-status': { group: '취업진로관리', label: '취업진로현황' },
-  '/field-training': { group: '취업진로관리', label: '현장실습/도제OJT현황' },
+  '/field-training': { group: '취업진로관리', label: '현장실습현황' },
   '/company-info': { group: '취업진로관리', label: '업체정보' },
   '/students': { group: '취업진로관리', label: '취업상세데이터' },
   '/employment/grade': { group: '취업진로관리', label: '내신등급 계산' },

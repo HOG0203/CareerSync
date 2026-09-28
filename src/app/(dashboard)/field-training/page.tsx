@@ -13,6 +13,10 @@ import { redirect } from 'next/navigation';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+export const metadata = {
+  title: '현장실습현황 | CareerSync',
+};
+
 /**
  * 현장실습현황 메인 페이지 (서버 컴포넌트)
  */
@@ -93,7 +97,7 @@ export default async function FieldTrainingPage() {
         <div className="flex flex-col gap-1 min-w-0">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-2 whitespace-nowrap">
             <CalendarCheck className="h-7 w-7 sm:h-8 sm:w-8 text-emerald-600 shrink-0" />
-            현장실습/도제OJT현황
+            현장실습현황
           </h2>
           <p className="text-muted-foreground text-xs sm:text-sm font-medium leading-relaxed break-keep">
             {isAdmin 

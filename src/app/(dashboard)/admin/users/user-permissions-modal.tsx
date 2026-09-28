@@ -37,7 +37,7 @@ export const ALL_SYSTEM_MENU_GROUPS = [
     color: 'text-indigo-600',
     items: [
       { href: '/employment-status', label: '취업진로현황', description: '전교생 취업/진학/진로 현황 종합 시트' },
-      { href: '/field-training', label: '현장실습/도제OJT현황', description: '3학년 현장실습 및 도제 파견 현황' },
+      { href: '/field-training', label: '현장실습현황', description: '3학년 현장실습 및 도제 파견 현황' },
       { href: '/company-info', label: '업체정보', description: '협약/실습/취업 기업체 및 구인 관리' },
       { href: '/students', label: '취업상세데이터', description: '학생별 상세 취업 데이터 스프레드시트' },
       { href: '/labor-education', label: '노동인권교육', description: '노동인권교육 이수 현황 그리드' },
