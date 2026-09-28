@@ -477,14 +477,23 @@ export async function parseScheduleExcel(
         afternoonType: 'dismiss',
         description: details || undefined,
       });
-    } else if (type.includes('대체') || type.includes('단축') || type.includes('변형') || type.includes('연속') || type.includes('블록')) {
+    } else if (type.includes('대체') || type.includes('단축') || type.includes('변형') || type.includes('연속') || type.includes('블록') || type.includes('시수')) {
       const isShortened = type.includes('단축') || /\d+교시\s*단축/.test(details) || /\d+교시\s*단축/.test(name);
       const isBlockOverride = type.includes('연속') || type.includes('블록') || details.includes('연속') || details.includes('복제') || name.includes('연속');
+      const isShift = details.includes('2~7') || name.includes('2~7') || (details.includes('시수') && details.includes('당김'));
       
       let shortPeriods = undefined;
       let periodOverrides: Record<number, number> | undefined = undefined;
+      let targetDayOfWeek = '월';
 
-      if (isShortened) {
+      if (isShift) {
+        periodOverrides = { 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7 };
+        shortPeriods = 6;
+        const matchTargetDay = (details + ' ' + name).match(/([월화수목금])요일/);
+        if (matchTargetDay) {
+          targetDayOfWeek = matchTargetDay[1];
+        }
+      } else if (isShortened) {
         const matchPeriod = (details + ' ' + name).match(/(\d+)교시/);
         if (matchPeriod) {
           shortPeriods = parseInt(matchPeriod[1], 10);
@@ -504,8 +513,8 @@ export async function parseScheduleExcel(
       specialDays.push({
         id: `excel-sp-${Date.now()}-${idx++}`,
         date: startDate,
-        originalDayOfWeek: '금',
-        targetDayOfWeek: '금',
+        originalDayOfWeek: '화',
+        targetDayOfWeek,
         shortenedPeriods: shortPeriods,
         periodOverrides,
         description: name || details,
@@ -561,12 +570,17 @@ export async function exportScheduleToExcel(config: AcademicCalendarConfig, file
   // 3. 대체 및 단축수업 / 교시 연속
   config.specialDaySchedules?.forEach(s => {
     const hasOverrides = Boolean(s.periodOverrides && Object.keys(s.periodOverrides).length > 0);
+    const isShift = Boolean(s.periodOverrides && s.periodOverrides[1] === 2 && s.periodOverrides[6] === 7);
 
     let category = '대체요일';
     let detailNote = `${s.originalDayOfWeek || '당일'}요일 ➔ ${s.targetDayOfWeek}요일 시간표`;
     let title = s.description || `${s.targetDayOfWeek}요일 시간표 대체`;
 
-    if (s.shortenedPeriods) {
+    if (isShift) {
+      category = '시수확보대체';
+      detailNote = `${s.targetDayOfWeek}요일 2~7교시 ➔ 당일 1~6교시 배정${s.shortenedPeriods ? ` (${s.shortenedPeriods}교시 단축)` : ''}`;
+      title = s.description || `${s.targetDayOfWeek}요일 2~7교시 시수확보 대체`;
+    } else if (s.shortenedPeriods) {
       category = '단축수업';
       detailNote = `${s.shortenedPeriods}교시 단축수업 운영`;
       title = s.description || `${s.shortenedPeriods}교시 단축운영`;

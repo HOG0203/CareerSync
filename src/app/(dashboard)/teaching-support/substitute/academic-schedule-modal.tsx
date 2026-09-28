@@ -187,6 +187,9 @@ export function AcademicScheduleModal({
   const [modalSwapDesc, setModalSwapDesc] = React.useState<string>('');
   const [modalBlockSourcePeriod, setModalBlockSourcePeriod] = React.useState<number>(5);
   const [modalBlockTargetPeriod, setModalBlockTargetPeriod] = React.useState<number>(6);
+  // 🌟 [방안 B] 요일 대체 시 시수확보(2~7교시 ➔ 1~6교시 당김) 및 7교시 단축 옵션
+  const [modalSwapShift, setModalSwapShift] = React.useState<boolean>(false);
+  const [modalSwapShorten7, setModalSwapShorten7] = React.useState<boolean>(false);
 
   // 4. 지필평가/시험 (단일일 vs 여러날짜 기간 모드)
   const [modalExamMode, setModalExamMode] = React.useState<'single' | 'range'>('single');
@@ -626,7 +629,10 @@ export function AcademicScheduleModal({
 
     // 3. 단축 및 대체 요일
     specialDaySchedules.forEach(s => {
-      if (s.shortenedPeriods) {
+      const isShift = Boolean(s.periodOverrides && s.periodOverrides[1] === 2 && s.periodOverrides[6] === 7);
+      const isPureShortened = Boolean(s.shortenedPeriods && !isShift && (!s.targetDayOfWeek || s.targetDayOfWeek === (s.originalDayOfWeek || getDayOfWeekFromDate(s.date))));
+
+      if (isPureShortened) {
         list.push({
           id: s.id,
           category: 'shortened',
@@ -639,18 +645,28 @@ export function AcademicScheduleModal({
         });
       } else {
         const hasOverrides = Boolean(s.periodOverrides && Object.keys(s.periodOverrides).length > 0);
-        const title = hasOverrides 
-          ? (s.description || '교시 변형/연속')
-          : `${s.targetDayOfWeek}요일 대체 시간표`;
+        let title = `${s.targetDayOfWeek}요일 대체 시간표`;
+        let badgeLabel = '🔄 요일대체';
+        let details = `${s.originalDayOfWeek || '당일'}요일에 ${s.targetDayOfWeek}요일 시간표로 수업 대체 (${s.description || '시간표 변경'})`;
+
+        if (isShift) {
+          title = s.description || `${s.targetDayOfWeek}요일 2~7교시 시수확보 대체`;
+          badgeLabel = '🔀 시수확보';
+          details = `${s.targetDayOfWeek}요일 2~7교시 ➔ 당일 1~6교시 배정${s.shortenedPeriods === 6 ? ' (7교시 없음)' : ''}`;
+        } else if (hasOverrides) {
+          title = s.description || '교시 변형/연속';
+          badgeLabel = '🔗 교시연속';
+          details = s.description || '교시 연속/중복 진행';
+        }
 
         list.push({
           id: s.id,
           category: 'special_day',
           date: s.date,
           title,
-          badgeLabel: '🔄 요일대체',
+          badgeLabel,
           badgeClass: 'bg-indigo-100 text-indigo-900 border-indigo-300 font-bold',
-          details: `${s.originalDayOfWeek || '당일'}요일에 ${s.targetDayOfWeek}요일 시간표로 수업 대체 (${s.description || '시간표 변경'})`,
+          details,
           rawItem: s,
         });
       }
@@ -827,6 +843,8 @@ export function AcademicScheduleModal({
     setModalShortenedDesc('');
     setModalSwapTargetDay(dayOfWeek === '수' ? '월' : '수');
     setModalSwapDesc(`${dayOfWeek}요일에 ${dayOfWeek === '수' ? '월' : '수'}요일 시간표 대체 운영`);
+    setModalSwapShift(false);
+    setModalSwapShorten7(false);
     setModalExamName('');
     setModalExamMode('single');
     setModalExamEnd(cDay.dateStr);
@@ -897,9 +915,10 @@ export function AcademicScheduleModal({
     setSelectedCalendarDate(targetDate);
 
     const hasOverrides = Boolean(s.periodOverrides && Object.keys(s.periodOverrides).length > 0);
-    const title = hasOverrides 
-      ? (s.description || '교시 연속/변형 운영')
-      : `${s.targetDayOfWeek}요일 대체 시간표`;
+    const isShift = Boolean(s.periodOverrides && s.periodOverrides[1] === 2 && s.periodOverrides[6] === 7);
+    const title = isShift
+      ? (s.description || `${s.targetDayOfWeek}요일 2~7교시 시수확보 대체`)
+      : (hasOverrides ? (s.description || '교시 연속/변형 운영') : `${s.targetDayOfWeek}요일 대체 시간표`);
 
     setEditingScheduleId({ 
       id: s.id, 
@@ -907,8 +926,16 @@ export function AcademicScheduleModal({
       originalTitle: title 
     });
 
-    if (hasOverrides && s.periodOverrides) {
+    if (isShift) {
+      setModalSwapMode('day');
+      setModalSwapTargetDay(s.targetDayOfWeek || '월');
+      setModalSwapShift(true);
+      setModalSwapShorten7(s.shortenedPeriods === 6);
+      setModalSwapDesc(s.description || '');
+    } else if (hasOverrides && s.periodOverrides) {
       setModalSwapMode('period_block');
+      setModalSwapShift(false);
+      setModalSwapShorten7(false);
       const targetP = Number(Object.keys(s.periodOverrides)[0]) || 6;
       const srcP = Number(s.periodOverrides[targetP]) || 5;
       setModalBlockSourcePeriod(srcP);
@@ -917,6 +944,8 @@ export function AcademicScheduleModal({
     } else {
       setModalSwapMode('day');
       setModalSwapTargetDay(s.targetDayOfWeek || '월');
+      setModalSwapShift(false);
+      setModalSwapShorten7(s.shortenedPeriods === 6);
       setModalSwapDesc(s.description || '');
     }
 
@@ -1167,12 +1196,23 @@ export function AcademicScheduleModal({
           description: desc,
         };
       } else {
+        let overrides: Record<number, number> | undefined = undefined;
+        if (modalSwapShift) {
+          overrides = { 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7 };
+        }
+        const shortened = modalSwapShorten7 ? 6 : undefined;
+        const defaultDesc = modalSwapShift 
+          ? `${dayOfWeek}요일에 ${modalSwapTargetDay}요일 2~7교시 시수확보 대체 운영${modalSwapShorten7 ? ' (7교시 없음)' : ''}`
+          : `${dayOfWeek}요일에 ${modalSwapTargetDay}요일 시간표 대체 운영`;
+
         newSp = {
           id: targetId,
           date: dateStr,
           originalDayOfWeek: dayOfWeek,
           targetDayOfWeek: modalSwapTargetDay,
-          description: modalSwapDesc.trim() || `${dayOfWeek}요일에 ${modalSwapTargetDay}요일 시간표 대체 운영`,
+          periodOverrides: overrides,
+          shortenedPeriods: shortened,
+          description: modalSwapDesc.trim() || defaultDesc,
         };
       }
       setSpecialDaySchedules(p => [...p.filter(s => s.id !== targetId && s.date !== dateStr), newSp].sort((a, b) => a.date.localeCompare(b.date)));
@@ -2312,10 +2352,14 @@ export function AcademicScheduleModal({
                           {/* 단축 및 대체 요일 */}
                           {cDay.specialDays.map(s => {
                             const hasOverrides = Boolean(s.periodOverrides && Object.keys(s.periodOverrides).length > 0);
+                            const isShift = Boolean(s.periodOverrides && s.periodOverrides[1] === 2 && s.periodOverrides[6] === 7);
                             let label = `🔄 ${s.targetDayOfWeek}요일대체`;
                             let tooltip = s.description || `${s.targetDayOfWeek}요일 대체`;
 
-                            if (s.shortenedPeriods) {
+                            if (isShift) {
+                              label = `🔀 ${s.targetDayOfWeek} 2~7교시`;
+                              tooltip = s.description || `${s.targetDayOfWeek}요일 2~7교시 시수확보 대체 운영${s.shortenedPeriods === 6 ? ' (7교시 없음)' : ''}`;
+                            } else if (s.shortenedPeriods && s.targetDayOfWeek === (s.originalDayOfWeek || getDayOfWeekFromDate(s.date))) {
                               label = `⏰ ${s.shortenedPeriods}교시단축`;
                               tooltip = s.description || `${s.shortenedPeriods}교시 단축`;
                             } else if (hasOverrides && s.periodOverrides) {
@@ -2330,11 +2374,13 @@ export function AcademicScheduleModal({
                                 key={s.id}
                                 className={cn(
                                   "px-1.5 py-0.5 rounded text-[9.5px] font-bold truncate border",
-                                  s.shortenedPeriods 
+                                  isShift
+                                    ? "bg-indigo-100 text-indigo-900 border-indigo-300"
+                                    : (s.shortenedPeriods && s.targetDayOfWeek === (s.originalDayOfWeek || getDayOfWeekFromDate(s.date)))
                                     ? "bg-amber-100 text-amber-900 border-amber-300" 
                                     : hasOverrides
-                                      ? "bg-blue-100 text-blue-900 border-blue-200"
-                                      : "bg-indigo-100 text-indigo-900 border-indigo-200"
+                                    ? "bg-blue-100 text-blue-900 border-blue-200"
+                                    : "bg-indigo-100 text-indigo-900 border-indigo-200"
                                 )}
                                 title={tooltip}
                               >
@@ -3701,35 +3747,43 @@ export function AcademicScheduleModal({
                           {/* 단축 및 대체 요일 */}
                           {curSp.map(s => {
                             const isEditing = editingScheduleId?.id === s.id;
-                            const isShort = !!s.shortenedPeriods;
+                            const isShift = Boolean(s.periodOverrides && s.periodOverrides[1] === 2 && s.periodOverrides[6] === 7);
+                            const isPureShort = Boolean(s.shortenedPeriods && !isShift && (!s.targetDayOfWeek || s.targetDayOfWeek === (s.originalDayOfWeek || getDayOfWeekFromDate(s.date))));
                             const hasOverrides = Boolean(s.periodOverrides && Object.keys(s.periodOverrides).length > 0);
-                            const desc = isShort 
+
+                            const desc = isShift
+                              ? `${s.targetDayOfWeek} 2~7교시 시수확보`
+                              : isPureShort 
                               ? `${s.shortenedPeriods}교시 단축` 
                               : hasOverrides 
                                 ? (s.description || '교시 연속/변형') 
                                 : `${s.targetDayOfWeek} 대체`;
-                            const fullDesc = isShort 
+
+                            const fullDesc = isShift
+                              ? (s.description || `${s.targetDayOfWeek}요일 2~7교시 시수확보 대체`)
+                              : isPureShort 
                               ? `${s.shortenedPeriods}교시 단축수업` 
                               : hasOverrides 
                                 ? (s.description || '교시 연속/변형 운영') 
                                 : `${s.targetDayOfWeek}요일 대체 시간표`;
+
                             return (
                               <div
                                 key={s.id}
                                 className={cn(
                                   "px-2 py-1 rounded-lg border text-xs font-bold flex items-center justify-between transition-all",
                                   isEditing
-                                    ? (isShort ? "bg-amber-600 text-white border-amber-700" : "bg-indigo-600 text-white border-indigo-700")
+                                    ? (isPureShort ? "bg-amber-600 text-white border-amber-700" : "bg-indigo-600 text-white border-indigo-700")
                                     : "bg-white text-slate-700 border-slate-200 hover:border-slate-300"
                                 )}
                               >
                                 <button
                                   type="button"
-                                  onClick={() => isShort ? handleDayModalPrefillShortened(s) : handleDayModalPrefillSwapDay(s)}
+                                  onClick={() => isPureShort ? handleDayModalPrefillShortened(s) : handleDayModalPrefillSwapDay(s)}
                                   className="flex items-center gap-1.5 cursor-pointer truncate text-left flex-1"
                                   title="클릭하여 수정"
                                 >
-                                  <span>{isShort ? '⏰' : (hasOverrides ? '🔗' : '🔄')}</span>
+                                  <span>{isShift ? '🔀' : (isPureShort ? '⏰' : (hasOverrides ? '🔗' : '🔄'))}</span>
                                   <span className="truncate">{desc}</span>
                                 </button>
                                 <button
@@ -4050,7 +4104,11 @@ export function AcademicScheduleModal({
                                   type="button"
                                   onClick={() => {
                                     setModalSwapTargetDay(d);
-                                    setModalSwapDesc(`${dayScheduleModal.dayOfWeek}요일에 ${d}요일 시간표 대체 운영`);
+                                    if (modalSwapShift) {
+                                      setModalSwapDesc(`${dayScheduleModal.dayOfWeek}요일에 ${d}요일 2~7교시 시수확보 대체 운영${modalSwapShorten7 ? ' (7교시 없음)' : ''}`);
+                                    } else {
+                                      setModalSwapDesc(`${dayScheduleModal.dayOfWeek}요일에 ${d}요일 시간표 대체 운영`);
+                                    }
                                   }}
                                   className={cn(
                                     "py-3 rounded-xl text-sm font-bold border transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-0.5",
@@ -4068,6 +4126,86 @@ export function AcademicScheduleModal({
                             </div>
                           </div>
 
+                          {/* ⚡ 시수 확보 및 교시 운영 옵션 (방안 B) */}
+                          <div className="p-3 bg-indigo-50/70 rounded-xl border border-indigo-200/90 space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-black text-indigo-950 flex items-center gap-1.5">
+                                <span>⚡ 시수 확보 및 교시 운영 옵션</span>
+                              </span>
+                              <span className="text-[10px] text-indigo-600 font-bold">결손시수 보충 / 단축</span>
+                            </div>
+
+                            <div className="space-y-2">
+                              {/* 옵션 1: 2~7교시 ➔ 1~6교시 앞당김 */}
+                              <label className="flex items-start gap-2.5 p-2.5 bg-white rounded-xl border border-indigo-100 hover:border-indigo-300 transition-all cursor-pointer shadow-2xs">
+                                <input
+                                  type="checkbox"
+                                  checked={modalSwapShift}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    setModalSwapShift(checked);
+                                    if (checked) {
+                                      setModalSwapShorten7(true);
+                                      setModalSwapDesc(`${dayScheduleModal.dayOfWeek}요일에 ${modalSwapTargetDay}요일 2~7교시 시수확보 대체 운영 (7교시 없음)`);
+                                    } else {
+                                      setModalSwapDesc(`${dayScheduleModal.dayOfWeek}요일에 ${modalSwapTargetDay}요일 시간표 대체 운영`);
+                                    }
+                                  }}
+                                  className="mt-0.5 h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 cursor-pointer shrink-0"
+                                />
+                                <div className="text-xs">
+                                  <span className="font-extrabold text-slate-900 block leading-tight">
+                                    2~7교시 수업을 ➔ 1~6교시로 당겨서 운영 (1교시 제외)
+                                  </span>
+                                  <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
+                                    {modalSwapTargetDay}요일 2~7교시 수업을 당일 1~6교시에 순차 배정합니다.
+                                  </span>
+                                </div>
+                              </label>
+
+                              {/* 옵션 2: 7교시 수업 없음 (6교시 단축) */}
+                              <label className="flex items-start gap-2.5 p-2.5 bg-white rounded-xl border border-indigo-100 hover:border-indigo-300 transition-all cursor-pointer shadow-2xs">
+                                <input
+                                  type="checkbox"
+                                  checked={modalSwapShorten7}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    setModalSwapShorten7(checked);
+                                    if (modalSwapShift) {
+                                      setModalSwapDesc(`${dayScheduleModal.dayOfWeek}요일에 ${modalSwapTargetDay}요일 2~7교시 시수확보 대체 운영${checked ? ' (7교시 없음)' : ''}`);
+                                    }
+                                  }}
+                                  className="mt-0.5 h-4 w-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 cursor-pointer shrink-0"
+                                />
+                                <div className="text-xs">
+                                  <span className="font-extrabold text-slate-900 block leading-tight">
+                                    7교시 수업 없음 (6교시까지만 운영)
+                                  </span>
+                                  <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
+                                    당일 7교시는 수업이 배정되지 않아 결보강이 발생하지 않습니다.
+                                  </span>
+                                </div>
+                              </label>
+                            </div>
+
+                            {/* 실시간 적용 미리보기 배지 */}
+                            {modalSwapShift && (
+                              <div className="p-2 bg-indigo-100/70 rounded-lg border border-indigo-200 text-[11px] font-bold text-indigo-950 flex flex-wrap items-center gap-1">
+                                <span className="font-black text-indigo-800">적용 교시:</span>
+                                <span className="bg-white px-1.5 py-0.5 rounded border border-indigo-200">1교시←{modalSwapTargetDay}2</span>
+                                <span className="bg-white px-1.5 py-0.5 rounded border border-indigo-200">2교시←{modalSwapTargetDay}3</span>
+                                <span className="bg-white px-1.5 py-0.5 rounded border border-indigo-200">3교시←{modalSwapTargetDay}4</span>
+                                <span className="bg-white px-1.5 py-0.5 rounded border border-indigo-200">4교시←{modalSwapTargetDay}5</span>
+                                <span className="text-slate-400">·</span>
+                                <span className="bg-white px-1.5 py-0.5 rounded border border-indigo-200">5교시←{modalSwapTargetDay}6</span>
+                                <span className="bg-white px-1.5 py-0.5 rounded border border-indigo-200">6교시←{modalSwapTargetDay}7</span>
+                                {modalSwapShorten7 && (
+                                  <span className="bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300 font-black">7교시 없음</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
                           <div>
                             <label className="text-xs font-bold text-slate-700 block mb-1">설명 / 비고</label>
                             <Input
@@ -4080,7 +4218,16 @@ export function AcademicScheduleModal({
 
                           <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-200 text-xs text-indigo-900 leading-relaxed">
                             💡 <strong>{dayScheduleModal.dateStr} ({dayScheduleModal.dayOfWeek}요일)</strong>에 
-                            전교 수업이 <strong>[{modalSwapTargetDay}요일]</strong> 정규 시간표로 자동 치환되어 결보강이 산출됩니다.
+                            {modalSwapShift ? (
+                              <>
+                                {' '}전교 수업이 <strong>[{modalSwapTargetDay}요일 2~7교시]</strong> 수업으로 1~6교시에 치환되며,
+                                {modalSwapShorten7 ? ' 7교시는 수업 없이 단축 운영됩니다.' : ' 7교시까지 정상 운영됩니다.'}
+                              </>
+                            ) : (
+                              <>
+                                {' '}전교 수업이 <strong>[{modalSwapTargetDay}요일]</strong> 정규 시간표로 자동 치환되어 결보강이 산출됩니다.
+                              </>
+                            )}
                           </div>
                         </div>
                       )}

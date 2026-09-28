@@ -105,10 +105,12 @@ function getEffectiveTeacherSlot(
   const effectiveDayKey = specialDay ? specialDay.targetDayOfWeek : dayOfWeek;
   const effectivePeriod = specialDay?.periodOverrides?.[period] ?? period;
 
-  const regularSlot = teacher.slots[`${effectiveDayKey}_${effectivePeriod}`];
-  const hasRegularClass = Boolean(
+  let hasRegularClass = Boolean(
     regularSlot && regularSlot.subjectName && regularSlot.subjectName.trim() !== '' && regularSlot.subjectName !== '-' && regularSlot.subjectName !== '공강'
   );
+  if (specialDay?.shortenedPeriods && period > specialDay.shortenedPeriods) {
+    hasRegularClass = false;
+  }
 
   const teacherName = teacher.teacherName;
   const activeApps = existingApplications.filter(app => app.status !== 'rejected');

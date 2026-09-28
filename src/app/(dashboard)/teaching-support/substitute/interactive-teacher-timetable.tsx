@@ -461,11 +461,14 @@ export function InteractiveTeacherTimetable({
                           )}
                           {specialDay && (() => {
                             const hasOverrides = Boolean(specialDay.periodOverrides && Object.keys(specialDay.periodOverrides).length > 0);
+                            const isShift = Boolean(specialDay.periodOverrides && specialDay.periodOverrides[1] === 2 && specialDay.periodOverrides[6] === 7);
                             let label = specialDay.targetDayOfWeek !== d.key 
                               ? `${specialDay.targetDayOfWeek}요일 수업` 
                               : '교시 변형';
 
-                            if (specialDay.shortenedPeriods) {
+                            if (isShift) {
+                              label = `🔀 ${specialDay.targetDayOfWeek} 2~7교시`;
+                            } else if (specialDay.shortenedPeriods && specialDay.targetDayOfWeek === d.key) {
                               label = `⏰ ${specialDay.shortenedPeriods}교시 단축`;
                             } else if (hasOverrides && specialDay.periodOverrides) {
                               const targetP = Number(Object.keys(specialDay.periodOverrides)[0]) || 6;
@@ -477,7 +480,9 @@ export function InteractiveTeacherTimetable({
                               <span
                                 className={cn(
                                   "px-1.5 py-0.2 rounded text-[9px] font-black border truncate max-w-[95px] flex items-center gap-0.5",
-                                  hasOverrides
+                                  isShift
+                                    ? "bg-indigo-100 text-indigo-900 border-indigo-300"
+                                    : hasOverrides
                                     ? "bg-blue-100 text-blue-900 border-blue-200"
                                     : "bg-indigo-100 text-indigo-800 border-indigo-200"
                                 )}
@@ -973,7 +978,7 @@ export function InteractiveTeacherTimetable({
                         {/* 교시 복제/변형 운영 뱃지 */}
                         {!isNormalSelected && isPeriodOverridden && (
                           <span className="absolute -top-1.5 -left-1 text-[8px] px-1 py-0.1 rounded-full font-black bg-indigo-600 text-white shadow-xs z-20 leading-tight ring-1 ring-white/50">
-                            🔄 {targetPeriod}교시
+                            {targetDayKey !== d.key ? `🔄 ${targetDayKey}${targetPeriod}` : `🔄 ${targetPeriod}교시`}
                           </span>
                         )}
 

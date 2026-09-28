@@ -855,11 +855,15 @@ export function getEffectiveSlotForTeacher(
   eventTitle?: string;
   partnerTeacher?: string;
 } {
-  const day = getDayOfWeekFromDate(dateStr);
+  const rawDay = getDayOfWeekFromDate(dateStr);
+  const specialDay = getSpecialDaySchedule(dateStr, calendarConfig);
+  const day = specialDay ? specialDay.targetDayOfWeek : rawDay;
+  const effectivePeriod = specialDay?.periodOverrides?.[period] ?? period;
+
   const teacher = timetableData.teachers.find(t => t.teacherName === teacherName);
   if (!teacher) return { hasClass: false };
 
-  const regularSlot = teacher.slots[`${day}_${period}`];
+  const regularSlot = teacher.slots[`${day}_${effectivePeriod}`];
   let hasRegularClass = Boolean(
     regularSlot && 
     regularSlot.subjectName && 
@@ -867,6 +871,10 @@ export function getEffectiveSlotForTeacher(
     regularSlot.subjectName !== '-' && 
     regularSlot.subjectName !== '공강'
   );
+
+  if (specialDay?.shortenedPeriods && period > specialDay.shortenedPeriods) {
+    hasRegularClass = false;
+  }
 
   const activeApps = existingApplications.filter(app => app.status !== 'rejected');
 
