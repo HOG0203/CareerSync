@@ -751,6 +751,51 @@ export function evaluateContestList<T extends { type: 'award' | 'participate'; t
 }
 
 /**
+ * 현장실습 레코드 이수 완료 여부 판정 함수
+ * 사용자의 요구 조건:
+ * "현장실습 이수(5점)이 DB에서 자동 반영되려면 현장실습 기간이 지나고 채용확정되거나 혹은 복교하지 않고, 현장실습기간을 모두 채운 경우 반영되도록 해야해."
+ * 
+ * 1. 복교 여부 확인 (hiring_status === '복교' 또는 return_reason이 기재된 경우 제외)
+ * 2. 조건 A: 현장실습 기간이 지나고 채용확정된 경우 (hiring_status === '채용전환' && (end_date <= todayStr || conversion_date <= todayStr))
+ * 3. 조건 B: 혹은 복교하지 않고, 현장실습기간을 모두 채운 경우 (end_date <= todayStr)
+ */
+export function isFieldTrainingRecordCompleted(
+  record: {
+    hiring_status?: string | null;
+    return_reason?: string | null;
+    start_date?: string | null;
+    end_date?: string | null;
+    conversion_date?: string | null;
+  },
+  todayStr: string = new Intl.DateTimeFormat('fr-CA', { timeZone: 'Asia/Seoul' }).format(new Date())
+): boolean {
+  if (!record) return false;
+
+  // 1. 복교한 경우 제외 (중도 포기/복교 학생은 이수 불인정)
+  const isReturned = record.hiring_status === '복교' || Boolean(record.return_reason && record.return_reason.trim() !== '');
+  if (isReturned) {
+    return false;
+  }
+
+  // 2-A. 현장실습 기간이 지나고 채용확정된 경우
+  const isConverted = record.hiring_status === '채용전환';
+  const periodPassed = Boolean(
+    (record.end_date && record.end_date <= todayStr) ||
+    (record.conversion_date && record.conversion_date <= todayStr)
+  );
+  if (isConverted && periodPassed) {
+    return true;
+  }
+
+  // 2-B. 혹은 복교하지 않고, 현장실습기간을 모두 채운 경우
+  if (record.end_date && record.end_date <= todayStr) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * 5. 종합 평가 전체 산출 마스터 함수
  */
 export function calculateStudentFullEvaluation(params: {
@@ -762,12 +807,14 @@ export function calculateStudentFullEvaluation(params: {
     class_info?: string;
     graduation_year: number;
     certificates?: string[];
+    field_training_records?: any[];
   };
   attendanceRecords?: any[];
   evalData?: CertificationEvaluationData;
   rewardsHistory?: StudentRewardRecord[];
   baseYear: number;
   prizeConfig?: CertificationPrizeConfig;
+  fieldTrainingRecords?: any[];
 }): FullStudentEvaluation {
   const { student, attendanceRecords = [], evalData = { student_id: student.id }, rewardsHistory = [], baseYear, prizeConfig } = params;
 
@@ -869,9 +916,46 @@ export function calculateStudentFullEvaluation(params: {
 
   // 5. 현장실습 참여 (최대 5점 캡)
   let fieldScore = 0;
-  const isFieldCompleted = evalData.employment_details?.field_training !== undefined
+
+  // DB 현장실습 이력(fieldTrainingRecords 또는 student.field_training_records) 자동 반영
+  // 사용자의 명확한 요구조건:
+  // "현장실습 이수(5점)이 DB에서 자동 반영되려면 현장실습 기간이 지나고 채용확정되거나 혹은 복교하지 않고, 현장실습기간을 모두 채운 경우 반영되도록 해야해."
+  const records = params.fieldTrainingRecords || (student as any).field_training_records || [];
+  const todayStr = new Intl.DateTimeFormat('fr-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
+
+  const qualifyingRecord = Array.isArray(records)
+    ? [...records]
+        .sort((a, b) => Number(b.training_order || 0) - Number(a.training_order || 0))
+        .find(r => isFieldTrainingRecordCompleted(r, todayStr))
+    : null;
+
+  const isFieldCompletedInDb = Boolean(qualifyingRecord);
+
+  const isFieldCompleted = (evalData.employment_details?.field_training !== undefined
     ? Boolean(evalData.employment_details.field_training.completed)
-    : Boolean(evalData.field_training_completed);
+    : Boolean(evalData.field_training_completed)) || isFieldCompletedInDb;
+
+  if (isFieldCompleted) {
+    evalData.field_training_completed = true;
+    if (!evalData.employment_details) {
+      evalData.employment_details = {};
+    }
+    if (!evalData.employment_details.field_training) {
+      evalData.employment_details.field_training = {
+        completed: true,
+        company: qualifyingRecord?.company || '현장실습',
+        period: qualifyingRecord ? [qualifyingRecord.start_date, qualifyingRecord.end_date].filter(Boolean).join(' ~ ') : undefined,
+      };
+    } else {
+      evalData.employment_details.field_training.completed = true;
+      if (!evalData.employment_details.field_training.company && qualifyingRecord?.company) {
+        evalData.employment_details.field_training.company = qualifyingRecord.company;
+      }
+      if (!evalData.employment_details.field_training.period && qualifyingRecord && (qualifyingRecord.start_date || qualifyingRecord.end_date)) {
+        evalData.employment_details.field_training.period = [qualifyingRecord.start_date, qualifyingRecord.end_date].filter(Boolean).join(' ~ ');
+      }
+    }
+  }
 
   const rawEmp = Array.isArray((student as any).student_employments)
     ? (student as any).student_employments[0]
@@ -915,14 +999,32 @@ export function calculateStudentFullEvaluation(params: {
     else if (ojtSems === 1) fieldScore = 2;
   }
   const fieldFinalScore = Math.min(5, fieldScore);
+
+  let fieldDisplayText = '해당 없음 (0점)';
+  if (fieldFinalScore > 0) {
+    const ftComp = evalData.employment_details?.field_training?.company;
+    const empComp = evalData.employment_details?.employed_early?.company;
+
+    if (isFieldCompleted && isEmployedEarly) {
+      const name = ftComp || empComp;
+      fieldDisplayText = name ? `현장실습 이수 및 취업확정 [${name}] (${fieldFinalScore}점)` : `현장실습 이수 및 취업확정 (${fieldFinalScore}점)`;
+    } else if (isFieldCompleted) {
+      fieldDisplayText = ftComp ? `현장실습 이수 [${ftComp}] (${fieldFinalScore}점)` : `현장실습 이수 (${fieldFinalScore}점)`;
+    } else if (isEmployedEarly && ojtSems === 0) {
+      fieldDisplayText = empComp ? `취업확정 [${empComp}] (${fieldFinalScore}점)` : `취업확정 (${fieldFinalScore}점)`;
+    } else if (ojtSems > 0) {
+      fieldDisplayText = `도제 OJT ${ojtSems}학기 (${fieldFinalScore}점)`;
+    } else {
+      fieldDisplayText = `현장실습/도제/취업확정 (${fieldFinalScore}점)`;
+    }
+  }
+
   const fieldDetail: ScoreItemDetail = {
     category: '취업역량강화',
     name: '현장실습 및 도제 참여',
     maxScore: 5,
     score: fieldFinalScore,
-    displayText: fieldFinalScore > 0 
-      ? (isEmployedEarly && !isFieldCompleted && ojtSems === 0 ? `취업확정 (${fieldFinalScore}점)` : `현장실습/도제/취업확정 (${fieldFinalScore}점)`)
-      : '해당 없음 (0점)'
+    displayText: fieldDisplayText
   };
 
   // 6. 출결상황 (10점)

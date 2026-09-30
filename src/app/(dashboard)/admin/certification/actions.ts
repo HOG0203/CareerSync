@@ -381,7 +381,7 @@ export async function getCertificationSummaryList(gradeNum: number, preloadedBas
   const [studentsRes, attendanceRes, evalStore, rewardsMap, prizeConfig] = await Promise.all([
     supabase
       .from('students')
-      .select('id, student_name, student_number, major, class_info, graduation_year, certificates, career_course, student_employments (business_type, company)')
+      .select('id, student_name, student_number, major, class_info, graduation_year, certificates, career_course, student_employments (business_type, company), field_training_records (*)')
       .eq('graduation_year', targetGradYear)
       .order('major', { ascending: true })
       .order('class_info', { ascending: true })
@@ -471,7 +471,7 @@ export async function getStudentSingleEvaluation(studentId: string): Promise<Ful
   const [studentRes, attendanceRes, evalStore, rewardsMap, prizeConfig] = await Promise.all([
     supabase
       .from('students')
-      .select('id, student_name, student_number, major, class_info, graduation_year, certificates, career_course, phone_number, student_employments (business_type, company)')
+      .select('id, student_name, student_number, major, class_info, graduation_year, certificates, career_course, phone_number, student_employments (business_type, company), field_training_records (*)')
       .eq('id', studentId)
       .maybeSingle(),
     supabase
@@ -2479,7 +2479,7 @@ export async function awardStudentItemAction(params: {
     const supabase = createAdminClient();
     const { data: student, error: stuErr } = await supabase
       .from('students')
-      .select('id, student_name, student_number, major, class_info, graduation_year, certificates')
+      .select('id, student_name, student_number, major, class_info, graduation_year, certificates, career_course, student_employments (business_type, company), field_training_records (*)')
       .eq('id', params.studentId)
       .single();
 
@@ -2653,7 +2653,7 @@ export async function bulkAwardItemsAction(params: {
     const supabase = createAdminClient();
     const { data: students, error: stuErr } = await supabase
       .from('students')
-      .select('id, student_name, student_number, major, class_info, graduation_year, certificates')
+      .select('id, student_name, student_number, major, class_info, graduation_year, certificates, career_course, student_employments (business_type, company), field_training_records (*)')
       .in('id', params.studentIds);
 
     if (stuErr || !students || students.length === 0) {
