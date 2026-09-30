@@ -183,6 +183,7 @@ export function StudentsHubClient({
     { label: '도제OJT', value: '도제OJT' },
     { label: '미취업', value: '미취업' },
     { label: '제외인정자', value: '제외인정자' },
+    { label: '퇴사/포기', value: '퇴사/포기' },
   ];
 
   // 학과 변경 시 반 필터 유효성 검사

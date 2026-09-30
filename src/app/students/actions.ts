@@ -907,6 +907,11 @@ export async function updateStudentField(id: string, field: string, value: any) 
     revalidatePath('/field-training');
     revalidatePath('/admission/middle-school-employment');
     revalidatePath('/share/admission/middle-school-employment');
+    revalidatePath('/admin/certification');
+    try {
+      const { clearCertificationSummaryCache } = await import('@/app/(dashboard)/admin/certification/actions');
+      await clearCertificationSummaryCache();
+    } catch (e) {}
     return { success: true };
   }
 
@@ -974,6 +979,11 @@ export async function updateStudentField(id: string, field: string, value: any) 
   revalidatePath('/field-training');
   revalidatePath('/admission/middle-school-employment');
   revalidatePath('/share/admission/middle-school-employment');
+  revalidatePath('/admin/certification');
+  try {
+    const { clearCertificationSummaryCache } = await import('@/app/(dashboard)/admin/certification/actions');
+    await clearCertificationSummaryCache();
+  } catch (e) {}
   return { success: true }
 }
 
@@ -1185,6 +1195,11 @@ export async function upsertFieldTrainingRecord(record: any) {
   revalidateTag('students');
   revalidatePath('/field-training');
   revalidatePath('/employment-status');
+  revalidatePath('/admin/certification');
+  try {
+    const { clearCertificationSummaryCache } = await import('@/app/(dashboard)/admin/certification/actions');
+    await clearCertificationSummaryCache();
+  } catch (e) {}
   return { success: true, data: upserted }
 }
 
@@ -1200,6 +1215,11 @@ export async function deleteFieldTrainingRecord(id: string) {
   revalidateTag('students');
   revalidatePath('/field-training');
   revalidatePath('/employment-status');
+  revalidatePath('/admin/certification');
+  try {
+    const { clearCertificationSummaryCache } = await import('@/app/(dashboard)/admin/certification/actions');
+    await clearCertificationSummaryCache();
+  } catch (e) {}
   return { success: true }
 }
 
@@ -1249,8 +1269,8 @@ export async function getStudentEmploymentHistory(studentId: string): Promise<Em
         return parsed.map((item: any, idx: number) => ({
           order: item.order || idx + 1,
           company: item.company || '',
-          company_type: item.company_type || '중견기업',
-          business_type: item.business_type || '취업',
+          company_type: item.company_type || '미지정',
+          business_type: item.business_type || '채용진행중',
           is_primary: Boolean(item.is_primary),
         }));
       }
@@ -1261,8 +1281,8 @@ export async function getStudentEmploymentHistory(studentId: string): Promise<Em
     return [{
       order: 1,
       company: data.company,
-      company_type: data.company_type || '중견기업',
-      business_type: data.business_type || '취업',
+      company_type: data.company_type || '미지정',
+      business_type: (data.business_type && data.business_type !== '미취업') ? data.business_type : '채용진행중',
       is_primary: true
     }];
   }
@@ -1302,7 +1322,7 @@ export async function saveStudentEmploymentHistory(
   if (primaryRecord) {
     updatePayload.company = primaryRecord.company;
     updatePayload.company_type = primaryRecord.company_type || null;
-    updatePayload.business_type = primaryRecord.business_type || '취업';
+    updatePayload.business_type = primaryRecord.business_type || '채용진행중';
   } else {
     updatePayload.company = null;
     updatePayload.company_type = null;
@@ -1338,6 +1358,11 @@ export async function saveStudentEmploymentHistory(
   revalidatePath('/admission/middle-school-employment');
   revalidatePath('/share/admission/middle-school-employment');
   revalidatePath('/employment-status');
+  revalidatePath('/admin/certification');
+  try {
+    const { clearCertificationSummaryCache } = await import('@/app/(dashboard)/admin/certification/actions');
+    await clearCertificationSummaryCache();
+  } catch (e) {}
 
   return { 
     success: true, 

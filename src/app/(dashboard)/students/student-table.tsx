@@ -231,7 +231,8 @@ const COLUMNS: ColumnConfig[] = [
     options: [
       { label: '취업', value: '취업' },
       { label: '제외인정자', value: '제외인정자' },
-      { label: '채용진행중', value: '채용진행중' }
+      { label: '채용진행중', value: '채용진행중' },
+      { label: '퇴사/포기', value: '퇴사/포기' },
     ],
     variant: (val) => {
       switch (val) {
@@ -239,6 +240,7 @@ const COLUMNS: ColumnConfig[] = [
         case '미취업': return 'bg-rose-100 text-rose-700 border-rose-200'
         case '제외인정자': return 'bg-slate-100 text-slate-700 border-slate-200'
         case '채용진행중': return 'bg-amber-100 text-amber-700 border-amber-200'
+        case '퇴사/포기': return 'bg-orange-100 text-orange-700 border-orange-200'
         case '현장실습중': return 'bg-blue-100 text-blue-700 border-blue-200'
         case '도제OJT': return 'bg-sky-100 text-sky-700 border-sky-200'
         default: return 'bg-slate-50 text-slate-400 border-slate-100' // '미결정' (미설정) 스타일
@@ -248,15 +250,20 @@ const COLUMNS: ColumnConfig[] = [
   { 
     key: 'company_type', label: '기업\n구분', width: 85, type: 'select', 
     options: [
+      { label: '미지정', value: '미지정' },
       { label: '대기업', value: '대기업' }, 
       { label: '공기업', value: '공기업' }, 
       { label: '공무원', value: '공무원' }, 
       { label: '중견기업', value: '중견기업' }, 
       { label: '강소기업', value: '강소기업' }, 
-      { label: '연계교육', value: '연계교육' }
+      { label: '연계교육', value: '연계교육' },
+      { label: '부사관', value: '부사관' },
+      { label: '중소기업', value: '중소기업' },
+      { label: '기타', value: '기타' }
     ],
     variant: (val) => {
       switch (val) {
+        case '미지정': return 'bg-slate-100 text-slate-500 border-slate-200'
         case '대기업': return 'bg-blue-50 text-blue-700 border-blue-100'
         case '공기업': return 'bg-indigo-50 text-indigo-700 border-indigo-100'
         case '공무원': return 'bg-slate-100 text-slate-700 border-slate-200'
@@ -264,6 +271,8 @@ const COLUMNS: ColumnConfig[] = [
         case '강소기업': return 'bg-cyan-50 text-cyan-700 border-cyan-100'
         case '연계교육': return 'bg-orange-50 text-orange-700 border-orange-100'
         case '부사관': return 'bg-emerald-50 text-emerald-700 border-emerald-100'
+        case '중소기업': return 'bg-amber-50 text-amber-700 border-amber-100'
+        case '기타': return 'bg-gray-100 text-gray-700 border-gray-200'
         default: return val ? 'bg-slate-50 text-slate-600 border-slate-100' : ''
       }
     }

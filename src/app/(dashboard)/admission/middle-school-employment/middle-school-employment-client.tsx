@@ -260,7 +260,6 @@ export function MiddleSchoolEmploymentClient({
       '출신중학교': s.middle_school || '미입력',
       '입학석차백분율(%)': s.admission_rank_percentile !== undefined && s.admission_rank_percentile !== null ? `${s.admission_rank_percentile}%` : '-',
       '전형구분': s.admission_type || '-',
-      '취업현황': s.business_type || s.employment_status || '미취업',
       '취업처(기업명)': s.company || s.latest_training_company || '-',
       '기업구분': s.company_type || '-',
       '현장실습처': s.latest_training_company || '-',
@@ -487,7 +486,6 @@ export function MiddleSchoolEmploymentClient({
                   <TableHead className="py-3.5 px-3 font-bold text-teal-900 bg-teal-50/70 text-xs sm:text-sm whitespace-nowrap">출신 중학교</TableHead>
                   <TableHead className="py-3.5 px-3 font-bold text-slate-700 text-right text-xs sm:text-sm whitespace-nowrap">입학 석차백분율</TableHead>
                   <TableHead className="py-3.5 px-3 font-bold text-slate-700 text-xs sm:text-sm whitespace-nowrap">전형 구분</TableHead>
-                  <TableHead className="py-3.5 px-3 font-bold text-slate-700 text-xs sm:text-sm whitespace-nowrap">취업 현황</TableHead>
                   <TableHead className="py-3.5 px-3 font-bold text-slate-900 text-xs sm:text-sm whitespace-nowrap">취업처 (기업명)</TableHead>
                   <TableHead className="py-3.5 px-3 font-bold text-slate-700 text-xs sm:text-sm whitespace-nowrap">기업 구분</TableHead>
                   {!isReadOnly && <TableHead className="py-3.5 px-3 font-bold text-center text-slate-700 w-16 text-xs sm:text-sm">관리</TableHead>}
@@ -496,13 +494,12 @@ export function MiddleSchoolEmploymentClient({
               <TableBody>
                 {filteredStudents.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={isReadOnly ? 10 : 11} className="text-center py-16 text-slate-400 text-sm">
+                    <TableCell colSpan={isReadOnly ? 9 : 10} className="text-center py-16 text-slate-400 text-sm">
                       일치하는 중학교 학생 데이터가 없습니다. 검색 조건이나 학년도를 변경해 보세요.
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredStudents.map((student, idx) => {
-                    const isEmployed = student.business_type === '취업' || student.employment_status === '취업';
                     const isTopCompany = ['대기업', '공기업', '공무원', '중견기업'].includes(student.company_type || '');
 
                     return (
@@ -546,19 +543,6 @@ export function MiddleSchoolEmploymentClient({
                         {/* 전형 구분 */}
                         <TableCell className="text-slate-600 font-medium text-xs sm:text-sm py-3.5 px-3 whitespace-nowrap">
                           {student.admission_type || '-'}
-                        </TableCell>
-
-                        {/* 취업 현황 */}
-                        <TableCell className="py-3.5 px-3 whitespace-nowrap">
-                          {isEmployed ? (
-                            <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-xs font-bold px-2.5 py-0.5">
-                              취업완료
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-slate-500 border-slate-300 text-xs px-2.5 py-0.5">
-                              {student.business_type || student.employment_status || '미취업'}
-                            </Badge>
-                          )}
                         </TableCell>
 
                         {/* 취업처 (기업명) */}

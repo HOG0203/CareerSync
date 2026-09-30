@@ -51,6 +51,14 @@ export async function updateFieldTrainingStatusAction(
   revalidatePath('/class-management')
   revalidatePath('/company-info')
   revalidatePath('/employment-status')
+  revalidatePath('/admin/certification')
+
+  try {
+    const { clearCertificationSummaryCache } = await import('@/app/(dashboard)/admin/certification/actions')
+    await clearCertificationSummaryCache()
+  } catch (e) {
+    console.error('Failed to clear certification summary cache:', e)
+  }
 
   return { success: true }
 }

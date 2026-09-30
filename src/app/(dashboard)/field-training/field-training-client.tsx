@@ -8,9 +8,10 @@ import { MAJOR_SORT_ORDER } from '@/lib/types';
  * 2. 실습 진행 중 & 채용전환 등록되었으나 전환일이 미래 ➔ [ongoing: 실습진행중]
  * 3. 채용전환일 도래/경과 ➔ [converted: 채용전환]
  * 4. 복교 ➔ [returned: 복교]
- * 5. 현재 실습 중 ➔ [ongoing: 실습진행중]
+ * 5. 실습 종료일 경과 ➔ [completed: 실습완료]
+ * 6. 현재 실습 중 ➔ [ongoing: 실습진행중]
  */
-function getEffectiveRecordStatus(r: any, todayStr: string): 'upcoming' | 'ongoing' | 'converted' | 'returned' | 'none' {
+function getEffectiveRecordStatus(r: any, todayStr: string): 'upcoming' | 'ongoing' | 'completed' | 'converted' | 'returned' | 'none' {
   if (!r || !r.company) return 'none';
   if (r.hiring_status === '복교') return 'returned';
   
@@ -26,6 +27,11 @@ function getEffectiveRecordStatus(r: any, todayStr: string): 'upcoming' | 'ongoi
       return 'ongoing'; // 전환일 전까지는 실습 진행중
     }
     return 'converted'; // 전환일 도래 시 채용전환
+  }
+
+  // 실습 종료일이 오늘 또는 이전인 경우 ➔ 실습완료
+  if (r.end_date && r.end_date <= todayStr) {
+    return 'completed';
   }
   
   return 'ongoing';
@@ -216,6 +222,7 @@ export function FieldTrainingClient({
 
       if (statusFilter === 'upcoming') return effectiveStatus === 'upcoming';
       if (statusFilter === 'ongoing') return effectiveStatus === 'ongoing';
+      if (statusFilter === 'completed') return effectiveStatus === 'completed';
       if (statusFilter === 'converted') return effectiveStatus === 'converted';
       if (statusFilter === 'returned') return effectiveStatus === 'returned';
 
@@ -233,11 +240,12 @@ export function FieldTrainingClient({
     });
   }, [dateFilteredStudents, searchTerm, statusFilter, selectedStartDate, todayStr]);
 
-  // 하단 7종 상태 필터 칩에 표시될 카테고리별 인원수 집계 (학년/학과/반/시작일자 기준)
+  // 하단 8종 상태 필터 칩에 표시될 카테고리별 인원수 집계 (학년/학과/반/시작일자 기준)
   const categoryCounts = React.useMemo(() => {
     let participatingCount = 0;
     let upcomingCount = 0;
     let ongoingCount = 0;
+    let completedCount = 0;
     let convertedCount = 0;
     let returnedCount = 0;
 
@@ -252,9 +260,10 @@ export function FieldTrainingClient({
         const effectiveStatus = getEffectiveRecordStatus(targetRecord, todayStr);
 
         if (effectiveStatus === 'upcoming') upcomingCount++;
+        else if (effectiveStatus === 'ongoing') ongoingCount++;
+        else if (effectiveStatus === 'completed') completedCount++;
         else if (effectiveStatus === 'converted') convertedCount++;
         else if (effectiveStatus === 'returned') returnedCount++;
-        else if (effectiveStatus === 'ongoing') ongoingCount++;
       }
     });
 
@@ -263,16 +272,18 @@ export function FieldTrainingClient({
       participatingCount,
       upcomingCount,
       ongoingCount,
+      completedCount,
       convertedCount,
       returnedCount,
       noneCount: dateFilteredStudents.length - participatingCount
     };
   }, [dateFilteredStudents, selectedStartDate, todayStr]);
 
-  // 상단 5개 KPI 카드 통계 (현재 화면에 필터링된 모든 조건 및 검색 결과 실시간 반영)
+  // 상단 6개 KPI 카드 통계 (현재 화면에 필터링된 모든 조건 및 검색 결과 실시간 반영)
   const stats = React.useMemo(() => {
     let upcomingCount = 0;
     let ongoingCount = 0;
+    let completedCount = 0;
     let convertedCount = 0;
     let returnedCount = 0;
 
@@ -286,9 +297,10 @@ export function FieldTrainingClient({
         const effectiveStatus = getEffectiveRecordStatus(targetRecord, todayStr);
 
         if (effectiveStatus === 'upcoming') upcomingCount++;
+        else if (effectiveStatus === 'ongoing') ongoingCount++;
+        else if (effectiveStatus === 'completed') completedCount++;
         else if (effectiveStatus === 'converted') convertedCount++;
         else if (effectiveStatus === 'returned') returnedCount++;
-        else if (effectiveStatus === 'ongoing') ongoingCount++;
       }
     });
 
@@ -296,6 +308,7 @@ export function FieldTrainingClient({
       total: filteredStudents.length,
       upcomingCount,
       ongoingCount,
+      completedCount,
       convertedCount,
       returnedCount,
     };
@@ -412,7 +425,7 @@ export function FieldTrainingClient({
   return (
     <div className="flex flex-col h-full gap-4 w-full overflow-hidden">
       {/* 1. 상단 KPI 집계 카드 대시보드 */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 shrink-0">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 shrink-0">
         {/* 1. 조회 학생 수 (하단 상태 필터 및 검색 적용 결과 실시간 반영) */}
         <Card className="bg-white border-slate-200/80 shadow-sm rounded-xl p-3 flex flex-col justify-between">
           <div className="flex items-center justify-between">
@@ -475,7 +488,24 @@ export function FieldTrainingClient({
           </div>
         </Card>
 
-        {/* 4. 채용 전환 완료 */}
+        {/* 4. 실습 완료 */}
+        <Card className="bg-white border-slate-200/80 shadow-sm rounded-xl p-3 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-500">실습 완료</span>
+            <div className="h-7 w-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="mt-2">
+            <div className="flex items-baseline justify-between">
+              <span className="text-xl font-extrabold text-indigo-600">{stats.completedCount}명</span>
+              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">COMPLETED</span>
+            </div>
+            <p className="text-[10px] text-slate-400 font-medium mt-1">종료일 도래 완료 학생</p>
+          </div>
+        </Card>
+
+        {/* 5. 채용 전환 완료 */}
         <Card className="bg-white border-slate-200/80 shadow-sm rounded-xl p-3 flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-slate-500">채용 전환 완료</span>
@@ -492,7 +522,7 @@ export function FieldTrainingClient({
           </div>
         </Card>
 
-        {/* 5. 복교 및 중단 */}
+        {/* 6. 복교 및 중단 */}
         <Card className="bg-white border-slate-200/80 shadow-sm rounded-xl p-3 flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-slate-500">복교 및 중단</span>
@@ -762,6 +792,23 @@ export function FieldTrainingClient({
             </span>
           </button>
 
+          {/* 4-2. 실습완료 */}
+          <button
+            type="button"
+            onClick={() => setStatusFilter('completed')}
+            className={cn(
+              "h-8 sm:h-8.5 px-3 rounded-xl text-xs font-extrabold transition-all border flex items-center justify-center gap-1.5 shrink-0 active:scale-95",
+              statusFilter === 'completed'
+                ? "bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-500/30 shadow-2xs"
+                : "bg-indigo-50 text-indigo-800 border-indigo-200 hover:bg-indigo-100"
+            )}
+          >
+            <span>실습완료</span>
+            <span className={cn("text-[10px] px-1.5 py-0.2 rounded-full font-black", statusFilter === 'completed' ? "bg-white/20 text-white" : "bg-indigo-200 text-indigo-900")}>
+              {categoryCounts.completedCount}
+            </span>
+          </button>
+
           {/* 5. 채용전환 */}
           <button
             type="button"
@@ -830,6 +877,10 @@ export function FieldTrainingClient({
                 <span className="inline-flex items-center gap-1 text-[10.5px] sm:text-[11px] bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0">
                   <span className="h-2.5 w-2.5 rounded-full bg-emerald-600 inline-block" />
                   실습 진행중 (녹색)
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10.5px] sm:text-[11px] bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0">
+                  <span className="h-2.5 w-2.5 rounded-full bg-indigo-600 inline-block" />
+                  실습완료 (남색)
                 </span>
                 <span className="inline-flex items-center gap-1 text-[10.5px] sm:text-[11px] bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs shrink-0">
                   <span className="h-2.5 w-2.5 rounded-full bg-purple-600 inline-block" />
@@ -997,12 +1048,13 @@ export function FieldTrainingClient({
                                     }
                                   }
 
-                                  const barWidthPct = Math.max(2, endPct - startPct);
+                                   const barWidthPct = Math.max(2, endPct - startPct);
                                   // 채용전환 투톤 분할 비율 계산 (녹색 실습구간 vs 보라색 채용전환구간)
                                   const trainingRatio = isConverted && barWidthPct > 0 
                                     ? Math.min(90, Math.max(15, ((convPct - startPct) / barWidthPct) * 100)) 
                                     : 100;
                                   const conversionRatio = 100 - trainingRatio;
+                                  const effectiveStatus = getEffectiveRecordStatus(r, todayStr);
 
                                   return (
                                     <TooltipProvider key={r.id || r.training_order}>
@@ -1012,12 +1064,14 @@ export function FieldTrainingClient({
                                             onClick={() => handleOpenModal(s)}
                                             className={cn(
                                               "h-7.5 sm:h-8 rounded-lg shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md relative overflow-hidden group/bar",
-                                              isConverted
+                                               effectiveStatus === 'converted'
                                                 ? "border-purple-400/80 p-0 flex items-stretch shadow-sm"
-                                                : isReturned
+                                                : effectiveStatus === 'returned'
                                                 ? "bg-rose-600 border-rose-500 text-white flex items-center px-2 shadow-sm"
-                                                : (r.start_date && r.start_date > todayStr)
+                                                : effectiveStatus === 'upcoming'
                                                 ? "bg-sky-500 border-sky-400 text-white flex items-center px-2 shadow-sm"
+                                                : effectiveStatus === 'completed'
+                                                ? "bg-indigo-600 border-indigo-500 text-white flex items-center px-2 shadow-sm"
                                                 : "bg-emerald-600 border-emerald-500 text-white flex items-center px-2 shadow-sm"
                                             )}
                                             style={{
@@ -1099,9 +1153,17 @@ export function FieldTrainingClient({
                                             </div>
                                             <Badge className={cn(
                                               "text-[10px] font-black px-2 py-0.5 rounded-full shadow-xs shrink-0", 
-                                              isConverted ? "bg-purple-600 text-white" : isReturned ? "bg-rose-600 text-white" : (r.start_date && r.start_date > todayStr) ? "bg-sky-500 text-white" : "bg-emerald-600 text-white"
+                                              effectiveStatus === 'converted' ? "bg-purple-600 text-white" 
+                                              : effectiveStatus === 'returned' ? "bg-rose-600 text-white" 
+                                              : effectiveStatus === 'upcoming' ? "bg-sky-500 text-white" 
+                                              : effectiveStatus === 'completed' ? "bg-indigo-600 text-white"
+                                              : "bg-emerald-600 text-white"
                                             )}>
-                                              {isConverted ? "✨ 채용전환" : isReturned ? "🔄 복교" : (r.start_date && r.start_date > todayStr) ? "⏳ 실습예정" : "🟢 실습중"}
+                                              {effectiveStatus === 'converted' ? "✨ 채용전환" 
+                                                : effectiveStatus === 'returned' ? "🔄 복교" 
+                                                : effectiveStatus === 'upcoming' ? "⏳ 실습예정" 
+                                                : effectiveStatus === 'completed' ? "✅ 실습완료"
+                                                : "🟢 실습중"}
                                             </Badge>
                                           </div>
 
@@ -1149,6 +1211,16 @@ export function FieldTrainingClient({
                                               <p className="font-black text-rose-300 text-xs flex items-center gap-1">⚠️ 복교 처리 정보</p>
                                               <p className="text-[11.5px] text-rose-100 font-medium">
                                                 복교 사유: <strong className="text-white font-bold">{r.return_reason || '사유 미입력'}</strong>
+                                              </p>
+                                            </div>
+                                          )}
+
+                                          {/* [실습완료 전용 상세 안내 카드] */}
+                                          {effectiveStatus === 'completed' && (
+                                            <div className="p-2 rounded-lg bg-indigo-950/80 border border-indigo-500/50 text-xs text-indigo-100">
+                                              <p className="font-black text-indigo-300 text-xs flex items-center gap-1">✅ 실습 정상 종료</p>
+                                              <p className="text-[11.5px] text-indigo-100 font-medium">
+                                                <strong className="text-white font-bold">{r.end_date}</strong>부로 현장실습이 종료 및 완료되었습니다.
                                               </p>
                                             </div>
                                           )}
@@ -1298,6 +1370,8 @@ export function FieldTrainingClient({
                                         ? "bg-sky-500 border border-sky-400"
                                         : isReturned
                                         ? "bg-rose-500 border border-rose-400"
+                                        : effectiveStatus === 'completed'
+                                        ? "bg-indigo-600 border border-indigo-500"
                                         : "bg-emerald-600 border border-emerald-500"
                                     )}
                                   >
@@ -1442,12 +1516,14 @@ export function FieldTrainingClient({
                                         "text-[10px] font-extrabold px-1.5 py-0.2 rounded-full",
                                         effectiveStatus === 'upcoming' && "bg-sky-500 text-white",
                                         effectiveStatus === 'ongoing' && "bg-emerald-600 text-white",
+                                        effectiveStatus === 'completed' && "bg-indigo-600 text-white",
                                         effectiveStatus === 'converted' && "bg-purple-600 text-white",
                                         effectiveStatus === 'returned' && "bg-rose-500 text-white",
                                         effectiveStatus === 'none' && "bg-slate-200 text-slate-700"
                                       )}>
                                         {effectiveStatus === 'upcoming' ? '⏳ 실습예정'
                                           : effectiveStatus === 'ongoing' ? '🟢 실습중'
+                                          : effectiveStatus === 'completed' ? '✅ 실습완료'
                                           : effectiveStatus === 'converted' ? '✨ 채용전환'
                                           : effectiveStatus === 'returned' ? '🔄 복교'
                                           : '미실습'}
@@ -1513,6 +1589,8 @@ export function FieldTrainingClient({
                                             ? "bg-sky-500 border border-sky-400 text-white"
                                             : isReturned
                                             ? "bg-rose-500 border border-rose-400 text-white"
+                                            : effectiveStatus === 'completed'
+                                            ? "bg-indigo-600 border border-indigo-500 text-white"
                                             : "bg-emerald-600 border border-emerald-500 text-white"
                                         )}
                                         style={{
