@@ -41,6 +41,9 @@ export type StudentEmploymentData = {
   admission_rank_percentile?: number | string;
   admission_type?: string;
   training_records?: FieldTrainingRecord[];
+  is_extra_emp?: boolean;
+  original_student_id?: string;
+  employment_order?: number;
 };
 
 export type FieldTrainingRecord = {

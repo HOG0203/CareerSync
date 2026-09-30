@@ -7,6 +7,7 @@ import { updateStudentField, bulkUpdateStudentData } from '@/app/students/action
 import { fetchYearlyRankings } from '../employment-status/actions'
 import { MasterCertificate } from '@/app/(dashboard)/admin/settings/actions'
 import { FieldTrainingModal } from './field-training-modal'
+import { EmploymentHistoryModal } from './employment-history-modal'
 
 // 행 데이터 기반 동적 기업유형 옵션 생성 함수
 const GET_CAREER_COURSE_OPTIONS = (rowData: any) => {
@@ -269,6 +270,24 @@ const COLUMNS: ColumnConfig[] = [
   },
   { key: 'company', label: '취업처\n(회사명)', width: 120 },
   { 
+    key: 'employment_history_action', 
+    label: '취업\n이력', 
+    width: 68, 
+    type: 'action', 
+    actionLabel: (rowData: any) => {
+      if (rowData?.remarks && typeof rowData.remarks === 'string' && rowData.remarks.trim().startsWith('[')) {
+        try {
+          const list = JSON.parse(rowData.remarks);
+          if (Array.isArray(list)) {
+            const valid = list.filter((i: any) => i && (i.company || '').trim() !== '');
+            if (valid.length > 1) return `${valid.length}건`;
+          }
+        } catch (e) {}
+      }
+      return '이력관리';
+    }
+  },
+  { 
     key: 'latest_training_order', 
     label: '차수', 
     width: 45, 
@@ -318,7 +337,7 @@ const COLUMNS: ColumnConfig[] = [
 
 const GROUP_HEADERS = [
   { label: '기본 정보', colSpan: 8, className: 'bg-slate-100 text-slate-900 text-[11px]' },
-  { label: '취업 현황', colSpan: 5, className: 'bg-blue-100/50 text-blue-900 text-[11px]' },
+  { label: '취업 현황', colSpan: 6, className: 'bg-blue-100/50 text-blue-900 text-[11px]' },
   { label: '현장실습 상세 및 결과 (최근 차수)', colSpan: 8, className: 'bg-amber-100/50 text-amber-900 text-[11px]' },
   { label: '비고(특이사항)', colSpan: 1, className: 'bg-slate-50 text-slate-700 text-[11px]' },
 ]
@@ -350,6 +369,9 @@ export function StudentTable({
   const router = useRouter()
   const [selectedStudent, setSelectedStudent] = React.useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = React.useState(false)
+
+  const [selectedStudentForEmployment, setSelectedStudentForEmployment] = React.useState<any | null>(null)
+  const [isEmploymentModalOpen, setIsEmploymentModalOpen] = React.useState(false)
 
   const [asyncRankingMap, setAsyncRankingMap] = React.useState<Record<string, any>>(rankingMap || {});
   const [isRankingsLoading, setIsRankingsLoading] = React.useState(false);
@@ -392,6 +414,12 @@ export function StudentTable({
       if (student) {
         setSelectedStudent(student)
         setIsModalOpen(true)
+      }
+    } else if (key === 'employment_history_action') {
+      const student = rowData || initialData.find(s => s.id === id)
+      if (student) {
+        setSelectedStudentForEmployment(student)
+        setIsEmploymentModalOpen(true)
       }
     }
   }, [initialData]);
@@ -451,6 +479,28 @@ export function StudentTable({
         student={selectedStudent}
         isAdmin={isAdmin}
         masterCompanies={masterCompanies}
+      />
+
+      <EmploymentHistoryModal 
+        isOpen={isEmploymentModalOpen}
+        onClose={() => {
+          setIsEmploymentModalOpen(false);
+          setSelectedStudentForEmployment(null);
+        }}
+        student={selectedStudentForEmployment}
+        isAdmin={isAdmin}
+        masterCompanies={masterCompanies}
+        onSaved={(studentId, records, primary) => {
+          if (selectedStudentForEmployment && selectedStudentForEmployment.id === studentId) {
+            selectedStudentForEmployment.remarks = JSON.stringify(records);
+            if (primary) {
+              selectedStudentForEmployment.company = primary.company;
+              selectedStudentForEmployment.company_type = primary.company_type;
+              selectedStudentForEmployment.business_type = primary.business_type;
+            }
+          }
+          router.refresh();
+        }}
       />
     </div>
   )

@@ -86,14 +86,34 @@ export function MiddleSchoolEmploymentClient({
   // 모달 상태
   const [editingStudent, setEditingStudent] = React.useState<StudentEmploymentData | null>(null);
 
-  // 학생 정보(students) 페이지의 취업현황 드롭다운 항목이 '취업'으로 선택된 학생들만 필터링
+  // 학생 정보(students) 페이지의 취업 확정 학생만 필터링 (채용진행중/채용중은 엄격 제외)
   const initialEmployedStudents = React.useMemo(() => {
     return initialStudents.filter((student) => {
       const bType = (student.business_type || '').trim();
       const status = (student.employment_status || '').trim();
 
-      // 취업현황 드롭다운 값이 '취업' 또는 '예'로 등록된 학생만 명시적 필터링
-      return bType === '취업' || status === '취업' || bType === '예' || status === '예';
+      // 1. 채용진행중 / 채용중 등 채용 관련 진행 상태는 절대 노출하지 않음
+      if (bType.includes('채용') || status.includes('채용')) {
+        return false;
+      }
+
+      // 2. 미취업, 제외인정자, 진학 등 비취업 상태 제외
+      if (bType === '미취업' || bType === '제외인정자' || bType === '진학' || status === '미취업') {
+        return false;
+      }
+
+      // 3. 유효 취업처(회사명)가 없으면 제외
+      const hasCompany = Boolean((student.company || student.latest_training_company || '').trim());
+      if (!hasCompany) {
+        return false;
+      }
+
+      // 4. 취업 확정 건 또는 퇴사/포기(이전 합격이력) 및 다중 취업 분리 행만 허용
+      const isConfirmed = bType === '취업' || (bType.includes('취업') && bType !== '미취업') || status === '취업';
+      const isPastConfirmed = bType === '퇴사/포기';
+      const isSplitConfirmed = Boolean(student.is_extra_emp);
+
+      return isConfirmed || isPastConfirmed || isSplitConfirmed;
     });
   }, [initialStudents]);
 
@@ -163,11 +183,15 @@ export function MiddleSchoolEmploymentClient({
   const stats = React.useMemo(() => {
     const totalStudents = filteredStudents.length;
 
-    // 취업자 수 및 취업률 (취업 또는 재직자)
+    // 취업자 수 및 취업률 (채용진행중 엄격 제외, 취업 확정 실적만 집계)
     const employedStudents = filteredStudents.filter((s) => {
-      const bType = s.business_type || '';
-      const status = s.employment_status || '';
-      return bType === '취업' || status === '취업';
+      const bType = (s.business_type || '').trim();
+      const status = (s.employment_status || '').trim();
+      if (bType.includes('채용') || status.includes('채용')) return false;
+      if (bType === '미취업' || bType === '제외인정자' || bType === '진학' || status === '미취업') return false;
+      const hasCompany = Boolean((s.company || s.latest_training_company || '').trim());
+      if (!hasCompany) return false;
+      return bType === '취업' || (bType.includes('취업') && bType !== '미취업') || status === '취업' || bType === '퇴사/포기' || Boolean(s.is_extra_emp);
     });
     const employedCount = employedStudents.length;
 
@@ -541,6 +565,11 @@ export function MiddleSchoolEmploymentClient({
                         <TableCell className="font-black text-slate-900 text-sm sm:text-base py-3.5 px-3 whitespace-nowrap">
                           {student.company || student.latest_training_company ? (
                             <div className="flex items-center gap-1.5">
+                              {student.is_extra_emp && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
+                                  {student.employment_order || 1}차
+                                </span>
+                              )}
                               {isTopCompany && <Trophy className="h-4 w-4 text-purple-600 shrink-0" />}
                               <span>{student.company || student.latest_training_company}</span>
                             </div>

@@ -42,7 +42,8 @@ export function AddStudentModal({ isOpen, onClose, baseYear, majors }: AddStuden
     class_info: '',
     student_number: '',
     graduation_year: (baseYear + 1).toString(),
-    middle_school: ''
+    middle_school: '',
+    admission_type: '일반전형',
   })
 
   React.useEffect(() => {
@@ -53,7 +54,8 @@ export function AddStudentModal({ isOpen, onClose, baseYear, majors }: AddStuden
         class_info: '',
         student_number: '',
         graduation_year: (baseYear + 1).toString(),
-        middle_school: ''
+        middle_school: '',
+        admission_type: '일반전형',
       })
     }
   }, [isOpen, baseYear, majors])
@@ -171,15 +173,36 @@ export function AddStudentModal({ isOpen, onClose, baseYear, majors }: AddStuden
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="middle_school" className="text-xs font-bold text-slate-500">출신 중학교 (선택)</Label>
-              <Input 
-                id="middle_school" 
-                placeholder="예: 옥천중학교" 
-                value={formData.middle_school}
-                onChange={(e) => setFormData(prev => ({ ...prev, middle_school: e.target.value }))}
-                className="h-10 border-slate-200 focus:ring-indigo-500 font-bold"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="middle_school" className="text-xs font-bold text-slate-500">출신 중학교 (선택)</Label>
+                <Input 
+                  id="middle_school" 
+                  placeholder="예: 옥천중학교" 
+                  value={formData.middle_school}
+                  onChange={(e) => setFormData(prev => ({ ...prev, middle_school: e.target.value }))}
+                  className="h-10 border-slate-200 focus:ring-indigo-500 font-bold"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="admission_type" className="text-xs font-bold text-slate-500">전형 구분</Label>
+                <Select 
+                  value={formData.admission_type} 
+                  onValueChange={(v) => setFormData(prev => ({ ...prev, admission_type: v }))}
+                >
+                  <SelectTrigger id="admission_type" className="h-10 border-slate-200 focus:ring-indigo-500">
+                    <SelectValue placeholder="전형 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="일반전형">일반전형</SelectItem>
+                    <SelectItem value="특별전형">특별전형</SelectItem>
+                    <SelectItem value="취업희망자전형">취업희망자전형</SelectItem>
+                    <SelectItem value="특성화고특별전형">특성화고특별전형</SelectItem>
+                    <SelectItem value="사회통합전형">사회통합전형</SelectItem>
+                    <SelectItem value="정원외">정원외전형</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 

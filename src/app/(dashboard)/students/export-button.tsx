@@ -21,7 +21,7 @@ export function ExportButton({
       return;
     }
 
-    // 기본 명부 서식 (6개 컬럼)
+    // 기본 명부 서식 (9개 컬럼)
     const basicHeaders = [
       { key: 'graduation_year', label: '졸업연도' },
       { key: 'major', label: '학과' },
@@ -29,17 +29,23 @@ export function ExportButton({
       { key: 'student_number', label: '번호' },
       { key: 'student_name', label: '성명' },
       { key: 'phone_number', label: '휴대전화번호' },
+      { key: 'middle_school', label: '출신중학교' },
+      { key: 'admission_rank_percentile', label: '입학성적(석차백분율%)' },
+      { key: 'admission_type', label: '전형구분' },
     ];
 
-    // 취업·실습 종합 서식 (29개 컬럼)
+    // 취업·실습 종합 서식 (32개 컬럼)
     const comprehensiveHeaders = [
-      // 기본 인적사항 (6개)
+      // 기본 인적사항 (9개)
       { key: 'graduation_year', label: '졸업연도' },
       { key: 'major', label: '학과' },
       { key: 'class_info', label: '반' },
       { key: 'student_number', label: '번호' },
       { key: 'student_name', label: '성명' },
       { key: 'phone_number', label: '휴대전화번호' },
+      { key: 'middle_school', label: '출신중학교' },
+      { key: 'admission_rank_percentile', label: '입학성적(석차백분율%)' },
+      { key: 'admission_type', label: '전형구분' },
 
       // 학반데이터 (9개)
       { key: 'career_aspiration', label: '진로희망' },

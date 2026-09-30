@@ -106,6 +106,7 @@ export function AdminStudentHub({
     class_info: '',
     student_number: '',
     phone_number: '',
+    admission_type: '',
   });
   const [isSavingEdit, setIsSavingEdit] = React.useState(false);
 
@@ -131,6 +132,7 @@ export function AdminStudentHub({
       (s.class_info || '').includes(q) ||
       (s.phone_number || '').includes(q) ||
       (s.middle_school || '').toLowerCase().includes(q) ||
+      (s.admission_type || '').toLowerCase().includes(q) ||
       (s.admission_rank_percentile != null ? String(s.admission_rank_percentile) : '').includes(q)
     );
   }, [processedData, search]);
@@ -201,6 +203,7 @@ export function AdminStudentHub({
       class_info: (student.class_info || '').replace(/[^0-9]/g, ''),
       student_number: (student.student_number || '').replace(/[^0-9]/g, ''),
       phone_number: student.phone_number || '',
+      admission_type: student.admission_type || '',
     });
   };
 
@@ -215,6 +218,7 @@ export function AdminStudentHub({
         { field: 'class_info', value: editFormData.class_info.trim() },
         { field: 'student_number', value: editFormData.student_number.trim() },
         { field: 'phone_number', value: editFormData.phone_number.trim() || null },
+        { field: 'admission_type', value: editFormData.admission_type.trim() || null },
       ];
 
       for (const u of updates) {
@@ -297,6 +301,29 @@ export function AdminStudentHub({
       label: '입학성적',
       width: 100,
       type: 'text',
+    },
+    {
+      key: 'admission_type',
+      label: '전형구분',
+      width: 130,
+      type: 'select',
+      options: [
+        { label: '일반전형', value: '일반전형' },
+        { label: '특별전형', value: '특별전형' },
+        { label: '취업희망자전형', value: '취업희망자전형' },
+        { label: '특성화고특별전형', value: '특성화고특별전형' },
+        { label: '사회통합전형', value: '사회통합전형' },
+        { label: '정원외', value: '정원외' },
+        { label: '기타(직접입력)', value: '기타(직접입력)' },
+      ],
+      variant: (val) => {
+        if (!val) return 'text-slate-400';
+        if (val === '일반전형') return 'bg-blue-50 text-blue-700 font-medium';
+        if (val === '특별전형') return 'bg-purple-50 text-purple-700 font-medium';
+        if (val === '취업희망자전형') return 'bg-emerald-50 text-emerald-700 font-medium';
+        if (val?.includes('특별')) return 'bg-indigo-50 text-indigo-700 font-medium';
+        return 'bg-slate-50 text-slate-700 font-medium';
+      },
     },
   ], [majors]);
 
@@ -524,6 +551,25 @@ export function AdminStudentHub({
               <p className="text-[11px] text-slate-400">
                 * 휴대폰 번호 변경 시 학생 로그인 초기 비밀번호(뒷 4자리)가 자동 동기화됩니다.
               </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">전형구분</label>
+              <Input
+                value={editFormData.admission_type}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, admission_type: e.target.value }))}
+                placeholder="예: 일반전형, 특별전형, 취업희망자전형 등"
+                className="h-9 text-xs rounded-xl"
+                list="admin-admission-type-list"
+              />
+              <datalist id="admin-admission-type-list">
+                <option value="일반전형" />
+                <option value="특별전형" />
+                <option value="취업희망자전형" />
+                <option value="특성화고특별전형" />
+                <option value="사회통합전형" />
+                <option value="정원외" />
+              </datalist>
             </div>
 
             <DialogFooter className="flex sm:justify-end gap-2 pt-3 border-t border-slate-100">

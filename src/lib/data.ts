@@ -452,32 +452,83 @@ async function fetchMiddleSchoolEmploymentData(): Promise<StudentEmploymentData[
     }
   }
 
-  // 3. 초경량 평탄화
-  const flattened = students.map((s: any) => {
+  // 3. 초경량 평탄화 (다중 취업 이력 자동 분리/Unnest 지원)
+  const flattened: StudentEmploymentData[] = [];
+  students.forEach((s: any) => {
     const rawEmp = Array.isArray(s.student_employments) ? s.student_employments[0] : s.student_employments;
     const emp = rawEmp || {};
     const latestTrainingCompany = trainingCompanyMap.get(s.id);
 
-    return {
-      id: s.id,
-      student_name: s.student_name,
-      student_number: s.student_number,
-      graduation_year: s.graduation_year,
-      major: s.major,
-      class_info: s.class_info,
-      middle_school: s.middle_school || '',
-      admission_rank_percentile: s.admission_rank_percentile,
-      admission_type: s.admission_type,
-      special_notes: s.special_notes,
-      career_aspiration: s.career_aspiration,
-      is_desiring_employment: emp.is_desiring_employment,
-      employment_status: emp.employment_status,
-      company_type: emp.company_type,
-      business_type: emp.business_type,
-      company: emp.company,
-      remarks: emp.remarks,
-      latest_training_company: latestTrainingCompany,
-    } as StudentEmploymentData;
+    // 취업 이력 (remarks에 저장된 다중 취업 배열 확인, 채용진행중은 제외)
+    let employmentHistory: any[] = [];
+    if (emp.remarks && typeof emp.remarks === 'string' && emp.remarks.trim().startsWith('[')) {
+      try {
+        const parsed = JSON.parse(emp.remarks);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          employmentHistory = parsed.filter((item: any) => {
+            if (!item || !(item.company || '').trim()) return false;
+            const b = (item.business_type || '').trim();
+            return !b.includes('채용') && b !== '미취업' && b !== '제외인정자';
+          });
+        }
+      } catch (e) {}
+    }
+
+    // 다중 취업 내역이 2건 이상인 경우 각각을 개별 행으로 분리(Row Split)하여 수치 극대화!
+    if (employmentHistory.length > 1) {
+      employmentHistory.forEach((histItem: any, idx: number) => {
+        flattened.push({
+          id: `${s.id}-emp-${idx}`,
+          student_id: s.id,
+          original_student_id: s.id,
+          student_name: s.student_name,
+          student_number: s.student_number,
+          graduation_year: s.graduation_year,
+          major: s.major,
+          class_info: s.class_info,
+          middle_school: s.middle_school || '',
+          admission_rank_percentile: s.admission_rank_percentile,
+          admission_type: s.admission_type,
+          special_notes: s.special_notes,
+          career_aspiration: s.career_aspiration,
+          is_desiring_employment: emp.is_desiring_employment,
+          employment_status: emp.employment_status,
+          company_type: histItem.company_type || emp.company_type || '',
+          business_type: histItem.business_type || '취업',
+          company: histItem.company || '',
+          remarks: `[${histItem.order || idx + 1}차 취업] ${histItem.company}`,
+          latest_training_company: latestTrainingCompany,
+          is_extra_emp: true,
+          employment_order: histItem.order || idx + 1,
+        } as StudentEmploymentData);
+      });
+    } else {
+      // 1건이거나 이력이 없는 경우
+      const singleItem = employmentHistory[0];
+      flattened.push({
+        id: s.id,
+        student_id: s.id,
+        original_student_id: s.id,
+        student_name: s.student_name,
+        student_number: s.student_number,
+        graduation_year: s.graduation_year,
+        major: s.major,
+        class_info: s.class_info,
+        middle_school: s.middle_school || '',
+        admission_rank_percentile: s.admission_rank_percentile,
+        admission_type: s.admission_type,
+        special_notes: s.special_notes,
+        career_aspiration: s.career_aspiration,
+        is_desiring_employment: emp.is_desiring_employment,
+        employment_status: emp.employment_status,
+        company_type: singleItem?.company_type || emp.company_type,
+        business_type: singleItem?.business_type || emp.business_type,
+        company: singleItem?.company || emp.company,
+        remarks: emp.remarks,
+        latest_training_company: latestTrainingCompany,
+        employment_order: 1,
+      } as StudentEmploymentData);
+    }
   });
 
   return flattened.sort((a, b) => {

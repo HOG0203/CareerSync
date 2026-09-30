@@ -371,7 +371,25 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
     >
       <div className="px-2 text-[11px] w-full h-full flex items-center justify-center whitespace-nowrap">
         {config.type === 'action' ? (
-          <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] bg-blue-50 text-blue-600 font-bold hover:bg-blue-100" onClick={(e) => { e.stopPropagation(); onAction?.(id, field, rowData); }}>{config.actionLabel || '상세보기'}</Button>
+          (() => {
+            const dynamicLabel = typeof config.actionLabel === 'function' ? config.actionLabel(rowData) : (config.actionLabel || '상세보기');
+            const isMulti = typeof dynamicLabel === 'string' && (dynamicLabel.includes('건') || dynamicLabel.includes('+'));
+            return (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className={cn(
+                  "h-6 px-2 text-[10px] font-bold transition-all",
+                  isMulti 
+                    ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300 shadow-2xs" 
+                    : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                )} 
+                onClick={(e) => { e.stopPropagation(); onAction?.(id, field, rowData); }}
+              >
+                {dynamicLabel}
+              </Button>
+            );
+          })()
         ) : field === 'student_name' ? (
           !disableNamePopover ? (
             <StudentPopover student={rowData} rankingSummary={rankingMap?.[id]} isRankingsLoading={isRankingsLoading} userProfile={userProfile} baseYear={baseYear}>

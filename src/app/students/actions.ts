@@ -392,6 +392,9 @@ export async function uploadStudentsCSV(csvData: string) {
 
   const headerRow = parsedRows[0].map(h => h.trim());
   const hasMiddleSchoolHeader = headerRow.some(h => h.includes('출신중'));
+  const admTypeHeaderIdx = headerRow.findIndex(h => h.includes('전형구분') || h.includes('전형'));
+  const msHeaderIdx = headerRow.findIndex(h => h.includes('출신중'));
+  const rankHeaderIdx = headerRow.findIndex(h => h.includes('입학성적') || h.includes('석차백분율'));
 
   const dataRows = parsedRows.slice(1);
   const settings = await getSystemSettings()
@@ -443,12 +446,30 @@ export async function uploadStudentsCSV(csvData: string) {
     const student_number = values[3] || null;
     const student_name = values[4] || null;
 
-    const isExtended = values.length >= 31 || hasMiddleSchoolHeader;
-    const offset = isExtended ? 2 : 0;
+    const hasAdmissionType = admTypeHeaderIdx !== -1 || values.length >= 32;
+    const isExtended = values.length >= 31 || hasMiddleSchoolHeader || hasAdmissionType;
+    const offset = hasAdmissionType ? 3 : (isExtended ? 2 : 0);
 
-    const middle_school = isExtended ? (values[6]?.trim() || null) : null;
-    const rawPercentile = isExtended ? (values[7]?.trim() || null) : null;
-    const admission_rank_percentile = rawPercentile && !isNaN(parseFloat(rawPercentile)) ? parseFloat(rawPercentile) : null;
+    let middle_school: string | null = null;
+    if (msHeaderIdx !== -1) {
+      middle_school = values[msHeaderIdx]?.trim() || null;
+    } else if (isExtended) {
+      middle_school = values[6]?.trim() || null;
+    }
+
+    let admission_rank_percentile: number | null = null;
+    const rawPercentile = rankHeaderIdx !== -1 ? values[rankHeaderIdx]?.trim() : (isExtended ? values[7]?.trim() : null);
+    if (rawPercentile) {
+      const parsed = parseFloat(rawPercentile);
+      if (!isNaN(parsed)) admission_rank_percentile = parsed;
+    }
+
+    let admission_type: string | null = null;
+    if (admTypeHeaderIdx !== -1) {
+      admission_type = values[admTypeHeaderIdx]?.trim() || null;
+    } else if (hasAdmissionType) {
+      admission_type = values[8]?.trim() || null;
+    }
 
     const key = (major && class_info && student_number) ? `${graduation_year}_${major}_${class_info}_${student_number}` : null;
     let studentId = key ? studentMap.get(key) : undefined;
@@ -491,6 +512,9 @@ export async function uploadStudentsCSV(csvData: string) {
     }
     if (admission_rank_percentile !== null && admission_rank_percentile !== undefined) {
       studentPayload.admission_rank_percentile = admission_rank_percentile;
+    }
+    if (admission_type !== null && admission_type !== undefined) {
+      studentPayload.admission_type = admission_type;
     }
 
     studentPayloads.push(studentPayload);
@@ -576,11 +600,12 @@ export async function uploadStudentsCSV(csvData: string) {
       .from('students')
       .upsert(chunk, { onConflict: 'id' });
 
-    if (uError && (uError.message.includes('middle_school') || uError.message.includes('admission_rank_percentile'))) {
+    if (uError && (uError.message.includes('middle_school') || uError.message.includes('admission_rank_percentile') || uError.message.includes('admission_type'))) {
       const sanitizedChunk = chunk.map(p => {
         const copy = { ...p };
         delete copy.middle_school;
         delete copy.admission_rank_percentile;
+        delete copy.admission_type;
         return copy;
       });
       const retry = await supabase
@@ -643,6 +668,7 @@ export async function uploadBasicStudentsCSV(csvData: string) {
   const headerRow = parsedRows[0].map(h => h.trim());
   const msHeaderIdx = headerRow.findIndex(h => h.includes('출신중'));
   const rankHeaderIdx = headerRow.findIndex(h => h.includes('입학성적') || h.includes('석차백분율'));
+  const admTypeHeaderIdx = headerRow.findIndex(h => h.includes('전형구분') || h.includes('전형'));
 
   const dataRows = parsedRows.slice(1);
   const settings = await getSystemSettings()
@@ -708,6 +734,13 @@ export async function uploadBasicStudentsCSV(csvData: string) {
       if (!isNaN(parsed)) admission_rank_percentile = parsed;
     }
 
+    let admission_type: string | null = null;
+    if (admTypeHeaderIdx !== -1) {
+      admission_type = values[admTypeHeaderIdx]?.trim() || null;
+    } else if (values.length >= 9) {
+      admission_type = values[8]?.trim() || null;
+    }
+
     const key = (major && class_info && student_number) ? `${graduation_year}_${major}_${class_info}_${student_number}` : null;
     let studentId = key ? studentMap.get(key) : undefined;
     const isNew = !studentId;
@@ -737,6 +770,9 @@ export async function uploadBasicStudentsCSV(csvData: string) {
     }
     if (admission_rank_percentile !== null && admission_rank_percentile !== undefined) {
       studentPayload.admission_rank_percentile = admission_rank_percentile;
+    }
+    if (admission_type !== null && admission_type !== undefined) {
+      studentPayload.admission_type = admission_type;
     }
 
     studentPayloads.push(studentPayload);
@@ -771,11 +807,12 @@ export async function uploadBasicStudentsCSV(csvData: string) {
       .from('students')
       .upsert(chunk, { onConflict: 'id' });
 
-    if (uError && (uError.message.includes('middle_school') || uError.message.includes('admission_rank_percentile'))) {
+    if (uError && (uError.message.includes('middle_school') || uError.message.includes('admission_rank_percentile') || uError.message.includes('admission_type'))) {
       const sanitizedChunk = chunk.map(p => {
         const copy = { ...p };
         delete copy.middle_school;
         delete copy.admission_rank_percentile;
+        delete copy.admission_type;
         return copy;
       });
       const retry = await supabase
@@ -1054,7 +1091,7 @@ export async function bulkUpdateStudentData(updates: { id: string, field: string
   return { success: true }
 }
 
-export async function createStudent(data: { graduation_year: number, major: string, class_info: string, student_number: string, student_name: string, middle_school?: string }) {
+export async function createStudent(data: { graduation_year: number, major: string, class_info: string, student_number: string, student_name: string, middle_school?: string, admission_type?: string }) {
   const supabase = await createClient(); 
   const settings = await getSystemSettings();
 
@@ -1065,11 +1102,14 @@ export async function createStudent(data: { graduation_year: number, major: stri
   if (data.middle_school !== undefined) {
     insertPayload.middle_school = data.middle_school?.trim() || null;
   }
+  if (data.admission_type !== undefined) {
+    insertPayload.admission_type = data.admission_type?.trim() || null;
+  }
 
   const { data: newStudent, error } = await supabase
     .from('students')
     .insert([insertPayload])
-    .select('id, graduation_year, major, class_info, student_number, middle_school')
+    .select('id, graduation_year, major, class_info, student_number, middle_school, admission_type')
     .single();
 
   if (error || !newStudent) return { error: error?.message || '학생 등록에 실패했습니다.' };
@@ -1181,6 +1221,141 @@ export async function getStudentFieldTrainings(studentId: string) {
   return data || [];
 }
 
+export interface EmploymentHistoryItem {
+  order: number;
+  company: string;
+  company_type: string;
+  business_type: string;
+  is_primary?: boolean;
+}
+
+/**
+ * 특정 학생의 다중 취업 이력 목록을 조회합니다.
+ */
+export async function getStudentEmploymentHistory(studentId: string): Promise<EmploymentHistoryItem[]> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from('student_employments')
+    .select('company, company_type, business_type, remarks')
+    .eq('id', studentId)
+    .single();
+
+  if (error || !data) return [];
+
+  if (data.remarks && typeof data.remarks === 'string' && data.remarks.trim().startsWith('[')) {
+    try {
+      const parsed = JSON.parse(data.remarks);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((item: any, idx: number) => ({
+          order: item.order || idx + 1,
+          company: item.company || '',
+          company_type: item.company_type || '중견기업',
+          business_type: item.business_type || '취업',
+          is_primary: Boolean(item.is_primary),
+        }));
+      }
+    } catch (e) {}
+  }
+
+  if (data.company && data.company.trim() !== '') {
+    return [{
+      order: 1,
+      company: data.company,
+      company_type: data.company_type || '중견기업',
+      business_type: data.business_type || '취업',
+      is_primary: true
+    }];
+  }
+
+  return [];
+}
+
+/**
+ * 특정 학생의 다중 취업 이력을 저장하고 통계 및 중학교별 취업현황에 연동합니다.
+ */
+export async function saveStudentEmploymentHistory(
+  studentId: string, 
+  records: EmploymentHistoryItem[]
+) {
+  const profile = await getCurrentUserProfile();
+  if (profile?.role !== 'admin') {
+    return { success: false, error: '취업 이력 관리는 관리자 권한이 필요합니다.' };
+  }
+
+  const supabase = createAdminClient();
+
+  // 유효한 기업명이 입력된 레코드만 필터링
+  const validRecords = records.filter(r => r && (r.company || '').trim() !== '');
+
+  // 대표 취업처 결정: is_primary 우선, 없으면 '취업' 상태인 마지막 레코드, 없으면 마지막 레코드
+  const primaryRecord = validRecords.find(r => r.is_primary) 
+    || [...validRecords].reverse().find(r => r.business_type === '취업') 
+    || validRecords[validRecords.length - 1];
+
+  const remarksJson = validRecords.length > 0 ? JSON.stringify(validRecords) : null;
+
+  const updatePayload: Record<string, any> = {
+    updated_at: new Date().toISOString(),
+    remarks: remarksJson
+  };
+
+  if (primaryRecord) {
+    updatePayload.company = primaryRecord.company;
+    updatePayload.company_type = primaryRecord.company_type || null;
+    updatePayload.business_type = primaryRecord.business_type || '취업';
+  } else {
+    updatePayload.company = null;
+    updatePayload.company_type = null;
+    updatePayload.business_type = null;
+  }
+
+  const { error } = await supabase
+    .from('student_employments')
+    .upsert({ id: studentId, ...updatePayload }, { onConflict: 'id' });
+
+  if (error) {
+    console.error('Failed to save student employment history:', error);
+    return { success: false, error: error.message };
+  }
+
+  // 감사 로그 기록 (비동기)
+  void (async () => {
+    try {
+      const { logAuditAction } = await import('@/lib/audit-logger');
+      const { data: st } = await supabase.from('students').select('student_name').eq('id', studentId).single();
+      await logAuditAction({
+        actor_name: profile.full_name || profile.username,
+        action_type: 'STUDENT_UPDATE',
+        target_name: `${st?.student_name || '학생'} - [취업 다중이력 설정]`,
+        details: { student_id: studentId, recordCount: validRecords.length, records: validRecords }
+      });
+    } catch (e) {}
+  })();
+
+  revalidateTag('students');
+  revalidateTag('middle-school-employment');
+  revalidatePath('/students');
+  revalidatePath('/admission/middle-school-employment');
+  revalidatePath('/share/admission/middle-school-employment');
+  revalidatePath('/employment-status');
+
+  return { 
+    success: true, 
+    data: {
+      records: validRecords,
+      primary: primaryRecord
+    }
+  };
+}
+
+/**
+ * 등록된 기업 마스터 목록(회사명, 기업구분 등)을 조회합니다.
+ */
+export async function getMasterCompaniesList() {
+  const { getCachedRegisteredCompanies } = await import('@/lib/data');
+  return await getCachedRegisteredCompanies();
+}
+
 /**
  * [복구] 특정 학생의 모든 성적 데이터를 가져옵니다.
  */
@@ -1223,6 +1398,7 @@ export async function previewStudentCSV(csvData: string) {
   const headerRow = parsedRows[0].map(h => h.trim());
   const msHeaderIdx = headerRow.findIndex(h => h.includes('출신중'));
   const rankHeaderIdx = headerRow.findIndex(h => h.includes('입학성적') || h.includes('석차백분율'));
+  const admTypeHeaderIdx = headerRow.findIndex(h => h.includes('전형구분') || h.includes('전형'));
   const hasMiddleSchoolHeader = headerRow.some(h => h.includes('출신중'));
 
   const dataRows = parsedRows.slice(1);
@@ -1265,6 +1441,7 @@ export async function previewStudentCSV(csvData: string) {
     phone: string;
     middleSchool?: string;
     admissionRank?: number;
+    admissionType?: string;
   }> = [];
 
   for (const values of dataRows) {
@@ -1278,9 +1455,11 @@ export async function previewStudentCSV(csvData: string) {
     const student_name = values[4] || '';
     const phone_number = values[5] || '';
 
-    const isExtended = values.length >= 31 || hasMiddleSchoolHeader;
+    const hasAdmissionType = admTypeHeaderIdx !== -1 || values.length >= 32;
+    const isExtended = values.length >= 31 || hasMiddleSchoolHeader || hasAdmissionType;
     let middle_school: string | undefined = undefined;
     let admission_rank_percentile: number | undefined = undefined;
+    let admission_type: string | undefined = undefined;
 
     if (msHeaderIdx !== -1) {
       middle_school = values[msHeaderIdx]?.trim() || undefined;
@@ -1294,6 +1473,14 @@ export async function previewStudentCSV(csvData: string) {
     if (rawRank) {
       const parsed = parseFloat(rawRank);
       if (!isNaN(parsed)) admission_rank_percentile = parsed;
+    }
+
+    if (admTypeHeaderIdx !== -1) {
+      admission_type = values[admTypeHeaderIdx]?.trim() || undefined;
+    } else if (hasAdmissionType && values[8]) {
+      admission_type = values[8]?.trim() || undefined;
+    } else if (values.length >= 9 && values[8]) {
+      admission_type = values[8]?.trim() || undefined;
     }
 
     const key = (major && class_info && student_number) ? `${graduation_year}_${major}_${class_info}_${student_number}` : null;
@@ -1315,7 +1502,8 @@ export async function previewStudentCSV(csvData: string) {
       name: student_name,
       phone: phone_number,
       middleSchool: middle_school,
-      admissionRank: admission_rank_percentile
+      admissionRank: admission_rank_percentile,
+      admissionType: admission_type
     });
   }
 

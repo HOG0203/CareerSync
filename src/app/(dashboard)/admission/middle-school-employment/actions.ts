@@ -38,10 +38,12 @@ export async function updateStudentAdmissionAction(
   if (payload.admission_rank_percentile !== undefined) updateData.admission_rank_percentile = payload.admission_rank_percentile;
   if (payload.admission_type !== undefined) updateData.admission_type = payload.admission_type?.trim() || null;
 
+  const realStudentId = studentId.includes('-emp-') ? studentId.split('-emp-')[0] : studentId;
+
   const { error } = await supabase
     .from('students')
     .update(updateData)
-    .eq('id', studentId);
+    .eq('id', realStudentId);
 
   if (error) {
     console.error('Failed to update student admission info:', error);
@@ -52,12 +54,12 @@ export async function updateStudentAdmissionAction(
   void (async () => {
     try {
       const { logAuditAction } = await import('@/lib/audit-logger');
-      const { data: st } = await supabase.from('students').select('student_name').eq('id', studentId).single();
+      const { data: st } = await supabase.from('students').select('student_name').eq('id', realStudentId).single();
       await logAuditAction({
         actor_name: profile.full_name || profile.username,
         action_type: 'STUDENT_UPDATE',
         target_name: `${st?.student_name || '학생'} - [입학정보/출신교]`,
-        details: { student_id: studentId, updated_fields: updateData }
+        details: { student_id: realStudentId, updated_fields: updateData }
       });
     } catch (e) {}
   })();
