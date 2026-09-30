@@ -797,11 +797,11 @@ export function EvaluationSheetModal({
                             subKeyOrId: t,
                             created_by: evaluation.rawEvaluationData?.employment_details?.apprenticeship_meta?.[t],
                           })),
-                          ...(evaluation.rawEvaluationData?.employment_details?.employed_early?.company ? [{
-                            text: `조기취업: ${evaluation.rawEvaluationData.employment_details.employed_early.company} (5점)`,
+                          ...(Boolean(evaluation.rawEvaluationData?.employed_early || evaluation.rawEvaluationData?.employment_details?.employed_early?.confirmed) ? [{
+                            text: `취업확정: ${evaluation.rawEvaluationData?.employment_details?.employed_early?.company || '취업확정'} (5점)`,
                             category: 'employed_early' as const,
                             subKeyOrId: 'main',
-                            created_by: evaluation.rawEvaluationData.employment_details.employed_early.created_by,
+                            created_by: evaluation.rawEvaluationData?.employment_details?.employed_early?.created_by,
                           }] : []),
                         ]}
                         formula={`최대 5.0점 캡 적용 ➔ ${d.fieldTraining.score}점`}
@@ -1487,11 +1487,11 @@ export function EvaluationSheetModal({
                               subKeyOrId: t,
                               created_by: evaluation.rawEvaluationData?.employment_details?.apprenticeship_meta?.[t],
                             })),
-                            ...(evaluation.rawEvaluationData?.employment_details?.employed_early?.company ? [{
-                              text: `조기취업: ${evaluation.rawEvaluationData.employment_details.employed_early.company} (5점)`,
+                            ...(Boolean(evaluation.rawEvaluationData?.employed_early || evaluation.rawEvaluationData?.employment_details?.employed_early?.confirmed) ? [{
+                              text: `취업확정: ${evaluation.rawEvaluationData?.employment_details?.employed_early?.company || '취업확정'} (5점)`,
                               category: 'employed_early' as const,
                               subKeyOrId: 'main',
-                              created_by: evaluation.rawEvaluationData.employment_details.employed_early.created_by,
+                              created_by: evaluation.rawEvaluationData?.employment_details?.employed_early?.created_by,
                             }] : []),
                           ]}
                           formula={`최대 5.0점 캡 적용 ➔ ${d.fieldTraining.score}점`}
@@ -1502,18 +1502,18 @@ export function EvaluationSheetModal({
                     <td className="border border-slate-400 p-2 space-y-1.5">
                       <div>
                         <span className="text-[10px] font-bold text-slate-600 block">① 현장실습 이수:</span>
-                        <CheckItem checked={!!evaluation.rawEvaluationData?.field_training_completed} label="현장실습 이수(5점)" />
+                        <CheckItem checked={Boolean(evaluation.rawEvaluationData?.field_training_completed || evaluation.rawEvaluationData?.employment_details?.field_training?.completed)} label="현장실습 이수(5점)" />
                       </div>
                       <div className="pt-1 border-t border-slate-200">
                         <span className="text-[10px] font-bold text-slate-600 block">② 도제 OJT 참여 기간:</span>
-                        <CheckItem checked={Number(evaluation.rawEvaluationData?.apprenticeship_semesters || 0) >= 4} label="4학기(5점)" />
-                        <CheckItem checked={Number(evaluation.rawEvaluationData?.apprenticeship_semesters || 0) === 3} label="3학기(4점)" />
-                        <CheckItem checked={Number(evaluation.rawEvaluationData?.apprenticeship_semesters || 0) === 2} label="2학기(3점)" />
-                        <CheckItem checked={Number(evaluation.rawEvaluationData?.apprenticeship_semesters || 0) === 1} label="1학기(2점)" />
+                        <CheckItem checked={(evaluation.rawEvaluationData?.employment_details?.apprenticeship ? Object.keys(evaluation.rawEvaluationData.employment_details.apprenticeship).length : Number(evaluation.rawEvaluationData?.apprenticeship_semesters || 0)) >= 4} label="4학기(5점)" />
+                        <CheckItem checked={(evaluation.rawEvaluationData?.employment_details?.apprenticeship ? Object.keys(evaluation.rawEvaluationData.employment_details.apprenticeship).length : Number(evaluation.rawEvaluationData?.apprenticeship_semesters || 0)) === 3} label="3학기(4점)" />
+                        <CheckItem checked={(evaluation.rawEvaluationData?.employment_details?.apprenticeship ? Object.keys(evaluation.rawEvaluationData.employment_details.apprenticeship).length : Number(evaluation.rawEvaluationData?.apprenticeship_semesters || 0)) === 2} label="2학기(3점)" />
+                        <CheckItem checked={(evaluation.rawEvaluationData?.employment_details?.apprenticeship ? Object.keys(evaluation.rawEvaluationData.employment_details.apprenticeship).length : Number(evaluation.rawEvaluationData?.apprenticeship_semesters || 0)) === 1} label="1학기(2점)" />
                       </div>
                       <div className="pt-1 border-t border-slate-200">
                         <span className="text-[10px] font-bold text-slate-600 block">③ 취업확정:</span>
-                        <CheckItem checked={!!evaluation.rawEvaluationData?.employed_early} label="취업확정(5점)" />
+                        <CheckItem checked={Boolean(evaluation.rawEvaluationData?.employed_early || evaluation.rawEvaluationData?.employment_details?.employed_early?.confirmed)} label="취업확정(5점)" />
                       </div>
                     </td>
                     <td className="border border-slate-400 p-2 text-center font-bold text-indigo-700 align-middle">

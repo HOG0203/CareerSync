@@ -193,6 +193,11 @@ export async function getEvaluationsStore(): Promise<Record<string, Certificatio
     if (!tableErr && tableRows && tableRows.length > 0) {
       const store: Record<string, CertificationEvaluationData> = {};
       for (const row of tableRows) {
+        const emp = row.employment_details || {};
+        const arts = row.arts_contest_details || {};
+        const contestList = arts.contest_list || [];
+        const contestRes = evaluateContestList(contestList);
+
         store[row.student_id] = {
           id: row.student_id,
           student_id: row.student_id,
@@ -205,11 +210,23 @@ export async function getEvaluationsStore(): Promise<Record<string, Certificatio
           volunteer_school_hours: Number(row.volunteer_school_hours || 0),
           volunteer_outside_hours: Number(row.volunteer_outside_hours || 0),
           volunteer_meta: row.volunteer_meta,
-          employment_details: row.employment_details || {},
-          arts_contest_details: row.arts_contest_details || {},
+          employment_details: emp,
+          arts_contest_details: arts,
           manual_overrides: row.manual_overrides,
           created_by: row.created_by,
           updated_by: row.updated_by,
+
+          // 하위 호환 및 평가표 렌더링용 집계 플래그 자동 산출
+          industry_edu_count: emp.industry_edu_list ? emp.industry_edu_list.length : Number(row.industry_edu_count || 0),
+          career_course_semesters: emp.career_courses ? Object.keys(emp.career_courses).length : Number(row.career_course_semesters || 0),
+          major_club_years: emp.major_clubs ? Object.keys(emp.major_clubs).length : Number(row.major_club_years || 0),
+          skills_contest_level: emp.skills_contest?.level || row.skills_contest_level || 'none',
+          field_training_completed: Boolean(emp.field_training?.completed || row.field_training_completed),
+          apprenticeship_semesters: emp.apprenticeship ? Object.keys(emp.apprenticeship).length : Number(row.apprenticeship_semesters || 0),
+          employed_early: Boolean(emp.employed_early?.confirmed || row.employed_early),
+          arts_sports_semesters: arts.arts_sports ? Object.keys(arts.arts_sports).length : Number(row.arts_sports_semesters || 0),
+          contest_award_count: contestRes.effectiveAwardCount,
+          contest_participate_count: contestRes.effectivePartCount,
         };
       }
       evalStoreMemoryCache = { data: store, timestamp: now };
@@ -364,7 +381,7 @@ export async function getCertificationSummaryList(gradeNum: number, preloadedBas
   const [studentsRes, attendanceRes, evalStore, rewardsMap, prizeConfig] = await Promise.all([
     supabase
       .from('students')
-      .select('id, student_name, student_number, major, class_info, graduation_year, certificates, career_course')
+      .select('id, student_name, student_number, major, class_info, graduation_year, certificates, career_course, student_employments (business_type, company)')
       .eq('graduation_year', targetGradYear)
       .order('major', { ascending: true })
       .order('class_info', { ascending: true })
@@ -454,7 +471,7 @@ export async function getStudentSingleEvaluation(studentId: string): Promise<Ful
   const [studentRes, attendanceRes, evalStore, rewardsMap, prizeConfig] = await Promise.all([
     supabase
       .from('students')
-      .select('id, student_name, student_number, major, class_info, graduation_year, certificates, career_course, phone_number')
+      .select('id, student_name, student_number, major, class_info, graduation_year, certificates, career_course, phone_number, student_employments (business_type, company)')
       .eq('id', studentId)
       .maybeSingle(),
     supabase

@@ -873,9 +873,34 @@ export function calculateStudentFullEvaluation(params: {
     ? Boolean(evalData.employment_details.field_training.completed)
     : Boolean(evalData.field_training_completed);
 
-  const isEmployedEarly = evalData.employment_details?.employed_early !== undefined
+  const rawEmp = Array.isArray((student as any).student_employments)
+    ? (student as any).student_employments[0]
+    : (student as any).student_employments;
+  const isEmployedInDb = Boolean(
+    (student as any).business_type === '취업' ||
+    rawEmp?.business_type === '취업' ||
+    (student as any).employment_status === '취업' ||
+    rawEmp?.employment_status === '취업'
+  );
+
+  const isEmployedEarly = (evalData.employment_details?.employed_early !== undefined
     ? Boolean(evalData.employment_details.employed_early.confirmed)
-    : Boolean(evalData.employed_early);
+    : Boolean(evalData.employed_early)) || isEmployedInDb;
+
+  // evalData에 employed_early 상태 및 세부정보 보장
+  if (isEmployedEarly) {
+    evalData.employed_early = true;
+    if (!evalData.employment_details) {
+      evalData.employment_details = {};
+    }
+    if (!evalData.employment_details.employed_early) {
+      const comp = rawEmp?.company || (student as any).company || '취업확정';
+      evalData.employment_details.employed_early = {
+        confirmed: true,
+        company: comp,
+      };
+    }
+  }
 
   const ojtSems = evalData.employment_details?.apprenticeship !== undefined
     ? Object.keys(evalData.employment_details.apprenticeship).length
@@ -895,7 +920,9 @@ export function calculateStudentFullEvaluation(params: {
     name: '현장실습 및 도제 참여',
     maxScore: 5,
     score: fieldFinalScore,
-    displayText: fieldFinalScore > 0 ? `현장실습/도제 참여 (${fieldFinalScore}점)` : '해당 없음 (0점)'
+    displayText: fieldFinalScore > 0 
+      ? (isEmployedEarly && !isFieldCompleted && ojtSems === 0 ? `취업확정 (${fieldFinalScore}점)` : `현장실습/도제/취업확정 (${fieldFinalScore}점)`)
+      : '해당 없음 (0점)'
   };
 
   // 6. 출결상황 (10점)
