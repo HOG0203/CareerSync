@@ -50,6 +50,7 @@ import {
   History,
   FileUp,
   MoreHorizontal,
+  Briefcase,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -57,6 +58,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -82,7 +84,7 @@ import {
   DEFAULT_CERTIFICATION_PRIZE_CONFIG,
 } from '@/lib/certification-calculator';
 import { GradeBulkAwardModal } from './grade-bulk-award-modal';
-import { RetroactiveAwardModal } from './retroactive-award-modal';
+import { CareerCourseBulkModal } from './career-course-bulk-modal';
 import { RetroactiveExcelModal } from './retroactive-excel-modal';
 import { PrizeSettingsModal } from './prize-settings-modal';
 
@@ -166,8 +168,7 @@ export function CertificationSummaryClient({
 
   // 원클릭 학년 일괄 확정 및 소급 등록 모달 상태
   const [isGradeBulkModalOpen, setIsGradeBulkModalOpen] = React.useState<boolean>(false);
-  const [retroSingleStudent, setRetroSingleStudent] = React.useState<FullStudentEvaluation | null>(null);
-  const [isRetroSingleModalOpen, setIsRetroSingleModalOpen] = React.useState<boolean>(false);
+  const [isCareerCourseBulkModalOpen, setIsCareerCourseBulkModalOpen] = React.useState<boolean>(false);
   const [isRetroExcelModalOpen, setIsRetroExcelModalOpen] = React.useState<boolean>(false);
 
   const [pageSize, setPageSize] = React.useState<number | 'all'>(50);
@@ -202,7 +203,7 @@ export function CertificationSummaryClient({
     };
   }, [
     isGradeBulkModalOpen,
-    isRetroSingleModalOpen,
+    isCareerCourseBulkModalOpen,
     isRetroExcelModalOpen,
     sheetModalEval,
     editModalEval,
@@ -832,37 +833,48 @@ export function CertificationSummaryClient({
               </Select>
             </div>
 
-            {/* 우측 액션 버튼 영역 */}
+            {/* 우측 액션 버튼 영역 (드롭다운 그룹화) */}
             <div className="flex flex-wrap items-center gap-2">
-              {/* 모든 사용자가 접근 가능한 엑셀 일괄 입력 버튼 */}
-              <Link href="/admin/certification/import">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 px-3 text-xs font-bold text-slate-700 hover:text-indigo-700 bg-white hover:bg-indigo-50/50 border-slate-200 rounded-xl gap-1.5 shadow-2xs transition-all"
-                  title="봉사활동, 직기초, 취업역량, 예체능/대회 실적 엑셀 일괄 입력/등록"
-                >
-                  <UploadCloud className="h-3.5 w-3.5 text-indigo-600" />
-                  <span>엑셀 일괄 입력</span>
-                </Button>
-              </Link>
-
-              {/* 관리자 전용 액션 버튼들 (일괄 확정, 소급 등록, 공문서 대장, 상품 설정, 종합 평가 엑셀) */}
-              {isAdmin && (
+              {isAdmin ? (
                 <>
-                  {/* 원클릭 대상자 일괄 확정 버튼 */}
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => setIsGradeBulkModalOpen(true)}
-                    className="h-8 px-3 text-xs font-black bg-amber-500 hover:bg-amber-600 text-white rounded-xl gap-1.5 shadow-xs transition-all hover:scale-[1.02]"
-                  >
-                    <Zap className="h-3.5 w-3.5 fill-white text-white" />
-                    <span>⚡ 대상자 일괄 확정</span>
-                  </Button>
+                  {/* 1. ⚡ 일괄 작업 드롭다운 */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8 px-3 text-xs font-black bg-amber-500 hover:bg-amber-600 text-white rounded-xl gap-1.5 shadow-xs transition-all hover:scale-[1.02]"
+                      >
+                        <Zap className="h-3.5 w-3.5 fill-white text-white" />
+                        <span>⚡ 일괄 작업</span>
+                        <ChevronDown className="h-3 w-3 opacity-80 ml-0.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56 p-1 rounded-xl shadow-lg border border-slate-200">
+                      <DropdownMenuItem
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          setIsCareerCourseBulkModalOpen(true);
+                        }}
+                        className="text-xs font-bold py-2 cursor-pointer gap-2 text-indigo-700 hover:text-indigo-800"
+                      >
+                        <Briefcase className="h-4 w-4 text-indigo-600" />
+                        <span>💼 취업진로코스 일괄 확정</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          setIsGradeBulkModalOpen(true);
+                        }}
+                        className="text-xs font-bold py-2 cursor-pointer gap-2 text-amber-700 hover:text-amber-800"
+                      >
+                        <Zap className="h-4 w-4 text-amber-500 fill-amber-500" />
+                        <span>⚡ 포상 대상자 일괄 확정</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
-                  {/* 과거 수령 소급 등록 드롭다운 */}
+                  {/* 2. 📊 엑셀 관리 드롭다운 */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
@@ -871,51 +883,48 @@ export function CertificationSummaryClient({
                         size="sm"
                         className="h-8 px-3 text-xs font-bold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border-slate-200 rounded-xl gap-1.5 shadow-2xs"
                       >
-                        <History className="h-3.5 w-3.5 text-slate-600" />
-                        <span>과거 수령 소급 등록</span>
+                        <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>📊 엑셀 관리</span>
                         <ChevronDown className="h-3 w-3 opacity-60 ml-0.5" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56 p-1 rounded-xl shadow-lg border border-slate-200">
+                    <DropdownMenuContent align="end" className="w-60 p-1 rounded-xl shadow-lg border border-slate-200">
+                      <DropdownMenuItem
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          handleExportExcel();
+                        }}
+                        className="text-xs font-semibold py-2 cursor-pointer gap-2"
+                      >
+                        <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+                        <span>종합 평가 결과 엑셀 다운로드</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          handleExportRewardLedger();
+                        }}
+                        disabled={isExportingLedger}
+                        className="text-xs font-semibold py-2 cursor-pointer gap-2"
+                      >
+                        <FileSpreadsheet className="h-4 w-4 text-indigo-600" />
+                        <span>{isExportingLedger ? '엑셀 생성 중...' : '공문서 수령 대장 엑셀'}</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onSelect={(e) => {
                           e.preventDefault();
                           setIsRetroExcelModalOpen(true);
                         }}
-                        className="text-xs font-semibold py-2 cursor-pointer gap-2"
+                        className="text-xs font-semibold py-2 cursor-pointer gap-2 text-rose-700 hover:text-rose-800"
                       >
-                        <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
-                        <span>📄 엑셀 일괄 소급 등록</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={(e) => {
-                          e.preventDefault();
-                          setRetroSingleStudent(null);
-                          setIsRetroSingleModalOpen(true);
-                        }}
-                        className="text-xs font-semibold py-2 cursor-pointer gap-2"
-                      >
-                        <Edit3 className="h-4 w-4 text-indigo-600" />
-                        <span>✏️ 개별 학생 소급 등록</span>
+                        <History className="h-4 w-4 text-rose-600" />
+                        <span>상품 수령 내역 소급 등록</span>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
 
-                  {/* 공문서 첨부용 엑셀 대장 버튼 */}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={isExportingLedger}
-                    onClick={handleExportRewardLedger}
-                    className="h-8 px-3 text-xs font-bold text-indigo-700 hover:text-indigo-800 bg-indigo-50/80 hover:bg-indigo-100 border-indigo-200 rounded-xl gap-1.5 shadow-2xs transition-all"
-                    title="공문서 첨부용 옥저인재인증제 수령 대장 엑셀 다운로드 (학과-반별 개별 시트 및 총괄 요약)"
-                  >
-                    <FileSpreadsheet className="h-3.5 w-3.5 text-indigo-600" />
-                    <span>{isExportingLedger ? '엑셀 생성 중...' : '공문서 수령 대장 엑셀'}</span>
-                  </Button>
-
-                  {/* 🎁 등급별 상품 설정 버튼 */}
+                  {/* 3. 🎁 등급별 상품 설정 버튼 */}
                   <Button
                     type="button"
                     variant="outline"
@@ -927,18 +936,18 @@ export function CertificationSummaryClient({
                     <Gift className="h-3.5 w-3.5 text-pink-600" />
                     <span>상품 설정</span>
                   </Button>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleExportExcel}
-                    className="h-8 px-3 text-xs font-bold text-slate-700 hover:text-indigo-600 bg-white border-slate-200 rounded-xl gap-1.5"
-                  >
-                    <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
-                    <span>종합 평가 엑셀</span>
-                  </Button>
                 </>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportExcel}
+                  className="h-8 px-3 text-xs font-bold text-slate-700 hover:text-indigo-600 bg-white border-slate-200 rounded-xl gap-1.5"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>종합 평가 엑셀</span>
+                </Button>
               )}
             </div>
           </div>
@@ -1211,22 +1220,6 @@ export function CertificationSummaryClient({
                           <span>조회 전용</span>
                         </div>
                       )}
-
-                      {isAdmin && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setRetroSingleStudent(student);
-                            setIsRetroSingleModalOpen(true);
-                          }}
-                          className="col-span-2 h-7 text-[11px] font-medium text-slate-500 hover:text-indigo-600 gap-1.5 justify-center border border-dashed border-slate-200 rounded-xl"
-                        >
-                          <History className="h-3 w-3 text-slate-400" />
-                          <span>과거 수령 이력 소급 등록</span>
-                        </Button>
-                      )}
                     </div>
                   </div>
                 );
@@ -1489,36 +1482,6 @@ export function CertificationSummaryClient({
                                 <Lock className="h-3 w-3" />
                                 <span>조회</span>
                               </div>
-                            )}
-
-                            {/* 과거 수령 소급 등록 더보기 드롭다운 */}
-                            {isAdmin && (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 w-6 p-0 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-                                    title="더보기 (소급 등록)"
-                                  >
-                                    <MoreHorizontal className="h-3.5 w-3.5" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48 p-1 rounded-xl shadow-lg border border-slate-200">
-                                  <DropdownMenuItem
-                                    onSelect={(e) => {
-                                      e.preventDefault();
-                                      setRetroSingleStudent(student);
-                                      setIsRetroSingleModalOpen(true);
-                                    }}
-                                    className="text-xs font-semibold py-2 cursor-pointer gap-2"
-                                  >
-                                    <History className="h-3.5 w-3.5 text-indigo-600" />
-                                    <span>과거 수령 이력 소급 등록</span>
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
                             )}
                           </div>
                         </TableCell>
@@ -1916,14 +1879,12 @@ export function CertificationSummaryClient({
         onSuccess={refreshCurrentGradeData}
       />
 
-      {/* 과거 수령 내역 개별 소급 등록 모달 */}
-      <RetroactiveAwardModal
-        open={isRetroSingleModalOpen}
-        onOpenChange={setIsRetroSingleModalOpen}
-        targetStudent={retroSingleStudent}
-        evaluations={currentEvaluations}
-        academicYear={baseYear}
+      {/* 취업진로코스 일괄 확정 & 동기화 모달 */}
+      <CareerCourseBulkModal
+        open={isCareerCourseBulkModalOpen}
+        onOpenChange={setIsCareerCourseBulkModalOpen}
         grade={activeGrade}
+        academicYear={baseYear}
         onSuccess={refreshCurrentGradeData}
       />
 

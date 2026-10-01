@@ -3168,6 +3168,270 @@ export async function getAllGradesEvaluationsAction(preloadedBaseYear?: number):
   }
 }
 
+/**
+ * 공식 인정 가능한 취업진로코스 9개 화이트리스트
+ */
+const OFFICIAL_CAREER_COURSES = [
+  '청솔반',
+  '취업맞춤반',
+  '중견기업반',
+  '반도체아카데미반',
+  '혁신인재반',
+  '부사관반',
+  '아우스빌둥',
+  '군특성화반',
+  '도제반',
+] as const;
+
+/**
+ * 공식 인정 코스 9개 정규화 헬퍼 (9개 외에는 null 반환하여 제외)
+ */
+function normalizeToOfficialCareerCourse(raw: string): string | null {
+  if (!raw) return null;
+  const s = raw.trim();
+  if (s.includes('청솔')) return '청솔반';
+  if (s.includes('맞춤') || s.includes('취업맞춤')) return '취업맞춤반';
+  if (s.includes('중견') || s.includes('중견기업')) return '중견기업반';
+  if (s.includes('반도체') || s.includes('아카데미')) return '반도체아카데미반';
+  if (s.includes('혁신') || s.includes('혁신인재')) return '혁신인재반';
+  if (s.includes('부사관')) return '부사관반';
+  if (s.includes('아우스빌둥')) return '아우스빌둥';
+  if (s.includes('군특') || s.includes('군특성화')) return '군특성화반';
+  if (s.includes('도제') || s.includes('산학일체')) return '도제반';
+  return null;
+}
+
+/**
+ * 취업진로코스 일괄 확정을 위한 후보 학생 목록 및 코스 통계 조회 (9개 공식 코스만 엄격 필터링)
+ */
+export async function getCareerCourseCandidatesAction(params: {
+  gradeNum: number;
+  academicYear: number;
+}): Promise<{
+  success: boolean;
+  candidates: Array<{
+    id: string;
+    studentName: string;
+    studentNumber: string;
+    major: string;
+    classInfo: string;
+    rawCourse: string;
+    standardCourse: string;
+    existingTerms: string[];
+  }>;
+  courseStats: Record<string, number>;
+  error?: string;
+}> {
+  try {
+    const supabase = createAdminClient();
+    const targetGradYear = params.academicYear + (4 - params.gradeNum);
+
+    const { data: students, error: stuErr } = await supabase
+      .from('students')
+      .select('id, student_name, student_number, major, class_info, graduation_year, career_course, student_employments (employment_status)')
+      .eq('graduation_year', targetGradYear)
+      .order('major', { ascending: true })
+      .order('class_info', { ascending: true })
+      .order('student_number', { ascending: true });
+
+    if (stuErr || !students) {
+      return { success: false, candidates: [], courseStats: {}, error: stuErr?.message || '학생 조회를 실패했습니다.' };
+    }
+
+    const studentIds = students.map(s => s.id);
+    const { data: evalRows } = await supabase
+      .from('student_cert_evaluations')
+      .select('student_id, employment_details')
+      .in('student_id', studentIds);
+
+    const evalMap = new Map<string, any>();
+    (evalRows || []).forEach(r => evalMap.set(r.student_id, r));
+
+    const candidates: any[] = [];
+    const courseStats: Record<string, number> = {};
+
+    for (const s of students) {
+      const rawEmp = Array.isArray(s.student_employments) ? s.student_employments[0] : s.student_employments;
+      // 1, 2, 3학년 모두 "희망진로코스(career_course)"가 아닌 "확정진로코스(employment_status)" 기준으로만 진행
+      const courseVal = rawEmp?.employment_status || '';
+
+      const trimmed = String(courseVal || '').trim();
+      // 9개 공식 인정 코스만 통과 (그 외에는 엄격히 null 제외)
+      const officialCourse = normalizeToOfficialCareerCourse(trimmed);
+      if (!officialCourse) {
+        continue;
+      }
+
+      courseStats[officialCourse] = (courseStats[officialCourse] || 0) + 1;
+
+      const evalData = evalMap.get(s.id);
+      const existingCourses = evalData?.employment_details?.career_courses;
+      const existingTerms = existingCourses ? Object.keys(existingCourses) : [];
+
+      candidates.push({
+        id: s.id,
+        studentName: s.student_name,
+        studentNumber: s.student_number || '',
+        major: s.major || '',
+        classInfo: s.class_info || '',
+        rawCourse: trimmed,
+        standardCourse: officialCourse,
+        existingTerms,
+      });
+    }
+
+    return {
+      success: true,
+      candidates,
+      courseStats,
+    };
+  } catch (err: any) {
+    console.error('Error in getCareerCourseCandidatesAction:', err);
+    return { success: false, candidates: [], courseStats: {}, error: err?.message || '조회 실패' };
+  }
+}
+
+/**
+ * 취업진로코스 학기별(1학기/2학기) 일괄 확정 실행
+ */
+export async function bulkSyncCareerCoursesAction(params: {
+  gradeNum: number;
+  academicYear: number;
+  semester: 1 | 2; // 1학기 or 2학기
+  skipExistingThisTerm: boolean; // 해당 학기에 이미 코스가 있으면 유지
+  selectedStudentIds?: string[]; // 선택된 학생만 적용 (옵션)
+}): Promise<{
+  success: boolean;
+  processedCount: number;
+  skippedCount: number;
+  targetTerm: string;
+  error?: string;
+}> {
+  const targetTerm = `${params.gradeNum}-${params.semester}`; // 예: 3-2, 2-1 등
+
+  try {
+    const profile = await getCurrentUserProfile();
+    if (!profile || profile.role !== 'admin') {
+      return { success: false, processedCount: 0, skippedCount: 0, targetTerm, error: '관리자 권한이 필요합니다.' };
+    }
+
+    const { candidates, error: candErr } = await getCareerCourseCandidatesAction({
+      gradeNum: params.gradeNum,
+      academicYear: params.academicYear,
+    });
+
+    if (candErr || !candidates || candidates.length === 0) {
+      return { success: false, processedCount: 0, skippedCount: 0, targetTerm, error: candErr || '적용 대상 학생이 없습니다.' };
+    }
+
+    const supabase = createAdminClient();
+    const nowIso = new Date().toISOString();
+    const auditMeta = {
+      at: nowIso,
+      by: profile.username || profile.full_name || '관리자',
+      userId: profile.id,
+      role: profile.role,
+      action: `bulk_sync_career_course_${targetTerm}`,
+    };
+
+    let processedCount = 0;
+    let skippedCount = 0;
+
+    const studentIdsToProcess = params.selectedStudentIds && params.selectedStudentIds.length > 0
+      ? new Set(params.selectedStudentIds)
+      : null;
+
+    // 기존 student_cert_evaluations 조회
+    const targetStudentIds = candidates
+      .filter(c => !studentIdsToProcess || studentIdsToProcess.has(c.id))
+      .map(c => c.id);
+
+    if (targetStudentIds.length === 0) {
+      return { success: true, processedCount: 0, skippedCount: 0, targetTerm };
+    }
+
+    const { data: existingRows } = await supabase
+      .from('student_cert_evaluations')
+      .select('*')
+      .in('student_id', targetStudentIds);
+
+    const existingMap = new Map<string, any>();
+    (existingRows || []).forEach(r => existingMap.set(r.student_id, r));
+
+    const upsertPayloads: any[] = [];
+
+    for (const cand of candidates) {
+      if (studentIdsToProcess && !studentIdsToProcess.has(cand.id)) {
+        continue;
+      }
+
+      const existingRow = existingMap.get(cand.id) || {};
+      const empDetails = existingRow.employment_details || {};
+      const careerCourses = { ...(empDetails.career_courses || {}) };
+      const careerCoursesMeta = { ...(empDetails.career_courses_meta || {}) };
+
+      // 이미 이번 학기(targetTerm)에 실적이 등록되어 있는 경우 스킵 처리
+      if (params.skipExistingThisTerm && careerCourses[targetTerm]) {
+        skippedCount++;
+        continue;
+      }
+
+      // 이번 학기 실적 할당
+      careerCourses[targetTerm] = cand.standardCourse;
+      careerCoursesMeta[targetTerm] = auditMeta;
+
+      const updatedEmpDetails = {
+        ...empDetails,
+        career_courses: careerCourses,
+        career_courses_meta: careerCoursesMeta,
+      };
+
+      upsertPayloads.push({
+        student_id: cand.id,
+        academic_year: params.academicYear,
+        employment_details: updatedEmpDetails,
+        updated_at: nowIso,
+        updated_by: profile.id,
+        ...(existingRow.vocational_details ? { vocational_details: existingRow.vocational_details } : {}),
+        ...(existingRow.arts_contest_details ? { arts_contest_details: existingRow.arts_contest_details } : {}),
+      });
+
+      processedCount++;
+    }
+
+    if (upsertPayloads.length > 0) {
+      // Chunk upsert (50개씩)
+      const CHUNK_SIZE = 50;
+      for (let i = 0; i < upsertPayloads.length; i += CHUNK_SIZE) {
+        const chunk = upsertPayloads.slice(i, i + CHUNK_SIZE);
+        const { error: upsertErr } = await supabase
+          .from('student_cert_evaluations')
+          .upsert(chunk, { onConflict: 'student_id' });
+
+        if (upsertErr) {
+          console.error('Error during bulkSyncCareerCourses upsert:', upsertErr);
+          return { success: false, processedCount, skippedCount, targetTerm, error: upsertErr.message };
+        }
+      }
+    }
+
+    // 캐시 완전 무효화
+    await clearCertificationSummaryCache(params.gradeNum);
+    revalidatePath('/admin/certification');
+    revalidatePath('/student/certification');
+
+    return {
+      success: true,
+      processedCount,
+      skippedCount,
+      targetTerm,
+    };
+  } catch (err: any) {
+    console.error('Error in bulkSyncCareerCoursesAction:', err);
+    return { success: false, processedCount: 0, skippedCount: 0, targetTerm, error: err?.message || '동기화 실패' };
+  }
+}
+
 
 
 
