@@ -82,8 +82,8 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { showCloseButton?: boolean }
->(({ className, children, showCloseButton = true, onCloseAutoFocus, onInteractOutside, ...props }, ref) => {
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { showCloseButton?: boolean; overlayClassName?: string }
+>(({ className, children, showCloseButton = true, overlayClassName, onCloseAutoFocus, onInteractOutside, ...props }, ref) => {
   React.useEffect(() => {
     return () => {
       forceUnlockBodyPointerEvents();
@@ -92,7 +92,7 @@ const DialogContent = React.forwardRef<
 
   return (
     <DialogPortal>
-      <DialogOverlay />
+      <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Content
         ref={ref}
         onCloseAutoFocus={(e) => {

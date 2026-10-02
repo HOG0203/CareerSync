@@ -28,13 +28,15 @@ import {
   MessageSquare,
   Phone,
   ChevronDown,
-  AlertTriangle
+  AlertTriangle,
+  Building2
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { getStudentScoresById, getStudentRankSummary, updateStudentField } from '@/app/students/actions';
+import { getStudentScoresById, getStudentRankSummary, updateStudentField, EmploymentHistoryItem } from '@/app/students/actions';
 import { Button } from '@/components/ui/button';
 import { CounselingModal } from '@/app/(dashboard)/class-management/counseling-modal';
 import { FieldTrainingModal } from '@/app/(dashboard)/students/field-training-modal';
+import { EmploymentHistoryModal } from '@/app/(dashboard)/students/employment-history-modal';
 
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -111,6 +113,9 @@ export function StudentPopover({
   const [currentCompany, setCurrentCompany] = React.useState(student.company || '');
   const [isCompanySaving, setIsCompanySaving] = React.useState(false);
 
+  const [currentRemarks, setCurrentRemarks] = React.useState(student.remarks || '');
+  const [isEmploymentHistoryModalOpen, setIsEmploymentHistoryModalOpen] = React.useState(false);
+
   const [currentTrainingRecords, setCurrentTrainingRecords] = React.useState<any[]>(student.training_records || []);
 
   React.useEffect(() => {
@@ -122,6 +127,7 @@ export function StudentPopover({
     setCurrentSpecialNotes(student.special_notes || '');
     setCurrentCareerCourse(student.career_course || '');
     setCurrentCompany(student.company || '');
+    setCurrentRemarks(student.remarks || '');
     setCurrentTrainingRecords(student.training_records || []);
   }, [
     student.employment_status,
@@ -132,8 +138,51 @@ export function StudentPopover({
     student.special_notes,
     student.career_course,
     student.company,
+    student.remarks,
     student.training_records,
   ]);
+
+  // 다중 취업 이력(JSON) 파싱
+  const parsedEmploymentHistory = React.useMemo<EmploymentHistoryItem[] | null>(() => {
+    if (!currentRemarks || typeof currentRemarks !== 'string' || !currentRemarks.trim().startsWith('[')) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(currentRemarks);
+      if (Array.isArray(parsed) && parsed.length > 0 && (parsed[0]?.company !== undefined || parsed[0]?.order !== undefined)) {
+        return parsed as EmploymentHistoryItem[];
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }, [currentRemarks]);
+
+  const handleEmploymentHistorySaved = (
+    studentId: string, 
+    updatedRecords: EmploymentHistoryItem[], 
+    primaryRecord: EmploymentHistoryItem | null
+  ) => {
+    const newRemarks = updatedRecords.length > 0 ? JSON.stringify(updatedRecords) : '';
+    setCurrentRemarks(newRemarks);
+    if (primaryRecord) {
+      setCurrentCompany(primaryRecord.company || '');
+      setCurrentCompanyType(primaryRecord.company_type || '');
+      setCurrentBusinessType(primaryRecord.business_type || '');
+    } else {
+      setCurrentCompany('');
+      setCurrentCompanyType('');
+      setCurrentBusinessType('');
+    }
+    const updatedStudent = {
+      ...student,
+      remarks: newRemarks,
+      company: primaryRecord ? primaryRecord.company : '',
+      company_type: primaryRecord ? primaryRecord.company_type : '',
+      business_type: primaryRecord ? primaryRecord.business_type : '',
+    };
+    onStudentUpdate?.(updatedStudent);
+  };
 
   // 팝오버가 열렸을 때 rankingSummary가 없으면 단건 석차 요약을 비동기로 자동 조회
   React.useEffect(() => {
@@ -790,11 +839,26 @@ export function StudentPopover({
               <div className="pt-1 border-t border-slate-200 mt-1">
                 <div className="flex items-center justify-between mb-1">
                   <p className="text-[9px] text-slate-400 font-bold uppercase">취업처 (회사명)</p>
-                  {isCompanySaving && (
-                    <span className="flex items-center gap-1 text-[9px] text-blue-600 font-bold">
-                      <Loader2 className="h-2.5 w-2.5 animate-spin" /> 저장 중...
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {userProfile?.role === 'admin' && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpen(false);
+                          setIsEmploymentHistoryModalOpen(true);
+                        }}
+                        className="text-[9px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-0.5"
+                      >
+                        이력 관리
+                      </button>
+                    )}
+                    {isCompanySaving && (
+                      <span className="flex items-center gap-1 text-[9px] text-blue-600 font-bold">
+                        <Loader2 className="h-2.5 w-2.5 animate-spin" /> 저장 중...
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {userProfile?.role === 'admin' ? (
                   <div className="flex items-center gap-1">
@@ -849,7 +913,7 @@ export function StudentPopover({
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={(e) => { e.stopPropagation(); setIsFieldTrainingModalOpen(true); }}
+              onClick={(e) => { e.stopPropagation(); setOpen(false); setIsFieldTrainingModalOpen(true); }}
               className="h-6 px-2 text-[9px] font-black text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 gap-1"
             >
               상세보기 <ExternalLink className="h-2.5 w-2.5" />
@@ -888,7 +952,7 @@ export function StudentPopover({
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={(e) => { e.stopPropagation(); setIsGradeModalOpen(true); }}
+            onClick={(e) => { e.stopPropagation(); setOpen(false); setIsGradeModalOpen(true); }}
             className="h-6 px-2 text-[9px] font-black text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 gap-1"
           >
             상세보기 <ExternalLink className="h-2.5 w-2.5" />
@@ -954,7 +1018,7 @@ export function StudentPopover({
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={(e) => { e.stopPropagation(); setIsAttendanceModalOpen(true); }}
+            onClick={(e) => { e.stopPropagation(); setOpen(false); setIsAttendanceModalOpen(true); }}
             className="h-6 px-2 text-[9px] font-black text-rose-500 hover:text-rose-700 hover:bg-rose-50 gap-1"
           >
             상세보기 <ExternalLink className="h-2.5 w-2.5" />
@@ -1016,7 +1080,7 @@ export function StudentPopover({
           <Button 
             variant="outline"
             size="sm"
-            onClick={(e) => { e.stopPropagation(); setIsCounselingModalOpen(true); }}
+            onClick={(e) => { e.stopPropagation(); setOpen(false); setIsCounselingModalOpen(true); }}
             className="px-3 h-7 text-[9px] font-black text-blue-600 border-blue-200 hover:bg-blue-50 gap-1 shadow-sm"
           >
             <MessageSquare className="h-3 w-3" />
@@ -1025,9 +1089,10 @@ export function StudentPopover({
         </div>
       )}
 
-      {student.remarks && (
-        <div className="mt-2 p-2 bg-amber-50/50 rounded-lg text-[10px] text-amber-700 italic border-l-2 border-amber-200 leading-relaxed">
-          "{student.remarks}"
+      {/* 순수 비고 메모만 표시 (JSON 형태의 취업 이력 데이터는 팝업 하단에 노출하지 않음) */}
+      {!parsedEmploymentHistory && currentRemarks && (
+        <div className="mt-2 p-2 bg-amber-50/50 rounded-lg text-[10px] text-amber-700 italic border-l-2 border-amber-200 leading-relaxed text-left">
+          "{currentRemarks}"
         </div>
       )}
     </div>
@@ -1334,6 +1399,14 @@ export function StudentPopover({
         student={{ ...student, training_records: currentTrainingRecords }}
         isAdmin={userProfile?.role === 'admin'}
         onUpdateRecords={handleUpdateRecords}
+      />
+
+      <EmploymentHistoryModal
+        isOpen={isEmploymentHistoryModalOpen}
+        onClose={() => setIsEmploymentHistoryModalOpen(false)}
+        student={{ ...student, remarks: currentRemarks, company: currentCompany, company_type: currentCompanyType, business_type: currentBusinessType }}
+        isAdmin={userProfile?.role === 'admin'}
+        onSaved={handleEmploymentHistorySaved}
       />
     </>
   );

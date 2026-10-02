@@ -307,7 +307,10 @@ export function FieldTrainingModal({ isOpen, onClose, student, isAdmin = false, 
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[95vw] sm:max-w-3xl max-h-[95vh] flex flex-col p-0 border-none shadow-2xl rounded-2xl overflow-hidden">
+      <DialogContent 
+        className="w-[95vw] sm:max-w-3xl max-h-[95vh] flex flex-col p-0 border-none shadow-2xl rounded-2xl overflow-hidden z-[200]"
+        overlayClassName="z-[190]"
+      >
         <DialogHeader className="p-4 sm:p-6 bg-white border-b border-slate-100 shrink-0">
           <div className="flex items-center justify-between mr-6 sm:mr-8">
             <div className="flex items-center gap-3 sm:gap-4">
