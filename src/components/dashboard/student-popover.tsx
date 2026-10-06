@@ -172,14 +172,14 @@ export function StudentPopover({
     } else {
       setCurrentCompany('');
       setCurrentCompanyType('');
-      setCurrentBusinessType('');
+      setCurrentBusinessType('미취업');
     }
     const updatedStudent = {
       ...student,
       remarks: newRemarks,
       company: primaryRecord ? primaryRecord.company : '',
       company_type: primaryRecord ? primaryRecord.company_type : '',
-      business_type: primaryRecord ? primaryRecord.business_type : '',
+      business_type: primaryRecord ? primaryRecord.business_type : '미취업',
     };
     onStudentUpdate?.(updatedStudent);
   };

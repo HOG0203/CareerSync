@@ -17,6 +17,10 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
   const [localValue, setLocalValue] = React.useState(value || '')
   const [isManualInput, setIsManualInput] = React.useState(false)
   const isManualRef = React.useRef(false)
+  const [isCalendarOpen, setIsCalendarOpen] = React.useState(false)
+  const isCalendarOpenRef = React.useRef(false)
+  isCalendarOpenRef.current = isCalendarOpen
+  const openCalendarOnEditRef = React.useRef(false)
   const selectRef = React.useRef<HTMLSelectElement>(null)
   const [autocompleteActiveIndex, setAutocompleteActiveIndex] = React.useState(-1)
 
@@ -44,6 +48,8 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
       setIsManualInput(false);
       isManualRef.current = false;
       setAutocompleteActiveIndex(-1);
+      setIsCalendarOpen(false);
+      isCalendarOpenRef.current = false;
       return;
     }
     setLocalValue(value || '');
@@ -52,7 +58,15 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
     const isManual = !!value && !isInOptions && value !== '기타(직접입력)';
     setIsManualInput(isManual);
     isManualRef.current = isManual;
-  }, [value, isEditing, resolvedOptions]);
+
+    if (config.type === 'date') {
+      if (openCalendarOnEditRef.current) {
+        setIsCalendarOpen(true);
+        isCalendarOpenRef.current = true;
+        openCalendarOnEditRef.current = false;
+      }
+    }
+  }, [value, isEditing, resolvedOptions, config.type]);
 
   // 더블클릭/수정 모드 진입 즉시 0ms 드롭다운 메뉴 팝업 자동 개방 (showPicker)
   React.useEffect(() => {
@@ -185,15 +199,20 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
     }
     if (config.type === 'date') {
       const parsedDate = parseFlexibleDate(localValue);
-      const selectedDate = parsedDate ? new Date(parsedDate) : undefined;
+      let selectedDate: Date | undefined = undefined;
+      if (parsedDate) {
+        const [y, m, d] = parsedDate.split('-').map(Number);
+        if (y && m && d) selectedDate = new Date(y, m - 1, d);
+      }
       return (
-        <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative h-8 z-40 bg-white ring-2 ring-blue-500 ring-inset overflow-hidden" style={{ minWidth: config.width, width: config.width }}>
+        <td data-row={rIdx} data-col={cIdx} className="p-0 border-r border-b relative h-8 z-40 bg-white ring-2 ring-blue-500 ring-inset" style={{ minWidth: config.width, width: config.width }}>
           <div className="flex items-center w-full h-8 bg-white pr-0.5">
             <Input 
               autoFocus 
               value={localValue} 
               onChange={(e) => setLocalValue(e.target.value)} 
               onBlur={() => {
+                if (isCalendarOpenRef.current) return;
                 const norm = parseFlexibleDate(localValue) || localValue.trim();
                 handleCommit(norm);
               }} 
@@ -207,28 +226,54 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
                 if (e.key === 'Escape') { 
                   e.preventDefault(); 
                   e.stopPropagation(); 
+                  setIsCalendarOpen(false);
+                  isCalendarOpenRef.current = false;
                   onEndEdit(); 
                 } 
               }} 
               placeholder="YYYY-MM-DD"
               className="h-8 flex-1 min-w-0 text-[11px] border-none rounded-none focus-visible:ring-0 px-1 bg-transparent font-medium" 
             />
-            <Popover>
+            <Popover 
+              open={isCalendarOpen} 
+              onOpenChange={(open) => {
+                setIsCalendarOpen(open);
+                isCalendarOpenRef.current = open;
+                if (!open && !isCommittingRef.current) {
+                  const norm = parseFlexibleDate(localValue) || localValue.trim();
+                  handleCommit(norm);
+                }
+              }}
+            >
               <PopoverTrigger asChild>
                 <Button 
                   type="button"
                   variant="ghost" 
                   size="icon" 
-                  className="h-6 w-6 shrink-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 p-0"
+                  className="h-6 w-6 shrink-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 p-0 cursor-pointer"
                   onMouseDown={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsCalendarOpen(prev => !prev);
                   }}
                   title="달력에서 선택"
                 >
                   <CalendarIcon className="h-3.5 w-3.5" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 z-[99999]" align="end" side="bottom" avoidCollisions={true} collisionPadding={10}>
+              <PopoverContent 
+                className="w-auto p-0 z-[99999] bg-white border border-slate-200 shadow-2xl rounded-xl overflow-hidden" 
+                align="end" 
+                side="bottom" 
+                sideOffset={4}
+                avoidCollisions={true} 
+                collisionPadding={10}
+                onOpenAutoFocus={(e) => e.preventDefault()}
+              >
                 <Calendar 
                   mode="single" 
                   selected={selectedDate} 
@@ -236,6 +281,8 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
                     if (date) {
                       const formatted = format(date, 'yyyy-MM-dd');
                       setLocalValue(formatted);
+                      setIsCalendarOpen(false);
+                      isCalendarOpenRef.current = false;
                       handleCommit(formatted);
                     }
                   }} 
@@ -398,6 +445,22 @@ export const SpreadsheetCell = React.memo(({ id, field, value, config, rowData, 
           ) : (
             <span className="font-bold text-slate-900 truncate">{value || ''}</span>
           )
+        ) : config.type === 'date' && !config.readOnly ? (
+          <div className="group relative w-full h-full flex items-center justify-center">
+            <span className="whitespace-nowrap">{value === 'X' ? '' : (value || '')}</span>
+            <button
+              type="button"
+              className="absolute right-0.5 top-1/2 -translate-y-1/2 h-5 w-5 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                openCalendarOnEditRef.current = true;
+                onStartEdit();
+              }}
+              title="달력에서 선택"
+            >
+              <CalendarIcon className="h-3 w-3" />
+            </button>
+          </div>
         ) : config.variant ? (
           <span className={cn("px-1.5 py-0.5 rounded-sm font-medium border text-[9px] leading-none whitespace-nowrap text-center", config.variant(value))}>{value === 'X' ? '' : (value || '')}</span>
         ) : (

@@ -125,24 +125,25 @@ export function EmploymentHistoryModal({
 
     // 이력이 아직 배열로 없는 경우, 기존 단일 취업처(company)로 1차 레코드 자동 구성
     if (initialList.length === 0) {
-      const currentCompany = student.company || student.latest_training_company || '';
-      // 회사가 없거나 취업현황이 미설정/미취업인 경우 기본값으로 '채용진행중' 설정
-      const defaultStatus = (student.company && student.business_type && student.business_type !== '미취업')
-        ? student.business_type
-        : '채용진행중';
+      const currentCompany = (student.company || student.latest_training_company || '').trim();
+      if (currentCompany !== '') {
+        const defaultStatus = (student.business_type && student.business_type !== '미취업')
+          ? student.business_type
+          : '채용진행중';
 
-      initialList.push({
-        order: 1,
-        company: currentCompany,
-        company_type: student.company_type || '미지정',
-        business_type: defaultStatus,
-        is_primary: true,
-      });
+        initialList.push({
+          order: 1,
+          company: currentCompany,
+          company_type: student.company_type || '미지정',
+          business_type: defaultStatus,
+          is_primary: true,
+        });
+      }
     }
 
     // 대표 취업처 인덱스 탐색
     let primeIdx = initialList.findIndex(r => r.is_primary);
-    if (primeIdx === -1) {
+    if (primeIdx === -1 && initialList.length > 0) {
       primeIdx = initialList.length - 1;
       initialList[primeIdx].is_primary = true;
     }
@@ -155,10 +156,15 @@ export function EmploymentHistoryModal({
     setIsLoading(true);
     getStudentEmploymentHistory(student.id)
       .then(freshHistory => {
-        if (isSubscribed && freshHistory && freshHistory.length > 0) {
-          setRecords(freshHistory);
-          const pIdx = freshHistory.findIndex(r => r.is_primary);
-          setPrimaryIndex(pIdx >= 0 ? pIdx : freshHistory.length - 1);
+        if (isSubscribed) {
+          if (freshHistory && freshHistory.length > 0) {
+            setRecords(freshHistory);
+            const pIdx = freshHistory.findIndex(r => r.is_primary);
+            setPrimaryIndex(pIdx >= 0 ? pIdx : freshHistory.length - 1);
+          } else if (initialList.length === 0) {
+            setRecords([]);
+            setPrimaryIndex(0);
+          }
         }
       })
       .catch(err => {
@@ -173,7 +179,7 @@ export function EmploymentHistoryModal({
     };
   }, [student, isOpen]);
 
-  // 새로운 취업 이력 추가 (2차, 3차...)
+  // 새로운 취업 이력 추가 (1차, 2차, 3차...)
   const handleAddRecord = () => {
     const nextOrder = records.length + 1;
     const newRecord: EmploymentHistoryItem = {
@@ -181,24 +187,26 @@ export function EmploymentHistoryModal({
       company: '',
       company_type: '미지정',
       business_type: '채용진행중',
-      is_primary: false,
+      is_primary: records.length === 0,
     };
     const nextList = [...records, newRecord];
     setRecords(nextList);
-    setPrimaryIndex(nextList.length - 1);
+    if (records.length === 0) {
+      setPrimaryIndex(0);
+    }
   };
 
   // 특정 이력 삭제
-  const handleDeleteRecord = (index: number) => {
-    if (records.length <= 1) {
-      setRecords([{
-        order: 1,
-        company: '',
-        company_type: '미지정',
-        business_type: '채용진행중',
-        is_primary: true,
-      }]);
-      setPrimaryIndex(0);
+  const handleDeleteRecord = async (index: number) => {
+    const target = records[index];
+    if (!target) return;
+
+    const compName = target.company?.trim();
+    const confirmMsg = compName 
+      ? `[${target.order}차 취업처: ${compName}] 이력을 정말 삭제하시겠습니까?`
+      : `${target.order}차 취업 이력을 목록에서 삭제하시겠습니까?`;
+
+    if (compName && !confirm(confirmMsg)) {
       return;
     }
 
@@ -207,14 +215,97 @@ export function EmploymentHistoryModal({
       .map((item, idx) => ({ ...item, order: idx + 1 }));
 
     let newPrimary = primaryIndex;
-    if (primaryIndex === index) {
-      newPrimary = Math.max(0, nextList.length - 1);
+    if (nextList.length === 0) {
+      newPrimary = 0;
+    } else if (primaryIndex === index) {
+      // 삭제된 항목이 대표 취업처였을 경우
+      const jobIdx = nextList.findIndex(r => r.business_type === '취업');
+      newPrimary = jobIdx >= 0 ? jobIdx : Math.max(0, nextList.length - 1);
+      if (nextList[newPrimary]) {
+        nextList[newPrimary].is_primary = true;
+      }
     } else if (primaryIndex > index) {
       newPrimary = primaryIndex - 1;
+      if (nextList[newPrimary]) {
+        nextList[newPrimary].is_primary = true;
+      }
     }
 
     setRecords(nextList);
     setPrimaryIndex(newPrimary);
+
+    // 저장되어 있던 실제 기업명이 있는 경우 DB에도 즉시 동기화 반영
+    if (student && compName) {
+      setIsSaving(true);
+      try {
+        const primeRec = nextList.find(r => r.is_primary) || (nextList.length > 0 ? nextList[nextList.length - 1] : null);
+        const res = await saveStudentEmploymentHistory(student.id, nextList);
+        if (res.success) {
+          toast({
+            title: '삭제 완료',
+            description: `[${compName}] 취업 이력이 성공적으로 삭제되었습니다.`,
+          });
+          onSaved?.(student.id, nextList, primeRec);
+        } else {
+          toast({
+            variant: 'destructive',
+            title: '삭제 실패',
+            description: res.error || '삭제 중 오류가 발생했습니다.',
+          });
+        }
+      } catch (err: any) {
+        toast({
+          variant: 'destructive',
+          title: '오류 발생',
+          description: err?.message || '네트워크 오류가 발생했습니다.',
+        });
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      toast({
+        title: '목록에서 제거됨',
+        description: '입력 행이 삭제되었습니다.',
+      });
+    }
+  };
+
+  // 등록된 전체 이력 삭제
+  const handleClearAllRecords = async () => {
+    if (!student || records.length === 0) return;
+    const studentName = student.student_name || '해당';
+    if (!confirm(`${studentName} 학생의 모든 취업 이력(${records.length}건)을 영구 삭제하시겠습니까?\n\n삭제 시 학생의 상태가 [미취업]으로 변경됩니다.`)) {
+      return;
+    }
+
+    setIsSaving(true);
+    setRecords([]);
+    setPrimaryIndex(0);
+
+    try {
+      const res = await saveStudentEmploymentHistory(student.id, []);
+      if (res.success) {
+        toast({
+          title: '전체 삭제 완료',
+          description: `${studentName} 학생의 모든 취업 이력이 삭제되었습니다.`,
+        });
+        onSaved?.(student.id, [], null);
+      } else {
+        toast({
+          variant: 'destructive',
+          title: '삭제 실패',
+          description: res.error || '전체 삭제 중 오류가 발생했습니다.',
+        });
+      }
+    } catch (err: any) {
+      toast({
+        variant: 'destructive',
+        title: '오류 발생',
+        description: err?.message || '네트워크 오류가 발생했습니다.',
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // 필드 값 변경 (취업현황, 기업구분, 취업처)
@@ -270,15 +361,20 @@ export function EmploymentHistoryModal({
     const validRecords = records.filter(r => (r.company || '').trim() !== '');
 
     if (validRecords.length === 0 && records.some(r => (r.company || '').trim() === '')) {
-      const confirmClear = confirm('입력된 취업처가 없습니다. 학생의 취업 정보를 비우시겠습니까?');
+      const confirmClear = confirm('입력된 취업처가 없습니다. 학생의 취업 이력을 비우고 [미취업] 상태로 변경하시겠습니까?');
       if (!confirmClear) return;
     }
 
     const finalRecords = (validRecords.length > 0 ? validRecords : []).map((item, idx) => ({
       ...item,
       order: idx + 1,
-      is_primary: idx === primaryIndex,
+      is_primary: validRecords.length === 1 ? true : (idx === primaryIndex),
     }));
+
+    if (finalRecords.length > 0 && !finalRecords.some(r => r.is_primary)) {
+      const prefIdx = finalRecords.findIndex(r => r.business_type === '취업');
+      finalRecords[prefIdx >= 0 ? prefIdx : finalRecords.length - 1].is_primary = true;
+    }
 
     setIsSaving(true);
     try {
@@ -286,10 +382,12 @@ export function EmploymentHistoryModal({
       if (res.success) {
         toast({
           title: '저장 완료',
-          description: `${student.student_name} 학생의 취업 이력(${finalRecords.length}건)이 성공적으로 반영되었습니다.`,
+          description: finalRecords.length > 0 
+            ? `${student.student_name} 학생의 취업 이력(${finalRecords.length}건)이 성공적으로 반영되었습니다.`
+            : `${student.student_name} 학생의 취업 이력이 모두 삭제되었습니다.`,
         });
 
-        const primeRec = finalRecords.find(r => r.is_primary) || finalRecords[finalRecords.length - 1] || null;
+        const primeRec = finalRecords.find(r => r.is_primary) || (finalRecords.length > 0 ? finalRecords[finalRecords.length - 1] : null);
         onSaved?.(student.id, finalRecords, primeRec);
         onClose();
       } else {
@@ -353,9 +451,23 @@ export function EmploymentHistoryModal({
               등록된 취업 목록 ({records.length}건)
             </h3>
             {isAdmin && (
-              <Button size="sm" onClick={handleAddRecord} className="bg-slate-900 hover:bg-slate-800 text-white font-bold h-8 sm:h-9 text-xs shadow-sm">
-                <Plus className="h-3.5 w-3.5 mr-1" /> 취업처 추가
-              </Button>
+              <div className="flex items-center gap-2">
+                {records.length > 0 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleClearAllRecords}
+                    disabled={isSaving}
+                    className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 font-bold h-8 sm:h-9 text-xs shadow-sm transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1 text-rose-500" /> 전체 삭제
+                  </Button>
+                )}
+                <Button size="sm" onClick={handleAddRecord} disabled={isSaving} className="bg-slate-900 hover:bg-slate-800 text-white font-bold h-8 sm:h-9 text-xs shadow-sm">
+                  <Plus className="h-3.5 w-3.5 mr-1" /> 취업처 추가
+                </Button>
+              </div>
             )}
           </div>
 
@@ -403,14 +515,15 @@ export function EmploymentHistoryModal({
                         )}
                       </div>
 
-                      {isAdmin && records.length > 1 && (
+                      {isAdmin && (
                         <div className="flex items-center gap-1.5 shrink-0">
                           <Button
                             type="button"
                             size="sm"
                             variant="ghost"
                             onClick={() => handleDeleteRecord(index)}
-                            className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-rose-500 hover:text-rose-700 hover:bg-rose-50"
+                            disabled={isSaving}
+                            className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors"
                             title="이 취업 이력 삭제"
                           >
                             <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -517,9 +630,24 @@ export function EmploymentHistoryModal({
                 );
               })
             ) : (
-              <div className="py-16 sm:py-20 text-center bg-white border-2 border-dashed border-slate-200 rounded-2xl sm:rounded-3xl">
-                <p className="text-slate-400 text-xs sm:text-sm">등록된 취업 이력이 없습니다.</p>
-                <p className="text-slate-300 text-[10px] sm:text-xs mt-1">상단의 '취업처 추가' 버튼을 눌러 기록을 시작하세요.</p>
+              <div className="py-14 sm:py-16 text-center bg-white border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center">
+                <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center mb-3 text-slate-400">
+                  <Building2 className="h-6 w-6" />
+                </div>
+                <p className="text-slate-600 font-bold text-xs sm:text-sm">등록된 취업 이력이 없습니다.</p>
+                <p className="text-slate-400 text-[10px] sm:text-xs mt-1 mb-4">상단의 '취업처 추가' 버튼을 눌러 기록을 시작하세요.</p>
+                {isAdmin && (
+                  <Button 
+                    type="button"
+                    size="sm" 
+                    onClick={handleAddRecord} 
+                    disabled={isSaving}
+                    variant="outline"
+                    className="border-slate-300 text-slate-700 font-bold h-8 text-xs shadow-sm hover:bg-slate-100"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" /> 첫 취업처 등록하기
+                  </Button>
+                )}
               </div>
             )}
           </div>

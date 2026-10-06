@@ -1326,7 +1326,7 @@ export async function saveStudentEmploymentHistory(
   } else {
     updatePayload.company = null;
     updatePayload.company_type = null;
-    updatePayload.business_type = null;
+    updatePayload.business_type = '미취업';
   }
 
   const { error } = await supabase
@@ -1371,6 +1371,13 @@ export async function saveStudentEmploymentHistory(
       primary: primaryRecord
     }
   };
+}
+
+/**
+ * 특정 학생의 취업 이력을 전체 삭제(초기화)합니다.
+ */
+export async function deleteStudentEmploymentHistory(studentId: string) {
+  return await saveStudentEmploymentHistory(studentId, []);
 }
 
 /**

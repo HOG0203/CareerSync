@@ -31,7 +31,6 @@ import {
   Calendar,
   Check,
   FileSpreadsheet,
-  Download,
 } from 'lucide-react';
 import {
   getCareerCourseCandidatesAction,
@@ -576,51 +575,36 @@ export function CareerCourseBulkModal({
         </div>
 
         {/* 모달 푸터 */}
-        <DialogFooter className="p-3 sm:p-4 bg-slate-50 border-t border-slate-200 flex flex-row items-center justify-between gap-2 shrink-0">
+        <DialogFooter className="p-3 sm:p-4 bg-slate-50 border-t border-slate-200 flex flex-row items-center justify-end gap-2 shrink-0">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            onClick={handleDownloadExcel}
-            disabled={isDownloadingExcel || candidates.length === 0}
-            className="rounded-xl text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-white hover:bg-emerald-50 border-emerald-300 gap-1.5 shadow-2xs"
-            title="적용 대상 학생 명단 엑셀 다운로드"
+            onClick={() => onOpenChange(false)}
+            disabled={isProcessing}
+            className="rounded-xl text-xs"
           >
-            <Download className="h-3.5 w-3.5 text-emerald-600" />
-            <span>{isDownloadingExcel ? '엑셀 생성 중...' : '적용 대상 엑셀 다운로드'}</span>
+            취소
           </Button>
-
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => onOpenChange(false)}
-              disabled={isProcessing}
-              className="rounded-xl text-xs"
-            >
-              취소
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleConfirm}
-              disabled={isProcessing || isLoading || targetCount === 0}
-              className="rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs gap-1.5"
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span>{targetTerm}학기 실적 DB 반영 중...</span>
-                </>
-              ) : (
-                <>
-                  <Check className="h-3.5 w-3.5" />
-                  <span>{targetTerm}학기 진로코스 일괄 확정 ({targetCount}명)</span>
-                </>
-              )}
-            </Button>
-          </div>
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleConfirm}
+            disabled={isProcessing || isLoading || targetCount === 0}
+            className="rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs gap-1.5"
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <span>{targetTerm}학기 실적 DB 반영 중...</span>
+              </>
+            ) : (
+              <>
+                <Check className="h-3.5 w-3.5" />
+                <span>{targetTerm}학기 진로코스 일괄 확정 ({targetCount}명)</span>
+              </>
+            )}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

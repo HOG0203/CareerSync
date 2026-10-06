@@ -501,11 +501,15 @@ export function StudentTable({
         masterCompanies={masterCompanies}
         onSaved={(studentId, records, primary) => {
           if (selectedStudentForEmployment && selectedStudentForEmployment.id === studentId) {
-            selectedStudentForEmployment.remarks = JSON.stringify(records);
+            selectedStudentForEmployment.remarks = records.length > 0 ? JSON.stringify(records) : null;
             if (primary) {
               selectedStudentForEmployment.company = primary.company;
               selectedStudentForEmployment.company_type = primary.company_type;
               selectedStudentForEmployment.business_type = primary.business_type;
+            } else {
+              selectedStudentForEmployment.company = null;
+              selectedStudentForEmployment.company_type = null;
+              selectedStudentForEmployment.business_type = '미취업';
             }
           }
           router.refresh();

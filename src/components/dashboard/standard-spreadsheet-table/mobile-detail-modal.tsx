@@ -271,7 +271,7 @@ export const MobileDetailModal = ({ isOpen, onClose, data, columns, onSave, onAc
                             {val || '날짜 선택...'}
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
+                        <PopoverContent className="w-auto p-0 z-[99999] bg-white border border-slate-200 shadow-2xl rounded-xl overflow-hidden" align="start">
                           <Calendar
                             mode="single"
                             selected={val ? new Date(val) : undefined}
