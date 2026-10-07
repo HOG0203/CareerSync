@@ -168,9 +168,8 @@ export function InteractiveTeacherTimetable({
         if (it.type === 'substitute') {
           // (1-a) 내가 결강자 (내 수업을 보강교사가 진행)
           if (it.originalTeacher === teacherName) {
-            const day = it.sourceDay;
-            const targetDayDate = selectedWeek.dates[day];
-            if (it.sourceDate === targetDayDate) {
+            const day = Object.keys(selectedWeek.dates).find(d => selectedWeek.dates[d] === it.sourceDate) || it.sourceDay;
+            if (it.sourceDate === selectedWeek.dates[day]) {
               const key = `${day}_${it.sourcePeriod}`;
               map[key] = {
                 appId: app.id,
@@ -189,9 +188,8 @@ export function InteractiveTeacherTimetable({
           }
           // (1-b) 내가 보강 담당 교사 (다른 교사의 결강을 내가 보강 진행)
           if (it.substituteTeacher === teacherName) {
-            const day = it.sourceDay;
-            const targetDayDate = selectedWeek.dates[day];
-            if (it.sourceDate === targetDayDate) {
+            const day = Object.keys(selectedWeek.dates).find(d => selectedWeek.dates[d] === it.sourceDate) || it.sourceDay;
+            if (it.sourceDate === selectedWeek.dates[day]) {
               const key = `${day}_${it.sourcePeriod}`;
               map[key] = {
                 appId: app.id,
@@ -215,7 +213,7 @@ export function InteractiveTeacherTimetable({
           // (2-a) 내가 신청자(applicantTeacher)인 경우
           if (app.applicantTeacher === teacherName) {
             // 내 원래 수업 시간(source) -> 상대방이 수업함 (exchange_out)
-            const srcDay = it.sourceDay;
+            const srcDay = Object.keys(selectedWeek.dates).find(d => selectedWeek.dates[d] === it.sourceDate) || it.sourceDay;
             if (it.sourceDate === selectedWeek.dates[srcDay]) {
               const key = `${srcDay}_${it.sourcePeriod}`;
               map[key] = {
@@ -233,7 +231,7 @@ export function InteractiveTeacherTimetable({
               };
             }
             // 상대방 수업 시간(target) -> 내가 수업함 (exchange_in)
-            const tgtDay = it.targetDay;
+            const tgtDay = it.targetDate ? (Object.keys(selectedWeek.dates).find(d => selectedWeek.dates[d] === it.targetDate) || it.targetDay) : it.targetDay;
             if (it.targetDate && tgtDay && it.targetDate === selectedWeek.dates[tgtDay] && it.targetPeriod) {
               const key = `${tgtDay}_${it.targetPeriod}`;
               map[key] = {
@@ -255,7 +253,7 @@ export function InteractiveTeacherTimetable({
           // (2-b) 내가 교체 대상자(targetTeacher)인 경우
           if (it.targetTeacher === teacherName && app.applicantTeacher !== teacherName) {
             // 내 원래 수업 시간(target) -> 신청자가 수업함 (exchange_out)
-            const tgtDay = it.targetDay;
+            const tgtDay = it.targetDate ? (Object.keys(selectedWeek.dates).find(d => selectedWeek.dates[d] === it.targetDate) || it.targetDay) : it.targetDay;
             if (it.targetDate && tgtDay && it.targetDate === selectedWeek.dates[tgtDay] && it.targetPeriod) {
               const key = `${tgtDay}_${it.targetPeriod}`;
               map[key] = {
@@ -273,7 +271,7 @@ export function InteractiveTeacherTimetable({
               };
             }
             // 상대방 수업 시간(source) -> 내가 수업함 (exchange_in)
-            const srcDay = it.sourceDay;
+            const srcDay = Object.keys(selectedWeek.dates).find(d => selectedWeek.dates[d] === it.sourceDate) || it.sourceDay;
             if (it.sourceDate === selectedWeek.dates[srcDay]) {
               const key = `${srcDay}_${it.sourcePeriod}`;
               map[key] = {
@@ -318,11 +316,16 @@ export function InteractiveTeacherTimetable({
     if (instructorInfo.isInstructorSlot) return;
 
     setSelectedSlots(prev => {
-      const exists = prev.some(s => s.key === key);
+      const exists = prev.some(s => s.key === key || (s.date === date && s.period === period));
       if (exists) {
-        return prev.filter(s => s.key !== key);
+        return prev.filter(s => s.key !== key && !(s.date === date && s.period === period));
       } else {
-        return [...prev, { key, day, date, period, slot }].sort((a, b) => a.period - b.period);
+        const normalizedSlot: TimetableSlot = {
+          ...slot,
+          day,
+          period,
+        };
+        return [...prev, { key, day, date, period, slot: normalizedSlot }].sort((a, b) => a.period - b.period);
       }
     });
   };
@@ -527,7 +530,15 @@ export function InteractiveTeacherTimetable({
                   const slot = selectedTeacher?.slots[slotKey];
                   const isSlotActive = Boolean(slot && (slot.subjectName || slot.classCode));
                   const classInfo = slot?.classCode ? parseClassCode(slot.classCode) : null;
-                  const isSelected = selectedSlots.some(s => s.key === slotKey);
+
+                  // 🌟 화면상 그리드 셀 고유 키 (요일 교체 여부와 무관하게 현재 컬럼 요일_교시)
+                  const cellKey = `${d.key}_${period}`;
+                  // 🌟 선택 여부 판별: 그리드 셀 키(cellKey), 날짜+교시, 또는 슬롯 키(slotKey) 일치 여부 완벽 검사 (요일 교체된 수업 체크표시 정상화)
+                  const isSelected = selectedSlots.some(s => 
+                    s.key === cellKey || 
+                    (s.date && dayDate && s.date === dayDate && s.period === period) || 
+                    s.key === slotKey
+                  );
 
                   // 지필평가/시험 기간 슬롯 검사
                   const examInfo = dayDate ? getExamSlotInfo(dayDate, period, slot?.classCode, calendarConfig) : null;
@@ -555,7 +566,7 @@ export function InteractiveTeacherTimetable({
                   const mainClassEvent = classEvents[0];
 
                   // 3. 결보강 / 교체 승인 또는 신청된 변동 슬롯이 존재하는 경우
-                  const effectiveInfo = effectiveSlotMap[slotKey];
+                  const effectiveInfo = effectiveSlotMap[cellKey] || effectiveSlotMap[slotKey];
 
                   // 🌟 시간강사 상시보강 편성 슬롯 검사 (원래 교사의 보강 완료 상태 -> 교체 및 추가 보강 일체 불가 🔒)
                   const instructorInfo = selectedTeacherName
@@ -960,7 +971,7 @@ export function InteractiveTeacherTimetable({
                     <td key={d.key} className="p-1 border-r last:border-r-0 border-slate-200 h-14">
                       <button
                         type="button"
-                        onClick={() => handleSlotClick(d.key, period, slot!)}
+                        onClick={() => handleSlotClick(d.key, period, { ...slot!, day: d.key, period })}
                         className={cn(
                           "w-full h-full min-h-[48px] max-h-[48px] p-1 sm:p-1.5 rounded-xl border-[1.5px] transition-all flex flex-col items-center justify-center text-center relative group shadow-2xs",
                           isNormalSelected
