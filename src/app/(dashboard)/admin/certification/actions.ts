@@ -1420,7 +1420,7 @@ export async function deleteStudentEvaluationItemAction(
       return { success: false, error: '삭제할 대회 실적을 찾을 수 없습니다.' };
     }
 
-    if (!isAdmin && item.created_by?.userId && item.created_by.userId !== currentUserId) {
+    if (!isAdmin && item.created_by?.userId !== currentUserId) {
       return { success: false, error: `이 항목은 ${item.created_by.userName} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
     }
 
@@ -1438,7 +1438,7 @@ export async function deleteStudentEvaluationItemAction(
     const sportsMeta = evalData.arts_contest_details?.arts_sports_meta || {};
     const meta = sportsMeta[subKeyOrId];
 
-    if (!isAdmin && meta?.userId && meta.userId !== currentUserId) {
+    if (!isAdmin && meta?.userId !== currentUserId) {
       return { success: false, error: `이 항목은 ${meta.userName} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
     }
 
@@ -1459,7 +1459,7 @@ export async function deleteStudentEvaluationItemAction(
       return { success: false, error: '삭제할 교육 이수 내역을 찾을 수 없습니다.' };
     }
 
-    if (!isAdmin && item.created_by?.userId && item.created_by.userId !== currentUserId) {
+    if (!isAdmin && item.created_by?.userId !== currentUserId) {
       return { success: false, error: `이 항목은 ${item.created_by.userName} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
     }
 
@@ -1475,7 +1475,7 @@ export async function deleteStudentEvaluationItemAction(
     const coursesMeta = evalData.employment_details?.career_courses_meta || {};
     const meta = coursesMeta[subKeyOrId];
 
-    if (!isAdmin && meta?.userId && meta.userId !== currentUserId) {
+    if (!isAdmin && meta?.userId !== currentUserId) {
       return { success: false, error: `이 항목은 ${meta.userName} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
     }
 
@@ -1494,7 +1494,7 @@ export async function deleteStudentEvaluationItemAction(
     const clubsMeta = evalData.employment_details?.major_clubs_meta || {};
     const meta = clubsMeta[subKeyOrId];
 
-    if (!isAdmin && meta?.userId && meta.userId !== currentUserId) {
+    if (!isAdmin && meta?.userId !== currentUserId) {
       return { success: false, error: `이 항목은 ${meta.userName} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
     }
 
@@ -1510,7 +1510,7 @@ export async function deleteStudentEvaluationItemAction(
 
   } else if (category === 'skills_contest') {
     const meta = evalData.employment_details?.skills_contest?.created_by;
-    if (!isAdmin && meta?.userId && meta.userId !== currentUserId) {
+    if (!isAdmin && meta?.userId !== currentUserId) {
       return { success: false, error: `이 항목은 ${meta.userName} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
     }
 
@@ -1521,7 +1521,7 @@ export async function deleteStudentEvaluationItemAction(
 
   } else if (category === 'field_training') {
     const meta = evalData.employment_details?.field_training?.created_by;
-    if (!isAdmin && meta?.userId && meta.userId !== currentUserId) {
+    if (!isAdmin && meta?.userId !== currentUserId) {
       return { success: false, error: `이 항목은 ${meta.userName} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
     }
 
@@ -1535,7 +1535,7 @@ export async function deleteStudentEvaluationItemAction(
     const appMeta = evalData.employment_details?.apprenticeship_meta || {};
     const meta = appMeta[subKeyOrId];
 
-    if (!isAdmin && meta?.userId && meta.userId !== currentUserId) {
+    if (!isAdmin && meta?.userId !== currentUserId) {
       return { success: false, error: `이 항목은 ${meta.userName} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
     }
 
@@ -1551,7 +1551,7 @@ export async function deleteStudentEvaluationItemAction(
 
   } else if (category === 'employed_early') {
     const meta = evalData.employment_details?.employed_early?.created_by;
-    if (!isAdmin && meta?.userId && meta.userId !== currentUserId) {
+    if (!isAdmin && meta?.userId !== currentUserId) {
       return { success: false, error: `이 항목은 ${meta.userName} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
     }
 
@@ -1702,7 +1702,7 @@ export async function getMyImportedRecordsAction(
       const school = Number(evalData.volunteer_school_hours || 0);
       const outside = Number(evalData.volunteer_outside_hours || 0);
       const hours = school + outside;
-      if (hours > 0 && (isAdmin || vMeta?.userId === currentUserId || (!vMeta && profile.role === 'teacher'))) {
+      if (hours > 0 && (isAdmin || vMeta?.userId === currentUserId)) {
         totalItemCount++;
         result.push({
           ...base,
@@ -1720,7 +1720,7 @@ export async function getMyImportedRecordsAction(
         const gData = vDetails[gradeKey];
         if (gData?.isCompleted) {
           const gMeta = gData.created_by;
-          if (isAdmin || gMeta?.userId === currentUserId || (!gMeta && profile.role === 'teacher')) {
+          if (isAdmin || gMeta?.userId === currentUserId) {
             totalItemCount++;
             const label = gradeKey === 'mock' ? '3학년 모의평가' : `${gradeKey.replace('grade', '')}학년`;
             result.push({
@@ -1740,7 +1740,7 @@ export async function getMyImportedRecordsAction(
 
       // 1. 산학교육 (배열 → 항목 하나당 1행)
       (eDetails.industry_edu_list || []).forEach((item: any, idx: number) => {
-        if (isAdmin || item.created_by?.userId === currentUserId || (!item.created_by && profile.role === 'teacher')) {
+        if (isAdmin || item.created_by?.userId === currentUserId) {
           totalItemCount++;
           const formattedDate = formatExcelDate(item.dateOrTerm);
           result.push({
@@ -1757,7 +1757,7 @@ export async function getMyImportedRecordsAction(
       // 2. 취업코스 (학기별 1행)
       Object.entries(eDetails.career_courses || {}).forEach(([term, course]) => {
         const meta = eDetails.career_courses_meta?.[term];
-        if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
+        if (isAdmin || meta?.userId === currentUserId) {
           totalItemCount++;
           result.push({
             ...base,
@@ -1773,7 +1773,7 @@ export async function getMyImportedRecordsAction(
       // 3. 심화동아리 (학년별 1행)
       Object.entries(eDetails.major_clubs || {}).forEach(([g, club]) => {
         const meta = eDetails.major_clubs_meta?.[g];
-        if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
+        if (isAdmin || meta?.userId === currentUserId) {
           totalItemCount++;
           result.push({
             ...base,
@@ -1789,7 +1789,7 @@ export async function getMyImportedRecordsAction(
       // 4. 기능경기대회 (1행)
       if (eDetails.skills_contest?.name) {
         const meta = eDetails.skills_contest.created_by;
-        if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
+        if (isAdmin || meta?.userId === currentUserId) {
           totalItemCount++;
           result.push({
             ...base,
@@ -1805,7 +1805,7 @@ export async function getMyImportedRecordsAction(
       // 5. 현장실습 (1행)
       if (eDetails.field_training?.company) {
         const meta = eDetails.field_training.created_by;
-        if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
+        if (isAdmin || meta?.userId === currentUserId) {
           totalItemCount++;
           result.push({
             ...base,
@@ -1821,7 +1821,7 @@ export async function getMyImportedRecordsAction(
       // 6. 도제 OJT (학기별 1행)
       Object.entries(eDetails.apprenticeship || {}).forEach(([term, comp]) => {
         const meta = eDetails.apprenticeship_meta?.[term];
-        if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
+        if (isAdmin || meta?.userId === currentUserId) {
           totalItemCount++;
           result.push({
             ...base,
@@ -1837,7 +1837,7 @@ export async function getMyImportedRecordsAction(
       // 7. 조기취업 (1행)
       if (eDetails.employed_early?.company) {
         const meta = eDetails.employed_early.created_by;
-        if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
+        if (isAdmin || meta?.userId === currentUserId) {
           totalItemCount++;
           result.push({
             ...base,
@@ -1856,7 +1856,7 @@ export async function getMyImportedRecordsAction(
 
       // 1. 대회 실적 (배열 → 항목 하나당 1행)
       (aDetails.contest_list || []).forEach((item: any, idx: number) => {
-        if (isAdmin || item.created_by?.userId === currentUserId || (!item.created_by && profile.role === 'teacher')) {
+        if (isAdmin || item.created_by?.userId === currentUserId) {
           totalItemCount++;
           const formattedDate = formatExcelDate(item.dateOrTerm);
           let itemCat = item.category || '교내대회';
@@ -1887,7 +1887,7 @@ export async function getMyImportedRecordsAction(
       // 2. 운동부/관악부 (학기별 1행)
       Object.entries(aDetails.arts_sports || {}).forEach(([term, dept]) => {
         const meta = aDetails.arts_sports_meta?.[term];
-        if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
+        if (isAdmin || meta?.userId === currentUserId) {
           totalItemCount++;
           result.push({
             ...base,
@@ -2229,7 +2229,7 @@ export async function deleteMyImportedRecordsAction(
 
     if (category === 'volunteer') {
       const vMeta = evalData.volunteer_meta;
-      if (isAdmin || vMeta?.userId === currentUserId || (!vMeta && profile.role === 'teacher')) {
+      if (isAdmin || vMeta?.userId === currentUserId) {
         evalData.volunteer_school_hours = 0;
         evalData.volunteer_outside_hours = 0;
         evalData.volunteer_meta = undefined;
@@ -2249,7 +2249,7 @@ export async function deleteMyImportedRecordsAction(
           const gData = vDetails[gradeKey];
           if (gData) {
             const gMeta = gData.created_by;
-            if (isAdmin || gMeta?.userId === currentUserId || (!gMeta && profile.role === 'teacher')) {
+            if (isAdmin || gMeta?.userId === currentUserId) {
               delete vDetails[gradeKey];
               if (gradeKey === 'grade1') evalData.vocational_grade_1 = 0;
               if (gradeKey === 'grade2') evalData.vocational_grade_2 = 0;
@@ -2268,7 +2268,7 @@ export async function deleteMyImportedRecordsAction(
         if (eDetails.industry_edu_list) {
           const initialLen = eDetails.industry_edu_list.length;
           eDetails.industry_edu_list = eDetails.industry_edu_list.filter(item => {
-            const canDel = isAdmin || item.created_by?.userId === currentUserId || (!item.created_by && profile.role === 'teacher');
+            const canDel = isAdmin || item.created_by?.userId === currentUserId;
             if (canDel) {
               modified = true;
               deletedItemsCount++;
@@ -2283,7 +2283,7 @@ export async function deleteMyImportedRecordsAction(
         if (eDetails.career_courses) {
           Object.keys(eDetails.career_courses).forEach(term => {
             const meta = eDetails.career_courses_meta?.[term];
-            if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
+            if (isAdmin || meta?.userId === currentUserId) {
               delete eDetails.career_courses![term];
               if (eDetails.career_courses_meta) delete eDetails.career_courses_meta[term];
               modified = true;
@@ -2297,7 +2297,7 @@ export async function deleteMyImportedRecordsAction(
         if (eDetails.major_clubs) {
           Object.keys(eDetails.major_clubs).forEach(grade => {
             const meta = eDetails.major_clubs_meta?.[grade];
-            if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
+            if (isAdmin || meta?.userId === currentUserId) {
               delete eDetails.major_clubs![grade];
               if (eDetails.major_clubs_meta) delete eDetails.major_clubs_meta[grade];
               modified = true;
@@ -2310,7 +2310,7 @@ export async function deleteMyImportedRecordsAction(
         // 기능경기대회
         if (eDetails.skills_contest) {
           const meta = eDetails.skills_contest.created_by;
-          if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
+          if (isAdmin || meta?.userId === currentUserId) {
             delete eDetails.skills_contest;
             evalData.skills_contest_level = 'none';
             modified = true;
@@ -2321,7 +2321,7 @@ export async function deleteMyImportedRecordsAction(
         // 현장실습
         if (eDetails.field_training) {
           const meta = eDetails.field_training.created_by;
-          if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
+          if (isAdmin || meta?.userId === currentUserId) {
             delete eDetails.field_training;
             evalData.field_training_completed = false;
             modified = true;
@@ -2333,7 +2333,7 @@ export async function deleteMyImportedRecordsAction(
         if (eDetails.apprenticeship) {
           Object.keys(eDetails.apprenticeship).forEach(term => {
             const meta = eDetails.apprenticeship_meta?.[term];
-            if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
+            if (isAdmin || meta?.userId === currentUserId) {
               delete eDetails.apprenticeship![term];
               if (eDetails.apprenticeship_meta) delete eDetails.apprenticeship_meta[term];
               modified = true;
@@ -2346,7 +2346,7 @@ export async function deleteMyImportedRecordsAction(
         // 조기취업
         if (eDetails.employed_early) {
           const meta = eDetails.employed_early.created_by;
-          if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
+          if (isAdmin || meta?.userId === currentUserId) {
             delete eDetails.employed_early;
             evalData.employed_early = false;
             modified = true;
@@ -2364,7 +2364,7 @@ export async function deleteMyImportedRecordsAction(
             if (targetRowKeys && targetRowKeys.length > 0 && !targetRowKeys.includes(expectedRowKey)) {
               return true;
             }
-            const canDel = isAdmin || item.created_by?.userId === currentUserId || (!item.created_by && profile.role === 'teacher');
+            const canDel = isAdmin || item.created_by?.userId === currentUserId;
             if (canDel) {
               modified = true;
               deletedItemsCount++;
@@ -2385,7 +2385,7 @@ export async function deleteMyImportedRecordsAction(
               return;
             }
             const meta = aDetails.arts_sports_meta?.[term];
-            if (isAdmin || meta?.userId === currentUserId || (!meta && profile.role === 'teacher')) {
+            if (isAdmin || meta?.userId === currentUserId) {
               delete aDetails.arts_sports![term];
               if (aDetails.arts_sports_meta) delete aDetails.arts_sports_meta[term];
               modified = true;
