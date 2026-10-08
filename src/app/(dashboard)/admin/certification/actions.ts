@@ -1421,7 +1421,7 @@ export async function deleteStudentEvaluationItemAction(
     }
 
     if (!isAdmin && item.created_by?.userId !== currentUserId) {
-      return { success: false, error: `이 항목은 ${item.created_by.userName} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
+      return { success: false, error: `이 항목은 ${item.created_by?.userName || '다른'} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
     }
 
     const newList = list.filter(c => c.id !== subKeyOrId);
@@ -1439,7 +1439,7 @@ export async function deleteStudentEvaluationItemAction(
     const meta = sportsMeta[subKeyOrId];
 
     if (!isAdmin && meta?.userId !== currentUserId) {
-      return { success: false, error: `이 항목은 ${meta.userName} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
+      return { success: false, error: `이 항목은 ${meta?.userName || '다른'} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
     }
 
     delete sportsMap[subKeyOrId];
@@ -1460,7 +1460,7 @@ export async function deleteStudentEvaluationItemAction(
     }
 
     if (!isAdmin && item.created_by?.userId !== currentUserId) {
-      return { success: false, error: `이 항목은 ${item.created_by.userName} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
+      return { success: false, error: `이 항목은 ${item.created_by?.userName || '다른'} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
     }
 
     const newList = list.filter(i => i.id !== subKeyOrId);
@@ -1511,7 +1511,7 @@ export async function deleteStudentEvaluationItemAction(
   } else if (category === 'skills_contest') {
     const meta = evalData.employment_details?.skills_contest?.created_by;
     if (!isAdmin && meta?.userId !== currentUserId) {
-      return { success: false, error: `이 항목은 ${meta.userName} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
+      return { success: false, error: `이 항목은 ${meta?.userName || '다른'} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
     }
 
     if (evalData.employment_details) {
@@ -1522,7 +1522,7 @@ export async function deleteStudentEvaluationItemAction(
   } else if (category === 'field_training') {
     const meta = evalData.employment_details?.field_training?.created_by;
     if (!isAdmin && meta?.userId !== currentUserId) {
-      return { success: false, error: `이 항목은 ${meta.userName} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
+      return { success: false, error: `이 항목은 ${meta?.userName || '다른'} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
     }
 
     if (evalData.employment_details) {
@@ -1536,7 +1536,7 @@ export async function deleteStudentEvaluationItemAction(
     const meta = appMeta[subKeyOrId];
 
     if (!isAdmin && meta?.userId !== currentUserId) {
-      return { success: false, error: `이 항목은 ${meta.userName} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
+      return { success: false, error: `이 항목은 ${meta?.userName || '다른'} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
     }
 
     delete appMap[subKeyOrId];
@@ -1552,7 +1552,7 @@ export async function deleteStudentEvaluationItemAction(
   } else if (category === 'employed_early') {
     const meta = evalData.employment_details?.employed_early?.created_by;
     if (!isAdmin && meta?.userId !== currentUserId) {
-      return { success: false, error: `이 항목은 ${meta.userName} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
+      return { success: false, error: `이 항목은 ${meta?.userName || '다른'} 선생님이 등록한 데이터로, 본인 또는 관리자만 삭제할 수 있습니다.` };
     }
 
     if (evalData.employment_details) {
