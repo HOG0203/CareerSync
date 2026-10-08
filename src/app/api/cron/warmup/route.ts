@@ -17,7 +17,11 @@ export const dynamic = 'force-dynamic';
  * 백그라운드 캐시 워밍업 및 DB 웜업 API (/api/cron/warmup)
  * 오랜만에 접속해도 딜레이 없이 0.01초 만에 로딩되도록 캐시와 DB 커넥션을 주기적으로 활성화
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret || request.headers.get('authorization') !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   const startTime = Date.now();
 
   try {

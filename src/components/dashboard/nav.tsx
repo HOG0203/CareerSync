@@ -47,6 +47,7 @@ import {
   CalendarDays,
   ArrowLeftRight,
   Plane,
+  Car,
   Trophy,
   Calculator,
   School,
@@ -151,6 +152,7 @@ export default function Nav({
       items: [
         { href: '/teaching-support/timetable', label: '시간표 조회/관리', icon: CalendarDays },
         { href: '/teaching-support/substitute', label: '결보강 처리', icon: ArrowLeftRight },
+        { href: '/teaching-support/travel-expense', label: '여비정산신청', icon: Car },
       ]
     },
     {
@@ -220,6 +222,7 @@ export default function Nav({
       items: [
         { href: '/teaching-support/timetable', label: '시간표 조회/관리', icon: CalendarDays },
         { href: '/teaching-support/substitute', label: '결보강 처리', icon: ArrowLeftRight },
+        { href: '/teaching-support/travel-expense', label: '여비정산신청', icon: Car },
       ]
     },
     {

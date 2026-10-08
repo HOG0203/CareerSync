@@ -67,7 +67,7 @@ export default async function SubstituteAdminPage() {
       }>
         <AdminClient
           initialApplications={initialApplications}
-          timetableData={timetableData}
+          timetableData={timetableData ?? fallbackTimetableData}
           initialCalendarConfig={initialCalendarConfig}
           currentUserFullName={currentUserFullName}
           currentUsername={currentUsername}

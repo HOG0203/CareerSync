@@ -52,6 +52,7 @@ export const ALL_SYSTEM_MENU_GROUPS = [
     items: [
       { href: '/teaching-support/timetable', label: '시간표 조회/관리', description: '전체/학급/교사별 주간 시간표 조회 및 관리' },
       { href: '/teaching-support/substitute', label: '결보강 처리', description: '대화형 결보강 배정, 교환 및 보강 신청/발급' },
+      { href: '/teaching-support/travel-expense', label: '여비정산신청', description: '출장 여비 정산 신청서 [별지 제3호서식] 작성 및 A4 공문서 출력' },
     ],
   },
   {
@@ -135,6 +136,7 @@ export function getDefaultRoutesForUser(profile: any, subAdminList: string[] = [
     '/admin/certification/import',
     '/teaching-support/timetable',
     '/teaching-support/substitute',
+    '/teaching-support/travel-expense',
   ];
 
   if (isGrade3) {

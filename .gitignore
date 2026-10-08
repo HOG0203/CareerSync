@@ -55,3 +55,8 @@ scratch/
 
 # backups
 /backups/
+
+# temporary pdf, images and outputs
+/*.pdf
+/output/
+/pdf_*.png

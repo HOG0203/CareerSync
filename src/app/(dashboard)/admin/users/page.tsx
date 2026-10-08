@@ -13,6 +13,7 @@ import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { getUserCustomPermissionsMapAction, getMasterAdminInfo, getSubAdminList } from './actions';
 import { UserCog, Crown, ShieldCheck } from 'lucide-react';
 import React from 'react';
+import { redirect } from 'next/navigation';
 import { TableLoadingSkeleton } from '@/components/dashboard/loading-skeleton';
 
 export const dynamic = 'force-dynamic';
@@ -22,6 +23,9 @@ export default async function AdminUsersPage() {
 }
 
 async function AdminUsersPageContent() {
+  const profile = await getCurrentUserProfile();
+  if (!profile) redirect('/login');
+  if (profile.role !== 'admin') redirect('/dashboard');
   // 서버 메모리 캐시 적용된 데이터 병렬 패칭 (Promise.all)
   const [profiles, graduationYears, allBaseData, settings, customPermissionsMap, masterAdminInfo, subAdminList, currentUserProfile] = await Promise.all([
     getCachedProfiles(),

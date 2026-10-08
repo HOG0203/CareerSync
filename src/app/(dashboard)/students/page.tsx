@@ -36,6 +36,7 @@ async function StudentsPageContent({
   if (!userProfile) {
     redirect('/login');
   }
+  if (userProfile.role === 'student') redirect('/student/certification');
 
   const ay = params.ay ? parseInt(params.ay) : settings.baseYear;
 

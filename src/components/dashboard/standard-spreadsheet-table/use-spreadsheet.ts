@@ -164,6 +164,24 @@ export function useSpreadsheet({
     setRedoStack([]);
   }, [])
 
+  const saveBulkAndReconcile = React.useCallback(async (updates: { id: string; field: string; value: any }[]) => {
+    let result: { success: boolean; error?: string };
+    try {
+      result = await onBulkSave(updates);
+    } catch (error) {
+      result = { success: false, error: error instanceof Error ? error.message : '서버 연결에 실패했습니다.' };
+    }
+    if (!result.success) {
+      recentEditsRef.current.clear();
+      setHistory([]);
+      setRedoStack([]);
+      toast({ variant: 'destructive', title: '일괄 저장 중단', description: result.error });
+    }
+    isSyncingRef.current = false;
+    router.refresh();
+    return result;
+  }, [onBulkSave, router, toast]);
+
   const handleUndo = React.useCallback(async () => {
     if (history.length === 0 || isSyncingRef.current) return;
     isSyncingRef.current = true;
@@ -181,10 +199,10 @@ export function useSpreadsheet({
       }
     });
     setData(newData); setHistory(newHistory); setRedoStack(prev => [redoUpdates, ...prev].slice(0, 20));
-    const result = await onBulkSave(serverUpdates);
+    const result = await saveBulkAndReconcile(serverUpdates);
     if (result.success) { toast({ title: '실행 취소 완료' }); router.refresh(); }
     setTimeout(() => { isSyncingRef.current = false; }, 500);
-  }, [history, data, onBulkSave, toast, router])
+  }, [history, data, saveBulkAndReconcile, toast, router])
 
   const handleRedo = React.useCallback(async () => {
     if (redoStack.length === 0 || isSyncingRef.current) return;
@@ -203,10 +221,10 @@ export function useSpreadsheet({
       }
     });
     setData(newData); setRedoStack(newRedoStack); setHistory(prev => [undoUpdates, ...prev].slice(0, 20));
-    const result = await onBulkSave(serverUpdates);
+    const result = await saveBulkAndReconcile(serverUpdates);
     if (result.success) { toast({ title: '다시 실행 완료' }); router.refresh(); }
     setTimeout(() => { isSyncingRef.current = false; }, 500);
-  }, [redoStack, data, onBulkSave, toast, router])
+  }, [redoStack, data, saveBulkAndReconcile, toast, router])
 
   React.useEffect(() => {
     if (isSyncingRef.current) return;
@@ -589,12 +607,12 @@ export function useSpreadsheet({
           recentEditsRef.current.set(`${u.id}-${u.field}`, { field: u.field, value: u.value, timestamp: Date.now() });
         });
         isSyncingRef.current = true;
-        const result = await onBulkSave(updates);
+        const result = await saveBulkAndReconcile(updates);
         if (result.success) toast({ title: '붙여넣기 완료' }); else toast({ variant: 'destructive', title: '저장 실패', description: result.error });
         setTimeout(() => { isSyncingRef.current = false; }, 1500);
       }
     } catch { toast({ variant: 'destructive', title: '붙여넣기 실패' }); }
-  }, [selectionStart, selectionEnd, filteredData, columns, data, onBulkSave, toast, recordHistory])
+  }, [selectionStart, selectionEnd, filteredData, columns, data, saveBulkAndReconcile, toast, recordHistory])
 
   const handleDelete = React.useCallback(async () => {
     if (editingCell || !selectionStart || !selectionEnd) return;
@@ -621,11 +639,11 @@ export function useSpreadsheet({
         recentEditsRef.current.set(`${u.id}-${u.field}`, { field: u.field, value: u.value, timestamp: Date.now() });
       });
       isSyncingRef.current = true;
-      const result = await onBulkSave(updates);
+      const result = await saveBulkAndReconcile(updates);
       if (result.success) toast({ title: '셀 지우기 완료' }); else toast({ variant: 'destructive', title: '삭제 실패' });
       setTimeout(() => { isSyncingRef.current = false; }, 1500);
     }
-  }, [editingCell, selectionStart, selectionEnd, filteredData, columns, data, onBulkSave, toast, recordHistory])
+  }, [editingCell, selectionStart, selectionEnd, filteredData, columns, data, saveBulkAndReconcile, toast, recordHistory])
 
   const handleSaveInternal = React.useCallback(async (id: any, field: any, value: any) => {
     const rIdx = filteredData.findIndex(r => r.id === id);

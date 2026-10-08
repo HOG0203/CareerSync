@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath, revalidateTag } from 'next/cache';
+import { getCurrentUserProfile } from '@/lib/data';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,6 +10,10 @@ export const dynamic = 'force-dynamic';
  * GET /api/revalidate
  */
 export async function GET(req: NextRequest) {
+  const profile = await getCurrentUserProfile();
+  if (profile?.role !== 'admin') {
+    return NextResponse.json({ success: false, error: '관리자 권한이 필요합니다.' }, { status: 403 });
+  }
   try {
     // 1. Next.js Data Cache 전역 태그 무효화
     const tags = [

@@ -793,18 +793,8 @@ export const getCurrentUserProfile = cache(async () => {
 
   if (profile) return profile;
 
-  // Fallback: Auth user metadata (학생 계정 등 RLS/지연 방지)
-  const meta = user.user_metadata || {};
-  return {
-    id: user.id,
-    username: meta.username || user.email?.split('@')[0] || 'user',
-    role: (meta.role || (meta.student_id ? 'student' : 'staff')) as string,
-    full_name: meta.full_name || '사용자',
-    assigned_year: meta.assigned_year || null,
-    assigned_major: meta.assigned_major || null,
-    assigned_class: meta.assigned_class || null,
-    assigned_grade: meta.assigned_grade || null,
-  };
+  // User-editable auth metadata must never grant application permissions.
+  return null;
 });
 
 

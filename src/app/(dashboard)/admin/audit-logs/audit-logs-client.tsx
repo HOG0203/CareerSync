@@ -47,6 +47,8 @@ export function formatTargetName(targetName?: string): string {
     .replace(/teaching-support\/substitute/g, '결보강 처리')
     .replace(/\[teaching-support\/timetable\]/g, '[시간표 조회/관리]')
     .replace(/teaching-support\/timetable/g, '시간표 조회/관리')
+    .replace(/\[teaching-support\/travel-expense\]/g, '[여비정산신청]')
+    .replace(/teaching-support\/travel-expense/g, '여비정산신청')
     .replace(/\[admission\/middle-school-employment\]/g, '[중학교별취업현황]')
     .replace(/admission\/middle-school-employment/g, '중학교별취업현황')
     .replace(/\[employment\/recommendation\]/g, '[학교장 추천 선발]')

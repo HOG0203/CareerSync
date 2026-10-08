@@ -1,5 +1,7 @@
 'use server';
 
+import { checkTeachingSupportPermission } from '@/lib/permissions';
+
 // ==============================================================================
 // src/app/(dashboard)/teaching-support/substitute/actions.ts
 // 결보강 및 수업 교체 서버 액션 (Supabase 영구 저장, 상태 관리, 충돌 검증)
@@ -72,6 +74,7 @@ export async function getSubstituteApplications(
   year = DEFAULT_YEAR,
   semester = DEFAULT_SEMESTER
 ): Promise<{ success: boolean; data: SubstituteApplication[]; error?: string }> {
+  if (!(await checkTeachingSupportPermission('/teaching-support/substitute'))) throw new Error('결보강 메뉴 접근 권한이 필요합니다.');
   try {
     const supabase = createAdminClient();
 
@@ -117,6 +120,7 @@ export async function getSubstituteApplications(
 export async function saveSubstituteApplication(
   application: SubstituteApplication
 ): Promise<{ success: boolean; data?: SubstituteApplication; error?: string }> {
+  if (!(await checkTeachingSupportPermission('/teaching-support/substitute'))) throw new Error('결보강 메뉴 접근 권한이 필요합니다.');
   try {
     const supabase = createAdminClient();
     const year = application.academicYear || DEFAULT_YEAR;
@@ -209,6 +213,7 @@ export async function updateApplicationStatus(
   year = DEFAULT_YEAR,
   semester = DEFAULT_SEMESTER
 ): Promise<{ success: boolean; error?: string }> {
+  if (!(await checkTeachingSupportPermission('/teaching-support/substitute'))) throw new Error('결보강 메뉴 접근 권한이 필요합니다.');
   try {
     const supabase = createAdminClient();
     const now = new Date().toISOString();
@@ -289,6 +294,7 @@ export async function deleteSubstituteApplication(
   year = DEFAULT_YEAR,
   semester = DEFAULT_SEMESTER
 ): Promise<{ success: boolean; error?: string }> {
+  if (!(await checkTeachingSupportPermission('/teaching-support/substitute'))) throw new Error('결보강 메뉴 접근 권한이 필요합니다.');
   try {
     const supabase = createAdminClient();
 
@@ -454,6 +460,7 @@ export const getAcademicCalendarConfig = unstable_cache(
 export async function saveAcademicCalendarConfig(
   config: AcademicCalendarConfig
 ): Promise<{ success: boolean; data?: AcademicCalendarConfig; error?: string }> {
+  if (!(await checkTeachingSupportPermission('/teaching-support/substitute'))) throw new Error('결보강 메뉴 접근 권한이 필요합니다.');
   try {
     const supabase = createAdminClient();
     const storeKey = getCalendarConfigKey(config.academicYear || DEFAULT_YEAR);
@@ -490,6 +497,7 @@ export async function getSubstitutePageData(
   targetYear?: number,
   targetSemester?: number
 ) {
+  if (!(await checkTeachingSupportPermission('/teaching-support/substitute'))) throw new Error('결보강 메뉴 접근 권한이 필요합니다.');
   // 1. 학년도 결정: 인자값 -> 시스템 설정(baseYear) -> 기본값(2026)
   let year = targetYear;
   if (!year) {
@@ -530,6 +538,7 @@ const SUBSTITUTE_ADMIN_PIN_KEY = 'substitute_admin_pin';
 export async function verifySubstituteAdminPin(
   pin: string
 ): Promise<{ success: boolean; isValid: boolean; error?: string }> {
+  if (!(await checkTeachingSupportPermission('/teaching-support/substitute'))) throw new Error('결보강 메뉴 접근 권한이 필요합니다.');
   try {
     const supabase = createAdminClient();
     const { data } = await supabase
@@ -555,6 +564,7 @@ export async function changeSubstituteAdminPin(
   currentPin: string,
   newPin: string
 ): Promise<{ success: boolean; error?: string }> {
+  if (!(await checkTeachingSupportPermission('/teaching-support/substitute'))) throw new Error('결보강 메뉴 접근 권한이 필요합니다.');
   try {
     if (!newPin || newPin.trim().length < 4) {
       return { success: false, error: '새 비밀번호는 최소 4자리 이상이어야 합니다.' };
@@ -602,6 +612,7 @@ export async function getSubstituteAllowanceConfig(
   year = DEFAULT_YEAR,
   semester = DEFAULT_SEMESTER
 ): Promise<{ success: boolean; data: SubstituteAllowanceConfig; error?: string }> {
+  if (!(await checkTeachingSupportPermission('/teaching-support/substitute'))) throw new Error('결보강 메뉴 접근 권한이 필요합니다.');
   try {
     const supabase = await createClient();
     const storeKey = getAllowanceStoreKey(year, semester);
@@ -631,6 +642,7 @@ export async function saveSubstituteAllowanceConfig(
   year = DEFAULT_YEAR,
   semester = DEFAULT_SEMESTER
 ): Promise<{ success: boolean; error?: string }> {
+  if (!(await checkTeachingSupportPermission('/teaching-support/substitute'))) throw new Error('결보강 메뉴 접근 권한이 필요합니다.');
   try {
     const supabase = createAdminClient();
     const storeKey = getAllowanceStoreKey(year, semester);
@@ -668,6 +680,7 @@ export async function exportMonthlySubstituteLedgerExcelAction({
   month?: string | number | null;
   statusFilter?: string;
 }): Promise<{ success: boolean; data?: string; fileName?: string; error?: string }> {
+  if (!(await checkTeachingSupportPermission('/teaching-support/substitute'))) throw new Error('결보강 메뉴 접근 권한이 필요합니다.');
   try {
     const appsRes = await getSubstituteApplications(year, semester);
     if (!appsRes.success || !appsRes.data) {

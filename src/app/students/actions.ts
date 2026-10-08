@@ -3,155 +3,11 @@
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions'
+import { authorizeStudentUpdates } from '@/lib/student-access'
+import { saveInOrder } from '@/lib/bulk-save'
+import { STUDENT_FIELDS as BASIC_INFO_FIELDS, TRAINING_FIELDS as FIELD_TRAINING_EDITABLE_FIELDS } from '@/lib/access-policy'
 
-const normalizeDate = (dateStr: string | null | undefined): string | null => {
-  if (!dateStr || dateStr.trim() === '') return null
-  const match = dateStr.trim().match(/^[\d.\-\/]+/)
-  if (!match) return null
-  let datePart = match[0]
-  let clean = datePart.replace(/[.\/]$/, '').replace(/[.\/]/g, '-')
-  const parts = clean.split('-').filter(p => p !== '')
-  if (parts.length === 3) {
-    let year = parts[0]
-    const month = parts[1].padStart(2, '0')
-    const day = parts[2].padStart(2, '0')
-    if (year.length === 2) year = '20' + year
-    return `${year}-${month}-${day}`
-  }
-  return null
-}
-
-const BASIC_INFO_FIELDS = [
-  'student_id', 'student_name', 'phone_number', 'graduation_year', 'major', 'class_info', 
-  'student_number', 'shoe_size', 'top_size', 'personal_remarks', 'certificates',
-  'career_aspiration', 'military_status', 'special_notes', 'career_course', 'labor_education_status',
-  'middle_school', 'admission_rank_percentile', 'admission_type'
-];
-
-const FIELD_TRAINING_EDITABLE_FIELDS = [
-  'latest_training_company',
-  'start_date',
-  'end_date',
-  'training_stipend_status',
-  'is_hiring_conversion',
-  'is_returned',
-  'return_reason'
-];
-
-async function updateStudentFieldTrainingRecord(
-  supabase: any,
-  studentId: string,
-  field: string,
-  value: any
-) {
-  let finalVal = value;
-  if (value === '' || value === 'CLEARED' || (Array.isArray(value) && value.length === 0)) finalVal = null;
-
-  // 최신 실습 기록 조회 (내림차순 정렬 1건)
-  const { data: latestRecords } = await supabase
-    .from('field_training_records')
-    .select('*')
-    .eq('student_id', studentId)
-    .order('training_order', { ascending: false })
-    .limit(1);
-
-  const latest = latestRecords && latestRecords.length > 0 ? latestRecords[0] : null;
-
-  if (latest) {
-    const updateData: any = { updated_at: new Date().toISOString() };
-    if (field === 'latest_training_company') {
-      updateData.company = finalVal || '';
-    } else if (field === 'start_date') {
-      updateData.start_date = normalizeDate(finalVal);
-    } else if (field === 'end_date') {
-      updateData.end_date = normalizeDate(finalVal);
-    } else if (field === 'training_stipend_status') {
-      updateData.stipend_status = finalVal || 'X';
-    } else if (field === 'is_hiring_conversion') {
-      if (finalVal && finalVal !== 'X') {
-        updateData.hiring_status = '채용전환';
-        updateData.conversion_date = normalizeDate(finalVal) || (finalVal === 'O' ? (latest.end_date || new Date().toISOString().slice(0, 10)) : finalVal);
-        updateData.return_reason = null; // 복교사유 초기화
-      } else {
-        updateData.hiring_status = '진행중';
-        updateData.conversion_date = null;
-      }
-    } else if (field === 'is_returned' || field === 'return_reason') {
-      if (finalVal && finalVal !== 'X') {
-        updateData.hiring_status = '복교';
-        updateData.return_reason = finalVal;
-        updateData.conversion_date = null; // 채용전환 초기화
-      } else {
-        updateData.hiring_status = '진행중';
-        updateData.return_reason = null;
-      }
-    }
-
-    // 수정 후 데이터가 모두 비어 있는지 확인 (실습처, 시작일, 종료일, 복교사유, 전환일 등이 모두 빈 값인 유령 데이터 방지)
-    const merged = { ...latest, ...updateData };
-    const hasCompany = Boolean(merged.company && String(merged.company).trim() !== '');
-    const hasStartDate = Boolean(merged.start_date);
-    const hasEndDate = Boolean(merged.end_date);
-    const hasConversion = Boolean(merged.conversion_date || (merged.hiring_status === '채용전환'));
-    const hasReturn = Boolean(merged.return_reason && String(merged.return_reason).trim() !== '');
-
-    if (!hasCompany && !hasStartDate && !hasEndDate && !hasConversion && !hasReturn) {
-      // 모든 주요 실습 데이터가 비워진 경우 유령 레코드 남기지 않고 삭제
-      await supabase.from('field_training_records').delete().eq('id', latest.id);
-      return { success: true };
-    }
-
-    const { error } = await supabase
-      .from('field_training_records')
-      .update(updateData)
-      .eq('id', latest.id);
-
-    if (error) return { success: false, error: error.message };
-
-    // 채용전환 상태인 경우 취업처도 동기화
-    const effectiveCompany = field === 'latest_training_company' && finalVal ? finalVal : latest.company;
-    if ((updateData.hiring_status === '채용전환' || latest.hiring_status === '채용전환') && effectiveCompany) {
-      await supabase.from('student_employments').upsert({ id: studentId, company: effectiveCompany, updated_at: new Date().toISOString() }, { onConflict: 'id' });
-    }
-
-    return { success: true };
-  } else {
-    // 실습 이력이 없는 상태에서 빈 값/취소 커밋인 경우 1차 실습 레코드를 생성하지 않음
-    const cleanStr = String(finalVal || '').trim();
-    if (!finalVal || cleanStr === '' || cleanStr === 'X' || cleanStr === 'CLEARED' || cleanStr === '-') {
-      return { success: true };
-    }
-
-    // 유효한 값이 입력된 경우에만 1차 실습으로 신규 등록
-    const isConv = field === 'is_hiring_conversion' && finalVal && finalVal !== 'X';
-    const isRet = (field === 'is_returned' || field === 'return_reason') && finalVal && finalVal !== 'X';
-
-    const newRecord: any = {
-      student_id: studentId,
-      training_order: 1,
-      company: field === 'latest_training_company' ? (finalVal || '') : '',
-      start_date: field === 'start_date' ? normalizeDate(finalVal) : null,
-      end_date: field === 'end_date' ? normalizeDate(finalVal) : null,
-      stipend_status: field === 'training_stipend_status' ? (finalVal || 'X') : 'X',
-      hiring_status: isRet ? '복교' : (isConv ? '채용전환' : '진행중'),
-      conversion_date: isConv ? (normalizeDate(finalVal) || (finalVal === 'O' ? new Date().toISOString().slice(0, 10) : finalVal)) : null,
-      return_reason: isRet ? finalVal : null,
-      updated_at: new Date().toISOString()
-    };
-
-    const { error } = await supabase
-      .from('field_training_records')
-      .insert([newRecord]);
-
-    if (error) return { success: false, error: error.message };
-
-    if (isConv && newRecord.company) {
-      await supabase.from('student_employments').upsert({ id: studentId, company: newRecord.company, updated_at: new Date().toISOString() }, { onConflict: 'id' });
-    }
-
-    return { success: true };
-  }
-}
+import { normalizeDate, updateStudentFieldTrainingRecord } from '@/lib/student-training'
 
 /**
  * 학적 이력 동기화
@@ -189,7 +45,7 @@ async function syncAcademicHistory(supabase: any, studentUuid: string, info: any
     }
   }
 
-  await supabase
+  const { error: historyError } = await supabase
     .from('student_academic_history')
     .upsert({
       student_id: studentUuid,
@@ -200,6 +56,7 @@ async function syncAcademicHistory(supabase: any, studentUuid: string, info: any
       student_number: info.student_number,
       teacher_name: teacherName
     }, { onConflict: 'student_id, grade' })
+  if (historyError) throw new Error(`학적 이력 동기화 실패: ${historyError.message}`);
 }
 
 function buildAcademicHistoryRecord(studentUuid: string, info: any, baseYear: number, teachers: any[]) {
@@ -244,6 +101,7 @@ import { parseCSVText } from '@/lib/student-utils';
 
 
 export async function bulkPromoteFromExcel(csvData: string) {
+  if ((await getCurrentUserProfile())?.role !== 'admin') return { success: false, count: 0, error: '관리자 권한이 필요합니다.' };
   const supabase = await createClient()
   const parsedRows = parseCSVText(csvData);
   if (parsedRows.length <= 1) return { success: false, count: 0, errors: ['데이터 행이 없습니다.'] };
@@ -386,6 +244,7 @@ export async function bulkPromoteFromExcel(csvData: string) {
  * [취업·실습 종합 서식] 엑셀 CSV 업로드 (학번 불필요, 자동 매칭/채번, 출신중/입학성적 포함 지원)
  */
 export async function uploadStudentsCSV(csvData: string) {
+  if ((await getCurrentUserProfile())?.role !== 'admin') return { success: false, count: 0, error: '관리자 권한이 필요합니다.' };
   const supabase = createAdminClient()
   const parsedRows = parseCSVText(csvData);
   if (parsedRows.length <= 1) return { success: false, count: 0, error: '데이터 행이 없습니다.' };
@@ -661,6 +520,7 @@ export async function uploadStudentsCSV(csvData: string) {
  * [학생 기본 명부 서식] 엑셀 CSV 업로드 (admin/students 전용, 학번 불필요, 출신중/입학성적 지원)
  */
 export async function uploadBasicStudentsCSV(csvData: string) {
+  if ((await getCurrentUserProfile())?.role !== 'admin') return { success: false, count: 0, error: '관리자 권한이 필요합니다.' };
   const supabase = createAdminClient()
   const parsedRows = parseCSVText(csvData);
   if (parsedRows.length <= 1) return { success: false, count: 0, error: '데이터 행이 없습니다.' };
@@ -859,6 +719,8 @@ export async function uploadBasicStudentsCSV(csvData: string) {
 
 
 export async function updateStudentField(id: string, field: string, value: any) {
+  const accessError = await authorizeStudentUpdates([{ id, field }]);
+  if (accessError) return { success: false, error: accessError };
   const supabase = await createClient(); const settings = await getSystemSettings()
 
   // employment_status(현재진로코스) 변경은 관리자만 가능
@@ -930,8 +792,12 @@ export async function updateStudentField(id: string, field: string, value: any) 
   const oldValue = oldRecord ? (oldRecord as any)[field] : null;
   const studentLabel = studentInfo ? `${studentInfo.student_name} (${studentInfo.class_info ? `${studentInfo.class_info}반 ` : ''}${studentInfo.student_number ? `${studentInfo.student_number}번` : ''})` : `학생 (ID: ${id})`;
 
-  const { error } = await supabase.from(targetTable).update({ [field]: finalValue, updated_at: new Date().toISOString() }).eq('id', id);
-  if (error) return { success: false, error: error.message };
+  const payload = { [field]: finalValue, updated_at: new Date().toISOString() };
+  const query = isBasicField
+    ? supabase.from(targetTable).update(payload).eq('id', id)
+    : supabase.from(targetTable).upsert({ id, ...payload }, { onConflict: 'id' });
+  const { data: saved, error } = await query.select('id').maybeSingle();
+  if (error || !saved) return { success: false, error: error?.message || '저장 권한이 없거나 학생을 찾을 수 없습니다.' };
   
   if (['major', 'class_info', 'student_number', 'graduation_year'].includes(field)) {
     const { data: student } = await supabase.from('students').select('*').eq('id', id).single();
@@ -992,6 +858,8 @@ export async function updateStudentField(id: string, field: string, value: any) 
  * 노동인권교육 이수 상태 전용 초고속 변경 액션 (0.1초 미만 응답)
  */
 export async function updateLaborEducationStatus(id: string, status: string) {
+  const accessError = await authorizeStudentUpdates([{ id, field: 'labor_education_status' }]);
+  if (accessError) return { success: false, error: accessError };
   const supabase = await createClient();
   const { error } = await supabase
     .from('students')
@@ -1021,87 +889,21 @@ export async function updateLaborEducationStatus(id: string, status: string) {
 
 
 export async function bulkUpdateStudentData(updates: { id: string, field: string, value: any }[]) {
-  if (!updates || updates.length === 0) return { success: true };
-
-  const supabase = createAdminClient();
-  const studentsMap = new Map<string, Record<string, any>>();
-  const employmentsMap = new Map<string, Record<string, any>>();
-  const fieldTrainingUpdates: Array<{ id: string; field: string; value: any }> = [];
-
-  for (const update of updates) {
-    if (FIELD_TRAINING_EDITABLE_FIELDS.includes(update.field)) {
-      fieldTrainingUpdates.push(update);
-    } else {
-      let fv = update.value;
-      if (update.field === 'graduation_year') fv = update.value ? parseInt(update.value) : null;
-      else if (update.value === '' || update.value === 'CLEARED' || (Array.isArray(update.value) && update.value.length === 0)) fv = null;
-
-      const isStudentField = BASIC_INFO_FIELDS.includes(update.field);
-      const targetMap = isStudentField ? studentsMap : employmentsMap;
-
-      let record = targetMap.get(update.id);
-      if (!record) {
-        record = { id: update.id, updated_at: new Date().toISOString() };
-        targetMap.set(update.id, record);
-      }
-      record[update.field] = fv;
-    }
+  const accessError = await authorizeStudentUpdates(updates);
+  if (accessError) return { success: false, savedCount: 0, error: accessError };
+  try {
+    // Reuse single-edit synchronization (history, phone accounts, training and audit).
+    return await saveInOrder(updates, update => updateStudentField(update.id, update.field, update.value));
+  } finally {
+    // A failed request may already have written some rows.
+    revalidateTag('students');
+    revalidateTag('middle-school-employment');
+    revalidatePath('/', 'layout');
   }
-
-  // Chunk 단위 학생 기본 정보 업데이트 (students) - not-null 제약조건 오류 방지 위해 update 적용
-  if (studentsMap.size > 0) {
-    const updatePromises = Array.from(studentsMap.entries()).map(([id, record]) => {
-      const { id: _, ...fields } = record;
-      return supabase.from('students').update(fields).eq('id', id);
-    });
-    const results = await Promise.all(updatePromises);
-    const err = results.find(r => r.error);
-    if (err?.error) {
-      console.error('Bulk update students error:', err.error);
-      return { success: false, error: err.error.message };
-    }
-  }
-
-  // Chunk 단위 Bulk Upsert (student_employments)
-  if (employmentsMap.size > 0) {
-    const employmentRecords = Array.from(employmentsMap.values());
-    for (let i = 0; i < employmentRecords.length; i += 100) {
-      const chunk = employmentRecords.slice(i, i + 100);
-      await supabase.from('student_employments').upsert(chunk, { onConflict: 'id' });
-    }
-  }
-
-  // 현장실습 항목 업데이트
-  for (const update of fieldTrainingUpdates) {
-    await updateStudentFieldTrainingRecord(supabase, update.id, update.field, update.value);
-  }
-
-  const { logAuditAction } = await import('@/lib/audit-logger');
-  await logAuditAction({
-    action_type: 'STUDENT_BULK_UPDATE',
-    target_name: `학생 데이터 ${updates.length}건 일괄 수정`,
-    details: { count: updates.length }
-  });
-
-  const { clearAssignedStudentDetailsCache } = await import('@/lib/data');
-  await clearAssignedStudentDetailsCache();
-
-  revalidateTag('students');
-  revalidateTag('middle-school-employment');
-  revalidatePath('/students'); 
-  revalidatePath('/admin/students'); 
-  revalidatePath('/class-management');
-  revalidatePath('/employment-status');
-  revalidatePath('/labor-education');
-  revalidatePath('/dashboard');
-  revalidatePath('/field-training');
-  revalidatePath('/admission/middle-school-employment');
-  revalidatePath('/share/admission/middle-school-employment');
-
-  return { success: true }
 }
 
 export async function createStudent(data: { graduation_year: number, major: string, class_info: string, student_number: string, student_name: string, middle_school?: string, admission_type?: string }) {
+  if ((await getCurrentUserProfile())?.role !== 'admin') return { success: false, count: 0, error: '관리자 권한이 필요합니다.' };
   const supabase = await createClient(); 
   const settings = await getSystemSettings();
 
@@ -1143,6 +945,7 @@ export async function createStudent(data: { graduation_year: number, major: stri
 
 
 export async function deleteStudents(ids: string[]) {
+  if ((await getCurrentUserProfile())?.role !== 'admin') return { success: false, count: 0, error: '관리자 권한이 필요합니다.' };
   const supabase = await createClient()
   await supabase.from('student_employments').delete().in('id', ids)
   const { error } = await supabase.from('students').delete().in('id', ids)
