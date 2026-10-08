@@ -13,7 +13,7 @@ const PAGE_NAME_MAP: Record<string, string> = {
   '/students': '취업상세데이터',
   '/employment/grade': '내신등급 계산',
   '/employment/kai-grade': '내신등급 계산',
-  '/employment/recommendation': '학교장 추천 선발',
+  '/employment/recommendation': '추천/선발',
   '/class-management': '학반 관리',
   '/merit-demerit': '상벌점 관리',
   '/labor-education': '노동인권교육',

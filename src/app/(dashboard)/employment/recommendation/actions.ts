@@ -14,61 +14,91 @@ import { getCachedCertificationSummaryList } from '@/app/(dashboard)/admin/certi
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 
-// 🎯 성적 산출 제외/반영 규칙 프리셋 인터페이스
-export interface GradeExclusionRules {
-  excludeArts: boolean; // 예체능(체육/음악/미술/스포츠/건강) 제외 (기본 true)
-  excludeSecondLang: boolean; // 제2외국어 및 한문 제외 (기본 true)
-  excludePF: boolean; // P/F(이수/미이수) 과목 제외 (기본 true)
-  subjectGroup: 'all' | 'kem' | 'general' | 'vocational'; // 반영 교과군 (기본 'all': 예체능·외국어 제외 전과목)
-  targetSemesters: 'five_semesters' | 'all_semesters'; // 반영 학기 (기본 'five_semesters': 1-1 ~ 3-1 5개 학기)
-  gradeScale: '9_scale' | '5_scale'; // 9등급제(1,3,5,7,9) vs 5등급제(1,2,3,4,5) (기본 '9_scale')
-  preferRankGrade: boolean; // 기존 데이터에 석차등급이 있는 경우 석차등급 우선 적용 (기본 true)
-}
+import {
+  GradeExclusionRules,
+  DEFAULT_GRADE_RULES,
+  EvaluationWeightsConfig,
+  DEFAULT_EVALUATION_WEIGHTS,
+  CandidateScoreRecord,
+  RecommendationSession
+} from './types';
 
-const DEFAULT_GRADE_RULES: GradeExclusionRules = {
-  excludeArts: true,
-  excludeSecondLang: true,
-  excludePF: true,
-  subjectGroup: 'all',
-  targetSemesters: 'five_semesters',
-  gradeScale: '9_scale',
-  preferRankGrade: true
+export type {
+  GradeExclusionRules,
+  EvaluationWeightsConfig,
+  CandidateScoreRecord,
+  RecommendationSession
 };
 
-export interface CandidateScoreRecord {
-  studentId: string;
-  studentName: string;
-  studentNumber: string;
-  major: string;
-  classInfo: string;
-  graduationYear: number;
-  // NCS: 30점 만점 직접 입력
-  ncsScore: number | null; // 0 ~ 30
-  // 면접: 10점 만점 직접 입력
-  interviewScore: number | null; // 0 ~ 10
-  // 교과성적: 평균 등급(GPA) 및 100점 만점 원점수, 30점 만점 환산점수
-  schoolAverageGrade?: number | null; // 예: 1.10등급
-  schoolScoreOriginal: number | null; // 0 ~ 100점
-  schoolScoreConverted: number | null; // 0 ~ 30점
-  // 옥저인재인증: 100점 만점 원점수 및 30점 만점 환산점수 (원점수 * 0.3)
-  certScoreOriginal: number | null;
-  certScoreConverted: number | null;
-  // 종합점수: 100점 만점
-  totalScore: number | null;
-  remarks?: string;
-  addedAt: string;
-}
+/**
+ * 학생 후보자의 배점 및 환산 점수 자동 계산 헬퍼
+ */
+function computeCandidateScores(
+  cand: CandidateScoreRecord,
+  schoolOriginal: number,
+  schoolAverageGrade: number,
+  certOriginal: number,
+  weights: EvaluationWeightsConfig = DEFAULT_EVALUATION_WEIGHTS,
+  overrides?: { ncsScore?: number | null; interviewScore?: number | null; remarks?: string }
+): void {
+  const useSchool = weights.useSchoolScore !== false;
+  const useCert = weights.useCertScore !== false;
+  const useNcs = weights.useNcs !== false;
+  const useInt = weights.useInterview !== false;
 
-export interface RecommendationSession {
-  id: string;
-  title: string;
-  targetGrade: number; // 대상 학년 (기본 3학년)
-  recommendationQuota: number; // 추천 선발 인원수 (기본 5명)
-  description?: string;
-  gradeRules?: GradeExclusionRules; // 성적 제외 및 반영 규칙 프리셋
-  createdAt: string;
-  updatedAt: string;
-  candidates: Record<string, CandidateScoreRecord>; // studentId -> CandidateScoreRecord
+  const schoolMax = weights.schoolScoreMax ?? 30;
+  const certMax = weights.certScoreMax ?? 30;
+  const ncsMax = weights.ncsMax ?? 30;
+  const intMax = weights.interviewMax ?? 10;
+
+  // NCS 점수 처리
+  let ncsScore = overrides?.ncsScore !== undefined ? overrides.ncsScore : cand.ncsScore;
+  if (!useNcs) {
+    ncsScore = null;
+  } else if (ncsScore !== null && ncsScore !== undefined) {
+    ncsScore = Math.min(ncsMax, Math.max(0, parseFloat(Number(ncsScore).toFixed(2))));
+  } else {
+    ncsScore = null;
+  }
+
+  // 면접 점수 처리
+  let interviewScore = overrides?.interviewScore !== undefined ? overrides.interviewScore : cand.interviewScore;
+  if (!useInt) {
+    interviewScore = null;
+  } else if (interviewScore !== null && interviewScore !== undefined) {
+    interviewScore = Math.min(intMax, Math.max(0, parseFloat(Number(interviewScore).toFixed(2))));
+  } else {
+    interviewScore = null;
+  }
+
+  // 교과성적 환산
+  cand.schoolAverageGrade = schoolAverageGrade;
+  cand.schoolScoreOriginal = schoolOriginal;
+  cand.schoolScoreConverted = useSchool
+    ? parseFloat(((schoolOriginal * schoolMax) / 100).toFixed(2))
+    : 0;
+
+  // 옥저인재인증 환산
+  cand.certScoreOriginal = certOriginal;
+  cand.certScoreConverted = useCert
+    ? parseFloat(((certOriginal * certMax) / 100).toFixed(2))
+    : 0;
+
+  cand.ncsScore = ncsScore;
+  cand.interviewScore = interviewScore;
+
+  if (overrides?.remarks !== undefined) {
+    cand.remarks = overrides.remarks;
+  }
+
+  const ncsVal = useNcs ? (ncsScore || 0) : 0;
+  const schoolVal = useSchool ? (cand.schoolScoreConverted || 0) : 0;
+  const certVal = useCert ? (cand.certScoreConverted || 0) : 0;
+  const intVal = useInt ? (interviewScore || 0) : 0;
+
+  cand.totalScore = (ncsScore !== null || interviewScore !== null || schoolVal > 0 || certVal > 0)
+    ? parseFloat((ncsVal + schoolVal + certVal + intVal).toFixed(2))
+    : null;
 }
 
 const SESSIONS_STORE_KEY = 'principal_recommendation_sessions';
@@ -287,6 +317,11 @@ export async function saveRecommendationSession(
       ...(sessionData.gradeRules || {})
     };
 
+    const evaluationWeights: EvaluationWeightsConfig = {
+      ...DEFAULT_EVALUATION_WEIGHTS,
+      ...(sessionData.evaluationWeights || {})
+    };
+
     if (sessionData.id) {
       const idx = sessions.findIndex(s => s.id === sessionData.id);
       if (idx === -1) {
@@ -299,10 +334,11 @@ export async function saveRecommendationSession(
         recommendationQuota: sessionData.recommendationQuota || sessions[idx].recommendationQuota || 5,
         description: sessionData.description !== undefined ? sessionData.description : sessions[idx].description,
         gradeRules,
+        evaluationWeights,
         updatedAt: now,
       };
 
-      // 규칙이 변경되었을 수 있으므로 기존 등록된 후보자들의 성적(30점) 자동 재산출
+      // 규칙이나 배점이 변경되었을 수 있으므로 기존 등록된 후보자들의 성적 및 총점 자동 재산출
       const studentIds = Object.keys(targetSession.candidates || {});
       if (studentIds.length > 0) {
         const recomputedScores = await batchCalculateStudentSchoolScores(studentIds, gradeRules);
@@ -310,15 +346,11 @@ export async function saveRecommendationSession(
           const cand = targetSession.candidates[id];
           if (!cand) return;
           const score = recomputedScores[id];
-          if (score) {
-            cand.schoolAverageGrade = score.schoolAverageGrade;
-            cand.schoolScoreOriginal = score.schoolOriginal;
-            cand.schoolScoreConverted = score.schoolConverted;
-            const certConv = cand.certScoreConverted || 0;
-            const ncsVal = cand.ncsScore || 0;
-            const intVal = cand.interviewScore || 0;
-            cand.totalScore = parseFloat((ncsVal + score.schoolConverted + certConv + intVal).toFixed(2));
-          }
+          const schoolOriginal = score ? score.schoolOriginal : (cand.schoolScoreOriginal || 0);
+          const schoolAvg = score ? score.schoolAverageGrade : (cand.schoolAverageGrade || 0);
+          const certOrig = cand.certScoreOriginal || 0;
+
+          computeCandidateScores(cand, schoolOriginal, schoolAvg, certOrig, evaluationWeights);
         });
       }
 
@@ -331,6 +363,7 @@ export async function saveRecommendationSession(
         recommendationQuota: sessionData.recommendationQuota || 5,
         description: sessionData.description || '',
         gradeRules,
+        evaluationWeights,
         createdAt: now,
         updatedAt: now,
         candidates: {}
@@ -400,7 +433,7 @@ export const getAvailableStudentsForRecommendation = unstable_cache(
 
       const { data: students, error } = await supabase
         .from('students')
-        .select('id, student_name, student_number, class_info, major, graduation_year')
+        .select('id, student_id, student_name, student_number, class_info, major, graduation_year')
         .eq('graduation_year', targetGradYear)
         .order('major', { ascending: true })
         .order('class_info', { ascending: true })
@@ -468,11 +501,12 @@ export async function fetchStudentBaseScores(
 }
 
 /**
- * 세션에 희망 학생 추가 (제외 규칙이 적용된 성적 30점 및 옥저인증 30점 자동 환산)
+ * 세션에 희망 학생 추가 (제외 규칙이 적용된 성적 30점 및 옥저인증 30점 자동 환산, 선택적 초기 점수 반영)
  */
 export async function addCandidatesToSession(
   sessionId: string,
-  studentIds: string[]
+  studentIds: string[],
+  initialScores?: Record<string, { ncsScore?: number | null; interviewScore?: number | null; remarks?: string }>
 ): Promise<{ success: boolean; session?: RecommendationSession; error?: string }> {
   try {
     const supabase = createAdminClient();
@@ -485,6 +519,7 @@ export async function addCandidatesToSession(
     const session = sessions[idx];
     const targetGrade = session.targetGrade || 3;
     const rules = session.gradeRules || DEFAULT_GRADE_RULES;
+    const weights = session.evaluationWeights || DEFAULT_EVALUATION_WEIGHTS;
 
     // 1. 학생 기본 정보 조회
     const { data: students, error: stErr } = await supabase
@@ -503,33 +538,37 @@ export async function addCandidatesToSession(
     students.forEach(st => {
       const existing = session.candidates[st.id];
       const score = baseScores[st.id] || { schoolOriginal: 0, schoolConverted: 0, schoolAverageGrade: 0, certOriginal: 0, certConverted: 0 };
+      const override = initialScores?.[st.id];
 
-      const ncsScore = existing?.ncsScore ?? null;
-      const interviewScore = existing?.interviewScore ?? null;
-
-      // 종합점수 = NCS(30) + 성적환산(30) + 옥저인증환산(30) + 면접(10)
-      const totalScore = (ncsScore !== null || interviewScore !== null || score.schoolConverted > 0 || score.certConverted > 0)
-        ? parseFloat(((ncsScore || 0) + score.schoolConverted + score.certConverted + (interviewScore || 0)).toFixed(2))
-        : null;
-
-      session.candidates[st.id] = {
+      const candRecord: CandidateScoreRecord = existing || {
         studentId: st.id,
         studentName: st.student_name,
         studentNumber: st.student_number,
         major: st.major,
         classInfo: st.class_info,
         graduationYear: st.graduation_year,
-        ncsScore,
-        interviewScore,
+        ncsScore: null,
+        interviewScore: null,
         schoolAverageGrade: score.schoolAverageGrade,
         schoolScoreOriginal: score.schoolOriginal,
-        schoolScoreConverted: score.schoolConverted,
+        schoolScoreConverted: 0,
         certScoreOriginal: score.certOriginal,
-        certScoreConverted: score.certConverted,
-        totalScore,
-        remarks: existing?.remarks || '',
-        addedAt: existing?.addedAt || now
+        certScoreConverted: 0,
+        totalScore: null,
+        remarks: '',
+        addedAt: now
       };
+
+      computeCandidateScores(
+        candRecord,
+        score.schoolOriginal,
+        score.schoolAverageGrade,
+        score.certOriginal,
+        weights,
+        override
+      );
+
+      session.candidates[st.id] = candRecord;
     });
 
     session.updatedAt = now;
@@ -609,27 +648,37 @@ export async function bulkSaveCandidateScores(
     }
 
     const session = sessions[idx];
+    const weights = session.evaluationWeights || DEFAULT_EVALUATION_WEIGHTS;
+    const ncsMax = weights.ncsMax ?? 30;
+    const intMax = weights.interviewMax ?? 10;
+    const useNcs = weights.useNcs !== false;
+    const useInt = weights.useInterview !== false;
 
     updates.forEach(u => {
       const cand = session.candidates[u.studentId];
       if (!cand) return;
 
+      let newNcs = cand.ncsScore;
+      let newInt = cand.interviewScore;
+
       if (u.ncsScore !== undefined) {
-        cand.ncsScore = u.ncsScore !== null ? Math.min(30, Math.max(0, parseFloat(Number(u.ncsScore).toFixed(2)))) : null;
+        newNcs = (useNcs && u.ncsScore !== null) ? Math.min(ncsMax, Math.max(0, parseFloat(Number(u.ncsScore).toFixed(2)))) : null;
       }
       if (u.interviewScore !== undefined) {
-        cand.interviewScore = u.interviewScore !== null ? Math.min(10, Math.max(0, parseFloat(Number(u.interviewScore).toFixed(2)))) : null;
+        newInt = (useInt && u.interviewScore !== null) ? Math.min(intMax, Math.max(0, parseFloat(Number(u.interviewScore).toFixed(2)))) : null;
       }
       if (u.remarks !== undefined) {
         cand.remarks = u.remarks;
       }
 
-      const schoolConv = cand.schoolScoreConverted || 0;
-      const certConv = cand.certScoreConverted || 0;
-      const ncsVal = cand.ncsScore || 0;
-      const intVal = cand.interviewScore || 0;
-
-      cand.totalScore = parseFloat((ncsVal + schoolConv + certConv + intVal).toFixed(2));
+      computeCandidateScores(
+        cand,
+        cand.schoolScoreOriginal || 0,
+        cand.schoolAverageGrade || 0,
+        cand.certScoreOriginal || 0,
+        weights,
+        { ncsScore: newNcs, interviewScore: newInt }
+      );
     });
 
     session.updatedAt = new Date().toISOString();
@@ -670,6 +719,7 @@ export async function recalculateSessionScoresAction(
 
     const session = sessions[idx];
     const rules = session.gradeRules || DEFAULT_GRADE_RULES;
+    const weights = session.evaluationWeights || DEFAULT_EVALUATION_WEIGHTS;
     const studentIds = Object.keys(session.candidates || {});
 
     if (studentIds.length > 0) {
@@ -678,15 +728,11 @@ export async function recalculateSessionScoresAction(
         const cand = session.candidates[id];
         if (!cand) return;
         const score = recomputed[id];
-        if (score) {
-          cand.schoolAverageGrade = score.schoolAverageGrade;
-          cand.schoolScoreOriginal = score.schoolOriginal;
-          cand.schoolScoreConverted = score.schoolConverted;
-          const certConv = cand.certScoreConverted || 0;
-          const ncsVal = cand.ncsScore || 0;
-          const intVal = cand.interviewScore || 0;
-          cand.totalScore = parseFloat((ncsVal + score.schoolConverted + certConv + intVal).toFixed(2));
-        }
+        const schoolOriginal = score ? score.schoolOriginal : (cand.schoolScoreOriginal || 0);
+        const schoolAvg = score ? score.schoolAverageGrade : (cand.schoolAverageGrade || 0);
+        const certOrig = cand.certScoreOriginal || 0;
+
+        computeCandidateScores(cand, schoolOriginal, schoolAvg, certOrig, weights);
       });
     }
 
@@ -796,8 +842,20 @@ export async function exportRecommendationExcelAction(
       bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
     };
 
+    const weights = session.evaluationWeights || DEFAULT_EVALUATION_WEIGHTS;
+    const parts: string[] = [];
+    if (weights.useNcs) parts.push(`NCS 시험 ${weights.ncsMax}점`);
+    if (weights.useSchoolScore) parts.push(`교과성적 ${weights.schoolScoreMax}점`);
+    if (weights.useCertScore) parts.push(`옥저인재인증 ${weights.certScoreMax}점`);
+    if (weights.useInterview) parts.push(`면접점수 ${weights.interviewMax}점`);
+    const totalMax = (weights.useNcs ? weights.ncsMax : 0) +
+                     (weights.useSchoolScore ? weights.schoolScoreMax : 0) +
+                     (weights.useCertScore ? weights.certScoreMax : 0) +
+                     (weights.useInterview ? weights.interviewMax : 0);
+    const weightDesc = `배점: ${parts.join(' + ')} (총 ${totalMax}점 만점)`;
+
     const subTitleRow2 = ws.addRow([
-      `■ 성적 반영 기준: ${scaleName} (${rules.preferRankGrade ? '기존 석차등급 우선 적용' : '성취도 환산'})   |   배점: NCS 시험 30점 + 교과성적 30점 + 옥저인재인증 30점 + 면접 10점 (총 100점 만점)`
+      `■ 성적 반영 기준: ${scaleName} (${rules.preferRankGrade ? '기존 석차등급 우선 적용' : '성취도 환산'})   |   ${weightDesc}`
     ]);
     subTitleRow2.height = 22;
     ws.mergeCells('A4:M4');
@@ -823,11 +881,11 @@ export async function exportRecommendationExcelAction(
       '반',
       '번호',
       '교과 평균등급',
-      '교과성적 (30점)',
-      'NCS점수 (30점)',
-      '옥저인증 (30점)',
-      '면접점수 (10점)',
-      '종합점수 (100점)',
+      weights.useSchoolScore ? `교과성적 (${weights.schoolScoreMax}점)` : '교과성적 (미반영)',
+      weights.useNcs ? `NCS점수 (${weights.ncsMax}점)` : 'NCS점수 (미반영)',
+      weights.useCertScore ? `옥저인증 (${weights.certScoreMax}점)` : '옥저인증 (미반영)',
+      weights.useInterview ? `면접점수 (${weights.interviewMax}점)` : '면접점수 (미반영)',
+      `종합점수 (${totalMax}점)`,
       '비고'
     ];
 

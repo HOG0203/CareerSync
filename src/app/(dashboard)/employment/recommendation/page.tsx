@@ -11,8 +11,8 @@ import { getUserCustomPermissionsMapAction } from '@/app/(dashboard)/admin/users
 import { redirect } from 'next/navigation';
 
 export const metadata: Metadata = {
-  title: '학교장 추천 대상자 선정 시스템 | 취업진로관리',
-  description: 'NCS 30점, 교과성적 30점, 옥저인재인증 30점, 면접 10점 기준 학교장추천대상자 심사 및 선발 시스템',
+  title: '추천/선발 시스템 | 취업진로관리',
+  description: 'NCS 30점, 교과성적 30점, 옥저인재인증 30점, 면접 10점 기준 추천/선발 대상자 심사 및 선발 시스템',
 };
 
 export default async function RecommendationPage() {

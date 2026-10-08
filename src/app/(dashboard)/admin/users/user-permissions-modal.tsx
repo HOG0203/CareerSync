@@ -42,7 +42,7 @@ export const ALL_SYSTEM_MENU_GROUPS = [
       { href: '/students', label: '취업상세데이터', description: '학생별 상세 취업 데이터 스프레드시트' },
       { href: '/labor-education', label: '노동인권교육', description: '노동인권교육 이수 현황 그리드' },
       { href: '/employment/grade', label: '내신등급 계산', description: '맞춤형 내신등급 산출 및 기업별 지원자 선별' },
-      { href: '/employment/recommendation', label: '학교장 추천 선발', description: 'NCS, 성적, 인증점수, 면접 종합 추천 대상자 심사' },
+      { href: '/employment/recommendation', label: '추천/선발', description: 'NCS, 성적, 인증점수, 면접 종합 추천 대상자 심사' },
     ],
   },
   {

@@ -142,7 +142,7 @@ export default function Nav({
         ...(canView3rdGradeDetailMenus ? [{ href: '/labor-education', label: '노동인권교육', icon: ShieldAlert }] : []),
         ...(isAdmin ? [
           { href: '/employment/grade', label: '내신등급 계산', icon: Calculator },
-          { href: '/employment/recommendation', label: '학교장 추천 선발', icon: Trophy },
+          { href: '/employment/recommendation', label: '추천/선발', icon: Trophy },
         ] : []),
       ]
     },
@@ -213,7 +213,7 @@ export default function Nav({
         { href: '/students', label: '취업상세데이터', icon: ClipboardList },
         { href: '/labor-education', label: '노동인권교육', icon: ShieldAlert },
         { href: '/employment/grade', label: '내신등급 계산', icon: Calculator },
-        { href: '/employment/recommendation', label: '학교장 추천 선발', icon: Trophy },
+        { href: '/employment/recommendation', label: '추천/선발', icon: Trophy },
       ]
     },
     {

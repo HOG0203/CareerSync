@@ -316,27 +316,39 @@ export const getGradeStudents = unstable_cache(
       const scoresByStudent: Record<string, RawScoreItem[]> = {};
 
       if (studentIds.length > 0) {
-        // Vercel 네트워크 지연 최소화를 위해 1회 통합 쿼리로 모든 학생 성적 패칭
-        const { data: allScores, error: scoreErr } = await supabase
-          .from('student_scores')
-          .select('student_id, grade, semester, subject, credits, achievement, rank_grade')
-          .in('student_id', studentIds);
-
-        if (scoreErr) {
-          console.error('Failed to fetch student scores:', scoreErr);
-        } else if (allScores) {
-          allScores.forEach((sc: any) => {
-            if (!scoresByStudent[sc.student_id]) scoresByStudent[sc.student_id] = [];
-            scoresByStudent[sc.student_id].push({
-              grade: sc.grade,
-              semester: sc.semester,
-              subject: sc.subject,
-              credits: sc.credits,
-              achievement: sc.achievement,
-              rank_grade: sc.rank_grade,
-            });
-          });
+        // Supabase 기본 쿼리 제한(최대 1,000행) 초과 방지를 위해 15명 단위 청크로 분할하여 병렬 조회
+        const chunkSize = 15;
+        const chunks: string[][] = [];
+        for (let i = 0; i < studentIds.length; i += chunkSize) {
+          chunks.push(studentIds.slice(i, i + chunkSize));
         }
+
+        const scorePromises = chunks.map(chunk =>
+          supabase
+            .from('student_scores')
+            .select('student_id, grade, semester, subject, credits, achievement, rank_grade')
+            .in('student_id', chunk)
+            .limit(1000)
+        );
+
+        const scoreResults = await Promise.all(scorePromises);
+        scoreResults.forEach(r => {
+          if (r.error) {
+            console.error('Failed to fetch a chunk of student scores:', r.error);
+          } else if (r.data) {
+            r.data.forEach((sc: any) => {
+              if (!scoresByStudent[sc.student_id]) scoresByStudent[sc.student_id] = [];
+              scoresByStudent[sc.student_id].push({
+                grade: sc.grade,
+                semester: sc.semester,
+                subject: sc.subject,
+                credits: sc.credits,
+                achievement: sc.achievement,
+                rank_grade: sc.rank_grade,
+              });
+            });
+          }
+        });
       }
 
       const studentsWithScores: GradeStudentListItem[] = students.map(st => ({

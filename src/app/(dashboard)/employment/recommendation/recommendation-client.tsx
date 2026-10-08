@@ -8,10 +8,15 @@
 // ==============================================================================
 
 import * as React from 'react';
-import { 
-  RecommendationSession, 
+import {
+  RecommendationSession,
   CandidateScoreRecord,
   GradeExclusionRules,
+  DEFAULT_GRADE_RULES,
+  EvaluationWeightsConfig,
+  DEFAULT_EVALUATION_WEIGHTS,
+} from './types';
+import { 
   saveRecommendationSession,
   deleteRecommendationSession,
   getAvailableStudentsForRecommendation,
@@ -21,16 +26,7 @@ import {
   recalculateSessionScoresAction,
   exportRecommendationExcelAction
 } from './actions';
-
-const DEFAULT_GRADE_RULES: GradeExclusionRules = {
-  excludeArts: true,
-  excludeSecondLang: true,
-  excludePF: true,
-  subjectGroup: 'all',
-  targetSemesters: 'five_semesters',
-  gradeScale: '9_scale',
-  preferRankGrade: true
-};
+import { RecommendationExcelTab } from './recommendation-excel-tab';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -125,6 +121,17 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
   const [sessionFormGrade, setSessionFormGrade] = React.useState<number>(3);
   const [sessionFormDesc, setSessionFormDesc] = React.useState<string>('');
 
+  // 세션 평가 영역 및 배점 설정 상태 (표준형 vs 커스텀)
+  const [sessionFormWeightsMode, setSessionFormWeightsMode] = React.useState<'standard' | 'custom'>('standard');
+  const [sessionFormUseNcs, setSessionFormUseNcs] = React.useState<boolean>(true);
+  const [sessionFormUseSchoolScore, setSessionFormUseSchoolScore] = React.useState<boolean>(true);
+  const [sessionFormUseCertScore, setSessionFormUseCertScore] = React.useState<boolean>(true);
+  const [sessionFormUseInterview, setSessionFormUseInterview] = React.useState<boolean>(true);
+  const [sessionFormNcsMax, setSessionFormNcsMax] = React.useState<number>(30);
+  const [sessionFormSchoolScoreMax, setSessionFormSchoolScoreMax] = React.useState<number>(30);
+  const [sessionFormCertScoreMax, setSessionFormCertScoreMax] = React.useState<number>(30);
+  const [sessionFormInterviewMax, setSessionFormInterviewMax] = React.useState<number>(10);
+
   // 세션 성적 산출 규칙 폼 상태 (9등급제/5등급제, 석차등급우선, 제외규칙)
   const [sessionFormGradeScale, setSessionFormGradeScale] = React.useState<'9_scale' | '5_scale'>('9_scale');
   const [sessionFormPreferRankGrade, setSessionFormPreferRankGrade] = React.useState<boolean>(true);
@@ -142,6 +149,7 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
   const [selectedToAddIds, setSelectedToAddIds] = React.useState<Set<string>>(new Set());
   const [isLoadingStudents, setIsLoadingStudents] = React.useState<boolean>(false);
   const [isAddingCandidates, setIsAddingCandidates] = React.useState<boolean>(false);
+  const [addModalTab, setAddModalTab] = React.useState<'list' | 'excel'>('list');
 
   // 사용 가능한 고유 학과 목록
   const availableMajors = React.useMemo(() => {
@@ -149,28 +157,47 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
     return Array.from(new Set(list)).filter(Boolean).sort();
   }, [candidatesMap]);
 
+  // 현재 세션의 평가 가중치 설정 (미설정 시 기본 표준형)
+  const currentWeights: EvaluationWeightsConfig = React.useMemo(() => {
+    return currentSession?.evaluationWeights || DEFAULT_EVALUATION_WEIGHTS;
+  }, [currentSession]);
+
   // 실시간 랭킹 산정 및 정렬된 후보자 목록
   const sortedCandidates = React.useMemo(() => {
     const list = Object.values(candidatesMap);
 
     // 총점 기준 내림차순(높은 점수 1위) 정렬
-    // 동점자 처리: 1순위 NCS 점수 우수자, 2순위 교과성적 우수자, 3순위 옥저인증 우수자
+    // 동점자 처리: 활성화된 영역 순 (NCS -> 교과성적 -> 옥저인증 -> 면접)
     list.sort((a, b) => {
       const tA = a.totalScore ?? -1;
       const tB = b.totalScore ?? -1;
       if (tB !== tA) return tB - tA;
 
-      const nA = a.ncsScore ?? -1;
-      const nB = b.ncsScore ?? -1;
-      if (nB !== nA) return nB - nA;
+      if (currentWeights.useNcs) {
+        const nA = a.ncsScore ?? -1;
+        const nB = b.ncsScore ?? -1;
+        if (nB !== nA) return nB - nA;
+      }
 
-      const sA = a.schoolScoreConverted ?? -1;
-      const sB = b.schoolScoreConverted ?? -1;
-      if (sB !== sA) return sB - sA;
+      if (currentWeights.useSchoolScore) {
+        const sA = a.schoolScoreConverted ?? -1;
+        const sB = b.schoolScoreConverted ?? -1;
+        if (sB !== sA) return sB - sA;
+      }
 
-      const cA = a.certScoreConverted ?? -1;
-      const cB = b.certScoreConverted ?? -1;
-      return cB - cA;
+      if (currentWeights.useCertScore) {
+        const cA = a.certScoreConverted ?? -1;
+        const cB = b.certScoreConverted ?? -1;
+        if (cB !== cA) return cB - cA;
+      }
+
+      if (currentWeights.useInterview) {
+        const iA = a.interviewScore ?? -1;
+        const iB = b.interviewScore ?? -1;
+        if (iB !== iA) return iB - iA;
+      }
+
+      return 0;
     });
 
     const quota = currentSession?.recommendationQuota || 5;
@@ -193,7 +220,7 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
 
       return true;
     });
-  }, [candidatesMap, currentSession, majorFilter, statusFilter, searchTerm]);
+  }, [candidatesMap, currentSession, currentWeights, majorFilter, statusFilter, searchTerm]);
 
   // 상위권 통계치
   const quota = currentSession?.recommendationQuota || 5;
@@ -214,30 +241,38 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
       let newInterview = target.interviewScore;
       let newRemarks = target.remarks;
 
+      const ncsLimit = currentWeights.useNcs ? currentWeights.ncsMax : 0;
+      const interviewLimit = currentWeights.useInterview ? currentWeights.interviewMax : 0;
+
       if (field === 'ncsScore') {
         if (val === '') {
           newNcs = null;
         } else {
           const num = parseFloat(val);
-          newNcs = isNaN(num) ? null : Math.min(30, Math.max(0, num));
+          newNcs = isNaN(num) ? null : Math.min(ncsLimit, Math.max(0, num));
         }
       } else if (field === 'interviewScore') {
         if (val === '') {
           newInterview = null;
         } else {
           const num = parseFloat(val);
-          newInterview = isNaN(num) ? null : Math.min(10, Math.max(0, num));
+          newInterview = isNaN(num) ? null : Math.min(interviewLimit, Math.max(0, num));
         }
       } else if (field === 'remarks') {
         newRemarks = val;
       }
 
-      const schoolConv = target.schoolScoreConverted || 0;
-      const certConv = target.certScoreConverted || 0;
-      const ncsVal = newNcs || 0;
-      const intVal = newInterview || 0;
+      const schoolConv = currentWeights.useSchoolScore ? (target.schoolScoreConverted || 0) : 0;
+      const certConv = currentWeights.useCertScore ? (target.certScoreConverted || 0) : 0;
+      const ncsVal = currentWeights.useNcs ? (newNcs || 0) : 0;
+      const intVal = currentWeights.useInterview ? (newInterview || 0) : 0;
 
-      const totalScore = (newNcs !== null || newInterview !== null || schoolConv > 0 || certConv > 0)
+      const hasAnyScore = (currentWeights.useNcs && newNcs !== null) ||
+        (currentWeights.useInterview && newInterview !== null) ||
+        (currentWeights.useSchoolScore && schoolConv > 0) ||
+        (currentWeights.useCertScore && certConv > 0);
+
+      const totalScore = hasAnyScore
         ? parseFloat((ncsVal + schoolConv + certConv + intVal).toFixed(2))
         : null;
 
@@ -247,8 +282,8 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
         ...prev,
         [studentId]: {
           ...target,
-          ncsScore: newNcs,
-          interviewScore: newInterview,
+          ncsScore: currentWeights.useNcs ? newNcs : null,
+          interviewScore: currentWeights.useInterview ? newInterview : null,
           totalScore,
           remarks: newRemarks
         }
@@ -388,6 +423,7 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
       return;
     }
     setIsAddModalOpen(true);
+    setAddModalTab('list');
     setSelectedToAddIds(new Set());
     setIsLoadingStudents(true);
     try {
@@ -430,6 +466,18 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
     setSessionFormQuota(5);
     setSessionFormGrade(3);
     setSessionFormDesc('');
+
+    // 평가 영역 및 배점 초기화 (표준형 30:30:30:10)
+    setSessionFormWeightsMode('standard');
+    setSessionFormUseNcs(true);
+    setSessionFormUseSchoolScore(true);
+    setSessionFormUseCertScore(true);
+    setSessionFormUseInterview(true);
+    setSessionFormNcsMax(30);
+    setSessionFormSchoolScoreMax(30);
+    setSessionFormCertScoreMax(30);
+    setSessionFormInterviewMax(10);
+
     setSessionFormGradeScale('9_scale');
     setSessionFormPreferRankGrade(true);
     setSessionFormExcludeArts(true);
@@ -449,6 +497,17 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
     setSessionFormGrade(currentSession.targetGrade || 3);
     setSessionFormDesc(currentSession.description || '');
 
+    const weights = currentSession.evaluationWeights || DEFAULT_EVALUATION_WEIGHTS;
+    setSessionFormWeightsMode(weights.mode || 'standard');
+    setSessionFormUseNcs(weights.useNcs ?? true);
+    setSessionFormUseSchoolScore(weights.useSchoolScore ?? true);
+    setSessionFormUseCertScore(weights.useCertScore ?? true);
+    setSessionFormUseInterview(weights.useInterview ?? true);
+    setSessionFormNcsMax(weights.ncsMax ?? 30);
+    setSessionFormSchoolScoreMax(weights.schoolScoreMax ?? 30);
+    setSessionFormCertScoreMax(weights.certScoreMax ?? 30);
+    setSessionFormInterviewMax(weights.interviewMax ?? 10);
+
     const rules = currentSession.gradeRules || DEFAULT_GRADE_RULES;
     setSessionFormGradeScale(rules.gradeScale || '9_scale');
     setSessionFormPreferRankGrade(rules.preferRankGrade ?? true);
@@ -467,7 +526,25 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
       alert('선발 공고명을 입력해 주세요.');
       return;
     }
+
+    if (!sessionFormUseNcs && !sessionFormUseSchoolScore && !sessionFormUseCertScore && !sessionFormUseInterview) {
+      alert('최소 1개 이상의 평가 영역을 선택해야 합니다.');
+      return;
+    }
+
     try {
+      const evaluationWeights: EvaluationWeightsConfig = {
+        mode: sessionFormWeightsMode,
+        useNcs: sessionFormUseNcs,
+        useSchoolScore: sessionFormUseSchoolScore,
+        useCertScore: sessionFormUseCertScore,
+        useInterview: sessionFormUseInterview,
+        ncsMax: sessionFormUseNcs ? (sessionFormWeightsMode === 'standard' ? 30 : sessionFormNcsMax) : 0,
+        schoolScoreMax: sessionFormUseSchoolScore ? (sessionFormWeightsMode === 'standard' ? 30 : sessionFormSchoolScoreMax) : 0,
+        certScoreMax: sessionFormUseCertScore ? (sessionFormWeightsMode === 'standard' ? 30 : sessionFormCertScoreMax) : 0,
+        interviewMax: sessionFormUseInterview ? (sessionFormWeightsMode === 'standard' ? 10 : sessionFormInterviewMax) : 0,
+      };
+
       const gradeRules: GradeExclusionRules = {
         gradeScale: sessionFormGradeScale,
         preferRankGrade: sessionFormPreferRankGrade,
@@ -484,6 +561,7 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
         recommendationQuota: sessionFormQuota,
         targetGrade: sessionFormGrade,
         description: sessionFormDesc,
+        evaluationWeights,
         gradeRules
       });
 
@@ -557,7 +635,7 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
               <Trophy className="h-5 w-5 sm:h-6 sm:w-6 text-amber-600" />
             </div>
             <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 whitespace-nowrap">
-              학교장 추천 대상자 선정 시스템
+              추천/선발 시스템
             </h2>
             <span className="text-[11px] bg-amber-500 text-white px-2.5 py-0.5 rounded-full font-black whitespace-nowrap shrink-0">
               공식 추천 심사 채점표
@@ -566,22 +644,43 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
 
           <div className="flex items-center gap-1.5 mt-0.5 text-xs text-slate-600 font-medium whitespace-nowrap overflow-x-auto pb-0.5">
             <span className="text-slate-500 font-bold shrink-0">선발 기준:</span>
-            <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 shrink-0">
-              NCS 시험 30점
+            {currentWeights.useNcs && (
+              <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 shrink-0">
+                NCS 시험 {currentWeights.ncsMax}점
+              </span>
+            )}
+            {currentWeights.useNcs && (currentWeights.useSchoolScore || currentWeights.useCertScore || currentWeights.useInterview) && (
+              <span className="text-slate-400">+</span>
+            )}
+            {currentWeights.useSchoolScore && (
+              <span className="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 shrink-0">
+                교과성적 {currentWeights.schoolScoreMax}점 ({isCurrent9Scale ? '9등급제' : '5등급제'})
+              </span>
+            )}
+            {currentWeights.useSchoolScore && (currentWeights.useCertScore || currentWeights.useInterview) && (
+              <span className="text-slate-400">+</span>
+            )}
+            {currentWeights.useCertScore && (
+              <span className="font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-100 shrink-0">
+                옥저인재인증 {currentWeights.certScoreMax}점
+              </span>
+            )}
+            {currentWeights.useCertScore && currentWeights.useInterview && (
+              <span className="text-slate-400">+</span>
+            )}
+            {currentWeights.useInterview && (
+              <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 shrink-0">
+                면접점수 {currentWeights.interviewMax}점
+              </span>
+            )}
+            <span className="font-black text-slate-900 shrink-0">
+              = 총 {(
+                (currentWeights.useNcs ? currentWeights.ncsMax : 0) +
+                (currentWeights.useSchoolScore ? currentWeights.schoolScoreMax : 0) +
+                (currentWeights.useCertScore ? currentWeights.certScoreMax : 0) +
+                (currentWeights.useInterview ? currentWeights.interviewMax : 0)
+              )}점 만점
             </span>
-            <span className="text-slate-400">+</span>
-            <span className="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 shrink-0">
-              교과성적 30점 ({isCurrent9Scale ? '9등급제' : '5등급제'})
-            </span>
-            <span className="text-slate-400">+</span>
-            <span className="font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-100 shrink-0">
-              옥저인재인증 30점
-            </span>
-            <span className="text-slate-400">+</span>
-            <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 shrink-0">
-              면접점수 10점
-            </span>
-            <span className="font-black text-slate-900 shrink-0">= 총 100점 만점</span>
           </div>
         </div>
 
@@ -732,7 +831,12 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
                     </span>
                   </div>
                   <p className="text-[10.5px] text-blue-700 font-bold whitespace-nowrap">
-                    종합 {top1Candidate?.totalScore !== null ? `${top1Candidate?.totalScore}점` : '-'} / 100점
+                    종합 {top1Candidate?.totalScore !== null ? `${top1Candidate?.totalScore}점` : '-'} / {(
+                      (currentWeights.useNcs ? currentWeights.ncsMax : 0) +
+                      (currentWeights.useSchoolScore ? currentWeights.schoolScoreMax : 0) +
+                      (currentWeights.useCertScore ? currentWeights.certScoreMax : 0) +
+                      (currentWeights.useInterview ? currentWeights.interviewMax : 0)
+                    )}점
                   </p>
                 </div>
                 <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 border border-amber-200 shrink-0">
@@ -745,12 +849,26 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
             <Card className="border-slate-200/80 shadow-2xs hover:shadow-sm transition-all rounded-2xl bg-white">
               <CardContent className="p-3.5 sm:p-4 flex items-center justify-between">
                 <div className="space-y-1 min-w-0">
-                  <p className="text-[11px] sm:text-xs font-bold text-slate-500 whitespace-nowrap">배점 항목 구성 (총 100점)</p>
+                  <p className="text-[11px] sm:text-xs font-bold text-slate-500 whitespace-nowrap">
+                    배점 항목 구성 ({currentWeights.mode === 'custom' ? '커스텀' : '표준형'} · 총 {(
+                      (currentWeights.useNcs ? currentWeights.ncsMax : 0) +
+                      (currentWeights.useSchoolScore ? currentWeights.schoolScoreMax : 0) +
+                      (currentWeights.useCertScore ? currentWeights.certScoreMax : 0) +
+                      (currentWeights.useInterview ? currentWeights.interviewMax : 0)
+                    )}점)
+                  </p>
                   <div className="text-[11px] font-black text-slate-900 whitespace-nowrap">
-                    NCS 30 · 성적 30 · 옥저 30 · 면접 10
+                    {[
+                      currentWeights.useNcs ? `NCS ${currentWeights.ncsMax}` : null,
+                      currentWeights.useSchoolScore ? `성적 ${currentWeights.schoolScoreMax}` : null,
+                      currentWeights.useCertScore ? `옥저 ${currentWeights.certScoreMax}` : null,
+                      currentWeights.useInterview ? `면접 ${currentWeights.interviewMax}` : null
+                    ].filter(Boolean).join(' · ')}
                   </div>
                   <p className="text-[10px] text-slate-400 whitespace-nowrap truncate">
-                    성적({isCurrent9Scale ? '9등급' : '5등급'})·옥저 30점 자동 환산
+                    {currentWeights.useSchoolScore ? `성적(${isCurrent9Scale ? '9등급' : '5등급'}) ` : ''}
+                    {currentWeights.useCertScore ? '옥저인재인증 ' : ''}
+                    자동 환산 적용
                   </p>
                 </div>
                 <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 shrink-0">
@@ -932,7 +1050,17 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
                 선발 공고: {currentSession?.title} (추천 선발 정원: {quota}명 / 총 지원 희망자 {totalCandidatesCount}명)
               </div>
               <div className="text-xs text-slate-500 mt-1">
-                평가 기준: NCS 시험 30점 + 교과성적 30점({isCurrent9Scale ? '9등급제' : '5등급제'}) + 옥저인재인증 30점 + 면접점수 10점 (총 100점 만점)
+                평가 기준: {[
+                  currentWeights.useNcs ? `NCS 시험 ${currentWeights.ncsMax}점` : null,
+                  currentWeights.useSchoolScore ? `교과성적 ${currentWeights.schoolScoreMax}점(${isCurrent9Scale ? '9등급제' : '5등급제'})` : null,
+                  currentWeights.useCertScore ? `옥저인재인증 ${currentWeights.certScoreMax}점` : null,
+                  currentWeights.useInterview ? `면접점수 ${currentWeights.interviewMax}점` : null
+                ].filter(Boolean).join(' + ')} (총 {(
+                  (currentWeights.useNcs ? currentWeights.ncsMax : 0) +
+                  (currentWeights.useSchoolScore ? currentWeights.schoolScoreMax : 0) +
+                  (currentWeights.useCertScore ? currentWeights.certScoreMax : 0) +
+                  (currentWeights.useInterview ? currentWeights.interviewMax : 0)
+                )}점 만점)
               </div>
             </div>
 
@@ -953,20 +1081,33 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
                       <th className="py-3 px-3 text-center w-24 whitespace-nowrap">선정 상태</th>
                       <th className="py-3 px-3 min-w-[90px] whitespace-nowrap">성명</th>
                       <th className="py-3 px-4 min-w-[170px] whitespace-nowrap">학과 / 학반</th>
-                      <th className="py-3 px-3 text-center min-w-[130px] bg-blue-50/50 text-blue-900 whitespace-nowrap">
-                        NCS 시험 <span className="text-[11px] font-normal text-blue-600">(30점)</span>
-                      </th>
-                      <th className="py-3 px-3 text-center min-w-[210px] bg-indigo-50/50 text-indigo-900 whitespace-nowrap">
-                        교과 성적 <span className="text-[11px] font-normal text-indigo-600">(30점 · {isCurrent9Scale ? '9등급제' : '5등급제'})</span>
-                      </th>
-                      <th className="py-3 px-3 text-center min-w-[150px] bg-purple-50/50 text-purple-900 whitespace-nowrap">
-                        옥저인재인증 <span className="text-[11px] font-normal text-purple-600">(30점)</span>
-                      </th>
-                      <th className="py-3 px-3 text-center min-w-[120px] bg-emerald-50/50 text-emerald-900 whitespace-nowrap">
-                        면접 점수 <span className="text-[11px] font-normal text-emerald-600">(10점)</span>
-                      </th>
+                      {currentWeights.useNcs && (
+                        <th className="py-3 px-3 text-center min-w-[130px] bg-blue-50/50 text-blue-900 whitespace-nowrap">
+                          NCS 시험 <span className="text-[11px] font-normal text-blue-600">({currentWeights.ncsMax}점)</span>
+                        </th>
+                      )}
+                      {currentWeights.useSchoolScore && (
+                        <th className="py-3 px-3 text-center min-w-[210px] bg-indigo-50/50 text-indigo-900 whitespace-nowrap">
+                          교과 성적 <span className="text-[11px] font-normal text-indigo-600">({currentWeights.schoolScoreMax}점 · {isCurrent9Scale ? '9등급제' : '5등급제'})</span>
+                        </th>
+                      )}
+                      {currentWeights.useCertScore && (
+                        <th className="py-3 px-3 text-center min-w-[150px] bg-purple-50/50 text-purple-900 whitespace-nowrap">
+                          옥저인재인증 <span className="text-[11px] font-normal text-purple-600">({currentWeights.certScoreMax}점)</span>
+                        </th>
+                      )}
+                      {currentWeights.useInterview && (
+                        <th className="py-3 px-3 text-center min-w-[120px] bg-emerald-50/50 text-emerald-900 whitespace-nowrap">
+                          면접 점수 <span className="text-[11px] font-normal text-emerald-600">({currentWeights.interviewMax}점)</span>
+                        </th>
+                      )}
                       <th className="py-3 px-3 text-center min-w-[130px] bg-amber-50/60 text-amber-950 font-black whitespace-nowrap">
-                        종합 점수 <span className="text-[11px] font-normal text-amber-700">(100점)</span>
+                        종합 점수 <span className="text-[11px] font-normal text-amber-700">({(
+                          (currentWeights.useNcs ? currentWeights.ncsMax : 0) +
+                          (currentWeights.useSchoolScore ? currentWeights.schoolScoreMax : 0) +
+                          (currentWeights.useCertScore ? currentWeights.certScoreMax : 0) +
+                          (currentWeights.useInterview ? currentWeights.interviewMax : 0)
+                        )}점)</span>
                       </th>
                       <th className="py-3 px-3 min-w-[140px] whitespace-nowrap">비고</th>
                       <th className="py-3 px-2 text-center w-16 print:hidden whitespace-nowrap">관리</th>
@@ -977,6 +1118,11 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
                       const rank = idx + 1;
                       const isSelected = rank <= quota;
                       const isCutline = rank === quota;
+                      const activeColumnCount = 6 + 
+                        (currentWeights.useNcs ? 1 : 0) + 
+                        (currentWeights.useSchoolScore ? 1 : 0) + 
+                        (currentWeights.useCertScore ? 1 : 0) + 
+                        (currentWeights.useInterview ? 1 : 0);
 
                       return (
                         <React.Fragment key={c.studentId}>
@@ -1015,74 +1161,82 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
                               <span className="font-mono text-slate-600">{c.classInfo}반 {c.studentNumber}번</span>
                             </td>
 
-                            {/* NCS 점수 (30점 만점) - 잘림 방지 넉넉한 너비 및 스피너 제거 */}
-                            <td className="py-2.5 px-3 text-center bg-blue-50/30 whitespace-nowrap">
-                              <div className="flex items-center justify-center gap-1">
-                                <Input
-                                  type="number"
-                                  step="0.1"
-                                  min="0"
-                                  max="30"
-                                  placeholder="0~30"
-                                  value={c.ncsScore !== null ? c.ncsScore : ''}
-                                  onChange={e => handleScoreChange(c.studentId, 'ncsScore', e.target.value)}
-                                  className="w-20 h-8 text-center text-xs sm:text-sm font-mono font-black px-1.5 rounded-lg border-blue-200 bg-white focus:border-blue-500 whitespace-nowrap [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                />
-                                <span className="text-[11px] text-slate-500 font-bold whitespace-nowrap">점</span>
-                              </div>
-                            </td>
+                            {/* NCS 점수 */}
+                            {currentWeights.useNcs && (
+                              <td className="py-2.5 px-3 text-center bg-blue-50/30 whitespace-nowrap">
+                                <div className="flex items-center justify-center gap-1">
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    min="0"
+                                    max={currentWeights.ncsMax}
+                                    placeholder={`0~${currentWeights.ncsMax}`}
+                                    value={c.ncsScore !== null ? c.ncsScore : ''}
+                                    onChange={e => handleScoreChange(c.studentId, 'ncsScore', e.target.value)}
+                                    className="w-20 h-8 text-center text-xs sm:text-sm font-mono font-black px-1.5 rounded-lg border-blue-200 bg-white focus:border-blue-500 whitespace-nowrap [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  />
+                                  <span className="text-[11px] text-slate-500 font-bold whitespace-nowrap">점</span>
+                                </div>
+                              </td>
+                            )}
 
-                            {/* 교과 성적 (30점 만점) - 단일 라인 깔끔한 가로 배치 */}
-                            <td className="py-3 px-3 text-center bg-indigo-50/30 whitespace-nowrap">
-                              <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
-                                <span className="font-mono text-sm font-black text-indigo-700">
-                                  {c.schoolScoreConverted !== null ? `${c.schoolScoreConverted.toFixed(2)}점` : '-'}
-                                </span>
-                                {c.schoolAverageGrade !== undefined && c.schoolAverageGrade !== null && c.schoolAverageGrade > 0 && (
-                                  <span className="text-[11px] font-bold text-indigo-800 bg-indigo-100/90 border border-indigo-200 px-1.5 py-0.5 rounded font-mono whitespace-nowrap">
-                                    {c.schoolAverageGrade.toFixed(2)}등급
+                            {/* 교과 성적 */}
+                            {currentWeights.useSchoolScore && (
+                              <td className="py-3 px-3 text-center bg-indigo-50/30 whitespace-nowrap">
+                                <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                                  <span className="font-mono text-sm font-black text-indigo-700">
+                                    {c.schoolScoreConverted !== null ? `${c.schoolScoreConverted.toFixed(2)}점` : '-'}
                                   </span>
-                                )}
-                                {c.schoolScoreOriginal !== null && (
-                                  <span className="text-[10.5px] text-slate-400 font-mono whitespace-nowrap">
-                                    ({c.schoolScoreOriginal.toFixed(1)})
+                                  {c.schoolAverageGrade !== undefined && c.schoolAverageGrade !== null && c.schoolAverageGrade > 0 && (
+                                    <span className="text-[11px] font-bold text-indigo-800 bg-indigo-100/90 border border-indigo-200 px-1.5 py-0.5 rounded font-mono whitespace-nowrap">
+                                      {c.schoolAverageGrade.toFixed(2)}등급
+                                    </span>
+                                  )}
+                                  {c.schoolScoreOriginal !== null && (
+                                    <span className="text-[10.5px] text-slate-400 font-mono whitespace-nowrap">
+                                      ({c.schoolScoreOriginal.toFixed(1)})
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                            )}
+
+                            {/* 옥저인재인증 */}
+                            {currentWeights.useCertScore && (
+                              <td className="py-3 px-3 text-center bg-purple-50/30 whitespace-nowrap">
+                                <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                                  <span className="font-mono text-sm font-black text-purple-700">
+                                    {c.certScoreConverted !== null ? `${c.certScoreConverted.toFixed(2)}점` : '-'}
                                   </span>
-                                )}
-                              </div>
-                            </td>
+                                  {c.certScoreOriginal !== null && (
+                                    <span className="text-[10.5px] text-slate-400 font-mono whitespace-nowrap">
+                                      ({c.certScoreOriginal}점)
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                            )}
 
-                            {/* 옥저인재인증 (30점 만점) - 단일 라인 가로 배치 */}
-                            <td className="py-3 px-3 text-center bg-purple-50/30 whitespace-nowrap">
-                              <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
-                                <span className="font-mono text-sm font-black text-purple-700">
-                                  {c.certScoreConverted !== null ? `${c.certScoreConverted.toFixed(2)}점` : '-'}
-                                </span>
-                                {c.certScoreOriginal !== null && (
-                                  <span className="text-[10.5px] text-slate-400 font-mono whitespace-nowrap">
-                                    ({c.certScoreOriginal}점)
-                                  </span>
-                                )}
-                              </div>
-                            </td>
+                            {/* 면접 점수 */}
+                            {currentWeights.useInterview && (
+                              <td className="py-2.5 px-3 text-center bg-emerald-50/30 whitespace-nowrap">
+                                <div className="flex items-center justify-center gap-1">
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    min="0"
+                                    max={currentWeights.interviewMax}
+                                    placeholder={`0~${currentWeights.interviewMax}`}
+                                    value={c.interviewScore !== null ? c.interviewScore : ''}
+                                    onChange={e => handleScoreChange(c.studentId, 'interviewScore', e.target.value)}
+                                    className="w-18 h-8 text-center text-xs sm:text-sm font-mono font-black px-1.5 rounded-lg border-emerald-200 bg-white focus:border-emerald-500 whitespace-nowrap [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  />
+                                  <span className="text-[11px] text-slate-500 font-bold whitespace-nowrap">점</span>
+                                </div>
+                              </td>
+                            )}
 
-                            {/* 면접 점수 (10점 만점) - 잘림 방지 넉넉한 너비 및 스피너 제거 */}
-                            <td className="py-2.5 px-3 text-center bg-emerald-50/30 whitespace-nowrap">
-                              <div className="flex items-center justify-center gap-1">
-                                <Input
-                                  type="number"
-                                  step="0.1"
-                                  min="0"
-                                  max="10"
-                                  placeholder="0~10"
-                                  value={c.interviewScore !== null ? c.interviewScore : ''}
-                                  onChange={e => handleScoreChange(c.studentId, 'interviewScore', e.target.value)}
-                                  className="w-18 h-8 text-center text-xs sm:text-sm font-mono font-black px-1.5 rounded-lg border-emerald-200 bg-white focus:border-emerald-500 whitespace-nowrap [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                />
-                                <span className="text-[11px] text-slate-500 font-bold whitespace-nowrap">점</span>
-                              </div>
-                            </td>
-
-                            {/* 종합 점수 (100점 만점) - 단일 라인 강조 */}
+                            {/* 종합 점수 */}
                             <td className="py-3 px-3 text-center bg-amber-50/40 whitespace-nowrap">
                               <span className={cn(
                                 "font-mono text-sm sm:text-base font-black px-2 py-0.5 rounded-lg whitespace-nowrap",
@@ -1120,7 +1274,7 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
                           {/* 추천 선발 인원(TO) 커트라인 구분선 - 단일 라인 */}
                           {isCutline && idx < sortedCandidates.length - 1 && (
                             <tr className="bg-amber-100/60 border-y-2 border-amber-300 whitespace-nowrap">
-                              <td colSpan={11} className="py-1.5 px-4 text-center whitespace-nowrap">
+                              <td colSpan={activeColumnCount} className="py-1.5 px-4 text-center whitespace-nowrap">
                                 <div className="flex items-center justify-center gap-2 text-[11px] font-black text-amber-900 whitespace-nowrap">
                                   <span>▲ 추천 선발 정원({quota}명) 합격선</span>
                                   <span>·</span>
@@ -1166,7 +1320,7 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
       {/* 5. 모달: [희망 학생 추가 모달] 다이얼로그 */}
       {/* ========================================================================= */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 border-none shadow-2xl rounded-2xl overflow-hidden bg-white">
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 border-none shadow-2xl rounded-2xl overflow-hidden bg-white">
           <DialogHeader className="p-4 sm:p-5 bg-white border-b border-slate-100 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100 shrink-0">
@@ -1177,131 +1331,189 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
                   추천 희망 학생 등록
                 </DialogTitle>
                 <DialogDescription className="text-xs text-slate-500">
-                  학생을 선택하면 공고의 성적 기준({isCurrent9Scale ? '9등급제' : '5등급제'})이 반영된 성적(30점)과 옥저인재인증점수(30점)가 자동 계산됩니다.
+                  학생을 직접 선택하거나 엑셀 파일로 일괄 등록하면 공고의 성적 기준({isCurrent9Scale ? '9등급제' : '5등급제'})이 반영된 성적(30점)과 옥저인증(30점)이 자동 계산됩니다.
                 </DialogDescription>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Button
+            {/* 상단 탭 전환 토글 버튼 */}
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl shrink-0 self-start sm:self-auto">
+              <button
                 type="button"
-                variant="outline"
-                size="sm"
-                onClick={toggleSelectAll}
-                className="h-8 text-xs font-bold rounded-lg border-slate-200"
+                onClick={() => setAddModalTab('list')}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
+                  addModalTab === 'list'
+                    ? "bg-white text-blue-700 shadow-2xs"
+                    : "text-slate-600 hover:text-slate-900"
+                )}
               >
-                {selectedToAddIds.size === filteredAvailableStudents.length && filteredAvailableStudents.length > 0
-                  ? '전체 해제'
-                  : '전체 선택'}
-              </Button>
+                <Users className="h-3.5 w-3.5" />
+                <span>목록 직접 선택</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddModalTab('excel')}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
+                  addModalTab === 'excel'
+                    ? "bg-white text-emerald-700 shadow-2xs"
+                    : "text-slate-600 hover:text-slate-900"
+                )}
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+                <span>엑셀 파일 일괄 등록</span>
+              </button>
             </div>
           </DialogHeader>
 
-          {/* 모달 필터 바 */}
-          <div className="p-3.5 bg-slate-50 border-b border-slate-200/80 flex items-center gap-2 shrink-0">
-            <Select value={addModalMajor} onValueChange={setAddModalMajor}>
-              <SelectTrigger className="w-[140px] h-8 text-xs font-bold rounded-lg border-slate-200 bg-white">
-                <SelectValue placeholder="학과 전체" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl">
-                <SelectItem value="all" className="text-xs font-bold">학과 전체</SelectItem>
-                {Array.from(new Set(availableStudents.map(s => s.major))).filter(Boolean).sort().map(m => (
-                  <SelectItem key={m} value={m} className="text-xs font-medium">
-                    {m}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-              <Input
-                placeholder="이름 또는 학번 검색..."
-                value={addModalSearch}
-                onChange={e => setAddModalSearch(e.target.value)}
-                className="h-8 pl-8 text-xs rounded-lg border-slate-200 bg-white"
+          {addModalTab === 'excel' ? (
+            currentSession ? (
+              <RecommendationExcelTab
+                currentSession={currentSession}
+                availableStudents={availableStudents}
+                candidatesMap={candidatesMap}
+                onSuccess={(updatedSession, count) => {
+                  setSessions(prev => prev.map(s => s.id === updatedSession.id ? updatedSession : s));
+                  setCandidatesMap(updatedSession.candidates || {});
+                  setIsAddModalOpen(false);
+                  alert(`${count}명의 희망 학생이 엑셀 파일을 통해 성공적으로 등록되었습니다.\n(성적 기준 및 옥저인재인증점수가 30점 만점으로 자동 환산되었습니다.)`);
+                }}
+                onCancel={() => setIsAddModalOpen(false)}
               />
-            </div>
+            ) : null
+          ) : (
+            <>
+              {/* 모달 필터 바 */}
+              <div className="p-3.5 bg-slate-50 border-b border-slate-200/80 flex items-center gap-2 shrink-0 flex-wrap">
+                <Select value={addModalMajor} onValueChange={setAddModalMajor}>
+                  <SelectTrigger className="w-[130px] h-8 text-xs font-bold rounded-lg border-slate-200 bg-white">
+                    <SelectValue placeholder="학과 전체" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="all" className="text-xs font-bold">학과 전체</SelectItem>
+                    {Array.from(new Set(availableStudents.map(s => s.major))).filter(Boolean).sort().map(m => (
+                      <SelectItem key={m} value={m} className="text-xs font-medium">
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-            <div className="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
-              선택: {selectedToAddIds.size}명
-            </div>
-          </div>
+                <div className="relative flex-1 min-w-[160px]">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <Input
+                    placeholder="이름 또는 학번 검색..."
+                    value={addModalSearch}
+                    onChange={e => setAddModalSearch(e.target.value)}
+                    className="h-8 pl-8 text-xs rounded-lg border-slate-200 bg-white"
+                  />
+                </div>
 
-          {/* 학생 체크 리스트 */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {isLoadingStudents ? (
-              <div className="p-12 text-center flex flex-col items-center justify-center gap-2">
-                <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-                <span className="text-xs text-slate-500 font-bold">학생 목록 불러오는 중...</span>
+                <div className="flex items-center gap-2">
+                  <div className="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
+                    선택: {selectedToAddIds.size}명
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleSelectAll}
+                    className="h-8 text-xs font-bold rounded-lg border-slate-200 bg-white"
+                  >
+                    {selectedToAddIds.size === filteredAvailableStudents.length && filteredAvailableStudents.length > 0
+                      ? '전체 해제'
+                      : '전체 선택'}
+                  </Button>
+                </div>
               </div>
-            ) : filteredAvailableStudents.length === 0 ? (
-              <div className="p-12 text-center text-xs font-bold text-slate-400">
-                추가 가능한 학생이 없습니다.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                {filteredAvailableStudents.map(s => {
-                  const isChecked = selectedToAddIds.has(s.id);
-                  return (
-                    <div
-                      key={s.id}
-                      onClick={() => toggleSelectStudent(s.id)}
-                      className={cn(
-                        "p-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all",
-                        isChecked
-                          ? "bg-blue-50 border-blue-400 shadow-2xs"
-                          : "bg-white border-slate-200 hover:bg-slate-50"
-                      )}
+
+              {/* 학생 체크 리스트 */}
+              <div className="flex-1 overflow-y-auto p-4">
+                {isLoadingStudents ? (
+                  <div className="p-12 text-center flex flex-col items-center justify-center gap-2">
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                    <span className="text-xs text-slate-500 font-bold">학생 목록 불러오는 중...</span>
+                  </div>
+                ) : filteredAvailableStudents.length === 0 ? (
+                  <div className="p-12 text-center text-xs font-bold text-slate-400 flex flex-col items-center justify-center gap-2">
+                    <p>추가 가능한 학생이 없습니다.</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAddModalTab('excel')}
+                      className="text-xs font-bold border-emerald-300 text-emerald-800 bg-emerald-50/50 hover:bg-emerald-100 gap-1.5 mt-1"
                     >
-                      <div>
-                        <div className="font-bold text-xs text-slate-900">{s.student_name}</div>
-                        <div className="text-[11px] text-slate-400 font-medium">
-                          {s.major} · {s.class_info}반 {s.student_number}번
+                      <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+                      <span>엑셀 파일로 일괄 등록하기</span>
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {filteredAvailableStudents.map(s => {
+                      const isChecked = selectedToAddIds.has(s.id);
+                      return (
+                        <div
+                          key={s.id}
+                          onClick={() => toggleSelectStudent(s.id)}
+                          className={cn(
+                            "p-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all",
+                            isChecked
+                              ? "bg-blue-50 border-blue-400 shadow-2xs"
+                              : "bg-white border-slate-200 hover:bg-slate-50"
+                          )}
+                        >
+                          <div>
+                            <div className="font-bold text-xs text-slate-900">{s.student_name}</div>
+                            <div className="text-[11px] text-slate-400 font-medium">
+                              {s.major} · {s.class_info}반 {s.student_number}번
+                            </div>
+                          </div>
+                          <div className={cn(
+                            "h-5 w-5 rounded-md border flex items-center justify-center transition-all",
+                            isChecked
+                              ? "bg-blue-600 border-blue-600 text-white"
+                              : "border-slate-300 bg-white"
+                          )}>
+                            {isChecked && <Check className="h-3.5 w-3.5" />}
+                          </div>
                         </div>
-                      </div>
-                      <div className={cn(
-                        "h-5 w-5 rounded-md border flex items-center justify-center transition-all",
-                        isChecked
-                          ? "bg-blue-600 border-blue-600 text-white"
-                          : "border-slate-300 bg-white"
-                      )}>
-                        {isChecked && <Check className="h-3.5 w-3.5" />}
-                      </div>
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {/* 모달 푸터 */}
-          <DialogFooter className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-xs text-slate-500">
-              선택한 학생을 추가하면 교과성적(30점, 학점가중치 적용)과 옥저인증점수(30점)가 자동 계산됩니다.
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setIsAddModalOpen(false)}
-                className="h-8 text-xs font-bold rounded-lg border-slate-200"
-              >
-                취소
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                disabled={selectedToAddIds.size === 0 || isAddingCandidates}
-                onClick={handleAddSelectedStudents}
-                className="h-8 px-4 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
-              >
-                {isAddingCandidates ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />}
-                <span>{selectedToAddIds.size}명 후보자 등록</span>
-              </Button>
-            </div>
-          </DialogFooter>
+              {/* 모달 푸터 */}
+              <DialogFooter className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-xs text-slate-500">
+                  선택한 학생을 추가하면 교과성적(30점, 학점가중치 적용)과 옥저인증점수(30점)가 자동 계산됩니다.
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsAddModalOpen(false)}
+                    className="h-8 text-xs font-bold rounded-lg border-slate-200"
+                  >
+                    취소
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={selectedToAddIds.size === 0 || isAddingCandidates}
+                    onClick={handleAddSelectedStudents}
+                    className="h-8 px-4 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
+                  >
+                    {isAddingCandidates ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />}
+                    <span>{selectedToAddIds.size}명 후보자 등록</span>
+                  </Button>
+                </div>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -1309,25 +1521,25 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
       {/* 6. 모달: [새 추천 선발 공고 등록 / 수정 모달] 다이얼로그 */}
       {/* ========================================================================= */}
       <Dialog open={isSessionModalOpen} onOpenChange={setIsSessionModalOpen}>
-        <DialogContent className="max-w-lg p-5 rounded-2xl bg-white border-none shadow-2xl space-y-4">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+        <DialogContent className="max-w-xl max-h-[90vh] flex flex-col p-0 rounded-2xl bg-white border-none shadow-2xl overflow-hidden">
+          <DialogHeader className="p-4 sm:p-5 pb-3 border-b border-slate-100 shrink-0">
+            <DialogTitle className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
               <Trophy className="h-5 w-5 text-amber-600" />
               <span>{editingSessionId ? '선발 공고 및 성적 평가 기준 수정' : '새 추천 선발 공고 등록'}</span>
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              기업/기관별 채용 요강에 맞게 평가 등급 체계(9등급제/5등급제)와 과목 제외 프리셋을 설정합니다.
+              기업/기관별 채용 요강에 맞게 평가 반영 영역과 배점, 등급 체계(9/5등급제)를 설정합니다.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3.5 text-xs">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5 text-xs">
             <div className="space-y-1">
               <label className="font-bold text-slate-700">선발 공고명 *</label>
               <Input
                 placeholder="예: 2026 한국항공우주산업(KAI) 생산직 학교장추천"
                 value={sessionFormTitle}
                 onChange={e => setSessionFormTitle(e.target.value)}
-                className="h-9 text-xs rounded-xl border-slate-200"
+                className="h-8 text-xs rounded-xl border-slate-200"
               />
             </div>
 
@@ -1340,14 +1552,14 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
                   max="100"
                   value={sessionFormQuota}
                   onChange={e => setSessionFormQuota(parseInt(e.target.value) || 1)}
-                  className="h-9 text-xs rounded-xl border-slate-200"
+                  className="h-8 text-xs rounded-xl border-slate-200"
                 />
               </div>
 
               <div className="space-y-1">
                 <label className="font-bold text-slate-700">대상 학년</label>
                 <Select value={String(sessionFormGrade)} onValueChange={v => setSessionFormGrade(parseInt(v))}>
-                  <SelectTrigger className="h-9 text-xs font-bold rounded-xl border-slate-200">
+                  <SelectTrigger className="h-8 text-xs font-bold rounded-xl border-slate-200">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
@@ -1356,6 +1568,181 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
                     <SelectItem value="1">1학년</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+
+            {/* ⚖️ 평가 반영 영역 및 배점 설정 섹션 (컴팩트 2x2 그리드형 UI) */}
+            <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-200/80 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="font-black text-amber-950 flex items-center gap-1.5 text-xs">
+                  <SlidersHorizontal className="h-3.5 w-3.5 text-amber-600" />
+                  평가 반영 영역 및 배점
+                </span>
+                <span className="font-mono font-black text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-md text-[11px]">
+                  총합 {(
+                    (sessionFormUseNcs ? sessionFormNcsMax : 0) +
+                    (sessionFormUseSchoolScore ? sessionFormSchoolScoreMax : 0) +
+                    (sessionFormUseCertScore ? sessionFormCertScoreMax : 0) +
+                    (sessionFormUseInterview ? sessionFormInterviewMax : 0)
+                  )}점 만점
+                </span>
+              </div>
+
+              {/* 모드 선택 토글 (표준형 vs 커스텀) */}
+              <div className="grid grid-cols-2 gap-1 p-0.5 bg-white/90 rounded-lg border border-amber-200 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSessionFormWeightsMode('standard');
+                    setSessionFormUseNcs(true);
+                    setSessionFormUseSchoolScore(true);
+                    setSessionFormUseCertScore(true);
+                    setSessionFormUseInterview(true);
+                    setSessionFormNcsMax(30);
+                    setSessionFormSchoolScoreMax(30);
+                    setSessionFormCertScoreMax(30);
+                    setSessionFormInterviewMax(10);
+                  }}
+                  className={cn(
+                    "py-1 px-2 rounded-md font-bold transition-all text-center text-[11px]",
+                    sessionFormWeightsMode === 'standard'
+                      ? "bg-amber-500 text-white shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  )}
+                >
+                  표준형 (30:30:30:10 · 100점)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSessionFormWeightsMode('custom')}
+                  className={cn(
+                    "py-1 px-2 rounded-md font-bold transition-all text-center text-[11px]",
+                    sessionFormWeightsMode === 'custom'
+                      ? "bg-amber-500 text-white shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  )}
+                >
+                  커스텀 (직접 선택/배점)
+                </button>
+              </div>
+
+              {/* 2x2 컴팩트 영역 그리드 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-0.5">
+                {/* NCS 시험 */}
+                <div className={cn(
+                  "px-2.5 py-1.5 rounded-lg border flex items-center justify-between transition-all",
+                  sessionFormUseNcs ? "bg-white border-blue-200 shadow-2xs" : "bg-slate-50 border-slate-200 opacity-50"
+                )}>
+                  <label className="flex items-center gap-1.5 cursor-pointer font-bold text-slate-800 text-[11px] truncate">
+                    <input
+                      type="checkbox"
+                      checked={sessionFormUseNcs}
+                      disabled={sessionFormWeightsMode === 'standard'}
+                      onChange={e => setSessionFormUseNcs(e.target.checked)}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+                    />
+                    <span className="truncate">NCS 직업기초</span>
+                  </label>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      disabled={!sessionFormUseNcs || sessionFormWeightsMode === 'standard'}
+                      value={sessionFormUseNcs ? sessionFormNcsMax : 0}
+                      onChange={e => setSessionFormNcsMax(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-13 h-6 text-center text-xs font-mono font-bold rounded-md border-blue-200 bg-white px-1"
+                    />
+                    <span className="text-[11px] text-slate-500 font-bold">점</span>
+                  </div>
+                </div>
+
+                {/* 교과 성적 */}
+                <div className={cn(
+                  "px-2.5 py-1.5 rounded-lg border flex items-center justify-between transition-all",
+                  sessionFormUseSchoolScore ? "bg-white border-indigo-200 shadow-2xs" : "bg-slate-50 border-slate-200 opacity-50"
+                )}>
+                  <label className="flex items-center gap-1.5 cursor-pointer font-bold text-slate-800 text-[11px] truncate">
+                    <input
+                      type="checkbox"
+                      checked={sessionFormUseSchoolScore}
+                      disabled={sessionFormWeightsMode === 'standard'}
+                      onChange={e => setSessionFormUseSchoolScore(e.target.checked)}
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
+                    />
+                    <span className="truncate">교과 성적</span>
+                  </label>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      disabled={!sessionFormUseSchoolScore || sessionFormWeightsMode === 'standard'}
+                      value={sessionFormUseSchoolScore ? sessionFormSchoolScoreMax : 0}
+                      onChange={e => setSessionFormSchoolScoreMax(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-13 h-6 text-center text-xs font-mono font-bold rounded-md border-indigo-200 bg-white px-1"
+                    />
+                    <span className="text-[11px] text-slate-500 font-bold">점</span>
+                  </div>
+                </div>
+
+                {/* 옥저인재인증 */}
+                <div className={cn(
+                  "px-2.5 py-1.5 rounded-lg border flex items-center justify-between transition-all",
+                  sessionFormUseCertScore ? "bg-white border-purple-200 shadow-2xs" : "bg-slate-50 border-slate-200 opacity-50"
+                )}>
+                  <label className="flex items-center gap-1.5 cursor-pointer font-bold text-slate-800 text-[11px] truncate">
+                    <input
+                      type="checkbox"
+                      checked={sessionFormUseCertScore}
+                      disabled={sessionFormWeightsMode === 'standard'}
+                      onChange={e => setSessionFormUseCertScore(e.target.checked)}
+                      className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 h-3.5 w-3.5"
+                    />
+                    <span className="truncate">옥저인재인증</span>
+                  </label>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      disabled={!sessionFormUseCertScore || sessionFormWeightsMode === 'standard'}
+                      value={sessionFormUseCertScore ? sessionFormCertScoreMax : 0}
+                      onChange={e => setSessionFormCertScoreMax(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-13 h-6 text-center text-xs font-mono font-bold rounded-md border-purple-200 bg-white px-1"
+                    />
+                    <span className="text-[11px] text-slate-500 font-bold">점</span>
+                  </div>
+                </div>
+
+                {/* 면접 점수 */}
+                <div className={cn(
+                  "px-2.5 py-1.5 rounded-lg border flex items-center justify-between transition-all",
+                  sessionFormUseInterview ? "bg-white border-emerald-200 shadow-2xs" : "bg-slate-50 border-slate-200 opacity-50"
+                )}>
+                  <label className="flex items-center gap-1.5 cursor-pointer font-bold text-slate-800 text-[11px] truncate">
+                    <input
+                      type="checkbox"
+                      checked={sessionFormUseInterview}
+                      disabled={sessionFormWeightsMode === 'standard'}
+                      onChange={e => setSessionFormUseInterview(e.target.checked)}
+                      className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
+                    />
+                    <span className="truncate">면접 점수</span>
+                  </label>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      disabled={!sessionFormUseInterview || sessionFormWeightsMode === 'standard'}
+                      value={sessionFormUseInterview ? sessionFormInterviewMax : 0}
+                      onChange={e => setSessionFormInterviewMax(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-13 h-6 text-center text-xs font-mono font-bold rounded-md border-emerald-200 bg-white px-1"
+                    />
+                    <span className="text-[11px] text-slate-500 font-bold">점</span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1484,13 +1871,13 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
             </div>
           </div>
 
-          <DialogFooter className="pt-2 flex items-center justify-end gap-2">
+          <DialogFooter className="p-3.5 sm:p-4 bg-slate-50/80 border-t border-slate-100 shrink-0 flex items-center justify-end gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => setIsSessionModalOpen(false)}
-              className="h-8 text-xs font-bold rounded-lg"
+              className="h-8 text-xs font-bold rounded-lg border-slate-200"
             >
               취소
             </Button>
@@ -1498,7 +1885,7 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
               type="button"
               size="sm"
               onClick={handleSaveSession}
-              className="h-8 px-4 text-xs font-bold rounded-lg bg-amber-500 hover:bg-amber-600 text-white"
+              className="h-8 px-4 text-xs font-bold rounded-lg bg-amber-500 hover:bg-amber-600 text-white shadow-2xs"
             >
               {editingSessionId ? '규칙 저장 및 재계산' : '등록하기'}
             </Button>

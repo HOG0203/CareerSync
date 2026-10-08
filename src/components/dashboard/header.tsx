@@ -46,7 +46,7 @@ const ROUTE_MAP: Record<string, { group: string; label: string }> = {
   '/students': { group: '취업진로관리', label: '취업상세데이터' },
   '/employment/grade': { group: '취업진로관리', label: '내신등급 계산' },
   '/employment/kai-grade': { group: '취업진로관리', label: '내신등급 계산' },
-  '/employment/recommendation': { group: '취업진로관리', label: '학교장 추천 대상자 선발' },
+  '/employment/recommendation': { group: '취업진로관리', label: '추천/선발' },
   '/class-management': { group: '학생 및 생활지도', label: '학반 관리' },
   '/merit-demerit': { group: '학생 및 생활지도', label: '상벌점 관리' },
   '/labor-education': { group: '학생 및 생활지도', label: '노동인권교육' },
