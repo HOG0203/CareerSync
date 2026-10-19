@@ -36,16 +36,24 @@ export default async function StudentCertificationPage({
     // 1. 프로필의 full_name 및 학과/반 정보로 매칭
     let query = supabase.from('students').select('id');
     
-    if (profile.username.startsWith('std_')) {
-      const rawStdId = profile.username.replace('std_', '');
-      const { data: stdMatch } = await supabase
+    // 1. 현재 사용자 세션의 user_metadata.student_id 우선 획득
+    const clientSupabase = await (await import('@/lib/supabase/server')).createClient();
+    const { data: { user: authUser } } = await clientSupabase.auth.getUser();
+    if (authUser?.user_metadata?.student_id) {
+      targetStudentId = authUser.user_metadata.student_id;
+    }
+
+    // 2. 만약 metadata에 없다면 username 접두사 매칭 (UUID ilike 타입 에러 방지)
+    if (!targetStudentId && profile.username.startsWith('std_')) {
+      const rawStdId = profile.username.replace('std_', '').toLowerCase();
+      const { data: candidates } = await supabase
         .from('students')
         .select('id')
-        .ilike('id', `${rawStdId}%`)
-        .maybeSingle();
+        .eq('student_name', profile.full_name);
 
-      if (stdMatch) {
-        targetStudentId = stdMatch.id;
+      const found = candidates?.find(s => s.id.replace(/-/g, '').toLowerCase().startsWith(rawStdId));
+      if (found) {
+        targetStudentId = found.id;
       }
     }
 

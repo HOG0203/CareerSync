@@ -793,6 +793,22 @@ export const getCurrentUserProfile = cache(async () => {
 
   if (profile) return profile;
 
+  // 학생의 경우 권한 상승 위험이 없으므로(읽기 전용 학생 전용 페이지만 접근),
+  // profiles 레코드가 누락되었더라도 auth user_metadata를 바탕으로 정상 프로필 반환
+  if (user.user_metadata?.role === 'student') {
+    return {
+      id: user.id,
+      username: user.user_metadata.username || ('std_' + user.id.replace(/-/g, '').substring(0, 12)),
+      role: 'student',
+      full_name: user.user_metadata.full_name || '',
+      assigned_year: null,
+      assigned_major: user.user_metadata.assigned_major || null,
+      assigned_class: user.user_metadata.assigned_class || null,
+      assigned_grade: user.user_metadata.assigned_grade || null,
+      career_course: null,
+    };
+  }
+
   // User-editable auth metadata must never grant application permissions.
   return null;
 });

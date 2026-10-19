@@ -287,59 +287,77 @@ export async function studentLogin(formData: FormData) {
     .eq('username', username)
     .maybeSingle()
 
-  if (!profile) {
-    // Auth 계정 생성 시도
-    const { data: authData, error: authCreateErr } = await supabaseAdmin.auth.admin.createUser({
-      email: virtualEmail,
-      password: formatStudentAuthPassword(last4),
-      email_confirm: true,
-      user_metadata: {
-        username,
-        full_name: student.student_name,
-        student_id: student.id,
-        role: 'student',
-        assigned_grade: grade,
-        assigned_major: student.major,
-        assigned_class: student.class_info,
-        is_custom_password: false,
-      }
-    })
+  let authUserId = profile?.id;
 
-    let authUserId = authData?.user?.id;
-
-    if (authCreateErr) {
-      const errMsg = authCreateErr.message?.toLowerCase() || '';
-      if (errMsg.includes('already') || errMsg.includes('registered')) {
-        // 이미 Auth 계정이 생성되어 있던 경우 정상 처리로 넘어가서 로그인 시도
-      } else {
-        return { error: `학생 계정 생성 실패: ${authCreateErr.message}` }
-      }
+  // Auth 계정 생성 또는 기존 계정 조회
+  const { data: authData, error: authCreateErr } = await supabaseAdmin.auth.admin.createUser({
+    email: virtualEmail,
+    password: formatStudentAuthPassword(last4),
+    email_confirm: true,
+    user_metadata: {
+      username,
+      full_name: student.student_name,
+      student_id: student.id,
+      role: 'student',
+      assigned_grade: grade,
+      assigned_major: student.major,
+      assigned_class: student.class_info,
+      is_custom_password: false,
     }
+  })
 
-    if (authUserId) {
-      try {
-        await supabaseAdmin
-          .from('profiles')
-          .upsert({
-            id: authUserId,
-            username: username,
+  if (authData?.user?.id) {
+    authUserId = authData.user.id;
+  } else if (authCreateErr) {
+    const errMsg = authCreateErr.message?.toLowerCase() || '';
+    if (errMsg.includes('already') || errMsg.includes('registered')) {
+      // 이미 Auth 계정이 생성되어 있던 경우 id를 획득하고 metadata 보강
+      const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
+      const existingAuth = listData?.users?.find(u => u.email === virtualEmail);
+      if (existingAuth?.id) {
+        authUserId = existingAuth.id;
+        // user_metadata 최신화 보장
+        await supabaseAdmin.auth.admin.updateUserById(authUserId, {
+          user_metadata: {
+            username,
             full_name: student.student_name,
-            email: virtualEmail,
+            student_id: student.id,
             role: 'student',
             assigned_grade: grade,
             assigned_major: student.major,
             assigned_class: student.class_info,
-          }, { onConflict: 'id' })
-      } catch (pErr) {
-        console.error('Error upserting profile:', pErr)
+            is_custom_password: false,
+          }
+        }).catch(() => {});
       }
-
-      await saveStudentAccountMeta(student.id, {
-        auth_user_id: authUserId,
-        is_custom_password: false,
-        login_count: 0,
-      })
+    } else {
+      return { error: `학생 계정 생성 실패: ${authCreateErr.message}` }
     }
+  }
+
+  if (authUserId) {
+    try {
+      await supabaseAdmin
+        .from('profiles')
+        .upsert({
+          id: authUserId,
+          username: username,
+          full_name: student.student_name,
+          email: virtualEmail,
+          role: 'student' as any,
+          assigned_grade: grade,
+          assigned_major: student.major,
+          assigned_class: student.class_info,
+        }, { onConflict: 'id' })
+    } catch (pErr) {
+      console.warn('Notice: profile upsert skipped (fallback to user_metadata):', pErr);
+    }
+
+    await saveStudentAccountMeta(student.id, {
+      auth_user_id: authUserId,
+      is_custom_password: false,
+      login_count: 0,
+    }).catch(() => {});
   }
 
   // 5. 로그인 시도 (매핑된 패스워드 시도 -> fallback 원본 패스워드)

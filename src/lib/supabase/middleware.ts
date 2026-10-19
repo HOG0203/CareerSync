@@ -34,12 +34,15 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && !isPublic) {
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    const role = profile?.role
+    let role: string | undefined = user.user_metadata?.role === 'student' ? 'student' : undefined;
+    if (!role) {
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+      role = profile?.role;
+    }
 
     if (!role || !['admin', 'teacher', 'staff', 'student'].includes(role)) return redirectTo('/login');
     if (!canAccessPath(role, pathname)) {
-      return redirectTo(role === 'student' ? '/student/certification' : '/dashboard')
+      return redirectTo(role === 'student' ? '/student/certification' : '/dashboard');
     }
 
     if (pathname === '/' || pathname.startsWith('/login')) {
