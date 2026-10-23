@@ -29,10 +29,12 @@ export interface EvaluationWeightsConfig {
   useSchoolScore: boolean;
   useCertScore: boolean;
   useInterview: boolean;
+  useBonusScore?: boolean; // 가산점 항목 활성화 여부
   ncsMax: number;          // 기본 30
   schoolScoreMax: number;  // 기본 30
   certScoreMax: number;    // 기본 30
   interviewMax: number;    // 기본 10
+  bonusScoreMax?: number;  // 가산점 최대 배점 (기본 5점, 커스텀 자유 설정)
 }
 
 export const DEFAULT_EVALUATION_WEIGHTS: EvaluationWeightsConfig = {
@@ -41,10 +43,12 @@ export const DEFAULT_EVALUATION_WEIGHTS: EvaluationWeightsConfig = {
   useSchoolScore: true,
   useCertScore: true,
   useInterview: true,
+  useBonusScore: false,
   ncsMax: 30,
   schoolScoreMax: 30,
   certScoreMax: 30,
-  interviewMax: 10
+  interviewMax: 10,
+  bonusScoreMax: 5
 };
 
 export interface CandidateScoreRecord {
@@ -58,6 +62,8 @@ export interface CandidateScoreRecord {
   ncsScore: number | null;
   // 면접: 배점 직접 입력 (기본 0~10점)
   interviewScore: number | null;
+  // 가산점: 배점 직접 입력 (기본 0~5점 또는 커스텀 배점)
+  bonusScore?: number | null;
   // 교과성적: 평균 등급(GPA) 및 100점 만점 원점수, 설정 배점 환산점수
   schoolAverageGrade?: number | null;
   schoolScoreOriginal: number | null;

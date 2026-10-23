@@ -31,6 +31,8 @@ export function AttendanceImportClient({ baseYear, onSuccess }: { baseYear: numb
   const [parsedData, setParsedData] = React.useState<ParsedAttendanceData[]>([]);
   const [studentMatchMap, setStudentMatchMap] = React.useState<Record<string, { id: string; major: string; classInfo: string; gradYear: number }>>({});
   const [fileNames, setFileNames] = React.useState<string[]>([]);
+  const [isDragging, setIsDragging] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const handleDeleteAll = async () => {
@@ -53,8 +55,7 @@ export function AttendanceImportClient({ baseYear, onSuccess }: { baseYear: numb
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+  const processFiles = async (files: FileList | File[]) => {
     if (!files || files.length === 0) return;
 
     setIsParsing(true);
@@ -172,6 +173,13 @@ export function AttendanceImportClient({ baseYear, onSuccess }: { baseYear: numb
     }
   };
 
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      processFiles(e.target.files);
+    }
+    e.target.value = '';
+  };
+
   const handleApply = async () => {
     if (parsedData.length === 0) return;
     setIsUploading(true);
@@ -237,22 +245,64 @@ export function AttendanceImportClient({ baseYear, onSuccess }: { baseYear: numb
       </div>
 
       {/* 통일된 파일 업로드 드롭존 영역 */}
-      <div className="border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-indigo-50/30 rounded-2xl p-6 transition-all text-center flex flex-col items-center justify-center space-y-3">
-        <div className="h-12 w-12 rounded-2xl bg-white shadow-sm border border-slate-200/80 flex items-center justify-center text-indigo-600">
+      <div 
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!isParsing && !isUploading) setIsDragging(true);
+        }}
+        onDragEnter={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!isParsing && !isUploading) setIsDragging(true);
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsDragging(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsDragging(false);
+          if (isParsing || isUploading) return;
+          if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            processFiles(e.dataTransfer.files);
+          }
+        }}
+        onClick={() => {
+          if (!isParsing && !isUploading) {
+            fileInputRef.current?.click();
+          }
+        }}
+        className={cn(
+          "border-2 border-dashed rounded-2xl p-6 transition-all text-center flex flex-col items-center justify-center space-y-3 cursor-pointer",
+          isDragging 
+            ? "border-indigo-500 bg-indigo-50/70 scale-[0.99] shadow-inner" 
+            : "border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-indigo-50/30"
+        )}
+      >
+        <div className={cn(
+          "h-12 w-12 rounded-2xl shadow-sm border flex items-center justify-center transition-all",
+          isDragging ? "bg-indigo-600 text-white border-indigo-600 scale-110" : "bg-white border-slate-200/80 text-indigo-600"
+        )}>
           <FileSpreadsheet className="h-6 w-6" />
         </div>
         <div className="space-y-1">
-          <h4 className="text-sm font-extrabold text-slate-800">NEIS 출결 엑셀 파일 선택</h4>
-          <p className="text-[11px] text-slate-500 max-w-md">컴퓨터에서 출결 엑셀 파일(.xlsx, .xls)을 가져옵니다. 다중 선택 가능합니다.</p>
+          <h4 className="text-sm font-extrabold text-slate-800">
+            {isDragging ? "여기에 파일을 놓아주세요!" : "NEIS 출결 엑셀 파일 선택 또는 드래그 앤 드롭"}
+          </h4>
+          <p className="text-[11px] text-slate-500 max-w-md">컴퓨터에서 출결 엑셀 파일(.xlsx, .xls)을 가져옵니다. 다중 선택 및 드래그 앤 드롭이 가능합니다.</p>
         </div>
 
-        <div className="flex items-center justify-center pt-1">
+        <div className="flex items-center justify-center pt-1" onClick={(e) => e.stopPropagation()}>
           <input 
+            ref={fileInputRef}
             type="file" 
             id="xlsx-upload-attn" 
             className="hidden" 
             accept=".xlsx, .xls" 
-            onChange={handleFileUpload} 
+            onChange={handleFileInputChange} 
             disabled={isParsing || isUploading} 
             multiple 
           />

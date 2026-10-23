@@ -131,6 +131,8 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
   const [sessionFormSchoolScoreMax, setSessionFormSchoolScoreMax] = React.useState<number>(30);
   const [sessionFormCertScoreMax, setSessionFormCertScoreMax] = React.useState<number>(30);
   const [sessionFormInterviewMax, setSessionFormInterviewMax] = React.useState<number>(10);
+  const [sessionFormUseBonusScore, setSessionFormUseBonusScore] = React.useState<boolean>(false);
+  const [sessionFormBonusScoreMax, setSessionFormBonusScoreMax] = React.useState<number>(5);
 
   // 세션 성적 산출 규칙 폼 상태 (9등급제/5등급제, 석차등급우선, 제외규칙)
   const [sessionFormGradeScale, setSessionFormGradeScale] = React.useState<'9_scale' | '5_scale'>('9_scale');
@@ -197,6 +199,12 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
         if (iB !== iA) return iB - iA;
       }
 
+      if (currentWeights.useBonusScore) {
+        const bA = a.bonusScore ?? -1;
+        const bB = b.bonusScore ?? -1;
+        if (bB !== bA) return bB - bA;
+      }
+
       return 0;
     });
 
@@ -230,7 +238,7 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
   // 인라인 점수 변경 핸들러
   const handleScoreChange = (
     studentId: string, 
-    field: 'ncsScore' | 'interviewScore' | 'remarks', 
+    field: 'ncsScore' | 'interviewScore' | 'bonusScore' | 'remarks', 
     val: string
   ) => {
     setCandidatesMap(prev => {
@@ -239,10 +247,12 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
 
       let newNcs = target.ncsScore;
       let newInterview = target.interviewScore;
+      let newBonus = target.bonusScore;
       let newRemarks = target.remarks;
 
       const ncsLimit = currentWeights.useNcs ? currentWeights.ncsMax : 0;
       const interviewLimit = currentWeights.useInterview ? currentWeights.interviewMax : 0;
+      const bonusLimit = currentWeights.useBonusScore ? (currentWeights.bonusScoreMax ?? 5) : 0;
 
       if (field === 'ncsScore') {
         if (val === '') {
@@ -258,6 +268,13 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
           const num = parseFloat(val);
           newInterview = isNaN(num) ? null : Math.min(interviewLimit, Math.max(0, num));
         }
+      } else if (field === 'bonusScore') {
+        if (val === '') {
+          newBonus = null;
+        } else {
+          const num = parseFloat(val);
+          newBonus = isNaN(num) ? null : Math.min(bonusLimit, Math.max(0, num));
+        }
       } else if (field === 'remarks') {
         newRemarks = val;
       }
@@ -266,14 +283,16 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
       const certConv = currentWeights.useCertScore ? (target.certScoreConverted || 0) : 0;
       const ncsVal = currentWeights.useNcs ? (newNcs || 0) : 0;
       const intVal = currentWeights.useInterview ? (newInterview || 0) : 0;
+      const bonusVal = currentWeights.useBonusScore ? (newBonus || 0) : 0;
 
       const hasAnyScore = (currentWeights.useNcs && newNcs !== null) ||
         (currentWeights.useInterview && newInterview !== null) ||
+        (currentWeights.useBonusScore && newBonus !== null) ||
         (currentWeights.useSchoolScore && schoolConv > 0) ||
         (currentWeights.useCertScore && certConv > 0);
 
       const totalScore = hasAnyScore
-        ? parseFloat((ncsVal + schoolConv + certConv + intVal).toFixed(2))
+        ? parseFloat((ncsVal + schoolConv + certConv + intVal + bonusVal).toFixed(2))
         : null;
 
       setHasUnsavedChanges(true);
@@ -284,6 +303,7 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
           ...target,
           ncsScore: currentWeights.useNcs ? newNcs : null,
           interviewScore: currentWeights.useInterview ? newInterview : null,
+          bonusScore: currentWeights.useBonusScore ? newBonus : null,
           totalScore,
           remarks: newRemarks
         }
@@ -300,6 +320,7 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
         studentId: c.studentId,
         ncsScore: c.ncsScore,
         interviewScore: c.interviewScore,
+        bonusScore: c.bonusScore,
         remarks: c.remarks
       }));
 
@@ -477,6 +498,8 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
     setSessionFormSchoolScoreMax(30);
     setSessionFormCertScoreMax(30);
     setSessionFormInterviewMax(10);
+    setSessionFormUseBonusScore(false);
+    setSessionFormBonusScoreMax(5);
 
     setSessionFormGradeScale('9_scale');
     setSessionFormPreferRankGrade(true);
@@ -507,6 +530,8 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
     setSessionFormSchoolScoreMax(weights.schoolScoreMax ?? 30);
     setSessionFormCertScoreMax(weights.certScoreMax ?? 30);
     setSessionFormInterviewMax(weights.interviewMax ?? 10);
+    setSessionFormUseBonusScore(weights.useBonusScore ?? false);
+    setSessionFormBonusScoreMax(weights.bonusScoreMax ?? 5);
 
     const rules = currentSession.gradeRules || DEFAULT_GRADE_RULES;
     setSessionFormGradeScale(rules.gradeScale || '9_scale');
@@ -527,7 +552,7 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
       return;
     }
 
-    if (!sessionFormUseNcs && !sessionFormUseSchoolScore && !sessionFormUseCertScore && !sessionFormUseInterview) {
+    if (!sessionFormUseNcs && !sessionFormUseSchoolScore && !sessionFormUseCertScore && !sessionFormUseInterview && !sessionFormUseBonusScore) {
       alert('최소 1개 이상의 평가 영역을 선택해야 합니다.');
       return;
     }
@@ -543,6 +568,8 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
         schoolScoreMax: sessionFormUseSchoolScore ? (sessionFormWeightsMode === 'standard' ? 30 : sessionFormSchoolScoreMax) : 0,
         certScoreMax: sessionFormUseCertScore ? (sessionFormWeightsMode === 'standard' ? 30 : sessionFormCertScoreMax) : 0,
         interviewMax: sessionFormUseInterview ? (sessionFormWeightsMode === 'standard' ? 10 : sessionFormInterviewMax) : 0,
+        useBonusScore: sessionFormUseBonusScore,
+        bonusScoreMax: sessionFormUseBonusScore ? sessionFormBonusScoreMax : 0,
       };
 
       const gradeRules: GradeExclusionRules = {
@@ -673,12 +700,23 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
                 면접점수 {currentWeights.interviewMax}점
               </span>
             )}
+            {currentWeights.useBonusScore && (
+              <>
+                {(currentWeights.useNcs || currentWeights.useSchoolScore || currentWeights.useCertScore || currentWeights.useInterview) && (
+                  <span className="text-slate-400">+</span>
+                )}
+                <span className="font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-100 shrink-0">
+                  가산점 {currentWeights.bonusScoreMax ?? 5}점
+                </span>
+              </>
+            )}
             <span className="font-black text-slate-900 shrink-0">
               = 총 {(
                 (currentWeights.useNcs ? currentWeights.ncsMax : 0) +
                 (currentWeights.useSchoolScore ? currentWeights.schoolScoreMax : 0) +
                 (currentWeights.useCertScore ? currentWeights.certScoreMax : 0) +
-                (currentWeights.useInterview ? currentWeights.interviewMax : 0)
+                (currentWeights.useInterview ? currentWeights.interviewMax : 0) +
+                (currentWeights.useBonusScore ? (currentWeights.bonusScoreMax ?? 5) : 0)
               )}점 만점
             </span>
           </div>
@@ -835,7 +873,8 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
                       (currentWeights.useNcs ? currentWeights.ncsMax : 0) +
                       (currentWeights.useSchoolScore ? currentWeights.schoolScoreMax : 0) +
                       (currentWeights.useCertScore ? currentWeights.certScoreMax : 0) +
-                      (currentWeights.useInterview ? currentWeights.interviewMax : 0)
+                      (currentWeights.useInterview ? currentWeights.interviewMax : 0) +
+                      (currentWeights.useBonusScore ? (currentWeights.bonusScoreMax ?? 5) : 0)
                     )}점
                   </p>
                 </div>
@@ -854,7 +893,8 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
                       (currentWeights.useNcs ? currentWeights.ncsMax : 0) +
                       (currentWeights.useSchoolScore ? currentWeights.schoolScoreMax : 0) +
                       (currentWeights.useCertScore ? currentWeights.certScoreMax : 0) +
-                      (currentWeights.useInterview ? currentWeights.interviewMax : 0)
+                      (currentWeights.useInterview ? currentWeights.interviewMax : 0) +
+                      (currentWeights.useBonusScore ? (currentWeights.bonusScoreMax ?? 5) : 0)
                     )}점)
                   </p>
                   <div className="text-[11px] font-black text-slate-900 whitespace-nowrap">
@@ -862,7 +902,8 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
                       currentWeights.useNcs ? `NCS ${currentWeights.ncsMax}` : null,
                       currentWeights.useSchoolScore ? `성적 ${currentWeights.schoolScoreMax}` : null,
                       currentWeights.useCertScore ? `옥저 ${currentWeights.certScoreMax}` : null,
-                      currentWeights.useInterview ? `면접 ${currentWeights.interviewMax}` : null
+                      currentWeights.useInterview ? `면접 ${currentWeights.interviewMax}` : null,
+                      currentWeights.useBonusScore ? `가산 ${currentWeights.bonusScoreMax ?? 5}` : null
                     ].filter(Boolean).join(' · ')}
                   </div>
                   <p className="text-[10px] text-slate-400 whitespace-nowrap truncate">
@@ -1054,12 +1095,14 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
                   currentWeights.useNcs ? `NCS 시험 ${currentWeights.ncsMax}점` : null,
                   currentWeights.useSchoolScore ? `교과성적 ${currentWeights.schoolScoreMax}점(${isCurrent9Scale ? '9등급제' : '5등급제'})` : null,
                   currentWeights.useCertScore ? `옥저인재인증 ${currentWeights.certScoreMax}점` : null,
-                  currentWeights.useInterview ? `면접점수 ${currentWeights.interviewMax}점` : null
+                  currentWeights.useInterview ? `면접점수 ${currentWeights.interviewMax}점` : null,
+                  currentWeights.useBonusScore ? `가산점 ${currentWeights.bonusScoreMax ?? 5}점` : null
                 ].filter(Boolean).join(' + ')} (총 {(
                   (currentWeights.useNcs ? currentWeights.ncsMax : 0) +
                   (currentWeights.useSchoolScore ? currentWeights.schoolScoreMax : 0) +
                   (currentWeights.useCertScore ? currentWeights.certScoreMax : 0) +
-                  (currentWeights.useInterview ? currentWeights.interviewMax : 0)
+                  (currentWeights.useInterview ? currentWeights.interviewMax : 0) +
+                  (currentWeights.useBonusScore ? (currentWeights.bonusScoreMax ?? 5) : 0)
                 )}점 만점)
               </div>
             </div>
@@ -1101,12 +1144,18 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
                           면접 점수 <span className="text-[11px] font-normal text-emerald-600">({currentWeights.interviewMax}점)</span>
                         </th>
                       )}
+                      {currentWeights.useBonusScore && (
+                        <th className="py-3 px-3 text-center min-w-[110px] bg-rose-50/50 text-rose-900 whitespace-nowrap">
+                          가산점 <span className="text-[11px] font-normal text-rose-600">({currentWeights.bonusScoreMax ?? 5}점)</span>
+                        </th>
+                      )}
                       <th className="py-3 px-3 text-center min-w-[130px] bg-amber-50/60 text-amber-950 font-black whitespace-nowrap">
                         종합 점수 <span className="text-[11px] font-normal text-amber-700">({(
                           (currentWeights.useNcs ? currentWeights.ncsMax : 0) +
                           (currentWeights.useSchoolScore ? currentWeights.schoolScoreMax : 0) +
                           (currentWeights.useCertScore ? currentWeights.certScoreMax : 0) +
-                          (currentWeights.useInterview ? currentWeights.interviewMax : 0)
+                          (currentWeights.useInterview ? currentWeights.interviewMax : 0) +
+                          (currentWeights.useBonusScore ? (currentWeights.bonusScoreMax ?? 5) : 0)
                         )}점)</span>
                       </th>
                       <th className="py-3 px-3 min-w-[140px] whitespace-nowrap">비고</th>
@@ -1122,7 +1171,8 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
                         (currentWeights.useNcs ? 1 : 0) + 
                         (currentWeights.useSchoolScore ? 1 : 0) + 
                         (currentWeights.useCertScore ? 1 : 0) + 
-                        (currentWeights.useInterview ? 1 : 0);
+                        (currentWeights.useInterview ? 1 : 0) +
+                        (currentWeights.useBonusScore ? 1 : 0);
 
                       return (
                         <React.Fragment key={c.studentId}>
@@ -1230,6 +1280,25 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
                                     value={c.interviewScore !== null ? c.interviewScore : ''}
                                     onChange={e => handleScoreChange(c.studentId, 'interviewScore', e.target.value)}
                                     className="w-18 h-8 text-center text-xs sm:text-sm font-mono font-black px-1.5 rounded-lg border-emerald-200 bg-white focus:border-emerald-500 whitespace-nowrap [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  />
+                                  <span className="text-[11px] text-slate-500 font-bold whitespace-nowrap">점</span>
+                                </div>
+                              </td>
+                            )}
+
+                            {/* 가산점 */}
+                            {currentWeights.useBonusScore && (
+                              <td className="py-2.5 px-3 text-center bg-rose-50/30 whitespace-nowrap">
+                                <div className="flex items-center justify-center gap-1">
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    min="0"
+                                    max={currentWeights.bonusScoreMax ?? 5}
+                                    placeholder={`0~${currentWeights.bonusScoreMax ?? 5}`}
+                                    value={c.bonusScore !== null && c.bonusScore !== undefined ? c.bonusScore : ''}
+                                    onChange={e => handleScoreChange(c.studentId, 'bonusScore', e.target.value)}
+                                    className="w-18 h-8 text-center text-xs sm:text-sm font-mono font-black px-1.5 rounded-lg border-rose-200 bg-white focus:border-rose-500 whitespace-nowrap [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   />
                                   <span className="text-[11px] text-slate-500 font-bold whitespace-nowrap">점</span>
                                 </div>
@@ -1583,7 +1652,8 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
                     (sessionFormUseNcs ? sessionFormNcsMax : 0) +
                     (sessionFormUseSchoolScore ? sessionFormSchoolScoreMax : 0) +
                     (sessionFormUseCertScore ? sessionFormCertScoreMax : 0) +
-                    (sessionFormUseInterview ? sessionFormInterviewMax : 0)
+                    (sessionFormUseInterview ? sessionFormInterviewMax : 0) +
+                    (sessionFormUseBonusScore ? sessionFormBonusScoreMax : 0)
                   )}점 만점
                 </span>
               </div>
@@ -1739,6 +1809,38 @@ export function RecommendationClient({ initialSessions }: RecommendationClientPr
                       value={sessionFormUseInterview ? sessionFormInterviewMax : 0}
                       onChange={e => setSessionFormInterviewMax(Math.max(0, parseInt(e.target.value) || 0))}
                       className="w-13 h-6 text-center text-xs font-mono font-bold rounded-md border-emerald-200 bg-white px-1"
+                    />
+                    <span className="text-[11px] text-slate-500 font-bold">점</span>
+                  </div>
+                </div>
+
+                {/* 가산점 (선택적 가산점 및 자율 배점 설정) */}
+                <div className={cn(
+                  "sm:col-span-2 px-2.5 py-1.5 rounded-lg border flex items-center justify-between transition-all",
+                  sessionFormUseBonusScore ? "bg-rose-50/70 border-rose-300 shadow-2xs" : "bg-slate-50 border-slate-200 opacity-60"
+                )}>
+                  <label className="flex items-center gap-1.5 cursor-pointer font-bold text-slate-800 text-[11px] truncate">
+                    <input
+                      type="checkbox"
+                      checked={sessionFormUseBonusScore}
+                      onChange={e => setSessionFormUseBonusScore(e.target.checked)}
+                      className="rounded border-slate-300 text-rose-600 focus:ring-rose-500 h-3.5 w-3.5"
+                    />
+                    <span className="truncate text-rose-950 font-black flex items-center gap-1">
+                      가산점 항목 추가
+                      <span className="text-[10px] font-normal text-rose-600">(자격증·특기·봉사 등 자율 배점)</span>
+                    </span>
+                  </label>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-[11px] text-slate-500 font-bold">최대 배점:</span>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="100"
+                      disabled={!sessionFormUseBonusScore}
+                      value={sessionFormUseBonusScore ? sessionFormBonusScoreMax : 0}
+                      onChange={e => setSessionFormBonusScoreMax(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-13 h-6 text-center text-xs font-mono font-bold rounded-md border-rose-200 bg-white px-1"
                     />
                     <span className="text-[11px] text-slate-500 font-bold">점</span>
                   </div>

@@ -53,6 +53,7 @@ export interface ParsedExcelCandidateRow {
   rawStudentId?: string;
   ncsScore: number | null;
   interviewScore: number | null;
+  bonusScore?: number | null;
   remarks: string;
 
   matchStatus: 'matched' | 'already_registered' | 'ambiguous' | 'unmatched';
@@ -220,6 +221,7 @@ export function RecommendationExcelTab({
       let colName = -1;
       let colNcs = -1;
       let colInterview = -1;
+      let colBonus = -1;
       let colRemarks = -1;
       let colId = -1;
 
@@ -248,6 +250,8 @@ export function RecommendationExcelTab({
               colNcs = idx;
             } else if (colInterview === -1 && (c.includes('면접') || c.includes('인터뷰'))) {
               colInterview = idx;
+            } else if (colBonus === -1 && (c.includes('가산') || c.includes('보너스') || c.includes('가점'))) {
+              colBonus = idx;
             } else if (colRemarks === -1 && (c.includes('비고') || c.includes('메모') || c.includes('특이사항') || c.includes('희망'))) {
               colRemarks = idx;
             } else if (colId === -1 && (c.includes('학번') || c.includes('학생번호') || c === 'id')) {
@@ -295,6 +299,7 @@ export function RecommendationExcelTab({
         };
         const ncsScore = (colNcs !== -1 && weights.useNcs) ? parseScore(row[colNcs], weights.ncsMax) : null;
         const interviewScore = (colInterview !== -1 && weights.useInterview) ? parseScore(row[colInterview], weights.interviewMax) : null;
+        const bonusScore = (colBonus !== -1 && weights.useBonusScore) ? parseScore(row[colBonus], weights.bonusScoreMax ?? 5) : null;
         const remarks = colRemarks !== -1 ? cleanText(row[colRemarks]) : '';
 
         // 완전 빈 행 무시
@@ -421,6 +426,7 @@ export function RecommendationExcelTab({
           rawStudentId,
           ncsScore,
           interviewScore,
+          bonusScore,
           remarks,
           matchStatus,
           matchedStudent,
@@ -552,13 +558,14 @@ export function RecommendationExcelTab({
     try {
       const studentIds = Array.from(new Set(rowsToRegister.map(r => r.matchedStudent.id)));
 
-      // 엑셀에서 입력된 NCS점수, 면접점수, 비고 맵 생성
-      const initialScores: Record<string, { ncsScore?: number | null; interviewScore?: number | null; remarks?: string }> = {};
+      // 엑셀에서 입력된 NCS점수, 면접점수, 가산점, 비고 맵 생성
+      const initialScores: Record<string, { ncsScore?: number | null; interviewScore?: number | null; bonusScore?: number | null; remarks?: string }> = {};
       rowsToRegister.forEach(r => {
         const id = r.matchedStudent.id;
         initialScores[id] = {
           ncsScore: r.ncsScore,
           interviewScore: r.interviewScore,
+          bonusScore: r.bonusScore,
           remarks: r.remarks
         };
       });
@@ -995,12 +1002,17 @@ export function RecommendationExcelTab({
                               <span className="font-semibold text-slate-400">면접:</span> {row.interviewScore}점
                             </div>
                           )}
+                          {row.bonusScore !== null && row.bonusScore !== undefined && (
+                            <div className="text-slate-700">
+                              <span className="font-semibold text-rose-500">가산:</span> {row.bonusScore}점
+                            </div>
+                          )}
                           {row.remarks && (
                             <div className="text-slate-500 truncate max-w-[140px]" title={row.remarks}>
                               <span className="font-semibold text-slate-400">비고:</span> {row.remarks}
                             </div>
                           )}
-                          {row.ncsScore === null && row.interviewScore === null && !row.remarks && (
+                          {row.ncsScore === null && row.interviewScore === null && (row.bonusScore === null || row.bonusScore === undefined) && !row.remarks && (
                             <span className="text-slate-300">-</span>
                           )}
                         </div>

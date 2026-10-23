@@ -39,17 +39,19 @@ function computeCandidateScores(
   schoolAverageGrade: number,
   certOriginal: number,
   weights: EvaluationWeightsConfig = DEFAULT_EVALUATION_WEIGHTS,
-  overrides?: { ncsScore?: number | null; interviewScore?: number | null; remarks?: string }
+  overrides?: { ncsScore?: number | null; interviewScore?: number | null; bonusScore?: number | null; remarks?: string }
 ): void {
   const useSchool = weights.useSchoolScore !== false;
   const useCert = weights.useCertScore !== false;
   const useNcs = weights.useNcs !== false;
   const useInt = weights.useInterview !== false;
+  const useBonus = weights.useBonusScore === true;
 
   const schoolMax = weights.schoolScoreMax ?? 30;
   const certMax = weights.certScoreMax ?? 30;
   const ncsMax = weights.ncsMax ?? 30;
   const intMax = weights.interviewMax ?? 10;
+  const bonusMax = weights.bonusScoreMax ?? 5;
 
   // NCS 점수 처리
   let ncsScore = overrides?.ncsScore !== undefined ? overrides.ncsScore : cand.ncsScore;
@@ -71,6 +73,16 @@ function computeCandidateScores(
     interviewScore = null;
   }
 
+  // 가산점 처리
+  let bonusScore = overrides?.bonusScore !== undefined ? overrides.bonusScore : (cand.bonusScore ?? null);
+  if (!useBonus) {
+    bonusScore = null;
+  } else if (bonusScore !== null && bonusScore !== undefined) {
+    bonusScore = Math.min(bonusMax, Math.max(0, parseFloat(Number(bonusScore).toFixed(2))));
+  } else {
+    bonusScore = null;
+  }
+
   // 교과성적 환산
   cand.schoolAverageGrade = schoolAverageGrade;
   cand.schoolScoreOriginal = schoolOriginal;
@@ -86,6 +98,7 @@ function computeCandidateScores(
 
   cand.ncsScore = ncsScore;
   cand.interviewScore = interviewScore;
+  cand.bonusScore = bonusScore;
 
   if (overrides?.remarks !== undefined) {
     cand.remarks = overrides.remarks;
@@ -95,9 +108,10 @@ function computeCandidateScores(
   const schoolVal = useSchool ? (cand.schoolScoreConverted || 0) : 0;
   const certVal = useCert ? (cand.certScoreConverted || 0) : 0;
   const intVal = useInt ? (interviewScore || 0) : 0;
+  const bonusVal = useBonus ? (bonusScore || 0) : 0;
 
-  cand.totalScore = (ncsScore !== null || interviewScore !== null || schoolVal > 0 || certVal > 0)
-    ? parseFloat((ncsVal + schoolVal + certVal + intVal).toFixed(2))
+  cand.totalScore = (ncsScore !== null || interviewScore !== null || (useBonus && bonusScore !== null) || schoolVal > 0 || certVal > 0)
+    ? parseFloat((ncsVal + schoolVal + certVal + intVal + bonusVal).toFixed(2))
     : null;
 }
 
@@ -506,7 +520,7 @@ export async function fetchStudentBaseScores(
 export async function addCandidatesToSession(
   sessionId: string,
   studentIds: string[],
-  initialScores?: Record<string, { ncsScore?: number | null; interviewScore?: number | null; remarks?: string }>
+  initialScores?: Record<string, { ncsScore?: number | null; interviewScore?: number | null; bonusScore?: number | null; remarks?: string }>
 ): Promise<{ success: boolean; session?: RecommendationSession; error?: string }> {
   try {
     const supabase = createAdminClient();
@@ -637,7 +651,7 @@ export async function removeCandidateFromSession(
  */
 export async function bulkSaveCandidateScores(
   sessionId: string,
-  updates: { studentId: string; ncsScore?: number | null; interviewScore?: number | null; remarks?: string }[]
+  updates: { studentId: string; ncsScore?: number | null; interviewScore?: number | null; bonusScore?: number | null; remarks?: string }[]
 ): Promise<{ success: boolean; session?: RecommendationSession; error?: string }> {
   try {
     const supabase = createAdminClient();
@@ -651,8 +665,10 @@ export async function bulkSaveCandidateScores(
     const weights = session.evaluationWeights || DEFAULT_EVALUATION_WEIGHTS;
     const ncsMax = weights.ncsMax ?? 30;
     const intMax = weights.interviewMax ?? 10;
+    const bonusMax = weights.bonusScoreMax ?? 5;
     const useNcs = weights.useNcs !== false;
     const useInt = weights.useInterview !== false;
+    const useBonus = weights.useBonusScore === true;
 
     updates.forEach(u => {
       const cand = session.candidates[u.studentId];
@@ -660,12 +676,16 @@ export async function bulkSaveCandidateScores(
 
       let newNcs = cand.ncsScore;
       let newInt = cand.interviewScore;
+      let newBonus = cand.bonusScore ?? null;
 
       if (u.ncsScore !== undefined) {
         newNcs = (useNcs && u.ncsScore !== null) ? Math.min(ncsMax, Math.max(0, parseFloat(Number(u.ncsScore).toFixed(2)))) : null;
       }
       if (u.interviewScore !== undefined) {
         newInt = (useInt && u.interviewScore !== null) ? Math.min(intMax, Math.max(0, parseFloat(Number(u.interviewScore).toFixed(2)))) : null;
+      }
+      if (u.bonusScore !== undefined) {
+        newBonus = (useBonus && u.bonusScore !== null) ? Math.min(bonusMax, Math.max(0, parseFloat(Number(u.bonusScore).toFixed(2)))) : null;
       }
       if (u.remarks !== undefined) {
         cand.remarks = u.remarks;
@@ -677,7 +697,7 @@ export async function bulkSaveCandidateScores(
         cand.schoolAverageGrade || 0,
         cand.certScoreOriginal || 0,
         weights,
-        { ncsScore: newNcs, interviewScore: newInt }
+        { ncsScore: newNcs, interviewScore: newInt, bonusScore: newBonus }
       );
     });
 
@@ -810,13 +830,54 @@ export async function exportRecommendationExcelAction(
       }
     });
 
+    const weights = session.evaluationWeights || DEFAULT_EVALUATION_WEIGHTS;
+    const useBonus = weights.useBonusScore === true;
+    const bonusMax = weights.bonusScoreMax ?? 5;
+
+    const parts: string[] = [];
+    if (weights.useNcs) parts.push(`NCS 시험 ${weights.ncsMax}점`);
+    if (weights.useSchoolScore) parts.push(`교과성적 ${weights.schoolScoreMax}점`);
+    if (weights.useCertScore) parts.push(`옥저인재인증 ${weights.certScoreMax}점`);
+    if (weights.useInterview) parts.push(`면접점수 ${weights.interviewMax}점`);
+    if (useBonus) parts.push(`가산점 ${bonusMax}점`);
+
+    const totalMax = (weights.useNcs ? weights.ncsMax : 0) +
+                     (weights.useSchoolScore ? weights.schoolScoreMax : 0) +
+                     (weights.useCertScore ? weights.certScoreMax : 0) +
+                     (weights.useInterview ? weights.interviewMax : 0) +
+                     (useBonus ? bonusMax : 0);
+    const weightDesc = `배점: ${parts.join(' + ')} (총 ${totalMax}점 만점)`;
+
+    // 3. 테이블 헤더 정의
+    const headers = [
+      '순위',
+      '선발 상태',
+      '성명',
+      '학과',
+      '반',
+      '번호',
+      '교과 평균등급',
+      weights.useSchoolScore ? `교과성적 (${weights.schoolScoreMax}점)` : '교과성적 (미반영)',
+      weights.useNcs ? `NCS점수 (${weights.ncsMax}점)` : 'NCS점수 (미반영)',
+      weights.useCertScore ? `옥저인증 (${weights.certScoreMax}점)` : '옥저인증 (미반영)',
+      weights.useInterview ? `면접점수 (${weights.interviewMax}점)` : '면접점수 (미반영)',
+      ...(useBonus ? [`가산점 (${bonusMax}점)`] : []),
+      `종합점수 (${totalMax}점)`,
+      '비고'
+    ];
+
+    const totalColCount = headers.length;
+    const lastColLetter = String.fromCharCode(64 + totalColCount); // 13이면 'M', 14면 'N'
+    const totalScoreColNum = totalColCount - 1; // 종합점수 열
+    const remarksColNum = totalColCount;       // 비고 열
+
     // 1. 대제목 (행 2)
     ws.addRow([]); // 빈 1행 (여백)
     ws.getRow(1).height = 12;
 
     const titleRow = ws.addRow(['대구공업고등학교 학교장 추천 대상자 심사 평가 결과표']);
     titleRow.height = 38;
-    ws.mergeCells('A2:M2');
+    ws.mergeCells(`A2:${lastColLetter}2`);
     const titleCell = ws.getCell('A2');
     titleCell.font = { name: '맑은 고딕', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
     titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } }; // Deep Navy
@@ -831,7 +892,7 @@ export async function exportRecommendationExcelAction(
     // 2. 공고 및 배점 안내 서브헤더 (행 3~4)
     const subTitleRow1 = ws.addRow([`■ 선발 공고: ${session.title}   |   추천 선발 정원: ${quota}명 (총 지원 희망자 ${candidates.length}명)`]);
     subTitleRow1.height = 24;
-    ws.mergeCells('A3:M3');
+    ws.mergeCells(`A3:${lastColLetter}3`);
     const subCell1 = ws.getCell('A3');
     subCell1.font = { name: '맑은 고딕', size: 10.5, bold: true, color: { argb: 'FF1E293B' } };
     subCell1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
@@ -842,23 +903,11 @@ export async function exportRecommendationExcelAction(
       bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
     };
 
-    const weights = session.evaluationWeights || DEFAULT_EVALUATION_WEIGHTS;
-    const parts: string[] = [];
-    if (weights.useNcs) parts.push(`NCS 시험 ${weights.ncsMax}점`);
-    if (weights.useSchoolScore) parts.push(`교과성적 ${weights.schoolScoreMax}점`);
-    if (weights.useCertScore) parts.push(`옥저인재인증 ${weights.certScoreMax}점`);
-    if (weights.useInterview) parts.push(`면접점수 ${weights.interviewMax}점`);
-    const totalMax = (weights.useNcs ? weights.ncsMax : 0) +
-                     (weights.useSchoolScore ? weights.schoolScoreMax : 0) +
-                     (weights.useCertScore ? weights.certScoreMax : 0) +
-                     (weights.useInterview ? weights.interviewMax : 0);
-    const weightDesc = `배점: ${parts.join(' + ')} (총 ${totalMax}점 만점)`;
-
     const subTitleRow2 = ws.addRow([
       `■ 성적 반영 기준: ${scaleName} (${rules.preferRankGrade ? '기존 석차등급 우선 적용' : '성취도 환산'})   |   ${weightDesc}`
     ]);
     subTitleRow2.height = 22;
-    ws.mergeCells('A4:M4');
+    ws.mergeCells(`A4:${lastColLetter}4`);
     const subCell2 = ws.getCell('A4');
     subCell2.font = { name: '맑은 고딕', size: 9.5, color: { argb: 'FF475569' } };
     subCell2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
@@ -871,23 +920,6 @@ export async function exportRecommendationExcelAction(
 
     ws.addRow([]); // 빈 행 (여백)
     ws.getRow(5).height = 10;
-
-    // 3. 테이블 헤더 (행 6)
-    const headers = [
-      '순위',
-      '선발 상태',
-      '성명',
-      '학과',
-      '반',
-      '번호',
-      '교과 평균등급',
-      weights.useSchoolScore ? `교과성적 (${weights.schoolScoreMax}점)` : '교과성적 (미반영)',
-      weights.useNcs ? `NCS점수 (${weights.ncsMax}점)` : 'NCS점수 (미반영)',
-      weights.useCertScore ? `옥저인증 (${weights.certScoreMax}점)` : '옥저인증 (미반영)',
-      weights.useInterview ? `면접점수 (${weights.interviewMax}점)` : '면접점수 (미반영)',
-      `종합점수 (${totalMax}점)`,
-      '비고'
-    ];
 
     const headerRow = ws.addRow(headers);
     headerRow.height = 30;
@@ -933,6 +965,10 @@ export async function exportRecommendationExcelAction(
       const interviewScoreVal = c.interviewScore !== null ? Number(c.interviewScore.toFixed(2)) : null;
       const totalScoreVal = c.totalScore !== null ? Number(c.totalScore.toFixed(2)) : null;
 
+      const bonusScoreVal = (useBonus && c.bonusScore !== null && c.bonusScore !== undefined)
+        ? Number(c.bonusScore.toFixed(2))
+        : null;
+
       if (isSelected && totalScoreVal !== null) {
         selectedTotalSum += totalScoreVal;
         selectedCount++;
@@ -950,6 +986,7 @@ export async function exportRecommendationExcelAction(
         ncsScoreVal !== null ? ncsScoreVal : '-',
         certScoreVal !== null ? certScoreVal : '-',
         interviewScoreVal !== null ? interviewScoreVal : '-',
+        ...(useBonus ? [bonusScoreVal !== null ? bonusScoreVal : '-'] : []),
         totalScoreVal !== null ? totalScoreVal : '-',
         c.remarks || ''
       ];
@@ -998,14 +1035,14 @@ export async function exportRecommendationExcelAction(
           if (c.schoolAverageGrade) {
             cell.font = { name: '맑은 고딕', size: 10, color: { argb: 'FF2563EB' } };
           }
-        } else if (colNumber >= 8 && colNumber <= 11) {
-          // 점수 영역 (교과, NCS, 옥저, 면접)
+        } else if (colNumber >= 8 && colNumber < totalScoreColNum) {
+          // 점수 영역 (교과, NCS, 옥저, 면접, 가산점)
           cell.alignment = { horizontal: 'right', vertical: 'middle' };
           if (typeof cell.value === 'number') {
             cell.numFmt = '#,##0.00';
           }
-        } else if (colNumber === 12) {
-          // 종합점수 (100점)
+        } else if (colNumber === totalScoreColNum) {
+          // 종합점수
           cell.alignment = { horizontal: 'right', vertical: 'middle' };
           cell.font = {
             name: '맑은 고딕',
@@ -1016,7 +1053,7 @@ export async function exportRecommendationExcelAction(
           if (typeof cell.value === 'number') {
             cell.numFmt = '#,##0.00';
           }
-        } else if (colNumber === 13) {
+        } else if (colNumber === remarksColNum) {
           // 비고
           cell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
         }
@@ -1027,18 +1064,17 @@ export async function exportRecommendationExcelAction(
     const summaryRowNumber = ws.rowCount + 1;
     const selectedAvg = selectedCount > 0 ? Number((selectedTotalSum / selectedCount).toFixed(2)) : null;
 
-    const summaryRow = ws.addRow([
-      `선발 요약: 추천 선발 정원 ${quota}명  /  총 ${candidates.length}명 신청`,
-      '', '', '', '', '',
-      '추천 선발 대상자 평균 종합점수',
-      '', '', '', '',
-      selectedAvg !== null ? selectedAvg : '-',
-      ''
-    ]);
+    const summaryRowValues = new Array(totalColCount).fill('');
+    summaryRowValues[0] = `선발 요약: 추천 선발 정원 ${quota}명  /  총 ${candidates.length}명 신청`;
+    summaryRowValues[6] = '추천 선발 대상자 평균 종합점수';
+    summaryRowValues[totalScoreColNum - 1] = selectedAvg !== null ? selectedAvg : '-';
+
+    const summaryRow = ws.addRow(summaryRowValues);
     summaryRow.height = 28;
 
+    const midEndColLetter = String.fromCharCode(64 + totalScoreColNum - 1);
     ws.mergeCells(`A${summaryRowNumber}:F${summaryRowNumber}`);
-    ws.mergeCells(`G${summaryRowNumber}:K${summaryRowNumber}`);
+    ws.mergeCells(`G${summaryRowNumber}:${midEndColLetter}${summaryRowNumber}`);
 
     const thickSummaryBorder = {
       top: { style: 'double' as const, color: { argb: 'FF64748B' } },
@@ -1053,7 +1089,7 @@ export async function exportRecommendationExcelAction(
       cell.font = { name: '맑은 고딕', size: 10, bold: true, color: { argb: 'FF1E293B' } };
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
 
-      if (colNumber === 12) {
+      if (colNumber === totalScoreColNum) {
         // 평균 종합점수 셀
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } }; // Soft Green
         cell.font = { name: '맑은 고딕', size: 11, bold: true, color: { argb: 'FF15803D' } };
@@ -1073,12 +1109,13 @@ export async function exportRecommendationExcelAction(
       { width: 8 },  // E: 반
       { width: 8 },  // F: 번호
       { width: 16 }, // G: 교과 평균등급
-      { width: 18 }, // H: 교과성적환산 (30점)
-      { width: 16 }, // I: NCS시험 (30점)
-      { width: 20 }, // J: 옥저인증환산 (30점)
-      { width: 16 }, // K: 면접점수 (10점)
-      { width: 20 }, // L: 종합점수 (100점)
-      { width: 26 }, // M: 비고
+      { width: 18 }, // H: 교과성적환산
+      { width: 16 }, // I: NCS시험
+      { width: 20 }, // J: 옥저인증환산
+      { width: 16 }, // K: 면접점수
+      ...(useBonus ? [{ width: 16 }] : []), // L: 가산점 (활성화 시)
+      { width: 20 }, // 종합점수
+      { width: 26 }, // 비고
     ];
 
     const buffer = await wb.xlsx.writeBuffer();
