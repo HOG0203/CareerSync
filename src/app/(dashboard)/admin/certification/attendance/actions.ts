@@ -148,6 +148,23 @@ export async function uploadStudentAttendance(
   });
   revalidateTag('cert-attendance');
   revalidatePath('/admin/certification/attendance');
+
+  // 감사 로그 기록 (STUDENT_BULK_UPDATE)
+  try {
+    const { logAuditAction } = await import('@/lib/audit-logger');
+    await logAuditAction({
+      action_type: 'STUDENT_BULK_UPDATE',
+      target_name: `[출결 일괄 등록] ${baseAcademicYear}학년도 출결 (${upsertData.length}건 반영)`,
+      details: {
+        baseAcademicYear,
+        count: upsertData.length,
+        affectedGrades
+      }
+    });
+  } catch (auditErr) {
+    console.error('Failed to log audit for uploadStudentAttendance:', auditErr);
+  }
+
   return { success: true, count: upsertData.length };
 }
 
@@ -161,6 +178,19 @@ export async function deleteAllStudentAttendance() {
   });
   revalidateTag('cert-attendance');
   revalidatePath('/admin/certification/attendance');
+
+  // 감사 로그 기록 (STUDENT_BULK_UPDATE)
+  try {
+    const { logAuditAction } = await import('@/lib/audit-logger');
+    await logAuditAction({
+      action_type: 'STUDENT_BULK_UPDATE',
+      target_name: `[출결 전체 초기화] 전교생 출결 데이터 일괄 삭제`,
+      details: { action: 'deleteAllStudentAttendance' }
+    });
+  } catch (auditErr) {
+    console.error('Failed to log audit for deleteAllStudentAttendance:', auditErr);
+  }
+
   return { success: true };
 }
 

@@ -303,6 +303,25 @@ export async function importUploadedCertificates(rawRows: any[][]) {
     revalidateTag('cert-certificates');
     revalidateTag('students');
     revalidatePath('/admin/certification/certificates');
+
+    // 감사 로그 기록 (STUDENT_BULK_UPDATE)
+    try {
+      const { logAuditAction } = await import('@/lib/audit-logger');
+      await logAuditAction({
+        action_type: 'STUDENT_BULK_UPDATE',
+        target_name: `[자격증 일괄 등록] ${major} ${grade}학년 ${classInfo} (${res.successCount}명 반영)`,
+        details: {
+          major,
+          grade,
+          classInfo,
+          successCount: res.successCount,
+          skippedCount: res.skippedCount,
+          errorSummary: res.errors.slice(0, 5)
+        }
+      });
+    } catch (auditErr) {
+      console.error('Failed to log audit for importUploadedCertificates:', auditErr);
+    }
     revalidatePath('/employment-status');
     revalidatePath('/students');
 

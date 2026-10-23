@@ -198,6 +198,24 @@ export async function uploadStudentScores(
     const { error: insertError } = await supabase.from('student_scores').insert(finalScores);
     if (insertError) return { error: `성적 저장 실패: ${insertError.message}` };
     results.success = finalScores.length;
+
+    // 감사 로그 기록 (STUDENT_BULK_UPDATE)
+    try {
+      const { logAuditAction } = await import('@/lib/audit-logger');
+      await logAuditAction({
+        action_type: 'STUDENT_BULK_UPDATE',
+        target_name: `[성적 일괄 등록] ${academicYear}학년도 성적 (${finalScores.length}건 반영)`,
+        details: {
+          academicYear,
+          totalRecords: finalScores.length,
+          uniqueStudents: deleteTargets.size,
+          failedCount: results.failed,
+          notMatched: results.notMatched.slice(0, 10)
+        }
+      });
+    } catch (auditErr) {
+      console.error('Failed to log audit for uploadStudentScores:', auditErr);
+    }
   }
 
   const { revalidateTag } = await import('next/cache');
