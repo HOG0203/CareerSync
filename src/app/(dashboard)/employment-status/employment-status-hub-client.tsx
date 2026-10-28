@@ -399,13 +399,21 @@ export function EmploymentStatusHubClient({
               <p className="text-xs sm:text-sm font-bold text-slate-600">
                 {isLowerGrade ? '취업 희망 (희망률)' : '취업 확정·진행 (취업률)'}
               </p>
-              <div className="flex items-baseline gap-2">
+              <div className="flex items-baseline gap-1.5 sm:gap-2">
                 <span className="text-2xl sm:text-3xl font-black text-emerald-600">
                   {stats.primaryRate}%
                 </span>
                 <span className="text-xs font-bold text-slate-500">
                   ({stats.primaryCount}명)
                 </span>
+                {stats.excludedCount !== undefined && (
+                  <span 
+                    className="text-[11px] text-slate-400 font-normal"
+                    title={`제외인정자 ${stats.excludedCount}명`}
+                  >
+                    • 제외 {stats.excludedCount}명
+                  </span>
+                )}
               </div>
             </div>
             <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 shrink-0">
