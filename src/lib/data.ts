@@ -888,14 +888,20 @@ export async function getYearlyRankingsSummary(graduationYear: number, baseYear:
   const students = studentsResult.data;
   const studentIds = students.map(s => s.id);
 
-  // 2. [초고속 2단계] 15명 단위 청크로 분할 (Supabase 1000개 행 제한을 초과하지 않도록 안전한 청크 크기 적용)
-  const CHUNK_SIZE = 15;
-  const chunks: string[][] = [];
-  for (let i = 0; i < studentIds.length; i += CHUNK_SIZE) {
-    chunks.push(studentIds.slice(i, i + CHUNK_SIZE));
+  // 2. [최적화 청크 분할] 과도한 병렬 쿼리로 인한 DB 디스크 I/O 고갈 방지 (기존 40개 병렬 -> 8개 이하로 통합)
+  const SCORE_CHUNK_SIZE = 60;
+  const scoreChunks: string[][] = [];
+  for (let i = 0; i < studentIds.length; i += SCORE_CHUNK_SIZE) {
+    scoreChunks.push(studentIds.slice(i, i + SCORE_CHUNK_SIZE));
   }
 
-  const scorePromises = chunks.map(chunk =>
+  const ATTENDANCE_CHUNK_SIZE = 100;
+  const attendanceChunks: string[][] = [];
+  for (let i = 0; i < studentIds.length; i += ATTENDANCE_CHUNK_SIZE) {
+    attendanceChunks.push(studentIds.slice(i, i + ATTENDANCE_CHUNK_SIZE));
+  }
+
+  const scorePromises = scoreChunks.map(chunk =>
     supabase
       .from('student_scores')
       .select('student_id, credits, achievement')
@@ -903,7 +909,7 @@ export async function getYearlyRankingsSummary(graduationYear: number, baseYear:
       .range(0, 5000)
   );
 
-  const attendancePromises = chunks.map(chunk =>
+  const attendancePromises = attendanceChunks.map(chunk =>
     supabase
       .from('student_attendance')
       .select('student_id, grade, semester, school_days, remarks, absent_unexcused, late_unexcused, early_unexcused, out_unexcused, absent_disease, late_disease, early_disease, out_disease, absent_other, late_other, early_other, out_other')
@@ -1050,7 +1056,7 @@ export async function getCachedYearlyRankingsSummary(graduationYear: number, bas
       async () => getYearlyRankingsSummary(graduationYear, baseYear),
       [`yearly-rankings-summary-${cacheKey}`],
       {
-        revalidate: 60,
+        revalidate: 300, // [최적화] 30분 캐싱으로 동시 접속 시 디스크 I/O 절감 (태그 무효화 지원)
         tags: [`rankings-${graduationYear}`, 'students', 'student_scores']
       }
     );

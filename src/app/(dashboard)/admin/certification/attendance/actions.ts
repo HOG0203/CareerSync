@@ -145,11 +145,18 @@ export async function uploadStudentAttendance(
 
   if (upsertData.length === 0) return { error: "매칭된 학생이 없어 저장할 데이터가 없습니다." };
 
-  const { error } = await supabase
-    .from('student_attendance')
-    .upsert(upsertData, { onConflict: 'student_id, academic_year, grade, semester' });
-
-  if (error) return { error: error.message };
+  // [디스크 I/O 최적화] 300건 단위 청크 분할 및 미세 지연(50ms) 적용하여 순간 I/O 버짓 소진 방지
+  const BATCH_SIZE = 300;
+  for (let i = 0; i < upsertData.length; i += BATCH_SIZE) {
+    const chunk = upsertData.slice(i, i + BATCH_SIZE);
+    const { error: batchErr } = await supabase
+      .from('student_attendance')
+      .upsert(chunk, { onConflict: 'student_id, academic_year, grade, semester' });
+    if (batchErr) return { error: batchErr.message };
+    if (i + BATCH_SIZE < upsertData.length) {
+      await new Promise(res => setTimeout(res, 50));
+    }
+  }
   
   // 업로드된 데이터에 포함된 학년들만 핀포인트 캐시 비우기
   const affectedGrades = Array.from(new Set(data.map(d => d.currentGrade).filter(Boolean)));

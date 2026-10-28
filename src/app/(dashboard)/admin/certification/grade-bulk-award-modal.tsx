@@ -24,7 +24,6 @@ interface GradeBulkAwardModalProps {
   onOpenChange: (open: boolean) => void;
   grade: number;
   academicYear: number;
-  semester?: number;
   evaluations: FullStudentEvaluation[];
   prizeConfig?: CertificationPrizeConfig;
   onSuccess: () => Promise<void>;
@@ -35,7 +34,6 @@ export function GradeBulkAwardModal({
   onOpenChange,
   grade,
   academicYear,
-  semester,
   evaluations,
   prizeConfig,
   onSuccess,
@@ -111,7 +109,6 @@ export function GradeBulkAwardModal({
           studentIds: prizeEligibleStudents.map(s => s.studentId),
           rewardType: 'prize',
           academicYear,
-          semester,
           gradeNum: grade,
         });
         if (prizeRes.success) {
@@ -127,7 +124,6 @@ export function GradeBulkAwardModal({
           studentIds: certAwardEligibleStudents.map(s => s.studentId),
           rewardType: 'certificate_award',
           academicYear,
-          semester,
           gradeNum: grade,
         });
         if (certRes.success) {
@@ -178,7 +174,6 @@ export function GradeBulkAwardModal({
     try {
       const res = await exportRewardLedgerExcelAction({
         academicYear,
-        semester,
         grade,
         selectedClass: 'all',
         targetAwardedDate: successInfo.awardedDate,

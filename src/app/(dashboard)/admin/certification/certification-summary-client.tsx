@@ -140,7 +140,6 @@ export function CertificationSummaryClient({
   const [rankFilter, setRankFilter] = React.useState<string>('all');
   const [onlyCertified, setOnlyCertified] = React.useState<boolean>(false);
   const [rewardFilter, setRewardFilter] = React.useState<'all' | 'prize_eligible' | 'prize_awarded' | 'award_eligible' | 'award_awarded'>('all');
-  const [activeSemester, setActiveSemester] = React.useState<number>(1);
   const [search, setSearch] = React.useState<string>('');
   const [sortCriteria, setSortCriteria] = React.useState<'score_desc' | 'class_num' | 'score_asc' | 'name_asc'>('score_desc');
 
@@ -182,7 +181,7 @@ export function CertificationSummaryClient({
   React.useEffect(() => {
     setCurrentPage(1);
     setSelectedStudentIds(new Set());
-  }, [selectedClass, selectedMajor, rankFilter, onlyCertified, rewardFilter, search, sortCriteria, activeGrade, activeSemester, pageSize]);
+  }, [selectedClass, selectedMajor, rankFilter, onlyCertified, rewardFilter, search, sortCriteria, activeGrade, pageSize]);
 
   // 모달이 닫힐 때 Radix UI로 인해 body에 pointer-events: none이 남아 다른 버튼 클릭이 먹통되는 문제 원천 차단
   React.useEffect(() => {
@@ -224,6 +223,7 @@ export function CertificationSummaryClient({
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href);
       url.searchParams.set('grade', String(targetGradeNum));
+      url.searchParams.delete('semester');
       window.history.replaceState(null, '', url.toString());
     }
 
@@ -274,7 +274,6 @@ export function CertificationSummaryClient({
         studentId: awardModalTarget.student.studentId,
         rewardType: awardModalTarget.rewardType,
         academicYear: baseYear,
-        semester: activeSemester,
         gradeNum: activeGrade,
         itemName: awardModalTarget.customItemName,
         remarks: awardModalTarget.remarks,
@@ -312,7 +311,7 @@ export function CertificationSummaryClient({
     }
     if (selectedStudentIds.size === 0) return;
     const typeLabel = rewardType === 'prize' ? '등급별 상품' : '옥저인재인증상';
-    const confirmMsg = `선택된 ${selectedStudentIds.size}명 중 자격 대상자에게 ${activeSemester}학기 ${typeLabel} 수령을 일괄 확정하시겠습니까?\n\n(확정 시점의 종합 점수와 4대 영역 점수가 영구 스냅샷으로 보존되며, 중복 수령 대상자는 자동 제외됩니다)`;
+    const confirmMsg = `선택된 ${selectedStudentIds.size}명 중 자격 대상자에게 ${typeLabel} 수령을 일괄 확정하시겠습니까?\n\n(확정 시점의 종합 점수와 4대 영역 점수가 영구 스냅샷으로 보존되며, 중복 수령 대상자는 자동 제외됩니다)`;
     if (!window.confirm(confirmMsg)) return;
 
     setIsBulkAwarding(true);
@@ -321,7 +320,6 @@ export function CertificationSummaryClient({
         studentIds: Array.from(selectedStudentIds),
         rewardType,
         academicYear: baseYear,
-        semester: activeSemester,
         gradeNum: activeGrade,
       });
 
@@ -377,7 +375,6 @@ export function CertificationSummaryClient({
     try {
       const res = await exportRewardLedgerExcelAction({
         academicYear: baseYear,
-        semester: activeSemester,
         grade: activeGrade,
         selectedClass: 'all',
       });
@@ -666,8 +663,9 @@ export function CertificationSummaryClient({
           
           {/* 상단 1열: 학년/학기 선택 + 검색창 */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-            {/* 학년 및 학기 탭 선택 */}
+            {/* 학년 탭 선택 */}
             <div className="flex items-center gap-2 flex-wrap">
+              {/* 학년 선택 */}
               <div className="grid grid-cols-3 sm:flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
                 {[3, 2, 1].map((g) => (
                   <Button
@@ -1909,7 +1907,6 @@ export function CertificationSummaryClient({
         onOpenChange={setIsGradeBulkModalOpen}
         grade={activeGrade}
         academicYear={baseYear}
-        semester={activeSemester}
         evaluations={currentEvaluations}
         prizeConfig={prizeConfig}
         onSuccess={refreshCurrentGradeData}
@@ -1920,7 +1917,6 @@ export function CertificationSummaryClient({
         open={isRewardLedgerModalOpen}
         onOpenChange={setIsRewardLedgerModalOpen}
         academicYear={baseYear}
-        semester={activeSemester}
         grade={activeGrade}
         evaluations={currentEvaluations}
         classes={uniqueClasses}

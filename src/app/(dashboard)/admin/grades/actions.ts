@@ -195,8 +195,16 @@ export async function uploadStudentScores(
       }
     }
 
-    const { error: insertError } = await supabase.from('student_scores').insert(finalScores);
-    if (insertError) return { error: `성적 저장 실패: ${insertError.message}` };
+    // [디스크 I/O 최적화] 500건 단위 청크 및 미세 지연(50ms) 적용하여 순간 쓰기 버짓 소진 방지
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < finalScores.length; i += BATCH_SIZE) {
+      const chunk = finalScores.slice(i, i + BATCH_SIZE);
+      const { error: insertError } = await supabase.from('student_scores').insert(chunk);
+      if (insertError) return { error: `성적 저장 실패: ${insertError.message}` };
+      if (i + BATCH_SIZE < finalScores.length) {
+        await new Promise(res => setTimeout(res, 50));
+      }
+    }
     results.success = finalScores.length;
 
     // 감사 로그 기록 (STUDENT_BULK_UPDATE)

@@ -9,6 +9,10 @@ export async function saveInOrder<T>(
       const result = await save(update);
       if (!result.success) throw new Error(result.error || '저장 실패');
       savedCount++;
+      // [I/O 보호] 5개 이상 연속 셀 저장 시 20ms 미세 지연으로 DB 폭주 방지
+      if (updates.length > 5 && savedCount < updates.length) {
+        await new Promise(r => setTimeout(r, 20));
+      }
     } catch (error) {
       const reason = error instanceof Error ? error.message : '저장 중 오류가 발생했습니다.';
       return {

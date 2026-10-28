@@ -57,7 +57,6 @@ interface RewardLedgerExportModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   academicYear: number;
-  semester?: number;
   grade: number;
   evaluations: FullStudentEvaluation[];
   classes?: string[];
@@ -69,7 +68,6 @@ export function RewardLedgerExportModal({
   open,
   onOpenChange,
   academicYear,
-  semester,
   grade,
   evaluations,
   initialAwardedDate,
@@ -219,7 +217,7 @@ export function RewardLedgerExportModal({
     }
 
     const count = filteredStudents.filter(s => {
-      const info = getStudentRecipientInfo(s, academicYear, semester, {
+      const info = getStudentRecipientInfo(s, academicYear, undefined, {
         targetAwardedDate: selectedDate,
         onlyAwarded,
       });
@@ -227,14 +225,13 @@ export function RewardLedgerExportModal({
     }).length;
 
     return count;
-  }, [evaluations, academicYear, semester, selectedDate, onlyAwarded, selectedClass]);
+  }, [evaluations, academicYear, selectedDate, onlyAwarded, selectedClass]);
 
   const handleDownload = async () => {
     setIsDownloading(true);
     try {
       const res = await exportRewardLedgerExcelAction({
         academicYear,
-        semester,
         grade,
         selectedClass,
         targetAwardedDate: selectedDate,

@@ -219,13 +219,22 @@ export async function bulkPromoteFromExcel(csvData: string) {
         student_number: next_number,
         graduation_year: student.graduation_year
       }, settings.baseYear);
+      // [I/O 보호] 진급 처리 5건마다 30ms 미세 지연으로 DB 순간 폭주 방지
+      if (successCount % 5 === 0) {
+        await new Promise(res => setTimeout(res, 30));
+      }
     } else {
       errors.push(`${student_name || student.id} 업데이트 실패: ${updateError.message}`);
     }
   }
 
   revalidateTag('students');
+  revalidateTag('student_scores');
   revalidateTag('middle-school-employment');
+  try {
+    const { clearYearlyRankingsCache } = await import('@/lib/data');
+    await clearYearlyRankingsCache();
+  } catch (e) {}
   revalidatePath('/class-management');
   revalidatePath('/admin/students');
   revalidatePath('/students');
@@ -485,6 +494,7 @@ export async function uploadStudentsCSV(csvData: string) {
   for (let i = 0; i < employmentsPayloads.length; i += CHUNK_SIZE) {
     const chunk = employmentsPayloads.slice(i, i + CHUNK_SIZE);
     await supabase.from('student_employments').upsert(chunk, { onConflict: 'id' });
+    if (i + CHUNK_SIZE < employmentsPayloads.length) await new Promise(r => setTimeout(r, 40));
   }
 
   // 6. field_training_records Bulk Upsert
@@ -693,6 +703,7 @@ export async function uploadBasicStudentsCSV(csvData: string) {
   for (let i = 0; i < employmentsPayloads.length; i += CHUNK_SIZE) {
     const chunk = employmentsPayloads.slice(i, i + CHUNK_SIZE);
     await supabase.from('student_employments').upsert(chunk, { onConflict: 'id' });
+    if (i + CHUNK_SIZE < employmentsPayloads.length) await new Promise(r => setTimeout(r, 40));
   }
 
   // 6. student_academic_history Bulk Upsert

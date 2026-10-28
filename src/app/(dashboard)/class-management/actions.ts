@@ -103,6 +103,8 @@ export async function updatePersonalDetail(id: string, field: string, value: any
 
   revalidateTag('students')
   revalidateTag('middle-school-employment')
+  revalidateTag('counseling-logs')
+  revalidateTag('students')
   revalidatePath('/class-management')
   revalidatePath('/employment-status')
   revalidatePath('/students')
@@ -152,6 +154,8 @@ export async function bulkUpdatePersonalDetails(updates: { id: string, field: st
 
   revalidateTag('students')
   revalidateTag('middle-school-employment')
+  revalidateTag('counseling-logs')
+  revalidateTag('students')
   revalidatePath('/class-management')
   revalidatePath('/employment-status')
   revalidatePath('/students')
@@ -357,6 +361,8 @@ export async function addCounselingLog(studentId: string, content: string) {
 
   if (error) return { error: error.message }
 
+  revalidateTag('counseling-logs')
+  revalidateTag('students')
   revalidatePath('/class-management')
   revalidatePath('/employment-status')
   revalidatePath('/students')
@@ -383,6 +389,8 @@ export async function updateCounselingLog(logId: string, content: string) {
 
   if (error) return { error: error.message }
 
+  revalidateTag('counseling-logs')
+  revalidateTag('students')
   revalidatePath('/class-management')
   revalidatePath('/employment-status')
   revalidatePath('/students')
@@ -409,6 +417,8 @@ export async function deleteCounselingLog(logId: string) {
 
   if (error) return { error: error.message }
 
+  revalidateTag('counseling-logs')
+  revalidateTag('students')
   revalidatePath('/class-management')
   revalidatePath('/employment-status')
   revalidatePath('/students')

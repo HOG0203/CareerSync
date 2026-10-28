@@ -163,6 +163,9 @@ async function upsertStudentCertEvaluations(
         console.error('Error upserting chunk to student_cert_evaluations:', error);
         return { success: false, error };
       }
+      if (i + CHUNK_SIZE < payloads.length) {
+        await new Promise(res => setTimeout(res, 50));
+      }
     }
     return { success: true };
   } catch (err) {
@@ -648,6 +651,7 @@ export async function saveStudentEvaluationAction(
   revalidateTag(`cert-eval-grade-${currentGrade}`);
   revalidateTag('cert-eval');
   revalidateTag('cert-certificates');
+  revalidateTag('students');
   revalidatePath('/admin/certification');
 
   return { success: true };
@@ -2753,7 +2757,19 @@ export async function bulkAwardItemsAction(params: {
     }
 
     if (payloadsToInsert.length > 0) {
-      const { error: insertErr } = await supabase.from('student_cert_rewards').insert(payloadsToInsert);
+      // [I/O 보호] 포상 수여 청크 분할 및 미세 지연
+      const BATCH_SIZE = 100;
+      let insertErr: any = null;
+      for (let i = 0; i < payloadsToInsert.length; i += BATCH_SIZE) {
+        const chunk = payloadsToInsert.slice(i, i + BATCH_SIZE);
+        const res = await supabase.from('student_cert_rewards').insert(chunk);
+        insertErr = res.error;
+        if (insertErr) {
+          console.warn('Fallback to system_settings for bulk insert:', insertErr);
+          break;
+        }
+        if (i + BATCH_SIZE < payloadsToInsert.length) await new Promise(r => setTimeout(r, 40));
+      }
       if (insertErr) {
         console.warn('Fallback to system_settings for bulk insert:', insertErr);
         const { data: settingRow } = await supabase.from('system_settings').select('value').eq('key', REWARD_SETTINGS_KEY).maybeSingle();
@@ -3535,6 +3551,9 @@ export async function bulkSyncCareerCoursesAction(params: {
           console.error('Error during bulkSyncCareerCourses upsert:', upsertErr);
           return { success: false, processedCount, skippedCount, targetTerm, error: upsertErr.message };
         }
+        if (i + CHUNK_SIZE < upsertPayloads.length) {
+          await new Promise(r => setTimeout(r, 50));
+        }
       }
     }
 
@@ -3652,6 +3671,9 @@ export async function bulkRollbackCareerCoursesAction(params: {
         if (upsertErr) {
           console.error('Error during bulkRollbackCareerCourses upsert:', upsertErr);
           return { success: false, removedCount: 0, targetTerm, error: upsertErr.message };
+        }
+        if (i + CHUNK_SIZE < payloadsToUpdate.length) {
+          await new Promise(r => setTimeout(r, 50));
         }
       }
     }
