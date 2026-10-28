@@ -441,13 +441,12 @@ export function TravelExpenseClient({ userProfile }: TravelExpenseClientProps) {
     ]);
   };
 
-  // LocalStorage 저장 및 불러오기
+  // LocalStorage 저장 및 불러오기 (차량 동승자는 건마다 다르므로 기본값 저장 대상에서 제외)
   const handleSaveToLocal = () => {
     try {
       const stateToSave = {
         position,
         fuelType,
-        passengerName,
         attachmentText,
         goingTransportType,
         returningTransportType
@@ -465,7 +464,12 @@ export function TravelExpenseClient({ userProfile }: TravelExpenseClientProps) {
         const parsed = JSON.parse(saved);
         if (parsed.position) setPosition(parsed.position);
         if (parsed.fuelType) setFuelType(parsed.fuelType);
-        if (parsed.passengerName) setPassengerName(parsed.passengerName);
+        // 차량 동승자는 출장마다 달라지므로 기본값에서 제외하고 항상 빈칸으로 시작
+        if (parsed.passengerName) {
+          delete parsed.passengerName;
+          localStorage.setItem('careersync_travel_expense_pref', JSON.stringify(parsed));
+        }
+        setPassengerName('');
         if (parsed.attachmentText) setAttachmentText(parsed.attachmentText);
         if (parsed.goingTransportType) {
           setGoingTransportType(parsed.goingTransportType);
