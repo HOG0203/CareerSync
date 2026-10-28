@@ -1,6 +1,7 @@
 'use server';
 
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
+import { getCurrentUserProfile } from '@/lib/data';
 import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
 
 export interface ParsedAttendanceData {
@@ -35,7 +36,12 @@ export async function matchStudentsForAttendance(
   uniqueKeys: { major: string; classInfo: string; number: string; name: string; currentGrade: number }[],
   academicYear: number
 ) {
-  const supabase = await createClient();
+  const profile = await getCurrentUserProfile();
+  if (!profile || (profile.role !== 'admin' && profile.role !== 'teacher')) {
+    return { matchMap: {} };
+  }
+
+  const supabase = createAdminClient();
   const matchMap: Record<string, { id: string; major: string; classInfo: string; gradYear: number }> = {};
 
   // 학년별로 키 그룹화하여 Supabase 쿼리 최소화 및 분기 처리
@@ -103,7 +109,12 @@ export async function uploadStudentAttendance(
   data: ParsedAttendanceData[],
   baseAcademicYear: number
 ) {
-  const supabase = await createClient();
+  const profile = await getCurrentUserProfile();
+  if (!profile || (profile.role !== 'admin' && profile.role !== 'teacher')) {
+    return { error: "출결 데이터를 등록할 수 있는 권한이 없습니다." };
+  }
+
+  const supabase = createAdminClient();
   
   const upsertData = data.filter(d => d.studentId).map(d => {
     // 실제 발생 연도 계산 (개별 학생의 업로드 시점 학년 d.currentGrade 기준 적용)
@@ -169,7 +180,12 @@ export async function uploadStudentAttendance(
 }
 
 export async function deleteAllStudentAttendance() {
-  const supabase = await createClient();
+  const profile = await getCurrentUserProfile();
+  if (!profile || profile.role !== 'admin') {
+    return { success: false, error: "관리자 권한이 필요합니다." };
+  }
+
+  const supabase = createAdminClient();
   const { error } = await supabase.from('student_attendance').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   if (error) return { success: false, error: error.message };
   [1, 2, 3].forEach(g => {

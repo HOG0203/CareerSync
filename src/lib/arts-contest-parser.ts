@@ -263,7 +263,9 @@ export function calcSportsScore(semesters: number): number {
 }
 
 export function calcContestScore(awardCount: number, partCount: number): number {
-  const raw = (awardCount * 1.0) + (partCount * 0.5);
+  // 대안 B: 참가 0.5점 + 입상 0.5점 가산 (입상 단독 등록 시에도 1.0점 보장)
+  const effectiveBase = Math.max(partCount, awardCount);
+  const raw = (effectiveBase * 0.5) + (awardCount * 0.5);
   return Math.min(5.0, Math.max(0.0, Math.round(raw * 10) / 10));
 }
 

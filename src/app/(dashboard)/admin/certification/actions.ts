@@ -2841,6 +2841,9 @@ export async function exportRewardLedgerExcelAction(params: {
   semester?: number;
   grade: number;
   selectedClass?: string;
+  targetAwardedDate?: string;
+  onlyAwarded?: boolean;
+  targetStudentIds?: string[];
 }): Promise<{ success: boolean; data?: string; fileName?: string; error?: string }> {
   try {
     const profile = await getCurrentUserProfile();
@@ -2854,12 +2857,16 @@ export async function exportRewardLedgerExcelAction(params: {
       semester: params.semester,
       grade: params.grade,
       selectedClass: params.selectedClass || 'all',
-      evaluations
+      evaluations,
+      targetAwardedDate: params.targetAwardedDate,
+      onlyAwarded: params.onlyAwarded ?? true,
+      targetStudentIds: params.targetStudentIds,
     });
 
     const classLabel = params.selectedClass && params.selectedClass !== 'all' ? params.selectedClass : '전체';
     const semesterPart = params.semester ? `${params.semester}학기_` : '';
-    const fileName = `${params.academicYear}학년도_${semesterPart}${params.grade}학년_${classLabel}_옥저인재인증_수령대장.xlsx`;
+    const datePart = params.targetAwardedDate && params.targetAwardedDate !== 'all' ? `_${params.targetAwardedDate}` : '';
+    const fileName = `${params.academicYear}학년도_${semesterPart}${params.grade}학년_${classLabel}_옥저인재인증_수령대장${datePart}.xlsx`;
 
     return {
       success: true,

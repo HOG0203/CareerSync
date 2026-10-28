@@ -691,60 +691,37 @@ export function getContestBaseTitle(title: string): string {
 }
 
 /**
- * 대회 실적 목록 평가 (동일 대회에 입상과 참가가 모두 있으면 입상 1.0점 우선 인정, 참가 0.5점 중복 제외)
+ * 대회 실적 목록 평가 (대안 B: 가산 방식)
+ * - 참가 기본 건당 0.5점 + 입상 건당 0.5점 가산
+ * - 동일 대회의 입상과 참가를 동시 등록하면: 참가(0.5) + 입상(0.5) = 정확히 1.0점 인정
+ * - 참가를 별도 등록하지 않고 입상만 단독 등록한 경우에도 입상 1건당 기본 1.0점 보장
  */
 export function evaluateContestList<T extends { type: 'award' | 'participate'; title: string; dateOrTerm?: string }>(contestList: T[]) {
-  const eventMap = new Map<string, { hasAward: boolean; hasParticipate: boolean }>();
+  const awards = contestList.filter(c => c.type === 'award');
+  const participates = contestList.filter(c => c.type === 'participate');
 
-  for (const c of contestList) {
-    const base = getContestBaseTitle(c.title);
-    const key = `${c.dateOrTerm || ''}_${base}`;
-    if (!eventMap.has(key)) {
-      eventMap.set(key, { hasAward: false, hasParticipate: false });
-    }
-    const entry = eventMap.get(key)!;
-    if (c.type === 'award') {
-      entry.hasAward = true;
-    } else {
-      entry.hasParticipate = true;
-    }
-  }
+  const totalAwards = awards.length;
+  const totalParticipates = participates.length;
 
-  let effectiveAwardCount = 0;
-  let effectivePartCount = 0;
+  // 입상은 참가를 내포하므로, 참가가 입상보다 적더라도 최소 입상 수만큼 기본 참가가 보장됨
+  const effectiveBaseParticipate = Math.max(totalParticipates, totalAwards);
+  const score = Math.min(5.0, Math.round(((effectiveBaseParticipate * 0.5) + (totalAwards * 0.5)) * 10) / 10);
 
-  for (const [, flags] of eventMap.entries()) {
-    if (flags.hasAward) {
-      // 입상이 있는 대회는 입상(1.0점) 우선 부여 (참가 0.5점 중복 제외)
-      effectiveAwardCount++;
-    } else if (flags.hasParticipate) {
-      // 입상이 없는 순수 참가 대회만 참가(0.5점) 부여
-      effectivePartCount++;
-    }
-  }
-
-  const score = Math.min(5.0, Math.round(((effectiveAwardCount * 1.0) + (effectivePartCount * 0.5)) * 10) / 10);
-
-  // 개별 실적별 중복 인정 여부 및 획득 점수 매핑
+  // 개별 실적별 획득 점수 매핑 (입상 0.5점 가산, 참가 0.5점)
   const itemsWithStatus = contestList.map(c => {
-    const base = getContestBaseTitle(c.title);
-    const key = `${c.dateOrTerm || ''}_${base}`;
-    const event = eventMap.get(key);
-    const isSuperseded = c.type === 'participate' && Boolean(event?.hasAward);
-    const earnedScore = c.type === 'award' ? 1.0 : (isSuperseded ? 0.0 : 0.5);
-
+    const earnedScore = 0.5;
     return {
       ...c,
-      isSuperseded,
+      isSuperseded: false,
       earnedScore
     };
   });
 
   return {
-    effectiveAwardCount,
-    effectivePartCount,
-    totalAwards: contestList.filter(c => c.type === 'award').length,
-    totalParticipates: contestList.filter(c => c.type === 'participate').length,
+    effectiveAwardCount: totalAwards,
+    effectivePartCount: totalParticipates,
+    totalAwards,
+    totalParticipates,
     score,
     itemsWithStatus
   };
@@ -1067,7 +1044,9 @@ export function calculateStudentFullEvaluation(params: {
   } else {
     effectiveAwardCount = Number(evalData.contest_award_count || 0);
     effectivePartCount = Number(evalData.contest_participate_count || 0);
-    contestScore = Math.min(5, Math.max(0, Math.round(((effectiveAwardCount * 1.0) + (effectivePartCount * 0.5)) * 10) / 10));
+    // 대안 B 가산 방식: 참가 0.5 + 입상 0.5 (입상 단독 등록 시에도 1.0점 보장)
+    const effectiveBase = Math.max(effectivePartCount, effectiveAwardCount);
+    contestScore = Math.min(5, Math.max(0, Math.round(((effectiveBase * 0.5) + (effectiveAwardCount * 0.5)) * 10) / 10));
   }
 
   const contestDetail: ScoreItemDetail = {

@@ -903,9 +903,7 @@ export function EvaluationSheetModal({
                             sourceLabel="대회/수상 실적"
                             structuredItems={contestEval.itemsWithStatus.map(c => {
                               const typeLabel = c.type === 'award' ? '입상' : '참가';
-                              const scoreBadge = c.isSuperseded 
-                                ? '입상 우선 적용(중복 0점)' 
-                                : (c.type === 'award' ? '1점' : '0.5점');
+                              const scoreBadge = c.type === 'award' ? '0.5점 가산' : '0.5점';
                               const awardDetail = c.award && c.award !== '입상' && c.award !== '참가' ? `${c.award}, ${scoreBadge}` : scoreBadge;
                               const catLabel = c.category ? `[${c.category}] ` : '';
                               const dateLabel = c.dateOrTerm ? ` [${c.dateOrTerm}]` : '';
@@ -917,7 +915,7 @@ export function EvaluationSheetModal({
                                 created_by: c.created_by,
                               };
                             })}
-                            formula={`(입상 ${contestEval.effectiveAwardCount}건 × 1점) + (참가 ${contestEval.effectivePartCount}건 × 0.5점) = ${d.schoolContests.score}점 (최대 5.0점)`}
+                            formula={`(참가 ${Math.max(contestEval.totalParticipates, contestEval.totalAwards)}건 × 0.5점) + (입상 ${contestEval.totalAwards}건 × 0.5점) = ${d.schoolContests.score}점 (최대 5.0점)`}
                           />
                         );
                       })()}
@@ -1623,9 +1621,7 @@ export function EvaluationSheetModal({
                               sourceLabel="대회/수상 실적"
                               structuredItems={contestEval.itemsWithStatus.map(c => {
                                 const typeLabel = c.type === 'award' ? '입상' : '참가';
-                                const scoreBadge = c.isSuperseded 
-                                  ? '입상 우선 적용(중복 0점)' 
-                                  : (c.type === 'award' ? '1점' : '0.5점');
+                                const scoreBadge = c.type === 'award' ? '0.5점 가산' : '0.5점';
                                 const awardDetail = c.award && c.award !== '입상' && c.award !== '참가' ? `${c.award}, ${scoreBadge}` : scoreBadge;
                                 const catLabel = c.category ? `[${c.category}] ` : '';
                                 const dateLabel = c.dateOrTerm ? ` [${c.dateOrTerm}]` : '';
@@ -1637,12 +1633,12 @@ export function EvaluationSheetModal({
                                   created_by: c.created_by,
                                 };
                               })}
-                              formula={`(입상 ${contestEval.effectiveAwardCount}건 × 1점) + (참가 ${contestEval.effectivePartCount}건 × 0.5점) = ${d.schoolContests.score}점 (동일 대회 입상 시 입상 우선 인정 / 최대 5.0점)`}
+                              formula={`(참가 ${Math.max(contestEval.totalParticipates, contestEval.totalAwards)}건 × 0.5점) + (입상 ${contestEval.totalAwards}건 × 0.5점) = ${d.schoolContests.score}점 (최대 5.0점)`}
                             />
                           );
                         })()}
                       </div>
-                      <span className="block text-[10px] text-slate-500 font-normal">입상 건당 1점, 참가 건당 0.5점 (동일 대회 입상 우선)</span>
+                      <span className="block text-[10px] text-slate-500 font-normal">참가 건당 0.5점, 입상 건당 0.5점 가산 (최대 5.0점)</span>
                     </td>
                     <td className="border border-slate-400 p-2">
                       <CheckItem checked={d.schoolContests.score > 0} label={d.schoolContests.displayText} scoreText={`${d.schoolContests.score}점`} />

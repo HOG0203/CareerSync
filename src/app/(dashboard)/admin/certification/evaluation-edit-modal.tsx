@@ -1301,7 +1301,7 @@ export function EvaluationEditModal({
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
                       <Trophy className="h-4 w-4 text-indigo-600" />
-                      2. 교내외 각종 대회 실적 목록 (최대 5점, 동일 대회 입상 우선 인정)
+                      2. 교내외 각종 대회 실적 목록 (최대 5점 - 참가 0.5점, 입상 0.5점 가산)
                     </h4>
                     <span className="text-[11px] font-bold text-indigo-600">
                       유효 입상 {contestEval.effectiveAwardCount}건, 참가 {contestEval.effectivePartCount}건 ({contestEval.score}점)
@@ -1487,8 +1487,8 @@ export function EvaluationEditModal({
                       >
                         <SelectTrigger className="h-10 text-xs bg-white font-bold"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="award" className="text-xs font-bold text-amber-600">입상 (1.0점)</SelectItem>
-                          <SelectItem value="participate" className="text-xs font-bold text-blue-600">참가 (0.5점)</SelectItem>
+                          <SelectItem value="award" className="text-xs font-bold text-amber-600">입상 (+0.5점 가산)</SelectItem>
+                          <SelectItem value="participate" className="text-xs font-bold text-blue-600">참가 (+0.5점)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

@@ -86,6 +86,7 @@ import {
 import { GradeBulkAwardModal } from './grade-bulk-award-modal';
 import { CareerCourseBulkModal } from './career-course-bulk-modal';
 import { RetroactiveExcelModal } from './retroactive-excel-modal';
+import { RewardLedgerExportModal } from './reward-ledger-export-modal';
 import { PrizeSettingsModal } from './prize-settings-modal';
 
 interface CertificationSummaryClientProps {
@@ -170,6 +171,7 @@ export function CertificationSummaryClient({
   const [isGradeBulkModalOpen, setIsGradeBulkModalOpen] = React.useState<boolean>(false);
   const [isCareerCourseBulkModalOpen, setIsCareerCourseBulkModalOpen] = React.useState<boolean>(false);
   const [isRetroExcelModalOpen, setIsRetroExcelModalOpen] = React.useState<boolean>(false);
+  const [isRewardLedgerModalOpen, setIsRewardLedgerModalOpen] = React.useState<boolean>(false);
 
   const [pageSize, setPageSize] = React.useState<number | 'all'>(50);
   const [currentPage, setCurrentPage] = React.useState<number>(1);
@@ -902,13 +904,12 @@ export function CertificationSummaryClient({
                       <DropdownMenuItem
                         onSelect={(e) => {
                           e.preventDefault();
-                          handleExportRewardLedger();
+                          setIsRewardLedgerModalOpen(true);
                         }}
-                        disabled={isExportingLedger}
                         className="text-xs font-semibold py-2 cursor-pointer gap-2"
                       >
                         <FileSpreadsheet className="h-4 w-4 text-indigo-600" />
-                        <span>{isExportingLedger ? '엑셀 생성 중...' : '공문서 수령 대장 엑셀'}</span>
+                        <span>공문서 수령 대장 엑셀</span>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
@@ -1874,9 +1875,21 @@ export function CertificationSummaryClient({
         onOpenChange={setIsGradeBulkModalOpen}
         grade={activeGrade}
         academicYear={baseYear}
+        semester={activeSemester}
         evaluations={currentEvaluations}
         prizeConfig={prizeConfig}
         onSuccess={refreshCurrentGradeData}
+      />
+
+      {/* 공문서 수령 대장 엑셀 다운로드 옵션 모달 */}
+      <RewardLedgerExportModal
+        open={isRewardLedgerModalOpen}
+        onOpenChange={setIsRewardLedgerModalOpen}
+        academicYear={baseYear}
+        semester={activeSemester}
+        grade={activeGrade}
+        evaluations={currentEvaluations}
+        classes={uniqueClasses}
       />
 
       {/* 취업진로코스 일괄 확정 & 동기화 모달 */}

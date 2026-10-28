@@ -134,10 +134,10 @@ export function InteractiveTeacherTimetable({
     return timetableData.teachers.find(t => t.teacherName === selectedTeacherName) || timetableData.teachers[0];
   }, [timetableData.teachers, selectedTeacherName]);
 
-  // 교사나 주차 변경 시 선택 초기화
+  // 교사, 주차, 또는 신청내역(저장/삭제/변경) 변동 시 선택 초기화
   React.useEffect(() => {
     setSelectedSlots([]);
-  }, [selectedTeacherName, selectedWeekNum]);
+  }, [selectedTeacherName, selectedWeekNum, applications]);
 
   // 해당 주차에서 해당 교사의 승인/접수된 결보강 변경 이력 매핑 (요일_교시 기준)
   const effectiveSlotMap = React.useMemo(() => {
@@ -705,6 +705,7 @@ export function InteractiveTeacherTimetable({
                             if (canEditThisSlot && effectiveInfo) {
                               const foundApp = applications.find(a => a.id === effectiveInfo.appId);
                               if (foundApp && onEditApplication) {
+                                setSelectedSlots([]);
                                 onEditApplication(foundApp);
                                 return;
                               }
@@ -1056,7 +1057,10 @@ export function InteractiveTeacherTimetable({
             <Button
               type="button"
               size="sm"
-              onClick={() => onOpenDrawer(selectedSlots, 'exchange')}
+              onClick={() => {
+                onOpenDrawer(selectedSlots, 'exchange');
+                setSelectedSlots([]);
+              }}
               className="h-9 px-3.5 text-xs font-black gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-md shadow-indigo-600/30"
             >
               <ArrowLeftRight className="h-3.5 w-3.5" />
@@ -1067,7 +1071,10 @@ export function InteractiveTeacherTimetable({
             <Button
               type="button"
               size="sm"
-              onClick={() => onOpenDrawer(selectedSlots, 'substitute')}
+              onClick={() => {
+                onOpenDrawer(selectedSlots, 'substitute');
+                setSelectedSlots([]);
+              }}
               className="h-9 px-3.5 text-xs font-black gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-md shadow-emerald-600/30"
             >
               <UserPlus className="h-3.5 w-3.5" />

@@ -1,6 +1,12 @@
 import ExcelJS from 'exceljs';
 import { FullStudentEvaluation, StudentRewardRecord, RANK_WEIGHT } from './certification-calculator';
 
+export interface RecipientFilterOptions {
+  targetAwardedDate?: string; // 'all' or 'YYYY-MM-DD'
+  onlyAwarded?: boolean;      // true이면 확정(status === 'awarded') 건만 출력 (수령예정자 제외)
+  targetStudentIds?: string[]; // 특정 학생 ID 필터링
+}
+
 export interface RewardLedgerExportOptions {
   academicYear: number;
   semester?: number;
@@ -8,6 +14,9 @@ export interface RewardLedgerExportOptions {
   selectedClass?: string; // 'all' or '1반', '2-1'
   evaluations: FullStudentEvaluation[];
   rewardsStore?: Record<string, StudentRewardRecord[]>;
+  targetAwardedDate?: string;
+  onlyAwarded?: boolean;
+  targetStudentIds?: string[];
 }
 
 export interface RecipientInfo {
@@ -29,23 +38,48 @@ export interface RecipientInfo {
 export function getStudentRecipientInfo(
   student: FullStudentEvaluation,
   academicYear: number,
-  semester?: number
+  semester?: number,
+  filterOptions?: RecipientFilterOptions
 ): RecipientInfo {
+  const { targetAwardedDate, onlyAwarded = false, targetStudentIds } = filterOptions || {};
+
+  // 특정 학생 ID 필터가 지정된 경우 해당 학생이 아니면 즉시 제외
+  if (targetStudentIds && targetStudentIds.length > 0 && !targetStudentIds.includes(student.studentId)) {
+    return {
+      isRecipient: false,
+      hasPrize: false,
+      hasAward: false,
+      displayScore: student.totalScore,
+      displayRank: student.rank,
+      prizeName: '-',
+      awardName: '-',
+      remarks: '',
+    };
+  }
+
   const history = student.rewardsHistory || [];
 
-  // 1. 이번 회차에 이미 확정된 포상 이력 조회 (동일 academicYear 및 semester)
+  // 확정일자 필터 매칭 헬퍼 (targetAwardedDate가 'all'이 아니면 해당 일자와 정확히 일치하는 건만 조회)
+  const isDateMatch = (r: StudentRewardRecord) => {
+    if (!targetAwardedDate || targetAwardedDate === 'all') return true;
+    return r.awardedDate === targetAwardedDate;
+  };
+
+  // 1. 이번 회차에 이미 확정된 포상 이력 조회 (동일 academicYear 및 semester, 확정일자 일치)
   const currentPrize = history.find(r => 
     r.rewardType === 'prize' && 
     r.status !== 'cancelled' && 
     r.academicYear === academicYear &&
-    (semester === undefined || !r.semester || r.semester === semester)
+    (semester === undefined || !r.semester || r.semester === semester) &&
+    isDateMatch(r)
   );
 
   const currentAward = history.find(r => 
     r.rewardType === 'certificate_award' && 
     r.status !== 'cancelled' && 
     r.academicYear === academicYear &&
-    (semester === undefined || !r.semester || r.semester === semester)
+    (semester === undefined || !r.semester || r.semester === semester) &&
+    isDateMatch(r)
   );
 
   // 2. 과거(이전 회차) 확정 기록 확인 (이번 회차 이전 건들)
@@ -53,14 +87,22 @@ export function getStudentRecipientInfo(
     r.rewardType === 'prize' && 
     r.status !== 'cancelled' && 
     r.id !== currentPrize?.id &&
-    (r.academicYear < academicYear || (r.academicYear === academicYear && semester !== undefined && r.semester !== undefined && r.semester < semester))
+    (
+      r.academicYear < academicYear || 
+      (r.academicYear === academicYear && semester !== undefined && r.semester !== undefined && r.semester < semester) ||
+      (targetAwardedDate && targetAwardedDate !== 'all' && r.awardedDate && r.awardedDate < targetAwardedDate)
+    )
   );
 
   const earlierAwards = history.filter(r => 
     r.rewardType === 'certificate_award' && 
     r.status !== 'cancelled' && 
     r.id !== currentAward?.id &&
-    (r.academicYear < academicYear || (r.academicYear === academicYear && semester !== undefined && r.semester !== undefined && r.semester < semester))
+    (
+      r.academicYear < academicYear || 
+      (r.academicYear === academicYear && semester !== undefined && r.semester !== undefined && r.semester < semester) ||
+      (targetAwardedDate && targetAwardedDate !== 'all' && r.awardedDate && r.awardedDate < targetAwardedDate)
+    )
   );
 
   // 과거 수령 최고 등급 가중치
@@ -84,7 +126,7 @@ export function getStudentRecipientInfo(
       prizeName = currentPrize.itemName;
       isPrizeUpgrade = maxEarlierWeight !== -1;
     }
-  } else if (student.rewardEligibility?.prize?.eligible) {
+  } else if (!onlyAwarded && (!targetAwardedDate || targetAwardedDate === 'all') && student.rewardEligibility?.prize?.eligible) {
     // 아직 확정 전이지만 이번 회차 지급 자격이 충족된 경우 (승급 또는 최초)
     hasPrize = true;
     prizeName = student.rewardEligibility.prize.recommendedPrizeName;
@@ -100,7 +142,7 @@ export function getStudentRecipientInfo(
       hasAward = true;
       awardName = currentAward.itemName || '옥저인재인증상';
     }
-  } else if (student.rewardEligibility?.certificateAward?.eligible) {
+  } else if (!onlyAwarded && (!targetAwardedDate || targetAwardedDate === 'all') && student.rewardEligibility?.certificateAward?.eligible) {
     if (earlierAwards.length === 0) {
       hasAward = true;
       awardName = student.rewardEligibility.certificateAward.recommendedAwardName || '옥저인재인증상';
@@ -111,11 +153,12 @@ export function getStudentRecipientInfo(
   const isRecipient = hasPrize || hasAward;
 
   // 표시 점수 및 등급: 확정 스냅샷 점수가 유효(> 0)하면 우선, 0점(소급 등록 등)이면 현재 종합점수 사용
-  const displayScore = (currentPrize?.certifiedScore && currentPrize.certifiedScore > 0)
-    ? currentPrize.certifiedScore
+  const activeRecord = currentPrize || currentAward;
+  const displayScore = (activeRecord?.certifiedScore && activeRecord.certifiedScore > 0)
+    ? activeRecord.certifiedScore
     : student.totalScore;
-  const displayRank = (currentPrize?.certifiedRank && currentPrize.certifiedRank !== 'D')
-    ? currentPrize.certifiedRank
+  const displayRank = (activeRecord?.certifiedRank && activeRecord.certifiedRank !== 'D')
+    ? activeRecord.certifiedRank
     : student.rank;
 
   // 비고란 문구
@@ -156,7 +199,22 @@ const TARGET_MAJOR_ORDER = [
  * 행정실 제출 및 공문서 첨부용 옥저인재인증제 상품 및 인증상 수령 대장 엑셀 생성기 (ExcelJS 기반)
  */
 export async function generateRewardLedgerExcelBuffer(options: RewardLedgerExportOptions): Promise<Buffer> {
-  const { academicYear, semester, grade, selectedClass = 'all', evaluations } = options;
+  const { 
+    academicYear, 
+    semester, 
+    grade, 
+    selectedClass = 'all', 
+    evaluations, 
+    targetAwardedDate, 
+    onlyAwarded = false, 
+    targetStudentIds 
+  } = options;
+
+  const filterOptions: RecipientFilterOptions = {
+    targetAwardedDate,
+    onlyAwarded,
+    targetStudentIds,
+  };
 
   const wb = new ExcelJS.Workbook();
   wb.creator = '대구공업고등학교 커리어싱크 (CareerSync)';
@@ -205,7 +263,9 @@ export async function generateRewardLedgerExcelBuffer(options: RewardLedgerExpor
 
   // 단일 학반 선택인 경우 해당 학반만 출력
   const targetClassKeys = selectedClass !== 'all'
-    ? sortedClassKeys.filter(k => k === selectedClass || k.includes(selectedClass) || selectedClass.includes(k))
+    ? (sortedClassKeys.filter(k => k === selectedClass).length > 0
+        ? sortedClassKeys.filter(k => k === selectedClass)
+        : sortedClassKeys.filter(k => k.includes(selectedClass) || selectedClass.includes(k)))
     : sortedClassKeys;
 
   // 전체 다운로드일 경우 첫 번째 탭으로 "전체 총괄 요약" 시트 생성
@@ -217,6 +277,7 @@ export async function generateRewardLedgerExcelBuffer(options: RewardLedgerExpor
       evaluations,
       sortedClassKeys,
       classMap,
+      filterOptions,
     });
   }
 
@@ -229,6 +290,7 @@ export async function generateRewardLedgerExcelBuffer(options: RewardLedgerExpor
       grade,
       classKey,
       students: classStudents,
+      filterOptions,
     });
   }
 
@@ -249,9 +311,10 @@ function buildClassLedgerSheet(
     grade: number;
     classKey: string;
     students: FullStudentEvaluation[];
+    filterOptions?: RecipientFilterOptions;
   }
 ) {
-  const { academicYear, semester, grade, classKey, students } = params;
+  const { academicYear, semester, grade, classKey, students, filterOptions } = params;
 
   // 1. 학년/학반별 학생 정렬 (번호순)
   const sortedStudents = [...students].sort((a, b) => {
@@ -260,11 +323,11 @@ function buildClassLedgerSheet(
     return numA - numB;
   });
 
-  // 2. 실제 수령 대상자만 필터링 (동일 등급 기수령자 및 기준 미달자 제외)
+  // 2. 실제 수령 대상자만 필터링 (동일 등급 기수령자 및 기준 미달자 제외, 확정일자 필터 적용)
   const recipientList = sortedStudents
     .map(student => ({
       student,
-      info: getStudentRecipientInfo(student, academicYear, semester),
+      info: getStudentRecipientInfo(student, academicYear, semester, filterOptions),
     }))
     .filter(item => item.info.isRecipient);
 
@@ -310,16 +373,18 @@ function buildClassLedgerSheet(
   // 1. 대제목 (A2:J3 병합) - 상단 결재란 없이 넓게 중앙 정렬
   ws.mergeCells('A2:J3');
   const titleCell = ws.getCell('A2');
+  const dateSuffix = filterOptions?.targetAwardedDate && filterOptions.targetAwardedDate !== 'all' ? ` [${filterOptions.targetAwardedDate} 확정 건]` : '';
   titleCell.value = semester
-    ? `${academicYear}학년도 제${semester}학기 옥저인재인증제 등급별 상품 및 인증상 수령 대장`
-    : `${academicYear}학년도 옥저인재인증제 등급별 상품 및 인증상 수령 대장`;
+    ? `${academicYear}학년도 제${semester}학기 옥저인재인증제 등급별 상품 및 인증상 수령 대장${dateSuffix}`
+    : `${academicYear}학년도 옥저인재인증제 등급별 상품 및 인증상 수령 대장${dateSuffix}`;
   titleCell.font = { name: '맑은 고딕', size: 16, bold: true, color: { argb: 'FF0F172A' } };
   titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
   // 2. 학반 정보 및 개요 바 (A5:J5)
   ws.mergeCells('A5:J5');
   const metaCell1 = ws.getCell('A5');
-  metaCell1.value = `■ 대상 학급: ${grade}학년 ${classKey}   |   재적인원: 총 ${sortedStudents.length}명 (실제 수령 대상: ${recipientList.length}명)   |   학교명: 대구공업고등학교 (산학협력부)`;
+  const dateMetaInfo = filterOptions?.targetAwardedDate && filterOptions.targetAwardedDate !== 'all' ? `   |   확정일자: ${filterOptions.targetAwardedDate}` : '';
+  metaCell1.value = `■ 대상 학급: ${grade}학년 ${classKey}${dateMetaInfo}   |   재적인원: 총 ${sortedStudents.length}명 (실제 수령 대상: ${recipientList.length}명)   |   학교명: 대구공업고등학교 (산학협력부)`;
   metaCell1.font = { name: '맑은 고딕', size: 10, bold: true, color: { argb: 'FF1E293B' } };
   metaCell1.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
   metaCell1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
@@ -454,9 +519,10 @@ function buildOverallSummarySheet(
     evaluations: FullStudentEvaluation[];
     sortedClassKeys: string[];
     classMap: Map<string, FullStudentEvaluation[]>;
+    filterOptions?: RecipientFilterOptions;
   }
 ) {
-  const { academicYear, semester, grade, evaluations, sortedClassKeys, classMap } = params;
+  const { academicYear, semester, grade, evaluations, sortedClassKeys, classMap, filterOptions } = params;
 
   const ws = wb.addWorksheet('전체 총괄 요약', {
     views: [{ showGridLines: true }],
@@ -485,9 +551,10 @@ function buildOverallSummarySheet(
   // 타이틀
   ws.mergeCells('A2:I3');
   const titleCell = ws.getCell('A2');
+  const dateSuffix = filterOptions?.targetAwardedDate && filterOptions.targetAwardedDate !== 'all' ? ` [${filterOptions.targetAwardedDate} 확정 건]` : '';
   titleCell.value = semester
-    ? `${academicYear}학년도 제${semester}학기 ${grade}학년 옥저인재인증 포상 총괄 현황`
-    : `${academicYear}학년도 ${grade}학년 옥저인재인증 포상 총괄 현황`;
+    ? `${academicYear}학년도 제${semester}학기 ${grade}학년 옥저인재인증 포상 총괄 현황${dateSuffix}`
+    : `${academicYear}학년도 ${grade}학년 옥저인재인증 포상 총괄 현황${dateSuffix}`;
   titleCell.font = { name: '맑은 고딕', size: 16, bold: true, color: { argb: 'FF0F172A' } };
   titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
@@ -514,8 +581,8 @@ function buildOverallSummarySheet(
     const students = classMap.get(classKey) || [];
     const countTotal = students.length;
 
-    // 등급별 인원: 현재 평가 점수 전체 분포가 아닌, 이번 회차 실제 확정(지급) 대상자 인원 집계
-    const studentRecipientInfos = students.map(s => getStudentRecipientInfo(s, academicYear, semester));
+    // 등급별 인원: 현재 평가 점수 전체 분포가 아닌, 이번 회차 실제 확정(지급) 대상자 인원 집계 (필터 적용)
+    const studentRecipientInfos = students.map(s => getStudentRecipientInfo(s, academicYear, semester, filterOptions));
     const countS = studentRecipientInfos.filter(info => info.hasPrize && info.displayRank === 'S').length;
     const countA = studentRecipientInfos.filter(info => info.hasPrize && info.displayRank === 'A').length;
     const countB = studentRecipientInfos.filter(info => info.hasPrize && info.displayRank === 'B').length;
