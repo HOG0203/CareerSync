@@ -158,9 +158,11 @@ export function TravelExpenseClient({ userProfile }: TravelExpenseClientProps) {
 
   // 출장 시작일 변경 -> 운임표 1행(가는 편) 일자와 동기화
   const handleTripStartDateChange = (newDateIso: string) => {
+    const isSameDayTrip = tripStartDate === tripEndDate;
     setTripStartDate(newDateIso);
-    // 종료일이 시작일보다 앞서면 종료일도 시작일로 자동 맞춤
-    if (!tripEndDate || tripEndDate < newDateIso) {
+    // 1. 기존에 당일 출장이었거나, 2. 종료일이 시작일보다 앞서면 종료일도 시작일로 자동 맞춤
+    const shouldSyncEndDate = isSameDayTrip || !tripEndDate || tripEndDate < newDateIso;
+    if (shouldSyncEndDate) {
       setTripEndDate(newDateIso);
     }
     const dot = isoToDot(newDateIso);
@@ -168,8 +170,9 @@ export function TravelExpenseClient({ userProfile }: TravelExpenseClientProps) {
       if (prev.length > 0) {
         const nextRows = [...prev];
         nextRows[0] = { ...nextRows[0], date: dot };
-        if (prev.length > 1 && (!tripEndDate || tripEndDate < newDateIso)) {
-          nextRows[1] = { ...nextRows[1], date: dot };
+        if (prev.length > 1 && shouldSyncEndDate) {
+          const lastIdx = prev.length - 1;
+          nextRows[lastIdx] = { ...nextRows[lastIdx], date: dot };
         }
         return nextRows;
       }
