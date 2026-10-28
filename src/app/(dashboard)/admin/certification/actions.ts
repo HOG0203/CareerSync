@@ -2834,6 +2834,122 @@ export async function cancelRewardAction(params: {
 }
 
 /**
+ * 특정 확정일자의 포상(상품/인증상) 수령 내역 일괄 삭제 (롤백) 액션
+ */
+export async function deleteRewardHistoryByDateAction(params: {
+  awardedDate: string;
+  academicYear: number;
+  gradeNum?: number;
+  studentIds?: string[];
+}): Promise<{ success: boolean; count: number; error?: string }> {
+  try {
+    const profile = await getCurrentUserProfile();
+    if (!profile || profile.role !== 'admin') {
+      return { success: false, count: 0, error: '관리자 권한이 필요합니다.' };
+    }
+
+    if (!params.awardedDate) {
+      return { success: false, count: 0, error: '삭제할 확정 일자가 지정되지 않았습니다.' };
+    }
+
+    const supabase = createAdminClient();
+
+    // 1. 삭제 대상 레코드 조회 (감사 로그 및 백업 동기화용)
+    let query = supabase
+      .from('student_cert_rewards')
+      .select('id, student_id, reward_type, item_name')
+      .eq('awarded_date', params.awardedDate)
+      .eq('academic_year', params.academicYear);
+
+    if (params.studentIds && params.studentIds.length > 0) {
+      query = query.in('student_id', params.studentIds);
+    }
+
+    const { data: targetRows, error: fetchErr } = await query;
+    if (fetchErr) {
+      return { success: false, count: 0, error: '확정 내역을 조회하지 못했습니다.' };
+    }
+
+    if (!targetRows || targetRows.length === 0) {
+      return { success: false, count: 0, error: '해당 일자에 삭제할 확정 내역이 없습니다.' };
+    }
+
+    const targetIds = targetRows.map(r => r.id);
+
+    // 2. student_cert_rewards 테이블에서 일괄 삭제
+    const { error: delErr } = await supabase
+      .from('student_cert_rewards')
+      .delete()
+      .in('id', targetIds);
+
+    if (delErr) {
+      console.error('Error deleting from student_cert_rewards:', delErr);
+      return { success: false, count: 0, error: delErr.message };
+    }
+
+    // 3. system_settings 백업 스토어 동기화
+    try {
+      const { data: settingRow } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', REWARD_SETTINGS_KEY)
+        .maybeSingle();
+
+      if (settingRow?.value && Array.isArray(settingRow.value)) {
+        const targetIdSet = new Set(targetIds);
+        const filtered = settingRow.value.filter((r: any) => !targetIdSet.has(r.id));
+        await supabase.from('system_settings').upsert({
+          key: REWARD_SETTINGS_KEY,
+          value: filtered,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'key' });
+      }
+    } catch (fallbackErr) {
+      console.warn('Fallback sync warning in deleteRewardHistoryByDateAction:', fallbackErr);
+    }
+
+    // 4. 캐시 무효화 (해당 학년 및 전 학년)
+    if (params.gradeNum) {
+      clearCertificationSummaryCache(params.gradeNum);
+      revalidateTag(`cert-eval-grade-${params.gradeNum}`);
+    } else {
+      [1, 2, 3].forEach(g => {
+        clearCertificationSummaryCache(g);
+        revalidateTag(`cert-eval-grade-${g}`);
+      });
+    }
+    clearCertificationSummaryCache();
+    revalidateTag('cert-eval');
+    revalidateTag('students');
+    revalidatePath('/admin/certification');
+    revalidatePath('/student/certification');
+
+    // 5. 감사 로그 기록
+    try {
+      await logAuditAction({
+        actor_name: profile.full_name || profile.username || '관리자',
+        action_type: 'STUDENT_BULK_UPDATE',
+        target_name: `[포상 확정 일괄 삭제] ${params.awardedDate} 확정 내역 ${targetIds.length}건 삭제`,
+        details: {
+          awardedDate: params.awardedDate,
+          academicYear: params.academicYear,
+          gradeNum: params.gradeNum,
+          deletedCount: targetIds.length,
+          targetIds,
+        }
+      });
+    } catch (auditErr) {
+      console.error('Audit log error in deleteRewardHistoryByDateAction:', auditErr);
+    }
+
+    return { success: true, count: targetIds.length };
+  } catch (err: any) {
+    console.error('Error in deleteRewardHistoryByDateAction:', err);
+    return { success: false, count: 0, error: err?.message || '확정 내역 삭제에 실패했습니다.' };
+  }
+}
+
+/**
  * 행정실 제출 및 공문서 첨부용 옥저인재인증제 상품 및 인증상 수령 대장 엑셀 내보내기 액션
  */
 export async function exportRewardLedgerExcelAction(params: {
@@ -3438,6 +3554,145 @@ export async function bulkSyncCareerCoursesAction(params: {
     return { success: false, processedCount: 0, skippedCount: 0, targetTerm, error: err?.message || '동기화 실패' };
   }
 }
+
+/**
+ * 취업진로코스 특정 학기(예: 3-1, 3-2 등) 실적 일괄 삭제 (롤백) 액션
+ */
+export async function bulkRollbackCareerCoursesAction(params: {
+  gradeNum: number;
+  academicYear: number;
+  term: string; // 예: "3-1", "3-2"
+}): Promise<{
+  success: boolean;
+  removedCount: number;
+  targetTerm: string;
+  error?: string;
+}> {
+  const targetTerm = params.term;
+
+  try {
+    const profile = await getCurrentUserProfile();
+    if (!profile || profile.role !== 'admin') {
+      return { success: false, removedCount: 0, targetTerm, error: '관리자 권한이 필요합니다.' };
+    }
+
+    if (!targetTerm) {
+      return { success: false, removedCount: 0, targetTerm: '', error: '삭제할 대상 학기가 지정되지 않았습니다.' };
+    }
+
+    const supabase = createAdminClient();
+    const targetGradYear = params.academicYear + (4 - params.gradeNum);
+
+    // 1. 해당 학년 학생 조회
+    const { data: students, error: stuErr } = await supabase
+      .from('students')
+      .select('id')
+      .eq('graduation_year', targetGradYear);
+
+    if (stuErr || !students || students.length === 0) {
+      return { success: false, removedCount: 0, targetTerm, error: stuErr?.message || '대상 학생을 찾을 수 없습니다.' };
+    }
+
+    const studentIds = students.map(s => s.id);
+
+    // 2. 해당 학생들의 student_cert_evaluations 조회
+    const { data: evalRows, error: fetchErr } = await supabase
+      .from('student_cert_evaluations')
+      .select('*')
+      .in('student_id', studentIds);
+
+    if (fetchErr || !evalRows || evalRows.length === 0) {
+      return { success: true, removedCount: 0, targetTerm };
+    }
+
+    const nowIso = new Date().toISOString();
+    const payloadsToUpdate: any[] = [];
+    let removedCount = 0;
+
+    for (const row of evalRows) {
+      const empDetails = row.employment_details || {};
+      const careerCourses = empDetails.career_courses ? { ...empDetails.career_courses } : null;
+      const careerCoursesMeta = empDetails.career_courses_meta ? { ...empDetails.career_courses_meta } : null;
+
+      // 대상 학기 실적이 존재하는 경우에만 제거
+      if (careerCourses && careerCourses[targetTerm]) {
+        delete careerCourses[targetTerm];
+        if (careerCoursesMeta && careerCoursesMeta[targetTerm]) {
+          delete careerCoursesMeta[targetTerm];
+        }
+
+        const updatedEmpDetails = {
+          ...empDetails,
+          career_courses: careerCourses,
+          ...(careerCoursesMeta ? { career_courses_meta: careerCoursesMeta } : {}),
+        };
+
+        payloadsToUpdate.push({
+          student_id: row.student_id,
+          academic_year: params.academicYear,
+          employment_details: updatedEmpDetails,
+          updated_at: nowIso,
+          updated_by: profile.id,
+          ...(row.vocational_details ? { vocational_details: row.vocational_details } : {}),
+          ...(row.arts_contest_details ? { arts_contest_details: row.arts_contest_details } : {}),
+        });
+
+        removedCount++;
+      }
+    }
+
+    if (payloadsToUpdate.length > 0) {
+      const CHUNK_SIZE = 50;
+      for (let i = 0; i < payloadsToUpdate.length; i += CHUNK_SIZE) {
+        const chunk = payloadsToUpdate.slice(i, i + CHUNK_SIZE);
+        const { error: upsertErr } = await supabase
+          .from('student_cert_evaluations')
+          .upsert(chunk, { onConflict: 'student_id' });
+
+        if (upsertErr) {
+          console.error('Error during bulkRollbackCareerCourses upsert:', upsertErr);
+          return { success: false, removedCount: 0, targetTerm, error: upsertErr.message };
+        }
+      }
+    }
+
+    // 3. 캐시 무효화
+    await clearCertificationSummaryCache(params.gradeNum);
+    revalidateTag('cert-eval');
+    if (params.gradeNum) {
+      revalidateTag(`cert-eval-grade-${params.gradeNum}`);
+    }
+    revalidatePath('/admin/certification');
+    revalidatePath('/student/certification');
+
+    // 4. 감사 로그 기록
+    try {
+      await logAuditAction({
+        actor_name: profile.full_name || profile.username || '관리자',
+        action_type: 'STUDENT_BULK_UPDATE',
+        target_name: `[취업진로코스 일괄 롤백] ${params.gradeNum}학년 ${targetTerm}학기 실적 ${removedCount}건 삭제`,
+        details: {
+          gradeNum: params.gradeNum,
+          academicYear: params.academicYear,
+          term: targetTerm,
+          removedCount,
+        }
+      });
+    } catch (auditErr) {
+      console.error('Audit log error in bulkRollbackCareerCoursesAction:', auditErr);
+    }
+
+    return {
+      success: true,
+      removedCount,
+      targetTerm,
+    };
+  } catch (err: any) {
+    console.error('Error in bulkRollbackCareerCoursesAction:', err);
+    return { success: false, removedCount: 0, targetTerm, error: err?.message || '롤백 처리 실패' };
+  }
+}
+
 
 
 

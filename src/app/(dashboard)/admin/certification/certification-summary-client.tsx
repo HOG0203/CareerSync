@@ -1021,7 +1021,11 @@ export function CertificationSummaryClient({
                 const isSelected = selectedStudentIds.has(student.studentId);
 
                 const prizeRewards = (student.rewardsHistory || []).filter(r => r.rewardType === 'prize' && r.status !== 'cancelled');
-                const latestPrize = prizeRewards[prizeRewards.length - 1];
+                const sortedPrizes = [...prizeRewards].sort((a, b) =>
+                  new Date(b.createdAt || b.awardedDate || 0).getTime() - new Date(a.createdAt || a.awardedDate || 0).getTime()
+                );
+                const latestPrize = sortedPrizes[0];
+                const previousPrizes = sortedPrizes.slice(1);
                 const prizeEligible = student.rewardEligibility?.prize?.eligible;
 
                 const awardRecord = (student.rewardsHistory || []).find(r => r.rewardType === 'certificate_award' && r.status !== 'cancelled');
@@ -1121,7 +1125,7 @@ export function CertificationSummaryClient({
                         </div>
                         <div>
                           {latestPrize ? (
-                            <div className="flex items-center gap-1">
+                            <div className="flex flex-wrap items-center gap-1 justify-end">
                               <button
                                 type="button"
                                 onClick={() => setSnapshotModalReward(latestPrize)}
@@ -1130,6 +1134,17 @@ export function CertificationSummaryClient({
                                 <span>{latestPrize.itemName} 수령</span>
                                 <Info className="h-2.5 w-2.5 opacity-70" />
                               </button>
+                              {previousPrizes.map((prev) => (
+                                <button
+                                  key={prev.id}
+                                  type="button"
+                                  onClick={() => setSnapshotModalReward(prev)}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-slate-200 text-slate-700 text-[9px] font-semibold"
+                                  title="이전 수령 포상 (클릭 시 확인 및 취소)"
+                                >
+                                  <span>{prev.itemName}</span>
+                                </button>
+                              ))}
                               {prizeEligible && (
                                 <Button
                                   type="button"
@@ -1274,7 +1289,11 @@ export function CertificationSummaryClient({
                     const isSelected = selectedStudentIds.has(student.studentId);
 
                     const prizeRewards = (student.rewardsHistory || []).filter(r => r.rewardType === 'prize' && r.status !== 'cancelled');
-                    const latestPrize = prizeRewards[prizeRewards.length - 1];
+                    const sortedPrizes = [...prizeRewards].sort((a, b) =>
+                      new Date(b.createdAt || b.awardedDate || 0).getTime() - new Date(a.createdAt || a.awardedDate || 0).getTime()
+                    );
+                    const latestPrize = sortedPrizes[0];
+                    const previousPrizes = sortedPrizes.slice(1);
                     const prizeEligible = student.rewardEligibility?.prize?.eligible;
 
                     const awardRecord = (student.rewardsHistory || []).find(r => r.rewardType === 'certificate_award' && r.status !== 'cancelled');
@@ -1376,6 +1395,21 @@ export function CertificationSummaryClient({
                                 <span className="text-[9px] text-slate-400">
                                   {latestPrize.awardedDate ? latestPrize.awardedDate.replace(/-/g, '.') : `${latestPrize.academicYear}년`}
                                 </span>
+                                {previousPrizes.length > 0 && (
+                                  <div className="flex flex-wrap items-center justify-center gap-1 mt-0.5">
+                                    {previousPrizes.map((prev) => (
+                                      <button
+                                        key={prev.id}
+                                        type="button"
+                                        onClick={() => setSnapshotModalReward(prev)}
+                                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-500 text-[9px] font-medium transition-all"
+                                        title={`이전 수령 포상: ${prev.itemName} (${prev.awardedDate}) - 클릭 시 확인 및 취소`}
+                                      >
+                                        <span className="line-through opacity-70">이전: {prev.itemName}</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
                                 {isAdmin && prizeEligible && (
                                   <Button
                                     type="button"
@@ -1890,6 +1924,7 @@ export function CertificationSummaryClient({
         grade={activeGrade}
         evaluations={currentEvaluations}
         classes={uniqueClasses}
+        onSuccess={refreshCurrentGradeData}
       />
 
       {/* 취업진로코스 일괄 확정 & 동기화 모달 */}

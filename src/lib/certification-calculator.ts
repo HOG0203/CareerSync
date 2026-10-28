@@ -240,7 +240,7 @@ export function evaluateRewardEligibility(
       recommendedPrize = '';
     } else {
       prizeEligible = true;
-      isUpgrade = true;
+      isUpgrade = false;
       prizeReason = `${currentRank}등급 최초 달성 (지급 대상)`;
       recommendedPrize = getDefaultPrizeName(currentRank, prizeConfig);
     }

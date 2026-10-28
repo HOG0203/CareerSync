@@ -73,7 +73,10 @@ export function EvaluationSheetModal({
 
   const d = evaluation.details;
   const prizeRewards = (evaluation.rewardsHistory || []).filter(r => r.rewardType === 'prize' && r.status !== 'cancelled');
-  const latestPrize = prizeRewards[prizeRewards.length - 1];
+  const sortedPrizes = [...prizeRewards].sort((a, b) =>
+    new Date(b.createdAt || b.awardedDate || 0).getTime() - new Date(a.createdAt || a.awardedDate || 0).getTime()
+  );
+  const latestPrize = sortedPrizes[0];
   const awardRecord = (evaluation.rewardsHistory || []).find(r => r.rewardType === 'certificate_award' && r.status !== 'cancelled');
 
   const handlePrint = () => {

@@ -9,32 +9,41 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import {
   Briefcase,
-  CheckCircle2,
   AlertCircle,
-  Sparkles,
   Loader2,
-  Users,
   Calendar,
   Check,
   FileSpreadsheet,
+  Trash2,
+  ChevronDown,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   getCareerCourseCandidatesAction,
   bulkSyncCareerCoursesAction,
+  bulkRollbackCareerCoursesAction,
 } from './actions';
 
 export const OFFICIAL_CAREER_COURSES = [
@@ -98,7 +107,10 @@ export function CareerCourseBulkModal({
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
   const [isProcessing, setIsProcessing] = React.useState(false);
+  const [isRollingBack, setIsRollingBack] = React.useState(false);
   const [isDownloadingExcel, setIsDownloadingExcel] = React.useState(false);
+  const [isTermDropdownOpen, setIsTermDropdownOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<{ term: string; termLabel: string; count: number } | null>(null);
 
   // 1학기 or 2학기 선택 (현재 월 기준 기본값 자동 지정: 8월 이후는 2학기, 그 전은 1학기)
   const currentMonth = new Date().getMonth() + 1;
@@ -113,47 +125,40 @@ export function CareerCourseBulkModal({
   const targetTerm = `${grade}-${semester}`;
 
   // 모달이 열릴 때 DB에서 최신 후보자 목록 로드
-  React.useEffect(() => {
-    if (!open) return;
-
-    let isMounted = true;
+  const loadCandidates = React.useCallback(async () => {
     setIsLoading(true);
-
-    getCareerCourseCandidatesAction({
-      gradeNum: grade,
-      academicYear,
-    })
-      .then((res) => {
-        if (!isMounted) return;
-        if (res.success) {
-          setCandidates(res.candidates || []);
-          setCourseStats(res.courseStats || {});
-        } else {
-          toast({
-            variant: 'destructive',
-            title: '데이터 조회 실패',
-            description: res.error || '진로코스 후보 학생을 불러오지 못했습니다.',
-          });
-        }
-      })
-      .catch((err) => {
-        console.error('Error loading candidates:', err);
-        if (isMounted) {
-          toast({
-            variant: 'destructive',
-            title: '오류 발생',
-            description: '학생 데이터를 불러오는 중 오류가 발생했습니다.',
-          });
-        }
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false);
+    try {
+      const res = await getCareerCourseCandidatesAction({
+        gradeNum: grade,
+        academicYear,
       });
+      if (res.success) {
+        setCandidates(res.candidates || []);
+        setCourseStats(res.courseStats || {});
+      } else {
+        toast({
+          variant: 'destructive',
+          title: '데이터 조회 실패',
+          description: res.error || '진로코스 후보 학생을 불러오지 못했습니다.',
+        });
+      }
+    } catch (err: any) {
+      console.error('Error loading candidates:', err);
+      toast({
+        variant: 'destructive',
+        title: '오류 발생',
+        description: '학생 데이터를 불러오는 중 오류가 발생했습니다.',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [grade, academicYear, toast]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [open, grade, academicYear, toast]);
+  React.useEffect(() => {
+    if (open) {
+      loadCandidates();
+    }
+  }, [open, loadCandidates]);
 
   // 학기 수에 따른 인증 점수 산출 함수
   const calcScore = (termCount: number) => {
@@ -163,6 +168,26 @@ export function CareerCourseBulkModal({
     if (termCount === 1) return 4;
     return 0;
   };
+
+  // 학기 옵션 목록 및 기등록 인원수 집계
+  const termOptions = React.useMemo(() => {
+    return [
+      {
+        semester: 1 as const,
+        term: `${grade}-1`,
+        label: `🌱 1학기 (${grade}-1학기)`,
+        registeredCount: candidates.filter((c) => c.existingTerms.includes(`${grade}-1`)).length,
+      },
+      {
+        semester: 2 as const,
+        term: `${grade}-2`,
+        label: `🍁 2학기 (${grade}-2학기)`,
+        registeredCount: candidates.filter((c) => c.existingTerms.includes(`${grade}-2`)).length,
+      },
+    ];
+  }, [grade, candidates]);
+
+  const currentTermOption = termOptions.find(o => o.semester === semester) || termOptions[0];
 
   // 실제 반영 예정 학생 수 계산 (이번 학기에 이미 등록되어 스킵되는 학생 제외)
   const targetCount = React.useMemo(() => {
@@ -299,6 +324,7 @@ export function CareerCourseBulkModal({
           title: `${res.targetTerm}학기 일괄 확정 완료`,
           description: `총 ${res.processedCount}명의 진로코스 실적이 인증제에 성공적으로 반영되었습니다.${res.skippedCount > 0 ? ` (${res.skippedCount}명 기존 유지)` : ''}`,
         });
+        await loadCandidates();
         await onSuccess();
         onOpenChange(false);
       } else {
@@ -320,293 +346,406 @@ export function CareerCourseBulkModal({
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl w-[95vw] max-h-[90vh] p-0 flex flex-col rounded-2xl overflow-hidden shadow-2xl border-slate-200">
-        {/* 모달 헤더 */}
-        <DialogHeader className="p-4 sm:p-5 bg-gradient-to-r from-indigo-50/80 via-white to-blue-50/50 border-b border-slate-100 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
-              <Briefcase className="h-5 w-5 sm:h-6 sm:w-6" />
-            </div>
-            <div>
-              <DialogTitle className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
-                <span>취업진로코스 학기별 일괄 확정</span>
-                <Badge className="bg-indigo-600 text-white text-[11px] font-extrabold px-2 py-0.5">
-                  {grade}학년 대상
-                </Badge>
-              </DialogTitle>
-              <DialogDescription className="text-xs text-slate-500 font-medium mt-0.5">
-                학생 DB의 확정진로코스(9개 공식 인정 코스)를 기준으로, 선택한 학기의 실적을 일괄 등록합니다.
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
+  // 일괄 롤백(취소) 실행
+  const handleExecuteRollback = async () => {
+    if (!deleteTarget) return;
+    setIsRollingBack(true);
+    try {
+      const res = await bulkRollbackCareerCoursesAction({
+        gradeNum: grade,
+        academicYear,
+        term: deleteTarget.term,
+      });
 
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
-          {isLoading ? (
-            <div className="py-16 flex flex-col items-center justify-center text-slate-400 gap-2">
-              <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-              <span className="text-xs font-bold text-slate-600">학생 DB 확정진로코스 데이터 분석 중...</span>
+      if (!res.success) {
+        toast({
+          variant: 'destructive',
+          title: '일괄 롤백 실패',
+          description: res.error || '롤백 처리 중 오류가 발생했습니다.',
+        });
+      } else {
+        toast({
+          title: '🗑️ 일괄 롤백 완료',
+          description: `${deleteTarget.termLabel} 진로코스 실적 ${res.removedCount}건이 성공적으로 롤백되었습니다.`,
+        });
+        setDeleteTarget(null);
+        await loadCandidates();
+        await onSuccess();
+      }
+    } catch (err: any) {
+      console.error('Error rolling back career courses:', err);
+      toast({
+        variant: 'destructive',
+        title: '롤백 오류',
+        description: err?.message || '처리 중 오류가 발생했습니다.',
+      });
+    } finally {
+      setIsRollingBack(false);
+    }
+  };
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-3xl w-[95vw] max-h-[90vh] p-0 flex flex-col rounded-2xl overflow-hidden shadow-2xl border-slate-200">
+          {/* 모달 헤더 */}
+          <DialogHeader className="p-4 sm:p-5 bg-gradient-to-r from-indigo-50/80 via-white to-blue-50/50 border-b border-slate-100 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                <Briefcase className="h-5 w-5 sm:h-6 sm:w-6" />
+              </div>
+              <div>
+                <DialogTitle className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
+                  <span>취업진로코스 학기별 일괄 확정 및 관리</span>
+                  <Badge className="bg-indigo-600 text-white text-[11px] font-extrabold px-2 py-0.5">
+                    {grade}학년 대상
+                  </Badge>
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-500 font-medium mt-0.5">
+                  학생 DB의 확정진로코스를 바탕으로 학기별 실적을 일괄 확정하거나 기존 실적을 롤백(취소)합니다.
+                </DialogDescription>
+              </div>
             </div>
-          ) : candidates.length === 0 ? (
-            <div className="py-12 flex flex-col items-center justify-center text-slate-400 text-center gap-2">
-              <AlertCircle className="h-8 w-8 text-slate-300" />
-              <p className="text-sm font-bold text-slate-600">현재 {grade}학년에 등록된 공식 확정진로코스 학생이 없습니다.</p>
-              <p className="text-xs text-slate-400">
-                희망진로코스가 아닌 &apos;확정진로코스&apos;에 9개 공식 코스(도제반, 청솔반, 맞춤반 등)가 등록되어 있어야 합니다.
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* 1. 학기 선택 컨트롤 카드 */}
-              <div className="bg-gradient-to-r from-slate-50 to-indigo-50/40 p-4 rounded-xl border border-indigo-100/80 shadow-2xs space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-indigo-600 shrink-0" />
-                    <div>
-                      <h4 className="text-xs sm:text-sm font-black text-slate-900">
-                        확정 대상 학기 선택
-                      </h4>
-                      <p className="text-[11px] text-slate-500">
-                        선택한 학기에 대해 {grade}학년 학생들의 코스 참여가 확정 등록됩니다.
-                      </p>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
+            {isLoading ? (
+              <div className="py-16 flex flex-col items-center justify-center text-slate-400 gap-2">
+                <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+                <span className="text-xs font-bold text-slate-600">학생 DB 확정진로코스 데이터 분석 중...</span>
+              </div>
+            ) : candidates.length === 0 ? (
+              <div className="py-12 flex flex-col items-center justify-center text-slate-400 text-center gap-2">
+                <AlertCircle className="h-8 w-8 text-slate-300" />
+                <p className="text-sm font-bold text-slate-600">현재 {grade}학년에 등록된 공식 확정진로코스 학생이 없습니다.</p>
+                <p className="text-xs text-slate-400">
+                  희망진로코스가 아닌 &apos;확정진로코스&apos;에 9개 공식 코스(도제반, 청솔반, 맞춤반 등)가 등록되어 있어야 합니다.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* 1. 간소화된 대상 학기 선택 드롭다운 (기등록 현황 및 우측 휴지통 롤백) */}
+                <div className="bg-gradient-to-r from-slate-50 to-indigo-50/40 p-3.5 rounded-xl border border-indigo-100/90 shadow-2xs space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 shrink-0">
+                      <Calendar className="h-4 w-4 text-indigo-600" />
+                      <span>확정 대상 학기 선택</span>
+                    </Label>
+
+                    {/* Popover 드롭다운 */}
+                    <Popover open={isTermDropdownOpen} onOpenChange={setIsTermDropdownOpen}>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className="w-full sm:w-[320px] flex items-center justify-between text-xs font-bold h-9 px-3 rounded-xl border border-indigo-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs hover:border-indigo-300 transition-colors cursor-pointer"
+                        >
+                          <span className="flex items-center gap-2 truncate">
+                            <span className="font-bold text-slate-900">{currentTermOption.label}</span>
+                            {currentTermOption.registeredCount > 0 ? (
+                              <span className="text-[10px] text-emerald-700 font-extrabold bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                                {currentTermOption.registeredCount}명 기등록
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-500 font-medium bg-slate-100 px-1.5 py-0.5 rounded">
+                                미등록 (0명)
+                              </span>
+                            )}
+                          </span>
+                          <ChevronDown className="h-4 w-4 text-slate-400 shrink-0 ml-2" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        className="w-[var(--radix-popover-trigger-width)] min-w-[300px] p-1.5 rounded-xl shadow-lg border border-slate-200 bg-white z-50 space-y-1"
+                        align="end"
+                      >
+                        {termOptions.map(opt => (
+                          <div
+                            key={opt.term}
+                            className={cn(
+                              "flex items-center justify-between px-2.5 py-2 text-xs rounded-lg transition-colors group",
+                              semester === opt.semester ? "bg-indigo-50/70" : "hover:bg-slate-50"
+                            )}
+                          >
+                            {/* 클릭 시 학기 선택 */}
+                            <div
+                              onClick={() => {
+                                setSemester(opt.semester);
+                                setIsTermDropdownOpen(false);
+                              }}
+                              className="flex items-center gap-2 flex-1 cursor-pointer min-w-0"
+                            >
+                              {semester === opt.semester ? (
+                                <Check className="h-4 w-4 text-indigo-600 shrink-0" />
+                              ) : (
+                                <span className="w-4 shrink-0" />
+                              )}
+                              <span className="font-bold text-slate-800">{opt.label}</span>
+                              {opt.registeredCount > 0 ? (
+                                <span className="text-[10px] text-emerald-700 font-extrabold bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded shrink-0">
+                                  {opt.registeredCount}명 등록됨
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
+                                  미등록 (0명)
+                                </span>
+                              )}
+                            </div>
+
+                            {/* 우측 끝에 정렬된 휴지통 버튼 (기등록 인원이 1명 이상일 때만 노출) */}
+                            {opt.registeredCount > 0 && (
+                              <button
+                                type="button"
+                                title={`${opt.label} 실적 일괄 취소 (롤백)`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  setDeleteTarget({ term: opt.term, termLabel: opt.label, count: opt.registeredCount });
+                                  setIsTermDropdownOpen(false);
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors ml-2 shrink-0 cursor-pointer"
+                              >
+                                <Trash2 className="h-4 w-4 text-rose-500" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* 옵션: 이번 학기 중복 유지 체크박스 */}
+                  <div className="pt-2 border-t border-indigo-100/70 flex items-center space-x-2">
+                    <Checkbox
+                      id="skipExisting"
+                      checked={skipExistingThisTerm}
+                      onCheckedChange={(checked) => setSkipExistingThisTerm(Boolean(checked))}
+                    />
+                    <Label
+                      htmlFor="skipExisting"
+                      className="text-xs font-bold text-slate-700 cursor-pointer select-none"
+                    >
+                      이미 이번 <span className="text-indigo-600 font-extrabold">{targetTerm}학기</span> 실적이 등록된 학생은 기존 데이터 유지 (중복 방지, 권장)
+                    </Label>
+                  </div>
+                </div>
+
+                {/* 2. 압축된 핵심 요약 바 (통계 + 코스 칩 결합) */}
+                <div className="bg-white border border-slate-200/90 rounded-xl p-3 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-slate-800">
+                        👥 {grade}학년 공식 인정 코스 총원: <strong className="text-indigo-600 font-black">{candidates.length}명</strong>
+                      </span>
+                      <span className="text-slate-300">|</span>
+                      <span className="font-bold text-slate-600">
+                        {targetTerm} 반영 대상: <strong className="text-indigo-700 font-black">{targetCount}명</strong>
+                      </span>
+                      {alreadyRegisteredCount > 0 && (
+                        <span className="text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded text-[11px]">
+                          기등록 {alreadyRegisteredCount}명
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  {/* 드롭다운: 1학기 or 2학기 */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Select
-                      value={String(semester)}
-                      onValueChange={(v) => setSemester(Number(v) as 1 | 2)}
+                  {/* 코스별 분포 요약 */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-slate-100">
+                    <span className="text-[10px] text-slate-400 font-bold shrink-0">감지 코스:</span>
+                    {OFFICIAL_CAREER_COURSES.map(courseName => {
+                      const count = courseStats[courseName] || 0;
+                      if (count === 0) return null;
+                      return (
+                        <Badge
+                          key={courseName}
+                          variant="outline"
+                          className="bg-slate-50 border-slate-200 text-slate-700 text-[11px] py-0.5 px-2 gap-1 font-bold"
+                        >
+                          <span>{courseName}</span>
+                          <span className="text-indigo-600 font-black">{count}명</span>
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 3. 적용 대상 학생 미리보기 테이블 */}
+                <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                  <div className="p-2.5 bg-slate-100/80 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold text-slate-700">
+                    <div className="flex items-center gap-2">
+                      <span>적용 대상 학생 미리보기 ({candidates.length}명)</span>
+                      <span className="text-[11px] text-slate-500 font-normal hidden sm:inline">
+                        • 확정 시 기존 이수 학기에 {targetTerm}이 누적됩니다
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownloadExcel}
+                      disabled={isDownloadingExcel || candidates.length === 0}
+                      className="h-7 px-2.5 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-white hover:bg-emerald-50 border-emerald-300 rounded-lg gap-1 shadow-2xs shrink-0 self-end sm:self-auto cursor-pointer"
+                      title="적용 대상 학생 명단 엑셀 다운로드"
                     >
-                      <SelectTrigger className="w-[180px] h-9 text-xs font-black bg-white border-indigo-200 text-indigo-950 rounded-xl shadow-2xs">
-                        <SelectValue placeholder="학기 선택" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1" className="text-xs font-bold py-2">
-                          🌱 1학기 ({grade}-1학기로 확정)
-                        </SelectItem>
-                        <SelectItem value="2" className="text-xs font-bold py-2">
-                          🍁 2학기 ({grade}-2학기로 확정)
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+                      <span>{isDownloadingExcel ? '엑셀 생성 중...' : '명단 엑셀 다운로드'}</span>
+                    </Button>
+                  </div>
+                  <div className="max-h-56 overflow-y-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 text-[11px] font-bold text-slate-500 border-b border-slate-200 sticky top-0 z-10">
+                        <tr>
+                          <th className="p-2 w-12 text-center">연번</th>
+                          <th className="p-2 w-14 text-center">번호</th>
+                          <th className="p-2 w-20">성명</th>
+                          <th className="p-2">학과/반</th>
+                          <th className="p-2">확정 코스</th>
+                          <th className="p-2 text-center">대상 학기</th>
+                          <th className="p-2 text-center">반영 후 누적 이수</th>
+                          <th className="p-2 w-20 text-center">상태</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {sortedCandidates.map((c, idx) => {
+                          const isAlreadyRegistered = c.existingTerms.includes(targetTerm);
+                          const willSkip = skipExistingThisTerm && isAlreadyRegistered;
 
-                    <Badge className="bg-indigo-600 hover:bg-indigo-600 text-white font-black text-xs px-2.5 py-1.5 h-9 rounded-xl shadow-2xs">
-                      {targetTerm}학기 반영
-                    </Badge>
+                          // 반영 후 누적 학기 수 및 점수
+                          const nextTerms = willSkip
+                            ? c.existingTerms
+                            : Array.from(new Set([...c.existingTerms, targetTerm])).sort();
+                          const nextScore = calcScore(nextTerms.length);
+
+                          return (
+                            <tr
+                              key={c.id}
+                              className={`hover:bg-slate-50/80 ${willSkip ? 'opacity-50 bg-slate-50/40' : ''}`}
+                            >
+                              <td className="p-2 text-center font-mono text-slate-400 text-[11px]">{idx + 1}</td>
+                              <td className="p-2 text-center font-mono text-slate-600 font-bold">{c.studentNumber}</td>
+                              <td className="p-2 font-bold text-slate-900">{c.studentName}</td>
+                              <td className="p-2 text-slate-500">
+                                {c.major} {c.classInfo}
+                              </td>
+                              <td className="p-2 font-semibold text-slate-800">
+                                <Badge variant="outline" className="bg-indigo-50/50 text-indigo-700 border-indigo-200 font-bold text-[11px]">
+                                  {c.standardCourse}
+                                </Badge>
+                              </td>
+                              <td className="p-2 text-center font-mono font-bold text-indigo-600">
+                                {targetTerm}
+                              </td>
+                              <td className="p-2 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <span className="font-bold text-slate-700">
+                                    {nextTerms.length}학기
+                                  </span>
+                                  <Badge className="text-[10px] font-black bg-indigo-50 text-indigo-700 hover:bg-indigo-50 border-indigo-200">
+                                    {nextScore}점
+                                  </Badge>
+                                </div>
+                              </td>
+                              <td className="p-2 text-center">
+                                {willSkip ? (
+                                  <Badge variant="outline" className="text-[9px] text-slate-400 bg-slate-50">
+                                    기존유지
+                                  </Badge>
+                                ) : (
+                                  <Badge className="text-[9px] bg-emerald-600 text-white font-extrabold">
+                                    확정반영
+                                  </Badge>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-
-                {/* 옵션: 이번 학기 중복 유지 체크박스 */}
-                <div className="pt-2 border-t border-indigo-100/60 flex items-center space-x-2">
-                  <Checkbox
-                    id="skipExisting"
-                    checked={skipExistingThisTerm}
-                    onCheckedChange={(checked) => setSkipExistingThisTerm(Boolean(checked))}
-                  />
-                  <Label
-                    htmlFor="skipExisting"
-                    className="text-xs font-bold text-slate-700 cursor-pointer select-none"
-                  >
-                    이미 이번 <span className="text-indigo-600 font-extrabold">{targetTerm}학기</span> 실적이 등록된 학생은 기존 데이터 유지 (중복 방지, 권장)
-                  </Label>
-                </div>
-              </div>
-
-              {/* 2. 요약 통계 */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between">
-                  <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
-                    <Users className="h-3.5 w-3.5 text-slate-400" />
-                    인정 코스 총원
-                  </span>
-                  <span className="text-xl font-black text-slate-900 mt-1">{candidates.length}명</span>
-                </div>
-                <div className="bg-indigo-50/70 border border-indigo-100 p-3 rounded-xl flex flex-col justify-between">
-                  <span className="text-[11px] font-bold text-indigo-600 flex items-center gap-1">
-                    <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
-                    {targetTerm} 반영 대상
-                  </span>
-                  <span className="text-xl font-black text-indigo-700 mt-1">{targetCount}명</span>
-                </div>
-                <div className="bg-emerald-50/70 border border-emerald-100 p-3 rounded-xl flex flex-col justify-between">
-                  <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    {targetTerm} 기등록
-                  </span>
-                  <span className="text-xl font-black text-emerald-700 mt-1">
-                    {alreadyRegisteredCount}명
-                  </span>
-                </div>
-                <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between">
-                  <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
-                    <Briefcase className="h-3.5 w-3.5 text-slate-400" />
-                    감지된 코스
-                  </span>
-                  <span className="text-xl font-black text-slate-900 mt-1">
-                    {Object.keys(courseStats).length}개 코스
-                  </span>
-                </div>
-              </div>
-
-              {/* 3. 감지된 공식 인정 코스 칩 목록 */}
-              <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2">
-                <span className="text-[11px] font-extrabold text-slate-500 block">
-                  공식 인정 코스 9개 중 감지된 코스 목록:
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {OFFICIAL_CAREER_COURSES.map((courseName) => {
-                    const count = courseStats[courseName] || 0;
-                    if (count === 0) return null;
-                    return (
-                      <Badge
-                        key={courseName}
-                        variant="outline"
-                        className="bg-slate-50 border-slate-200 text-slate-700 text-xs py-1 px-2 gap-1.5 font-bold"
-                      >
-                        <span>{courseName}</span>
-                        <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.2 rounded-full text-[10px] font-black">
-                          {count}명
-                        </span>
-                      </Badge>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 4. 적용 대상 학생 미리보기 테이블 */}
-              <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
-                <div className="p-2.5 bg-slate-100/80 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold text-slate-700">
-                  <div className="flex items-center gap-2">
-                    <span>적용 대상 학생 미리보기 ({candidates.length}명)</span>
-                    <span className="text-[11px] text-slate-500 font-normal hidden sm:inline">
-                      • 확정 시 기존 이수 학기에 {targetTerm}이 누적됩니다
-                    </span>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDownloadExcel}
-                    disabled={isDownloadingExcel || candidates.length === 0}
-                    className="h-7 px-2.5 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-white hover:bg-emerald-50 border-emerald-300 rounded-lg gap-1 shadow-2xs shrink-0 self-end sm:self-auto"
-                    title="적용 대상 학생 명단 엑셀 다운로드"
-                  >
-                    <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
-                    <span>{isDownloadingExcel ? '엑셀 생성 중...' : '대상자 엑셀 다운로드'}</span>
-                  </Button>
-                </div>
-                <div className="max-h-52 overflow-y-auto">
-                  <table className="w-full text-xs text-left">
-                    <thead className="bg-slate-50 text-[11px] font-bold text-slate-500 border-b border-slate-200 sticky top-0 z-10">
-                      <tr>
-                        <th className="p-2 w-12 text-center">연번</th>
-                        <th className="p-2 w-14 text-center">번호</th>
-                        <th className="p-2 w-20">성명</th>
-                        <th className="p-2">학과/반</th>
-                        <th className="p-2">확정 코스</th>
-                        <th className="p-2 text-center">확정 학기</th>
-                        <th className="p-2 text-center">반영 후 누적 이수</th>
-                        <th className="p-2 w-20 text-center">상태</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {sortedCandidates.map((c, idx) => {
-                        const isAlreadyRegistered = c.existingTerms.includes(targetTerm);
-                        const willSkip = skipExistingThisTerm && isAlreadyRegistered;
-
-                        // 반영 후 누적 학기 수 및 점수
-                        const nextTerms = willSkip
-                          ? c.existingTerms
-                          : Array.from(new Set([...c.existingTerms, targetTerm])).sort();
-                        const nextScore = calcScore(nextTerms.length);
-
-                        return (
-                          <tr
-                            key={c.id}
-                            className={`hover:bg-slate-50/80 ${willSkip ? 'opacity-50 bg-slate-50/40' : ''}`}
-                          >
-                            <td className="p-2 text-center font-mono text-slate-400 text-[11px]">{idx + 1}</td>
-                            <td className="p-2 text-center font-mono text-slate-600 font-bold">{c.studentNumber}</td>
-                            <td className="p-2 font-bold text-slate-900">{c.studentName}</td>
-                            <td className="p-2 text-slate-500">
-                              {c.major} {c.classInfo}
-                            </td>
-                            <td className="p-2 font-semibold text-slate-800">
-                              <Badge variant="outline" className="bg-indigo-50/50 text-indigo-700 border-indigo-200 font-bold text-[11px]">
-                                {c.standardCourse}
-                              </Badge>
-                            </td>
-                            <td className="p-2 text-center font-mono font-bold text-indigo-600">
-                              {targetTerm}
-                            </td>
-                            <td className="p-2 text-center">
-                              <div className="flex items-center justify-center gap-1">
-                                <span className="font-bold text-slate-700">
-                                  {nextTerms.length}학기
-                                </span>
-                                <Badge className="text-[10px] font-black bg-indigo-50 text-indigo-700 hover:bg-indigo-50 border-indigo-200">
-                                  {nextScore}점
-                                </Badge>
-                              </div>
-                            </td>
-                            <td className="p-2 text-center">
-                              {willSkip ? (
-                                <Badge variant="outline" className="text-[9px] text-slate-400 bg-slate-50">
-                                  기존유지
-                                </Badge>
-                              ) : (
-                                <Badge className="text-[9px] bg-emerald-600 text-white font-extrabold">
-                                  확정반영
-                                </Badge>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* 모달 푸터 */}
-        <DialogFooter className="p-3 sm:p-4 bg-slate-50 border-t border-slate-200 flex flex-row items-center justify-end gap-2 shrink-0">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => onOpenChange(false)}
-            disabled={isProcessing}
-            className="rounded-xl text-xs"
-          >
-            취소
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleConfirm}
-            disabled={isProcessing || isLoading || targetCount === 0}
-            className="rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs gap-1.5"
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                <span>{targetTerm}학기 실적 DB 반영 중...</span>
-              </>
-            ) : (
-              <>
-                <Check className="h-3.5 w-3.5" />
-                <span>{targetTerm}학기 진로코스 일괄 확정 ({targetCount}명)</span>
               </>
             )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </div>
+
+          {/* 모달 푸터 */}
+          <DialogFooter className="p-3 sm:p-4 bg-slate-50 border-t border-slate-200 flex flex-row items-center justify-end gap-2 shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+              disabled={isProcessing || isRollingBack}
+              className="rounded-xl text-xs cursor-pointer"
+            >
+              취소
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleConfirm}
+              disabled={isProcessing || isRollingBack || isLoading || targetCount === 0}
+              className="rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs gap-1.5 cursor-pointer"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>{targetTerm}학기 실적 DB 반영 중...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="h-3.5 w-3.5" />
+                  <span>{targetTerm}학기 진로코스 일괄 확정 ({targetCount}명)</span>
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 취업진로코스 실적 일괄 롤백 확인 경고 다이얼로그 */}
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(isOpen) => {
+          if (!isOpen && !isRollingBack) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent className="max-w-md w-[92vw] rounded-2xl bg-white p-5 sm:p-6 shadow-2xl border border-slate-100">
+          <AlertDialogHeader className="space-y-2">
+            <AlertDialogTitle className="text-base sm:text-lg font-black text-rose-600 flex items-center gap-2">
+              <div className="p-1.5 bg-rose-100 text-rose-600 rounded-xl">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <span>취업진로코스 실적 일괄 롤백</span>
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="text-xs text-slate-600 space-y-2 pt-1">
+                <div className="p-3 bg-rose-50 rounded-xl border border-rose-100 text-rose-950 font-medium leading-relaxed">
+                  <strong className="font-extrabold text-rose-700">{deleteTarget?.termLabel}</strong> 실적이 등록된 <strong>{grade}학년 {deleteTarget?.count}명</strong>의 진로코스 실적을 정말로 일괄 삭제(취소)하시겠습니까?
+                </div>
+                <div className="text-[11px] text-slate-500 leading-normal space-y-0.5">
+                  <p>• 삭제 시 대상 학생들의 진로코스 이수 학기 수가 1학기 차감되며, 취업 영역 인증 점수가 자동으로 재계산됩니다.</p>
+                  <p>• 다른 학기에 등록된 실적은 안전하게 유지됩니다.</p>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-0 pt-3">
+            <AlertDialogCancel disabled={isRollingBack} className="text-xs font-semibold rounded-xl">
+              취소
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isRollingBack}
+              onClick={(e) => {
+                e.preventDefault();
+                handleExecuteRollback();
+              }}
+              className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl gap-1.5 shadow-sm cursor-pointer"
+            >
+              {isRollingBack ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              <span>{isRollingBack ? '삭제 중...' : '그래도 삭제'}</span>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

@@ -19,11 +19,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { cn } from '@/lib/utils';
 import { FullStudentEvaluation } from '@/lib/certification-calculator';
 import { getStudentRecipientInfo } from '@/lib/cert-reward-excel-generator';
-import { exportRewardLedgerExcelAction } from './actions';
+import { exportRewardLedgerExcelAction, deleteRewardHistoryByDateAction } from './actions';
 import { useToast } from '@/hooks/use-toast';
-import { FileSpreadsheet, Calendar, Users, Filter, Download, CheckCircle2, AlertCircle } from 'lucide-react';
+import { FileSpreadsheet, Calendar, Users, Filter, Download, CheckCircle2, AlertCircle, Trash2, Loader2, Check, ChevronDown } from 'lucide-react';
 
 const TARGET_MAJOR_ORDER = [
   '자동화기계과',
@@ -46,6 +62,7 @@ interface RewardLedgerExportModalProps {
   evaluations: FullStudentEvaluation[];
   classes?: string[];
   initialAwardedDate?: string;
+  onSuccess?: () => Promise<void>;
 }
 
 export function RewardLedgerExportModal({
@@ -56,6 +73,7 @@ export function RewardLedgerExportModal({
   grade,
   evaluations,
   initialAwardedDate,
+  onSuccess,
 }: RewardLedgerExportModalProps) {
   const { toast } = useToast();
 
@@ -77,6 +95,7 @@ export function RewardLedgerExportModal({
       .map(([date, students]) => ({
         date,
         count: students.size,
+        studentIds: Array.from(students),
       }))
       .sort((a, b) => b.date.localeCompare(a.date));
 
@@ -127,9 +146,49 @@ export function RewardLedgerExportModal({
 
   // 선택 상태
   const [selectedDate, setSelectedDate] = React.useState<string>(initialAwardedDate || 'all');
+  const [isDateDropdownOpen, setIsDateDropdownOpen] = React.useState<boolean>(false);
   const [onlyAwarded, setOnlyAwarded] = React.useState<boolean>(true);
   const [selectedClass, setSelectedClass] = React.useState<string>('all');
   const [isDownloading, setIsDownloading] = React.useState<boolean>(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<{ date: string; count: number; studentIds: string[] } | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState<boolean>(false);
+
+  const handleExecuteDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      const res = await deleteRewardHistoryByDateAction({
+        awardedDate: deleteTarget.date,
+        academicYear,
+        gradeNum: grade,
+        studentIds: deleteTarget.studentIds,
+      });
+
+      if (!res.success) {
+        toast({
+          title: '확정 내역 삭제 실패',
+          description: res.error || '삭제 처리 중 오류가 발생했습니다.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: '🗑️ 확정 내역 삭제 완료',
+          description: `${deleteTarget.date} 확정 내역 ${res.count}건이 성공적으로 삭제되었습니다.`,
+        });
+        setSelectedDate('all');
+        setDeleteTarget(null);
+        await onSuccess?.();
+      }
+    } catch (err: any) {
+      toast({
+        title: '삭제 오류',
+        description: err?.message || '처리 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // 모달이 열리거나 initialAwardedDate가 변경될 때 기본값 세팅
   React.useEffect(() => {
@@ -251,24 +310,90 @@ export function RewardLedgerExportModal({
               <Calendar className="h-3.5 w-3.5 text-indigo-600" />
               <span>확정 일자 선택</span>
             </Label>
-            <Select value={selectedDate} onValueChange={setSelectedDate}>
-              <SelectTrigger className="w-full text-xs font-bold h-9 rounded-xl border-slate-200">
-                <SelectValue placeholder="확정 일자를 선택하세요" />
-              </SelectTrigger>
-              <SelectContent className="max-h-60 rounded-xl shadow-lg border-slate-200">
-                <SelectItem value="all" className="text-xs font-bold py-2">
-                  <span>📅 전체 확정 내역 (누적 합산)</span>
-                </SelectItem>
+            <Popover open={isDateDropdownOpen} onOpenChange={setIsDateDropdownOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between text-xs font-bold h-9 px-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs hover:border-slate-300 transition-colors cursor-pointer"
+                >
+                  <span className="truncate">
+                    {selectedDate === 'all' ? (
+                      '📅 전체 확정 내역 (누적 합산)'
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900">{selectedDate}</span>
+                        <span className="text-[11px] text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded">
+                          {dateOptions.find(d => d.date === selectedDate)?.count || 0}명 확정
+                        </span>
+                      </span>
+                    )}
+                  </span>
+                  <ChevronDown className="h-4 w-4 text-slate-400 shrink-0 ml-2" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-[var(--radix-popover-trigger-width)] p-1 rounded-xl shadow-lg border border-slate-200 bg-white max-h-60 overflow-y-auto z-50"
+                align="start"
+              >
+                {/* 1. 전체 확정 내역 (누적 합산) */}
+                <div
+                  onClick={() => {
+                    setSelectedDate('all');
+                    setIsDateDropdownOpen(false);
+                  }}
+                  className={cn(
+                    "flex items-center justify-between px-2.5 py-2 text-xs font-bold rounded-lg cursor-pointer transition-colors",
+                    selectedDate === 'all' ? "bg-indigo-50 text-indigo-700" : "hover:bg-slate-50 text-slate-700"
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    {selectedDate === 'all' && <Check className="h-4 w-4 text-indigo-600 shrink-0" />}
+                    <span>📅 전체 확정 내역 (누적 합산)</span>
+                  </div>
+                </div>
+
+                {/* 2. 각 확정일자 행 (우측 정렬된 휴지통 아이콘) */}
                 {dateOptions.map(opt => (
-                  <SelectItem key={opt.date} value={opt.date} className="text-xs py-2">
-                    <span className="font-bold text-slate-800">{opt.date}</span>
-                    <span className="ml-2 text-[11px] text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded">
-                      {opt.count}명 확정
-                    </span>
-                  </SelectItem>
+                  <div
+                    key={opt.date}
+                    className={cn(
+                      "flex items-center justify-between px-2.5 py-1.5 text-xs rounded-lg transition-colors group",
+                      selectedDate === opt.date ? "bg-indigo-50/60" : "hover:bg-slate-50"
+                    )}
+                  >
+                    {/* 클릭 시 날짜 선택 */}
+                    <div
+                      onClick={() => {
+                        setSelectedDate(opt.date);
+                        setIsDateDropdownOpen(false);
+                      }}
+                      className="flex items-center gap-2 flex-1 cursor-pointer py-1 min-w-0"
+                    >
+                      {selectedDate === opt.date && <Check className="h-4 w-4 text-indigo-600 shrink-0" />}
+                      <span className="font-bold text-slate-800">{opt.date}</span>
+                      <span className="text-[11px] text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded shrink-0">
+                        {opt.count}명 확정
+                      </span>
+                    </div>
+
+                    {/* 우측 끝에 정렬된 휴지통 버튼 */}
+                    <button
+                      type="button"
+                      title={`${opt.date} 확정 내역 삭제`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setDeleteTarget({ date: opt.date, count: opt.count, studentIds: opt.studentIds });
+                        setIsDateDropdownOpen(false);
+                      }}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors ml-auto shrink-0 cursor-pointer"
+                    >
+                      <Trash2 className="h-4 w-4 text-rose-500" />
+                    </button>
+                  </div>
                 ))}
-              </SelectContent>
-            </Select>
+              </PopoverContent>
+            </Popover>
             <p className="text-[11px] text-slate-400">
               특정 일자에 일괄 확정된 건만 분리하여 기안할 때 해당 일자를 선택하세요.
             </p>
@@ -363,6 +488,52 @@ export function RewardLedgerExportModal({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* 포상 확정 내역 일괄 삭제 확인 경고 다이얼로그 */}
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(isOpen) => {
+          if (!isOpen && !isDeleting) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent className="max-w-md w-[92vw] rounded-2xl bg-white p-5 sm:p-6 shadow-2xl border border-slate-100">
+          <AlertDialogHeader className="space-y-2">
+            <AlertDialogTitle className="text-base sm:text-lg font-black text-rose-600 flex items-center gap-2">
+              <div className="p-1.5 bg-rose-100 text-rose-600 rounded-xl">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <span>포상 확정 내역 일괄 삭제</span>
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="text-xs text-slate-600 space-y-2 pt-1">
+                <div className="p-3 bg-rose-50 rounded-xl border border-rose-100 text-rose-950 font-medium leading-relaxed">
+                  <strong className="font-extrabold text-rose-700">{deleteTarget?.date}</strong> 일자로 확정된 <strong>{grade}학년 {deleteTarget?.count}명</strong>의 포상(상품/인증상) 수령 내역을 정말로 일괄 삭제(취소)하시겠습니까?
+                </div>
+                <div className="text-[11px] text-slate-500 leading-normal space-y-0.5">
+                  <p>• 삭제 시 대상 학생들의 포상 상태가 <strong>&apos;수령 전&apos;</strong>으로 롤백되며, 해당 일자의 스냅샷 데이터가 영구 제거됩니다.</p>
+                  <p>• 공문서 수령 대장 목록에서도 해당 일자 내역이 제외됩니다.</p>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-0 pt-3">
+            <AlertDialogCancel disabled={isDeleting} className="text-xs font-semibold rounded-xl">
+              취소
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeleting}
+              onClick={(e) => {
+                e.preventDefault();
+                handleExecuteDelete();
+              }}
+              className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl gap-1.5 shadow-sm"
+            >
+              {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              <span>{isDeleting ? '삭제 중...' : '그래도 삭제'}</span>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
