@@ -85,6 +85,7 @@ const GET_SPECIFIC_COURSE_OPTIONS = (rowData: any) => {
       { label: '군특성화', value: '군특성화' },
       { label: '기술사관', value: '기술사관' },
       { label: '운동부', value: '운동부' },
+      { label: '기능생', value: '기능생' },
       { label: '기타(직접입력)', value: '기타(직접입력)' },
     ];
   }
@@ -111,6 +112,9 @@ const GET_SPECIFIC_COURSE_OPTIONS = (rowData: any) => {
     { label: '도제반', value: '도제반' },
     { label: '아우스빌둥', value: '아우스빌둥' },
     { label: '군특성화', value: '군특성화' },
+    { label: '기술사관', value: '기술사관' },
+    { label: '운동부', value: '운동부' },
+    { label: '기능생', value: '기능생' },
     { label: '전문대학', value: '전문대학' },
     { label: '4년제대학', value: '4년제대학' },
     { label: '기타(직접입력)', value: '기타(직접입력)' },
@@ -240,6 +244,7 @@ export function ClassTable({
           if (val === '군특성화') return 'bg-teal-50 text-teal-700 border-teal-100';
           if (val === '기술사관') return 'bg-lime-50 text-lime-700 border-lime-100';
           if (val === '운동부') return 'bg-yellow-50 text-yellow-700 border-yellow-100';
+          if (val === '기능생') return 'bg-amber-50 text-amber-700 border-amber-100';
           if (val === '기타(직접입력)') return 'bg-violet-50 text-violet-700 border-violet-100';
           return 'bg-slate-50 text-slate-600 border-slate-100';
         }

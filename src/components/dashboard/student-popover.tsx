@@ -737,7 +737,7 @@ export function StudentPopover({
                         className="w-full text-xs font-bold text-blue-600 bg-white border border-slate-200 rounded-md py-1 pl-2 pr-6 hover:border-slate-300 transition-colors cursor-pointer appearance-none outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
                       >
                         <option value="">(미설정)</option>
-                        {['청솔반', '취업맞춤반', '중견기업반', '반도체아카데미반', '혁신인재반', '부사관반', '일학습병행', '계약학과', '도제반', '아우스빌둥', '군특성화', '기술사관', '운동부', '전문대학', '4년제대학', '일반취업', '진학', '입대', '기타(직접입력)'].map((opt) => (
+                        {['청솔반', '취업맞춤반', '중견기업반', '반도체아카데미반', '혁신인재반', '부사관반', '일학습병행', '계약학과', '도제반', '아우스빌둥', '군특성화', '기술사관', '운동부', '기능생', '전문대학', '4년제대학', '일반취업', '진학', '입대', '기타(직접입력)'].map((opt) => (
                           <option key={opt} value={opt}>
                             {opt}
                           </option>
@@ -766,7 +766,7 @@ export function StudentPopover({
                         className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-md py-1 pl-2 pr-6 hover:border-slate-300 transition-colors cursor-pointer appearance-none outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
                       >
                         <option value="">(미선택)</option>
-                        {['청솔반', '취업맞춤반', '중견기업반', '반도체아카데미반', '혁신인재반', '부사관반', '일학습병행', '계약학과', '도제반', '아우스빌둥', '일반취업', '기술사관', '군특성화', '운동부', '진학', '입대', '기타'].map((opt) => (
+                        {['청솔반', '취업맞춤반', '중견기업반', '반도체아카데미반', '혁신인재반', '부사관반', '일학습병행', '계약학과', '도제반', '아우스빌둥', '일반취업', '기술사관', '군특성화', '운동부', '기능생', '진학', '입대', '기타'].map((opt) => (
                           <option key={opt} value={opt}>
                             {opt}
                           </option>
@@ -798,7 +798,7 @@ export function StudentPopover({
                         className="w-full text-[10px] font-bold text-slate-800 bg-white border border-slate-200 rounded py-0.5 pl-1.5 pr-4 hover:border-slate-300 transition-colors cursor-pointer appearance-none outline-none text-left shadow-2xs"
                       >
                         <option value="">(미선택)</option>
-                        {['청솔반', '취업맞춤반', '중견기업반', '반도체아카데미반', '혁신인재반', '부사관반', '일학습병행', '계약학과', '도제반', '아우스빌둥', '일반취업', '기술사관', '군특성화', '운동부', '진학', '입대', '기타'].map((opt) => (
+                        {['청솔반', '취업맞춤반', '중견기업반', '반도체아카데미반', '혁신인재반', '부사관반', '일학습병행', '계약학과', '도제반', '아우스빌둥', '일반취업', '기술사관', '군특성화', '운동부', '기능생', '진학', '입대', '기타'].map((opt) => (
                           <option key={opt} value={opt}>
                             {opt}
                           </option>

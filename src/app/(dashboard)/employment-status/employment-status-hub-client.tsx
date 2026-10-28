@@ -183,7 +183,7 @@ export function EmploymentStatusHubClient({
     const DEFAULT_COURSES = [
       '청솔반', '취업맞춤반', '중견기업반', '반도체아카데미반', '혁신인재반',
       '부사관반', '일학습병행', '계약학과', '도제반', '아우스빌둥',
-      '일반취업', '기술사관', '군특성화', '운동부', '진학', '입대', '기타'
+      '일반취업', '기술사관', '군특성화', '운동부', '기능생', '진학', '입대', '기타'
     ];
     const set = new Set<string>(DEFAULT_COURSES);
     students.forEach((s) => {
