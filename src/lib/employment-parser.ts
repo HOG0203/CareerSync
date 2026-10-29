@@ -158,14 +158,14 @@ export function parseEmploymentWorkbook(fileBuffer: ArrayBuffer, fileName: strin
 
     const headers = data[headerRowIdx].map((h: any) => String(h).trim());
 
-    const isClubSheet = sheetName.includes('전공동아리') || sheetName.includes('전공심화') || sheetName.includes('동아리') || fileName.includes('전공동아리') || fileName.includes('전공심화') || fileName.includes('동아리') || fileName.includes('3.전공');
-    const isEduSheet = sheetName.includes('산학교육') || sheetName.includes('교육') || fileName.includes('산학교육') || fileName.includes('교육') || fileName.includes('2.산학');
+    const isClubSheet = sheetName.includes('전공동아리') || sheetName.includes('전공심화') || sheetName.includes('동아리') || fileName.includes('전공동아리') || fileName.includes('전공심화') || fileName.includes('동아리') || fileName.includes('3.전공') || fileName.includes('2.전공');
+    const isEduSheet = sheetName.includes('산학교육') || sheetName.includes('교육') || fileName.includes('산학교육') || fileName.includes('교육') || fileName.includes('2.산학') || fileName.includes('1.산학');
     const isCourseSheet = sheetName.includes('진로코스') || sheetName.includes('취업진로') || sheetName.includes('코스') || fileName.includes('진로코스') || fileName.includes('취업진로') || fileName.includes('코스') || fileName.includes('1.취업');
-    const isContestSheet = sheetName.includes('기능대회') || sheetName.includes('기능경기') || fileName.includes('기능대회') || fileName.includes('기능경기') || fileName.includes('4.기능');
+    const isContestSheet = sheetName.includes('기능대회') || sheetName.includes('기능경기') || fileName.includes('기능대회') || fileName.includes('기능경기') || fileName.includes('4.기능') || fileName.includes('3.기능');
     // 현장실습/도제/취업확정 시트 판단: 취업진로코스(1.취업)와 겹치지 않도록 방지
     const isFieldSheet = !isCourseSheet && (
       sheetName.includes('현장실습') || sheetName.includes('도제') || sheetName.includes('취업명단') || sheetName.includes('취업확정') || sheetName.includes('조기취업') ||
-      fileName.includes('현장실습') || fileName.includes('도제') || fileName.includes('취업명단') || fileName.includes('취업확정') || fileName.includes('조기취업') || fileName.includes('5.현장')
+      fileName.includes('현장실습') || fileName.includes('도제') || fileName.includes('취업명단') || fileName.includes('취업확정') || fileName.includes('조기취업') || fileName.includes('5.현장') || fileName.includes('4.도제')
     );
 
     // 주요 컬럼 인덱스 매핑
@@ -1020,11 +1020,11 @@ export async function generateEmploymentTemplate(
     applyDropdownValidation(ws, 8, ['금상', '은상', '동상', '우수상', '장려상'], '입상내역 선택 오류', '금상, 은상, 동상, 우수상, 장려상 중 선택해주세요.');
 
   } else if (type === 'field') {
-    const ws = wb.addWorksheet('현장실습_도제_취업명단');
+    const ws = wb.addWorksheet('도제_현장실습명단');
     ws.views = [{ showGridLines: true }];
 
-    ws.addRow([`${academicYear}학년도 현장실습 / 도제OJT / 취업확정 명단 일괄 등록 서식`]);
-    ws.addRow(['※ [학년], [학과], [구분], [참여학기] 셀을 클릭하시면 드롭다운 목록이 나타납니다.']);
+    ws.addRow([`${academicYear}학년도 도제학교 OJT 및 현장실습 명단 일괄 등록 서식`]);
+    ws.addRow(['※ [학년], [학과], [구분], [참여학기] 셀을 클릭하시면 드롭다운 목록이 나타납니다. (도제OJT 및 현장실습 수기등록)']);
     ws.addRow([]);
     
     const headerRow = ws.addRow(['학년', '학과', '반', '번호', '이름', '구분', '참여학기', '업체명(기업명)', '비고']);

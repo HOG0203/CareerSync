@@ -11,6 +11,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { 
@@ -207,11 +208,11 @@ export function EmploymentImportCard({
       a.href = url;
       
       const nameMap: Record<string, string> = {
-        course: '1.취업진로코스_참여명단_서식',
-        edu: '2.산학협력_교육이수_명단_서식',
-        club: '3.전공심화동아리_참여명단_서식',
-        contest: '4.기능경기대회_입상명단_서식',
-        field: '5.현장실습_도제_취업_명단_서식'
+        edu: '1.산학협력_교육이수_명단_서식',
+        club: '2.전공심화동아리_참여명단_서식',
+        contest: '3.기능경기대회_입상명단_서식',
+        field: '4.도제학교_OJT_및_현장실습_명단_서식',
+        course: '취업진로코스_참여명단_서식'
       };
       
       a.download = `(${baseYear}학년도)_${nameMap[type]}.xlsx`;
@@ -412,42 +413,48 @@ export function EmploymentImportCard({
                   <ChevronDown className="h-3.5 w-3.5 opacity-70 ml-0.5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-auto min-w-[310px] rounded-xl text-xs font-semibold p-1.5 shadow-xl border-slate-200">
-                <DropdownMenuItem onClick={() => handleDownloadTemplate('course')} className="cursor-pointer gap-2.5 py-2 px-3 rounded-lg">
-                  <GraduationCap className="h-4 w-4 text-indigo-600 shrink-0" />
-                  <div className="flex flex-col text-left">
-                    <span className="font-bold text-slate-800 whitespace-nowrap">1. 취업진로코스 참여 명단</span>
-                    <span className="text-[10px] text-slate-400 whitespace-nowrap">청솔·맞춤·중견·반도체·부사관반 (.xlsx)</span>
-                  </div>
-                </DropdownMenuItem>
+              <DropdownMenuContent align="end" className="w-auto min-w-[320px] max-w-[360px] rounded-xl text-xs font-semibold p-1.5 shadow-xl border-slate-200">
                 <DropdownMenuItem onClick={() => handleDownloadTemplate('edu')} className="cursor-pointer gap-2.5 py-2 px-3 rounded-lg">
                   <Building className="h-4 w-4 text-emerald-600 shrink-0" />
                   <div className="flex flex-col text-left">
-                    <span className="font-bold text-slate-800 whitespace-nowrap">2. 산학협력 교육이수 명단</span>
+                    <span className="font-bold text-slate-800 whitespace-nowrap">1. 산학협력 교육이수 명단</span>
                     <span className="text-[10px] text-slate-400 whitespace-nowrap">학년, 설명회·박람회·특강 (회당 1점) (.xlsx)</span>
                   </div>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleDownloadTemplate('club')} className="cursor-pointer gap-2.5 py-2 px-3 rounded-lg">
                   <Layers className="h-4 w-4 text-purple-600 shrink-0" />
                   <div className="flex flex-col text-left">
-                    <span className="font-bold text-slate-800 whitespace-nowrap">3. 전공심화동아리 참여 명단</span>
+                    <span className="font-bold text-slate-800 whitespace-nowrap">2. 전공심화동아리 참여 명단</span>
                     <span className="text-[10px] text-slate-400 whitespace-nowrap">학년, 1~3학년 심화동아리 실적 (.xlsx)</span>
                   </div>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleDownloadTemplate('contest')} className="cursor-pointer gap-2.5 py-2 px-3 rounded-lg">
                   <Award className="h-4 w-4 text-amber-600 shrink-0" />
                   <div className="flex flex-col text-left">
-                    <span className="font-bold text-slate-800 whitespace-nowrap">4. 기능경기대회 입상 명단</span>
+                    <span className="font-bold text-slate-800 whitespace-nowrap">3. 기능경기대회 입상 명단</span>
                     <span className="text-[10px] text-slate-400 whitespace-nowrap">학년, 전국대회(5점)·지방대회(2점) (.xlsx)</span>
                   </div>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleDownloadTemplate('field')} className="cursor-pointer gap-2.5 py-2 px-3 rounded-lg">
                   <Briefcase className="h-4 w-4 text-rose-600 shrink-0" />
                   <div className="flex flex-col text-left">
-                    <span className="font-bold text-slate-800 whitespace-nowrap">5. 현장실습·도제·취업 명단</span>
-                    <span className="text-[10px] text-slate-400 whitespace-nowrap">학년, 현장실습(5점)·도제OJT·조기취업 (.xlsx)</span>
+                    <span className="font-bold text-slate-800 whitespace-nowrap">4. 도제학교 OJT 및 현장실습 명단</span>
+                    <span className="text-[10px] text-slate-400 whitespace-nowrap">도제 OJT 학기별 이수 및 현장실습 (.xlsx)</span>
                   </div>
                 </DropdownMenuItem>
+
+                <DropdownMenuSeparator className="my-1" />
+
+                <div className="p-2.5 bg-indigo-50/80 rounded-lg text-[11px] text-indigo-950 leading-snug space-y-1">
+                  <p className="font-bold flex items-center gap-1.5 text-indigo-700">
+                    <Sparkles className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                    <span>진로코스 및 현장실습 자동 연동 안내</span>
+                  </p>
+                  <p className="text-[10.5px] text-slate-600 leading-normal">
+                    • <strong>취업맞춤반·중견기업반 등</strong>: 메인 종합 평가 화면의 <strong className="text-indigo-700">[취업진로코스 일괄 반영]</strong> 버튼을 통해 원클릭 자동 동기화됩니다.<br />
+                    • <strong>현장실습 이수자</strong>: 학생 관리 DB에서 실습 완료 시 5점이 자동 부여됩니다.
+                  </p>
+                </div>
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -711,19 +718,6 @@ export function EmploymentImportCard({
                   <Button
                     type="button"
                     size="sm"
-                    variant={activeCategoryTab === 'course' ? 'default' : 'outline'}
-                    onClick={() => setActiveCategoryTab('course')}
-                    className={cn(
-                      "h-7 text-xs font-bold rounded-xl px-2.5 gap-1.5 shadow-2xs transition-all",
-                      activeCategoryTab === 'course' ? "bg-indigo-600 text-white" : "bg-white text-indigo-700 hover:bg-indigo-50 border-indigo-200"
-                    )}
-                  >
-                    <GraduationCap className="h-3.5 w-3.5" />
-                    <span>2. 취업진로코스 ({uploadedRows.filter(r => r.careerCourseSemesters > 0).length}명)</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
                     variant={activeCategoryTab === 'club' ? 'default' : 'outline'}
                     onClick={() => setActiveCategoryTab('club')}
                     className={cn(
@@ -732,7 +726,7 @@ export function EmploymentImportCard({
                     )}
                   >
                     <Layers className="h-3.5 w-3.5" />
-                    <span>3. 전공심화동아리 ({uploadedRows.filter(r => r.majorClubYears > 0).length}명)</span>
+                    <span>2. 전공심화동아리 ({uploadedRows.filter(r => r.majorClubYears > 0).length}명)</span>
                   </Button>
                   <Button
                     type="button"
@@ -745,7 +739,7 @@ export function EmploymentImportCard({
                     )}
                   >
                     <Award className="h-3.5 w-3.5" />
-                    <span>4. 기능경기대회 ({uploadedRows.filter(r => r.skillsContest && r.skillsContest.level !== 'none').length}명)</span>
+                    <span>3. 기능경기대회 ({uploadedRows.filter(r => r.skillsContest && r.skillsContest.level !== 'none').length}명)</span>
                   </Button>
                   <Button
                     type="button"
@@ -758,8 +752,23 @@ export function EmploymentImportCard({
                     )}
                   >
                     <Briefcase className="h-3.5 w-3.5" />
-                    <span>5. 현장실습·도제·취업 ({uploadedRows.filter(r => r.fieldParticipationScore > 0).length}명)</span>
+                    <span>4. 도제·현장실습 ({uploadedRows.filter(r => r.fieldParticipationScore > 0).length}명)</span>
                   </Button>
+                  {uploadedRows.some(r => r.careerCourseSemesters > 0) && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={activeCategoryTab === 'course' ? 'default' : 'outline'}
+                      onClick={() => setActiveCategoryTab('course')}
+                      className={cn(
+                        "h-7 text-xs font-bold rounded-xl px-2.5 gap-1.5 shadow-2xs transition-all",
+                        activeCategoryTab === 'course' ? "bg-indigo-600 text-white" : "bg-white text-indigo-700 hover:bg-indigo-50 border-indigo-200"
+                      )}
+                    >
+                      <GraduationCap className="h-3.5 w-3.5" />
+                      <span>취업진로코스 ({uploadedRows.filter(r => r.careerCourseSemesters > 0).length}명)</span>
+                    </Button>
+                  )}
                 </div>
                 <div className="text-[11px] text-slate-500 font-semibold shrink-0">
                   표시 중: <strong className="text-slate-900">{filteredRows.length}명</strong>
