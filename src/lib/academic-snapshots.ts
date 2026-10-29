@@ -4,6 +4,7 @@ import { unstable_cache, revalidateTag, revalidatePath } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/server';
 import { getFilteredStudentData, getCurrentUserProfile } from '@/lib/data';
 import { logAuditAction } from './audit-logger';
+import ExcelJS from 'exceljs';
 
 export interface AcademicSnapshotItem {
   id: string;
@@ -462,5 +463,239 @@ export async function restoreAcademicSnapshot(snapshotId: string) {
   } catch (error: any) {
     console.error('Error restoring academic snapshot:', error);
     return { error: error.message || '스냅샷 복원 중 오류가 발생했습니다.' };
+  }
+}
+
+/**
+ * 전교생 스냅샷 데이터를 4개 시트의 고품질 엑셀 워크북 버퍼로 생성
+ */
+export async function generateSnapshotExcelBuffer(
+  studentsData: any[],
+  baseYear: number
+): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'CareerSync';
+  wb.created = new Date();
+
+  const applyHeaderStyle = (row: ExcelJS.Row, bgArgb: string) => {
+    row.font = { name: '맑은 고딕', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+    row.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: bgArgb }
+    };
+    row.alignment = { vertical: 'middle', horizontal: 'center' };
+    row.height = 26;
+  };
+
+  const applyDataStyle = (row: ExcelJS.Row) => {
+    row.font = { name: '맑은 고딕', size: 9 };
+    row.alignment = { vertical: 'middle', horizontal: 'center' };
+    row.height = 22;
+  };
+
+  // 1. 기본학적명부 시트
+  const ws1 = wb.addWorksheet('1.기본학적명부');
+  ws1.views = [{ showGridLines: true }];
+  const header1 = ws1.addRow(['학년', '학과', '반', '번호', '성명', '졸업연도', '휴대전화', '출신중학교', '입학성적(석차백분율)', '전형구분']);
+  applyHeaderStyle(header1, 'FF1E3A8A'); // Navy
+
+  // 2. 취업진로종합 시트
+  const ws2 = wb.addWorksheet('2.취업진로종합');
+  ws2.views = [{ showGridLines: true }];
+  const header2 = ws2.addRow([
+    '학년', '학과', '반', '번호', '성명',
+    '진로희망', '취업희망여부', '취업상태', '취업희망코스', '취업처(기업명)',
+    '기업유형', '업종/직종', '병역희망', '희망지역', '학부모의견',
+    '신발사이즈', '상의사이즈', '비고'
+  ]);
+  applyHeaderStyle(header2, 'FF3730A3'); // Indigo
+
+  // 3. 교과성적 시트
+  const ws3 = wb.addWorksheet('3.교과성적');
+  ws3.views = [{ showGridLines: true }];
+  const header3 = ws3.addRow([
+    '학년', '학과', '반', '번호', '성명',
+    '학기', '과목명', '교과군', '단위수', '원점수', '과목평균', '표준편차', '성취도', '석차_수강자수'
+  ]);
+  applyHeaderStyle(header3, 'FF065F46'); // Emerald
+
+  // 4. 출결상황 시트
+  const ws4 = wb.addWorksheet('4.출결상황');
+  ws4.views = [{ showGridLines: true }];
+  const header4 = ws4.addRow([
+    '학년', '학과', '반', '번호', '성명',
+    '수업일수', '결석(질병)', '결석(무단)', '결석(기타)',
+    '지각(질병)', '지각(무단)', '지각(기타)',
+    '조퇴(질병)', '조퇴(무단)', '조퇴(기타)',
+    '결과(질병)', '결과(무단)', '결과(기타)', '특기사항'
+  ]);
+  applyHeaderStyle(header4, 'FF92400E'); // Amber
+
+  for (const s of studentsData) {
+    const calcGrade = s.graduation_year ? Math.max(1, Math.min(3, baseYear + 4 - s.graduation_year)) : '';
+    const emp = s.student_employments_backup || {};
+
+    // 1. 기본학적
+    const r1 = ws1.addRow([
+      calcGrade ? `${calcGrade}학년` : '',
+      s.major || '',
+      s.class_info || '',
+      s.student_number || '',
+      s.student_name || '',
+      s.graduation_year || '',
+      s.phone_number || '',
+      s.middle_school || '',
+      s.admission_rank_percentile || '',
+      s.admission_type || ''
+    ]);
+    applyDataStyle(r1);
+
+    // 2. 취업진로
+    const r2 = ws2.addRow([
+      calcGrade ? `${calcGrade}학년` : '',
+      s.major || '',
+      s.class_info || '',
+      s.student_number || '',
+      s.student_name || '',
+      emp.career_aspiration || s.career_aspiration || '',
+      emp.is_desiring_employment ?? s.is_desiring_employment ?? '',
+      emp.employment_status || s.employment_status || '',
+      emp.career_course || s.career_course || '',
+      emp.company || s.company || '',
+      emp.company_type || s.company_type || '',
+      emp.business_type || s.business_type || '',
+      emp.military_status || s.military_status || '',
+      emp.desired_work_area || s.desired_work_area || '',
+      emp.parents_opinion || s.parents_opinion || '',
+      emp.shoe_size || s.shoe_size || '',
+      emp.top_size || s.top_size || '',
+      emp.remarks || s.remarks || ''
+    ]);
+    applyDataStyle(r2);
+
+    // 3. 교과성적
+    const scores = Array.isArray(s.student_scores_backup) ? s.student_scores_backup : [];
+    for (const sc of scores) {
+      const r3 = ws3.addRow([
+        calcGrade ? `${calcGrade}학년` : '',
+        s.major || '',
+        s.class_info || '',
+        s.student_number || '',
+        s.student_name || '',
+        sc.semester || '',
+        sc.subject_name || '',
+        sc.subject_group || '',
+        sc.unit_count ?? '',
+        sc.raw_score ?? '',
+        sc.subject_average ?? '',
+        sc.standard_deviation ?? '',
+        sc.achievement_level || '',
+        sc.rank_and_total || ''
+      ]);
+      applyDataStyle(r3);
+    }
+
+    // 4. 출결
+    const attendance = Array.isArray(s.student_attendance_backup) ? s.student_attendance_backup : [];
+    for (const at of attendance) {
+      const r4 = ws4.addRow([
+        at.grade ? `${at.grade}학년` : (calcGrade ? `${calcGrade}학년` : ''),
+        s.major || '',
+        s.class_info || '',
+        s.student_number || '',
+        s.student_name || '',
+        at.school_days ?? '',
+        at.absent_disease ?? 0,
+        at.absent_unexcused ?? 0,
+        at.absent_etc ?? 0,
+        at.late_disease ?? 0,
+        at.late_unexcused ?? 0,
+        at.late_etc ?? 0,
+        at.early_disease ?? 0,
+        at.early_unexcused ?? 0,
+        at.early_etc ?? 0,
+        at.result_disease ?? 0,
+        at.result_unexcused ?? 0,
+        at.result_etc ?? 0,
+        at.remarks || ''
+      ]);
+      applyDataStyle(r4);
+    }
+  }
+
+  // 컬럼 너비 자동 설정
+  [ws1, ws2, ws3, ws4].forEach(ws => {
+    ws.columns?.forEach(col => {
+      let maxLen = 10;
+      if (col && typeof col.eachCell === 'function') {
+        col.eachCell({ includeEmpty: true }, (cell: any) => {
+          const val = cell.value ? String(cell.value) : '';
+          maxLen = Math.max(maxLen, Math.min(30, val.length * 1.5));
+        });
+      }
+      col.width = Math.max(maxLen, 12);
+    });
+  });
+
+  const buffer = await wb.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+/**
+ * 특정 저장된 스냅샷의 엑셀 Base64 파일 생성
+ */
+export async function exportSnapshotToExcel(snapshotId: string) {
+  try {
+    const detail = await getSnapshotDetails(snapshotId);
+    if (!detail || !detail.snapshot_data || detail.snapshot_data.length === 0) {
+      return { error: '스냅샷 데이터를 찾을 수 없습니다.' };
+    }
+
+    const buffer = await generateSnapshotExcelBuffer(detail.snapshot_data, detail.base_year);
+    const filename = `(${detail.base_year}학년도)_학적_및_취업이력_최종마감백업.xlsx`;
+
+    return {
+      success: true,
+      filename,
+      base64: buffer.toString('base64'),
+    };
+  } catch (error: any) {
+    console.error('Error exporting snapshot to excel:', error);
+    return { error: error.message || '엑셀 변환 실패' };
+  }
+}
+
+/**
+ * 현재 활성화된 기준학사년도의 전교생 실시간 데이터를 즉시 엑셀로 추출
+ */
+export async function exportCurrentYearToExcel(baseYear: number) {
+  try {
+    const gradYear3 = (baseYear + 1).toString();
+    const gradYear2 = (baseYear + 2).toString();
+    const gradYear1 = (baseYear + 3).toString();
+
+    const [dataGrade3, dataGrade2, dataGrade1] = await Promise.all([
+      getFullStudentSnapshotDataForGrade(gradYear3, baseYear),
+      getFullStudentSnapshotDataForGrade(gradYear2, baseYear),
+      getFullStudentSnapshotDataForGrade(gradYear1, baseYear),
+    ]);
+
+    const allData = [...dataGrade3, ...dataGrade2, ...dataGrade1];
+    if (allData.length === 0) {
+      return { error: '해당 학년도 재학생 데이터를 찾을 수 없습니다.' };
+    }
+
+    const buffer = await generateSnapshotExcelBuffer(allData, baseYear);
+    const filename = `(${baseYear}학년도)_전교생_학적_취업_성적_출결_통합백업.xlsx`;
+
+    return {
+      success: true,
+      filename,
+      base64: buffer.toString('base64'),
+    };
+  } catch (error: any) {
+    console.error('Error exporting current year to excel:', error);
+    return { error: error.message || '실시간 엑셀 추출 실패' };
   }
 }

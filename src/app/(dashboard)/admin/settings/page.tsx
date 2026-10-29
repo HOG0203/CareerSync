@@ -3,6 +3,8 @@ import {
   getCachedMasterCertificates,
   getCachedCertificationConfig,
   getCachedMeritDemeritRules,
+  getAcademicSnapshotsAction,
+  getGradeStudentCounts,
 } from './actions';
 import { AdminSettingsClient } from './settings-client';
 import { getCurrentUserProfile } from '@/lib/data';
@@ -43,12 +45,15 @@ export default async function AdminSettingsPage() {
   }
 
   // 서버 캐시 1-Shot 동시 병렬 패칭 (0.01초 소요)
-  const [settings, certs, certConfig, meritRules] = await Promise.all([
+  const [settings, certs, certConfig, meritRules, snapshots] = await Promise.all([
     getSystemSettings(),
     getCachedMasterCertificates(),
     getCachedCertificationConfig(),
     getCachedMeritDemeritRules(),
+    getAcademicSnapshotsAction(),
   ]);
+
+  const gradeCounts = await getGradeStudentCounts(settings.baseYear);
 
   return (
     <AdminSettingsClient
@@ -56,6 +61,8 @@ export default async function AdminSettingsPage() {
       initialCerts={certs}
       initialCertConfig={certConfig}
       initialMeritRules={meritRules}
+      initialSnapshots={snapshots || []}
+      initialGradeCounts={gradeCounts}
     />
   );
 }

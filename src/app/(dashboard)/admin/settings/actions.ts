@@ -435,3 +435,88 @@ export async function updateMeritDemeritRules(rules: MeritDemeritRule[]) {
     return { error: error.message };
   }
 }
+/**
+ * 기준학사년도에 따른 1, 2, 3학년 재학생 인원수 실시간 계산
+ */
+export async function getGradeStudentCounts(baseYear: number) {
+  const supabase = createAdminClient();
+  const gradYear3 = baseYear + 1;
+  const gradYear2 = baseYear + 2;
+  const gradYear1 = baseYear + 3;
+
+  try {
+    const { data, error } = await supabase
+      .from('students')
+      .select('graduation_year')
+      .in('graduation_year', [gradYear1, gradYear2, gradYear3]);
+
+    if (error || !data) {
+      return { grade1: 0, grade2: 0, grade3: 0, total: 0 };
+    }
+
+    let grade1 = 0;
+    let grade2 = 0;
+    let grade3 = 0;
+
+    data.forEach((s) => {
+      if (s.graduation_year === gradYear1) grade1++;
+      else if (s.graduation_year === gradYear2) grade2++;
+      else if (s.graduation_year === gradYear3) grade3++;
+    });
+
+    return { grade1, grade2, grade3, total: grade1 + grade2 + grade3 };
+  } catch (e) {
+    return { grade1: 0, grade2: 0, grade3: 0, total: 0 };
+  }
+}
+
+/**
+ * 학사학년도 마감 스냅샷 백업 생성 Server Action
+ */
+export async function createAcademicSnapshotAction(baseYear: number, snapshotName?: string) {
+  if (!(await checkIsAdmin())) return { error: '관리자 권한이 필요합니다.' };
+  const { createAcademicHistorySnapshot } = await import('@/lib/academic-snapshots');
+  return createAcademicHistorySnapshot({ baseYear, snapshotName });
+}
+
+/**
+ * 저장된 학사 스냅샷 목록 조회 Server Action
+ */
+export async function getAcademicSnapshotsAction() {
+  const { getCachedAcademicSnapshots } = await import('@/lib/academic-snapshots');
+  return getCachedAcademicSnapshots();
+}
+
+/**
+ * 특정 스냅샷 삭제 Server Action
+ */
+export async function deleteAcademicSnapshotAction(snapshotId: string) {
+  if (!(await checkIsAdmin())) return { error: '관리자 권한이 필요합니다.' };
+  const { deleteAcademicSnapshot } = await import('@/lib/academic-snapshots');
+  return deleteAcademicSnapshot(snapshotId);
+}
+
+/**
+ * 특정 스냅샷 복원 Server Action
+ */
+export async function restoreAcademicSnapshotAction(snapshotId: string) {
+  if (!(await checkIsAdmin())) return { error: '관리자 권한이 필요합니다.' };
+  const { restoreAcademicSnapshot } = await import('@/lib/academic-snapshots');
+  return restoreAcademicSnapshot(snapshotId);
+}
+
+/**
+ * 특정 스냅샷 엑셀 다운로드 Server Action
+ */
+export async function downloadSnapshotExcelAction(snapshotId: string) {
+  const { exportSnapshotToExcel } = await import('@/lib/academic-snapshots');
+  return exportSnapshotToExcel(snapshotId);
+}
+
+/**
+ * 현재 활성화된 기준학사년도 전교생 실시간 백업 엑셀 다운로드 Server Action
+ */
+export async function downloadCurrentYearExcelAction(baseYear: number) {
+  const { exportCurrentYearToExcel } = await import('@/lib/academic-snapshots');
+  return exportCurrentYearToExcel(baseYear);
+}
