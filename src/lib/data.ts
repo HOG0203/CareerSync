@@ -888,20 +888,30 @@ export async function getYearlyRankingsSummary(graduationYear: number, baseYear:
   const students = studentsResult.data;
   const studentIds = students.map(s => s.id);
 
-  // 2. [최적화 청크 분할] 과도한 병렬 쿼리로 인한 DB 디스크 I/O 고갈 방지 (기존 40개 병렬 -> 8개 이하로 통합)
-  const SCORE_CHUNK_SIZE = 60;
+  // 2. [안전한 청크 & 동시성 제어 배치] PostgREST 1000행 한도 초과 방지(15명 단위) 및 최대 동시 쿼리 수 4개 제한
+  const SCORE_CHUNK_SIZE = 15;
   const scoreChunks: string[][] = [];
   for (let i = 0; i < studentIds.length; i += SCORE_CHUNK_SIZE) {
     scoreChunks.push(studentIds.slice(i, i + SCORE_CHUNK_SIZE));
   }
 
-  const ATTENDANCE_CHUNK_SIZE = 100;
+  const ATTENDANCE_CHUNK_SIZE = 50;
   const attendanceChunks: string[][] = [];
   for (let i = 0; i < studentIds.length; i += ATTENDANCE_CHUNK_SIZE) {
     attendanceChunks.push(studentIds.slice(i, i + ATTENDANCE_CHUNK_SIZE));
   }
 
-  const scorePromises = scoreChunks.map(chunk =>
+  async function runConcurrentBatches<T>(tasks: (() => Promise<T>)[], concurrency = 4): Promise<T[]> {
+    const results: T[] = [];
+    for (let i = 0; i < tasks.length; i += concurrency) {
+      const batch = tasks.slice(i, i + concurrency);
+      const batchResults = await Promise.all(batch.map(fn => fn()));
+      results.push(...batchResults);
+    }
+    return results;
+  }
+
+  const scoreTasks = scoreChunks.map(chunk => async () =>
     supabase
       .from('student_scores')
       .select('student_id, credits, achievement')
@@ -909,7 +919,7 @@ export async function getYearlyRankingsSummary(graduationYear: number, baseYear:
       .range(0, 5000)
   );
 
-  const attendancePromises = attendanceChunks.map(chunk =>
+  const attendanceTasks = attendanceChunks.map(chunk => async () =>
     supabase
       .from('student_attendance')
       .select('student_id, grade, semester, school_days, remarks, absent_unexcused, late_unexcused, early_unexcused, out_unexcused, absent_disease, late_disease, early_disease, out_disease, absent_other, late_other, early_other, out_other')
@@ -918,8 +928,8 @@ export async function getYearlyRankingsSummary(graduationYear: number, baseYear:
   );
 
   const [scoreResults, attendanceResults] = await Promise.all([
-    Promise.all(scorePromises),
-    Promise.all(attendancePromises)
+    runConcurrentBatches(scoreTasks, 4),
+    runConcurrentBatches(attendanceTasks, 4)
   ]);
 
   const allScores: any[] = [];
