@@ -8,7 +8,8 @@ import {
   Loader2,
   Edit2,
   Download,
-  RotateCw
+  RotateCw,
+  Settings
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
@@ -32,6 +33,7 @@ import {
   clearCertificateSummariesCache
 } from './actions';
 import { CertificateImportModal } from './certificate-import-modal';
+import { MasterCertificatesModal } from './master-certificates-modal';
 import { CertificatePicker } from '@/components/dashboard/standard-spreadsheet-table/certificate-picker';
 
 import { CertificationDataSkeleton } from '@/components/dashboard/loading-skeleton';
@@ -53,6 +55,7 @@ export function CertificateSummaryClient({
   const searchParams = useSearchParams();
 
   // 학년별 인메모리 캐싱 (0ms 즉시 탭 전환)
+  const [isMasterModalOpen, setIsMasterModalOpen] = React.useState(false);
   const [activeGrade, setActiveGrade] = React.useState<number>(currentGrade);
   const [gradeDataMap, setGradeDataMap] = React.useState<Record<number, StudentCertificateSummary[]>>({
     [currentGrade]: initialSummaries,

@@ -1,8 +1,5 @@
 import {
   getSystemSettings,
-  getCachedMasterCertificates,
-  getCachedCertificationConfig,
-  getCachedMeritDemeritRules,
   getAcademicSnapshotsAction,
   getGradeStudentCounts,
 } from './actions';
@@ -16,7 +13,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * 시스템 설정 메인 페이지 (서버 컴포넌트 - 1회 동시 병렬 패칭)
+ * 학사학년도 및 안전 백업 센터 메인 페이지 (서버 컴포넌트)
  */
 export default async function AdminSettingsPage() {
   const [userProfile, masterInfo, customPermMap, subAdminList] = await Promise.all([
@@ -44,12 +41,9 @@ export default async function AdminSettingsPage() {
     redirect('/dashboard');
   }
 
-  // 서버 캐시 1-Shot 동시 병렬 패칭 (0.01초 소요)
-  const [settings, certs, certConfig, meritRules, snapshots] = await Promise.all([
+  // 서버 캐시 동시 패칭
+  const [settings, snapshots] = await Promise.all([
     getSystemSettings(),
-    getCachedMasterCertificates(),
-    getCachedCertificationConfig(),
-    getCachedMeritDemeritRules(),
     getAcademicSnapshotsAction(),
   ]);
 
@@ -58,9 +52,6 @@ export default async function AdminSettingsPage() {
   return (
     <AdminSettingsClient
       initialBaseYear={settings.baseYear}
-      initialCerts={certs}
-      initialCertConfig={certConfig}
-      initialMeritRules={meritRules}
       initialSnapshots={snapshots || []}
       initialGradeCounts={gradeCounts}
     />

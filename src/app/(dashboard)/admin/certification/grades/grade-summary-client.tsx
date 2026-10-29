@@ -8,7 +8,8 @@ import {
   ChevronRight,
   Download,
   Loader2,
-  RotateCw
+  RotateCw,
+  Settings
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
@@ -25,6 +26,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { GradeImportModal } from './grade-import-modal';
+import { AchievementWeightsModal } from './achievement-weights-modal';
 
 interface StudentSummary {
   id: string;
@@ -64,6 +66,7 @@ export function GradeSummaryClient({
   const searchParams = useSearchParams();
 
   // 학년별 인메모리 캐싱 (0ms 즉각 탭 전환)
+  const [isWeightsModalOpen, setIsWeightsModalOpen] = React.useState(false);
   const [activeGrade, setActiveGrade] = React.useState<number>(currentGrade);
   const [gradeDataMap, setGradeDataMap] = React.useState<Record<number, StudentSummary[]>>({
     [currentGrade]: initialSummaries,
@@ -243,11 +246,22 @@ export function GradeSummaryClient({
             성적 관리 및 석차 조회
           </h2>
         </div>
-        {(isAdmin || userProfile?.role === 'teacher') && (
-          <div className="shrink-0 ml-2">
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-2">
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsWeightsModalOpen(true)}
+              className="border-indigo-200 text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 font-bold gap-1.5 h-8 sm:h-9 text-xs shadow-2xs px-2.5 sm:px-3 whitespace-nowrap"
+            >
+              <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-600 shrink-0" />
+              <span>성취도 배점 설정</span>
+            </Button>
+          )}
+          {(isAdmin || userProfile?.role === 'teacher') && (
             <GradeImportModal onSuccess={() => refreshAllGrades(activeGrade)} />
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* 필터 바 */}

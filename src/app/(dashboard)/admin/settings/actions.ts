@@ -127,6 +127,7 @@ export async function updateCertificationConfig(config: CertificationConfig) {
     if (error) throw error;
     revalidateTag('cert-grades');
     revalidatePath('/admin/settings');
+    revalidatePath('/admin/certification/certificates');;
     revalidatePath('/admin/certification/grades');
     return { success: true };
 
