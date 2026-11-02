@@ -2791,6 +2791,26 @@ export async function bulkAwardItemsAction(params: {
     revalidatePath('/admin/certification');
     revalidatePath('/student/certification');
 
+    // 감사 로그 기록 (STUDENT_BULK_UPDATE)
+    try {
+      const typeLabel = params.rewardType === 'prize' ? '상품' : '인증상';
+      await logAuditAction({
+        actor_name: profile.full_name || profile.username || '교사',
+        action_type: 'STUDENT_BULK_UPDATE',
+        target_name: `[인증제 ${typeLabel} 일괄 확정] ${params.gradeNum ? `${params.gradeNum}학년 ` : ''}(${payloadsToInsert.length}명 확정)`,
+        details: {
+          rewardType: params.rewardType,
+          academicYear: params.academicYear,
+          semester: params.semester,
+          gradeNum: params.gradeNum,
+          confirmedCount: payloadsToInsert.length,
+          skippedCount
+        }
+      });
+    } catch (auditErr) {
+      console.error('Failed to log audit for bulkAwardItemsAction:', auditErr);
+    }
+
     return {
       success: true,
       count: payloadsToInsert.length,
@@ -2841,6 +2861,18 @@ export async function cancelRewardAction(params: {
     }
     revalidatePath('/admin/certification');
     revalidatePath('/student/certification');
+
+    // 감사 로그 기록 (STUDENT_UPDATE)
+    try {
+      await logAuditAction({
+        actor_name: profile.full_name || profile.username || '교사',
+        action_type: 'STUDENT_UPDATE',
+        target_name: `[인증제 포상 수령 취소] 포상ID: ${params.rewardId}`,
+        details: { rewardId: params.rewardId, gradeNum: params.gradeNum }
+      });
+    } catch (auditErr) {
+      console.error('Failed to log audit for cancelRewardAction:', auditErr);
+    }
 
     return { success: true };
   } catch (err: any) {
@@ -3278,6 +3310,22 @@ export async function batchImportPastRewardsAction(params: {
     revalidatePath('/admin/certification');
     revalidatePath('/student/certification');
 
+    // 감사 로그 기록 (STUDENT_BULK_UPDATE)
+    try {
+      await logAuditAction({
+        actor_name: profile.full_name || profile.username || '관리자',
+        action_type: 'STUDENT_BULK_UPDATE',
+        target_name: `[인증제 과거 소급 일괄 등록] ${params.academicYear}학년도 (${payloadsToInsert.length}건 반영)`,
+        details: {
+          academicYear: params.academicYear,
+          gradeNum: params.gradeNum,
+          count: payloadsToInsert.length
+        }
+      });
+    } catch (auditErr) {
+      console.error('Failed to log audit for batchImportPastRewardsAction:', auditErr);
+    }
+
     return {
       success: true,
       count: payloadsToInsert.length,
@@ -3561,6 +3609,24 @@ export async function bulkSyncCareerCoursesAction(params: {
     await clearCertificationSummaryCache(params.gradeNum);
     revalidatePath('/admin/certification');
     revalidatePath('/student/certification');
+
+    // 감사 로그 기록 (STUDENT_BULK_UPDATE)
+    try {
+      await logAuditAction({
+        actor_name: profile.full_name || profile.username || '관리자',
+        action_type: 'STUDENT_BULK_UPDATE',
+        target_name: `[취업진로코스 일괄 배정] ${params.gradeNum}학년 ${targetTerm}학기 (${processedCount}명 반영)`,
+        details: {
+          gradeNum: params.gradeNum,
+          academicYear: params.academicYear,
+          targetTerm,
+          processedCount,
+          skippedCount
+        }
+      });
+    } catch (auditErr) {
+      console.error('Failed to log audit for bulkSyncCareerCoursesAction:', auditErr);
+    }
 
     return {
       success: true,

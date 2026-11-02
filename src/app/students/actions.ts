@@ -523,7 +523,26 @@ export async function uploadStudentsCSV(csvData: string) {
   revalidateTag('student-accounts');
   revalidatePath('/students');
   revalidatePath('/admin/students');
-  return { success: true, count: successCount }
+
+  // 감사 로그 기록 (STUDENT_BULK_UPDATE)
+  try {
+    const { logAuditAction } = await import('@/lib/audit-logger');
+    const profile = await getCurrentUserProfile();
+    await logAuditAction({
+      actor_name: profile?.full_name || profile?.username || '관리자',
+      action_type: 'STUDENT_BULK_UPDATE',
+      target_name: `[취업데이터 명부 일괄 등록] CSV 일괄 업로드 (${successCount}명 반영)`,
+      details: {
+        gradYears,
+        successCount,
+        totalRows: dataRows.length
+      }
+    });
+  } catch (auditErr) {
+    console.error('Failed to log audit for uploadStudentsCSV:', auditErr);
+  }
+
+  return { success: true, count: successCount };
 }
 
 /**
@@ -724,6 +743,25 @@ export async function uploadBasicStudentsCSV(csvData: string) {
   revalidateTag('student-accounts');
   revalidatePath('/admin/students');
   revalidatePath('/students');
+
+  // 감사 로그 기록 (STUDENT_BULK_UPDATE)
+  try {
+    const { logAuditAction } = await import('@/lib/audit-logger');
+    const profile = await getCurrentUserProfile();
+    await logAuditAction({
+      actor_name: profile?.full_name || profile?.username || '관리자',
+      action_type: 'STUDENT_BULK_UPDATE',
+      target_name: `[학생 기본 명부 일괄 등록] CSV 일괄 업로드 (${successCount}명 반영)`,
+      details: {
+        gradYears,
+        successCount,
+        totalRows: dataRows.length
+      }
+    });
+  } catch (auditErr) {
+    console.error('Failed to log audit for uploadBasicStudentsCSV:', auditErr);
+  }
+
   return { success: true, count: successCount };
 }
 

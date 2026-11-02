@@ -287,6 +287,19 @@ export async function deleteAllStudentScores() {
     revalidatePath('/admin/certification/grades');
     revalidatePath('/employment-status');
     revalidatePath('/class-management');
+
+    // 감사 로그 기록 (STUDENT_BULK_UPDATE)
+    try {
+      const { logAuditAction } = await import('@/lib/audit-logger');
+      await logAuditAction({
+        action_type: 'STUDENT_BULK_UPDATE',
+        target_name: '[성적 전체 초기화] 전교생 성적 데이터 일괄 삭제',
+        details: { action: 'deleteAllStudentScores' }
+      });
+    } catch (auditErr) {
+      console.error('Failed to log audit for deleteAllStudentScores:', auditErr);
+    }
+
     return { success: true };
   } catch (error: any) {
     return { error: error.message };

@@ -118,6 +118,25 @@ export async function updateStudentCertificates(studentId: string, certificates:
   revalidatePath('/admin/certification/certificates');
   revalidatePath('/employment-status');
   revalidatePath('/students');
+
+  // 감사 로그 기록 (STUDENT_UPDATE)
+  try {
+    const { logAuditAction } = await import('@/lib/audit-logger');
+    const { data: st } = await supabase.from('students').select('student_name, student_number, class_info').eq('id', studentId).single();
+    await logAuditAction({
+      action_type: 'STUDENT_UPDATE',
+      target_name: `[자격증 수정] ${st?.student_name || '학생'} (${st?.class_info || ''} ${st?.student_number || ''}번)`,
+      details: {
+        student_id: studentId,
+        student_name: st?.student_name,
+        certificates_count: certificates.length,
+        certificates
+      }
+    });
+  } catch (auditErr) {
+    console.error('Failed to log audit for updateStudentCertificates:', auditErr);
+  }
+
   return { success: true };
 }
 
