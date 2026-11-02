@@ -533,11 +533,9 @@ export function InteractiveTeacherTimetable({
 
                   // 🌟 화면상 그리드 셀 고유 키 (요일 교체 여부와 무관하게 현재 컬럼 요일_교시)
                   const cellKey = `${d.key}_${period}`;
-                  // 🌟 선택 여부 판별: 그리드 셀 키(cellKey), 날짜+교시, 또는 슬롯 키(slotKey) 일치 여부 완벽 검사 (요일 교체된 수업 체크표시 정상화)
+                  // 🌟 선택 여부 판별: 날짜+교시 정확 일치 검사 (대체 요일 운영 시 slotKey 공유로 인한 서로 다른 날짜 간 동시 선택 오류 원천 차단)
                   const isSelected = selectedSlots.some(s => 
-                    s.key === cellKey || 
-                    (s.date && dayDate && s.date === dayDate && s.period === period) || 
-                    s.key === slotKey
+                    (s.date && dayDate) ? (s.date === dayDate && s.period === period) : (s.key === cellKey)
                   );
 
                   // 지필평가/시험 기간 슬롯 검사
@@ -902,56 +900,21 @@ export function InteractiveTeacherTimetable({
                     );
                   }
 
-                  // 3) 교사는 인솔자가 아니나, 해당 학급 학생들이 행사에 참여하여 수업이 없어진 경우 (클릭하여 결보강/교체 신청 가능)
+                  // 3) 교사는 인솔자가 아니나, 해당 학급 학생들이 행사에 참여하여 수업이 없어진 경우 (공강: 결보강/교체 신청 불가)
                   if (hasClassEvent) {
-                    const classEventSlot: TimetableSlot = {
-                      id: `classevent-${mainClassEvent.id}-${d.key}-${period}`,
-                      teacherName: selectedTeacherName,
-                      homeroomClass: slot?.classCode || selectedTeacher?.homeroomClass || '',
-                      day: d.key,
-                      period,
-                      subjectName: slot?.subjectName || `[행사] ${mainClassEvent.title}`,
-                      classCode: slot?.classCode || '',
-                      deptName: slot?.deptName || '전체',
-                      grade: slot?.grade || 1,
-                      classNum: slot?.classNum || 1,
-                      weight: 1,
-                      isActivity: true,
-                      activityType: '행사공강',
-                    };
-
                     return (
                       <td key={d.key} className="p-1 border-r last:border-r-0 border-slate-200 h-14">
-                        <button
-                          type="button"
-                          onClick={() => handleSlotClick(d.key, period, classEventSlot)}
-                          className={cn(
-                            "w-full h-full min-h-[48px] max-h-[48px] p-1.5 rounded-xl border-[1.5px] transition-all flex flex-col items-center justify-between text-center relative group shadow-2xs cursor-pointer",
-                            isSelected
-                              ? "border-amber-600 bg-amber-600 text-white ring-2 ring-amber-600 ring-offset-2 scale-[1.03] shadow-md z-10"
-                              : "border-dashed border-amber-300 bg-amber-50/70 hover:border-amber-400 hover:bg-amber-100/80"
-                          )}
-                          title={`${slot?.classCode || '학급'} 학생들이 '${mainClassEvent.title}' 행사에 참여함 (클릭하여 결보강/교체 신청 가능)`}
+                        <div
+                          className="w-full h-full min-h-[48px] max-h-[48px] p-1.5 rounded-xl border-[1.5px] border-dashed border-amber-200/90 bg-amber-50/50 flex flex-col items-center justify-between text-center relative group shadow-2xs select-none cursor-not-allowed opacity-90"
+                          title={`${slot?.classCode || '학급'} 학생 '${mainClassEvent.title}' 행사 참여 (공강 - 결보강/교체 신청 불가)`}
                         >
-                          {isSelected && (
-                            <div className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-white text-amber-600 flex items-center justify-center shadow-xs text-xs font-black ring-1 ring-amber-600">
-                              ✓
-                            </div>
-                          )}
-
-                          <span className={cn(
-                            "font-bold text-[10.5px] truncate max-w-full leading-tight",
-                            isSelected ? "text-white line-through decoration-white/70" : "text-slate-600 line-through decoration-slate-400"
-                          )}>
+                          <span className="font-bold text-[10.5px] truncate max-w-full leading-tight text-slate-500 line-through decoration-slate-400">
                             {slot?.subjectName || '수업'} ({slot?.classCode})
                           </span>
-                          <span className={cn(
-                            "text-[8.5px] font-black px-1.5 py-0.2 rounded-full border mt-0.5 shadow-2xs",
-                            isSelected ? "bg-white text-amber-900 border-white" : "bg-amber-100 text-amber-800 border-amber-200"
-                          )}>
+                          <span className="text-[8.5px] font-black px-1.5 py-0.2 rounded-full border border-amber-200 bg-amber-100 text-amber-800 mt-0.5 shadow-2xs">
                             공강 ({mainClassEvent.title})
                           </span>
-                        </button>
+                        </div>
                       </td>
                     );
                   }
