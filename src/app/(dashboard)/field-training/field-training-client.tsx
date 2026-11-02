@@ -998,7 +998,7 @@ export function FieldTrainingClient({
                                 <span className="text-[11px] text-slate-300 italic font-medium">현장실습 미배정</span>
                               </div>
                             ) : (
-                              <div className="relative z-10 p-1.5 flex flex-col justify-center gap-1.5 w-full min-h-[44px]">
+                              <div className="relative z-10 px-1 py-1 w-full h-8.5 sm:h-9">
                                 {records.map((r: any) => {
                                   let startPct = 0;
                                   let endPct = 100;
@@ -1063,7 +1063,7 @@ export function FieldTrainingClient({
                                           <div
                                             onClick={() => handleOpenModal(s)}
                                             className={cn(
-                                              "h-7.5 sm:h-8 rounded-lg shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md relative overflow-hidden group/bar",
+                                              "h-7.5 sm:h-8 rounded-lg shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md absolute top-0.5 bottom-0.5 overflow-hidden group/bar",
                                                effectiveStatus === 'converted'
                                                 ? "border-purple-400/80 p-0 flex items-stretch shadow-sm"
                                                 : effectiveStatus === 'returned'
@@ -1075,7 +1075,7 @@ export function FieldTrainingClient({
                                                 : "bg-emerald-600 border-emerald-500 text-white flex items-center px-2 shadow-sm"
                                             )}
                                             style={{
-                                              marginLeft: `${startPct}%`,
+                                              left: `${startPct}%`,
                                               width: `${barWidthPct}%`
                                             }}
                                           >
@@ -1308,7 +1308,7 @@ export function FieldTrainingClient({
                           {!hasRecords ? (
                             <span className="text-[9.5px] text-slate-300 italic text-center relative z-10">미배정</span>
                           ) : (
-                            <div className="relative z-10 flex flex-col gap-1 w-full">
+                            <div className="relative z-10 w-full h-7">
                               {records.map((r: any) => {
                                 let startPct = 0;
                                 let endPct = 100;
@@ -1348,7 +1348,7 @@ export function FieldTrainingClient({
                                   <div 
                                     key={r.id}
                                     style={{ left: `${startPct}%`, width: `${widthPct}%` }}
-                                    className="relative h-6.5 rounded-lg flex items-stretch text-[10px] font-black text-white shadow-2xs overflow-hidden border border-purple-400"
+                                    className="absolute top-0.5 bottom-0.5 rounded-lg flex items-stretch text-[10px] font-black text-white shadow-2xs overflow-hidden border border-purple-400"
                                   >
                                     <div style={{ width: `${trainingRatio}%` }} className="bg-emerald-600 px-1.5 flex items-center justify-between border-r border-white/80 shrink-0 min-w-0 overflow-hidden">
                                       <span className="truncate">{r.company}</span>
@@ -1365,7 +1365,7 @@ export function FieldTrainingClient({
                                     key={r.id}
                                     style={{ left: `${startPct}%`, width: `${widthPct}%` }}
                                     className={cn(
-                                      "relative h-6.5 rounded-lg flex items-center justify-between px-1.5 text-[10px] font-black text-white shadow-2xs",
+                                      "absolute top-0.5 bottom-0.5 rounded-lg flex items-center justify-between px-1.5 text-[10px] font-black text-white shadow-2xs",
                                       effectiveStatus === 'upcoming' 
                                         ? "bg-sky-500 border border-sky-400"
                                         : isReturned
@@ -1435,207 +1435,214 @@ export function FieldTrainingClient({
                           </Button>
                         </div>
 
-                        {/* 100% 폭 모바일 미니 스트립 막대 (Concept 1) */}
-                        <div className="space-y-2.5 pt-2 border-t border-slate-100">
+                        {/* 100% 폭 모바일 미니 스트립 막대 (Concept 1) - 1차/2차 한 줄 통합 뷰 */}
+                        <div className="space-y-3 pt-2.5 border-t border-slate-100">
                           {!hasRecords ? (
                             <div className="p-3 bg-slate-50 rounded-xl text-center text-xs text-slate-400 italic">
                               등록된 현장실습 이력이 없습니다.
                             </div>
                           ) : (
-                            records.map((r: any) => {
-                              let startPct = 0;
-                              let endPct = 100;
-                              let startDateFormatted = r.start_date || '미정';
-                              let endDateFormatted = r.end_date || '미정';
+                            <div className="space-y-2.5">
+                              {/* 1. 기업 이력 요약 (1차 ➔ 2차 한 줄 뱃지 형태) */}
+                              <div className="flex items-center flex-wrap gap-1.5 text-xs">
+                                {records.map((r: any, rIdx: number) => {
+                                  const effectiveStatus = getEffectiveRecordStatus(r, todayStr);
+                                  return (
+                                    <React.Fragment key={r.id || r.training_order}>
+                                      {rIdx > 0 && <span className="text-slate-400 font-black text-xs shrink-0">➔</span>}
+                                      <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/90 rounded-lg px-2 py-1 shadow-2xs">
+                                        <Badge variant="outline" className="bg-white font-extrabold text-slate-700 text-[10px] px-1 h-4 border-slate-300 shrink-0">
+                                          {r.training_order}차
+                                        </Badge>
+                                        <span className="font-extrabold text-slate-900 text-xs truncate max-w-[130px] sm:max-w-[160px]">
+                                          {r.company || '업체 미지정'}
+                                        </span>
+                                        <Badge className={cn(
+                                          "text-[9.5px] font-extrabold px-1.5 py-0.2 rounded-full shrink-0",
+                                          effectiveStatus === 'upcoming' && "bg-sky-500 text-white",
+                                          effectiveStatus === 'ongoing' && "bg-emerald-600 text-white",
+                                          effectiveStatus === 'completed' && "bg-indigo-600 text-white",
+                                          effectiveStatus === 'converted' && "bg-purple-600 text-white",
+                                          effectiveStatus === 'returned' && "bg-rose-500 text-white",
+                                          effectiveStatus === 'none' && "bg-slate-200 text-slate-700"
+                                        )}>
+                                          {effectiveStatus === 'upcoming' ? '⏳ 예정'
+                                            : effectiveStatus === 'ongoing' ? '🟢 실습중'
+                                            : effectiveStatus === 'completed' ? '✅ 완료'
+                                            : effectiveStatus === 'converted' ? '✨ 전환'
+                                            : effectiveStatus === 'returned' ? '🔄 복교'
+                                            : '미실습'}
+                                        </Badge>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleToggleStipend(r.id, r.stipend_status);
+                                          }}
+                                          title="실습 지원금 지급 여부 토글"
+                                          className={cn(
+                                            "px-1.5 py-0.5 rounded font-extrabold text-[10px] border transition-transform active:scale-95 shrink-0",
+                                            r.stipend_status === 'O' ? "bg-emerald-50 text-emerald-700 border-emerald-300" : "bg-slate-100 text-slate-400 border-slate-200"
+                                          )}
+                                        >
+                                          지원금 {r.stipend_status === 'O' ? 'O' : 'X'}
+                                        </button>
+                                      </div>
+                                    </React.Fragment>
+                                  );
+                                })}
+                              </div>
 
-                              const isConverted = r.hiring_status === '채용전환';
-                              const isReturned = r.hiring_status === '복교';
-
-                              if (r.start_date) {
-                                const sDate = parseISO(r.start_date);
-                                if (isValid(sDate)) {
-                                  startDateFormatted = format(sDate, 'MM.dd');
-                                  if (isBefore(sDate, timelineStart)) startPct = 0;
-                                  else if (isAfter(sDate, timelineEnd)) startPct = 100;
-                                  else startPct = Math.min(100, Math.max(0, (differenceInDays(sDate, timelineStart) / totalDays) * 100));
-                                }
-                              }
-
-                              let convPct = endPct;
-                              let convDateFormatted = '';
-
-                              if (isConverted) {
-                                endPct = 100;
-                                endDateFormatted = '졸업';
-                                if (r.conversion_date) {
-                                  const cDate = parseISO(r.conversion_date);
-                                  if (isValid(cDate)) {
-                                    convDateFormatted = format(cDate, 'MM.dd');
-                                    if (isBefore(cDate, timelineStart)) convPct = 0;
-                                    else if (isAfter(cDate, timelineEnd)) convPct = 100;
-                                    else convPct = Math.min(100, Math.max(0, (differenceInDays(cDate, timelineStart) / totalDays) * 100));
-                                  }
-                                } else if (r.end_date) {
-                                  const eDate = parseISO(r.end_date);
-                                  if (isValid(eDate)) {
-                                    convDateFormatted = format(eDate, 'MM.dd');
-                                    if (isBefore(eDate, timelineStart)) convPct = 0;
-                                    else if (isAfter(eDate, timelineEnd)) convPct = 100;
-                                    else convPct = Math.min(100, Math.max(0, (differenceInDays(eDate, timelineStart) / totalDays) * 100));
-                                  }
-                                }
-                              } else if (r.end_date) {
-                                const eDate = parseISO(r.end_date);
-                                if (isValid(eDate)) {
-                                  endDateFormatted = format(eDate, 'MM.dd');
-                                  if (isBefore(eDate, timelineStart)) endPct = 0;
-                                  else if (isAfter(eDate, timelineEnd)) endPct = 100;
-                                  else endPct = Math.min(100, Math.max(0, (differenceInDays(eDate, timelineStart) / totalDays) * 100));
-                                }
-                              }
-
-                              const barWidthPct = Math.max(8, endPct - startPct);
-                              const trainingRatio = isConverted && barWidthPct > 0 
-                                ? Math.min(90, Math.max(15, ((convPct - startPct) / barWidthPct) * 100)) 
-                                : 100;
-                              const conversionRatio = 100 - trainingRatio;
-                              const effectiveStatus = getEffectiveRecordStatus(r, todayStr);
-
-                              return (
-                                <div key={r.id || r.training_order} className="bg-slate-50/90 border border-slate-200/80 rounded-xl p-2.5 space-y-2">
-                                  {/* 헤더: 차수, 업체명, 상태 뱃지, 지원금 버튼 */}
-                                  <div className="flex items-center justify-between text-xs gap-1">
-                                    <div className="flex items-center gap-1.5 min-w-0">
-                                      <Badge variant="outline" className="bg-white font-extrabold text-slate-800 text-[10px] px-1.5 h-4 border-slate-300 shrink-0">
-                                        {r.training_order}차
-                                      </Badge>
-                                      <span className="font-extrabold text-slate-900 truncate text-xs">{r.company || '업체 미지정'}</span>
+                              {/* 2. 단일 통합 7~2월 타임라인 트랙 (1차/2차 한 줄 나란히 렌더링) */}
+                              <div className="relative h-7.5 bg-slate-200/70 rounded-lg overflow-visible border border-slate-200 shadow-inner">
+                                {/* 월별 배경 세로 트랙 격자선 및 라벨 */}
+                                <div className="absolute inset-0 grid pointer-events-none overflow-hidden rounded-lg" style={{ gridTemplateColumns: `repeat(${timelineMonths.length}, minmax(0, 1fr))` }}>
+                                  {timelineMonths.map((m, mIdx) => (
+                                    <div key={m.key} className={cn("h-full border-r border-slate-300/40 flex items-end justify-center pb-0.5", mIdx === timelineMonths.length - 1 && "border-r-0")}>
+                                      <span className="text-[8px] font-bold text-slate-400 leading-none">{m.month}월</span>
                                     </div>
-                                    <div className="flex items-center gap-1 shrink-0">
-                                      <Badge className={cn(
-                                        "text-[10px] font-extrabold px-1.5 py-0.2 rounded-full",
-                                        effectiveStatus === 'upcoming' && "bg-sky-500 text-white",
-                                        effectiveStatus === 'ongoing' && "bg-emerald-600 text-white",
-                                        effectiveStatus === 'completed' && "bg-indigo-600 text-white",
-                                        effectiveStatus === 'converted' && "bg-purple-600 text-white",
-                                        effectiveStatus === 'returned' && "bg-rose-500 text-white",
-                                        effectiveStatus === 'none' && "bg-slate-200 text-slate-700"
-                                      )}>
-                                        {effectiveStatus === 'upcoming' ? '⏳ 실습예정'
-                                          : effectiveStatus === 'ongoing' ? '🟢 실습중'
-                                          : effectiveStatus === 'completed' ? '✅ 실습완료'
-                                          : effectiveStatus === 'converted' ? '✨ 채용전환'
-                                          : effectiveStatus === 'returned' ? '🔄 복교'
-                                          : '미실습'}
-                                      </Badge>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleToggleStipend(r.id, r.stipend_status)}
-                                        className={cn(
-                                          "px-1.5 py-0.5 rounded font-extrabold text-[10px] border transition-transform active:scale-95",
-                                          r.stipend_status === 'O' ? "bg-emerald-50 text-emerald-700 border-emerald-300" : "bg-slate-100 text-slate-400 border-slate-200"
-                                        )}
-                                      >
-                                        지원금 {r.stipend_status === 'O' ? 'O' : 'X'}
-                                      </button>
+                                  ))}
+                                </div>
+
+                                {/* 오늘 날짜 위치 마커 */}
+                                {todayPositionPercent > 0 && todayPositionPercent < 100 && (
+                                  <div
+                                    className="absolute top-0 bottom-0 z-20 pointer-events-none"
+                                    style={{ left: `${todayPositionPercent}%` }}
+                                  >
+                                    <div className="absolute top-0 bottom-0 w-[1.5px] bg-red-500/80 border-l border-dashed border-red-400" />
+                                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-red-500 text-white text-[8px] font-black px-1 py-0.5 rounded whitespace-nowrap leading-none shadow">
+                                      오늘
                                     </div>
                                   </div>
+                                )}
 
-                                  {/* 100% 폭 모바일 월 트랙 (7월 · 8월 · 9월 · 10월 · 11월 · 12월 · 1월 · 2월) */}
-                                  <div className="relative h-7 bg-slate-200/70 rounded-lg overflow-visible border border-slate-200 shadow-inner">
-                                    {/* 월별 배경 세로 트랙 격자선 및 라벨 */}
-                                    <div className="absolute inset-0 grid pointer-events-none overflow-hidden rounded-lg" style={{ gridTemplateColumns: `repeat(${timelineMonths.length}, minmax(0, 1fr))` }}>
-                                      {timelineMonths.map((m, mIdx) => (
-                                        <div key={m.key} className={cn("h-full border-r border-slate-300/40 flex items-end justify-center pb-0.5", mIdx === timelineMonths.length - 1 && "border-r-0")}>
-                                          <span className="text-[8px] font-bold text-slate-400 leading-none">{m.month}월</span>
-                                        </div>
-                                      ))}
-                                    </div>
+                                {/* 한 줄 트랙 위에 1차와 2차 실습 구간 바 나란히 렌더링 */}
+                                {records.map((r: any) => {
+                                  let startPct = 0;
+                                  let endPct = 100;
+                                  let startDateFormatted = r.start_date || '미정';
+                                  let endDateFormatted = r.end_date || '미정';
 
-                                    {/* 100% 폭 트랙 위에 얹어지는 실습 기간 가로바 */}
-                                    {isConverted ? (
-                                      /* [채용전환 전용 투톤 막대]: 좌측 녹색 + 우측 보라색 */
+                                  const isConverted = r.hiring_status === '채용전환';
+                                  const isReturned = r.hiring_status === '복교';
+
+                                  if (r.start_date) {
+                                    const sDate = parseISO(r.start_date);
+                                    if (isValid(sDate)) {
+                                      startDateFormatted = format(sDate, 'MM.dd');
+                                      if (isBefore(sDate, timelineStart)) startPct = 0;
+                                      else if (isAfter(sDate, timelineEnd)) startPct = 100;
+                                      else startPct = Math.min(100, Math.max(0, (differenceInDays(sDate, timelineStart) / totalDays) * 100));
+                                    }
+                                  }
+
+                                  let convPct = endPct;
+                                  let convDateFormatted = '';
+
+                                  if (isConverted) {
+                                    endPct = 100;
+                                    endDateFormatted = '졸업';
+                                    if (r.conversion_date) {
+                                      const cDate = parseISO(r.conversion_date);
+                                      if (isValid(cDate)) {
+                                        convDateFormatted = format(cDate, 'MM.dd');
+                                        if (isBefore(cDate, timelineStart)) convPct = 0;
+                                        else if (isAfter(cDate, timelineEnd)) convPct = 100;
+                                        else convPct = Math.min(100, Math.max(0, (differenceInDays(cDate, timelineStart) / totalDays) * 100));
+                                      }
+                                    } else if (r.end_date) {
+                                      const eDate = parseISO(r.end_date);
+                                      if (isValid(eDate)) {
+                                        convDateFormatted = format(eDate, 'MM.dd');
+                                        if (isBefore(eDate, timelineStart)) convPct = 0;
+                                        else if (isAfter(eDate, timelineEnd)) convPct = 100;
+                                        else convPct = Math.min(100, Math.max(0, (differenceInDays(eDate, timelineStart) / totalDays) * 100));
+                                      }
+                                    }
+                                  } else if (r.end_date) {
+                                    const eDate = parseISO(r.end_date);
+                                    if (isValid(eDate)) {
+                                      endDateFormatted = format(eDate, 'MM.dd');
+                                      if (isBefore(eDate, timelineStart)) endPct = 0;
+                                      else if (isAfter(eDate, timelineEnd)) endPct = 100;
+                                      else endPct = Math.min(100, Math.max(0, (differenceInDays(eDate, timelineStart) / totalDays) * 100));
+                                    }
+                                  }
+
+                                  const barWidthPct = Math.max(6, endPct - startPct);
+                                  const trainingRatio = isConverted && barWidthPct > 0 
+                                    ? Math.min(90, Math.max(15, ((convPct - startPct) / barWidthPct) * 100)) 
+                                    : 100;
+                                  const conversionRatio = 100 - trainingRatio;
+                                  const effectiveStatus = getEffectiveRecordStatus(r, todayStr);
+
+                                  return isConverted ? (
+                                    <div 
+                                      key={r.id || r.training_order}
+                                      className="absolute top-0.5 bottom-0.5 rounded-md shadow-sm flex items-stretch transition-all z-10 overflow-hidden border border-purple-400"
+                                      style={{ left: `${startPct}%`, width: `${barWidthPct}%` }}
+                                      title={`[${r.training_order}차 실습] ${r.company || '업체미지정'} (채용전환: ${startDateFormatted}~${convDateFormatted || endDateFormatted})`}
+                                    >
                                       <div 
-                                        className="absolute top-0.5 bottom-0.5 rounded-md shadow-sm flex items-stretch transition-all z-10 overflow-hidden border border-purple-400"
-                                        style={{
-                                          left: `${startPct}%`,
-                                          width: `${barWidthPct}%`
-                                        }}
+                                        style={{ width: `${trainingRatio}%` }}
+                                        className="bg-emerald-600 text-white flex items-center px-1 border-r border-white/80 shrink-0 min-w-0 overflow-hidden"
                                       >
-                                        {/* 좌측 녹색 실습 구간 (원톤) */}
-                                        <div 
-                                          style={{ width: `${trainingRatio}%` }}
-                                          className="bg-emerald-600 text-white flex items-center px-1.5 border-r border-white/80 shrink-0 min-w-0 overflow-hidden"
-                                        >
-                                          <span className="text-[8.5px] font-black tracking-tighter truncate">
-                                            {startDateFormatted}~{convDateFormatted || endDateFormatted}
-                                          </span>
-                                        </div>
-                                        {/* 우측 보라색 채용전환 구간 (원톤) */}
-                                        <div 
-                                          style={{ width: `${conversionRatio}%` }}
-                                          className="bg-purple-600 text-white flex items-center px-1.5 shrink-0 min-w-0 overflow-hidden flex-1"
-                                        >
-                                          <span className="text-[8.5px] font-black tracking-tighter truncate text-purple-100">
-                                            ✨채용전환 ({convDateFormatted ? `${convDateFormatted}~졸업` : '전환~졸업'})
-                                          </span>
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <div 
-                                        className={cn(
-                                          "absolute top-0.5 bottom-0.5 rounded-md shadow-sm flex items-center px-1.5 transition-all z-10",
-                                          effectiveStatus === 'upcoming'
-                                            ? "bg-sky-500 border border-sky-400 text-white"
-                                            : isReturned
-                                            ? "bg-rose-500 border border-rose-400 text-white"
-                                            : effectiveStatus === 'completed'
-                                            ? "bg-indigo-600 border border-indigo-500 text-white"
-                                            : "bg-emerald-600 border border-emerald-500 text-white"
-                                        )}
-                                        style={{
-                                          left: `${startPct}%`,
-                                          width: `${barWidthPct}%`
-                                        }}
-                                      >
-                                        <span className="text-[9px] font-black tracking-tighter truncate">
-                                          {startDateFormatted} ~ {endDateFormatted}
+                                        <span className="text-[8px] font-black tracking-tighter truncate">
+                                          {r.company} ({startDateFormatted}~{convDateFormatted || endDateFormatted})
                                         </span>
                                       </div>
-                                    )}
-
-                                    {/* 오늘 날짜 위치 마커 */}
-                                    {todayPositionPercent > 0 && todayPositionPercent < 100 && (
-                                      <div
-                                        className="absolute top-0 bottom-0 z-20 pointer-events-none"
-                                        style={{ left: `${todayPositionPercent}%` }}
+                                      <div 
+                                        style={{ width: `${conversionRatio}%` }}
+                                        className="bg-purple-600 text-white flex items-center px-1 shrink-0 min-w-0 overflow-hidden flex-1"
                                       >
-                                        {/* 세로 점선 */}
-                                        <div className="absolute top-0 bottom-0 w-[1.5px] bg-red-500/80 border-l border-dashed border-red-400" />
-                                        {/* 오늘 라벨 — 막대 위에 살짝 튀어나옴 */}
-                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-red-500 text-white text-[8px] font-black px-1 py-0.5 rounded whitespace-nowrap leading-none shadow">
-                                          오늘
-                                        </div>
+                                        <span className="text-[8px] font-black tracking-tighter truncate text-purple-100">
+                                          ✨전환 ({convDateFormatted ? `${convDateFormatted}~졸업` : '전환~졸업'})
+                                        </span>
                                       </div>
-                                    )}
-                                  </div>
+                                    </div>
+                                  ) : (
+                                    <div 
+                                      key={r.id || r.training_order}
+                                      className={cn(
+                                        "absolute top-0.5 bottom-0.5 rounded-md shadow-sm flex items-center px-1 transition-all z-10",
+                                        effectiveStatus === 'upcoming' ? "bg-sky-500 border border-sky-400 text-white"
+                                          : isReturned ? "bg-rose-500 border border-rose-400 text-white"
+                                          : effectiveStatus === 'completed' ? "bg-indigo-600 border border-indigo-500 text-white"
+                                          : "bg-emerald-600 border border-emerald-500 text-white"
+                                      )}
+                                      style={{ left: `${startPct}%`, width: `${barWidthPct}%` }}
+                                      title={`[${r.training_order}차 실습] ${r.company || '업체미지정'} (${effectiveStatus === 'returned' ? '복교' : '실습'}: ${startDateFormatted}~${endDateFormatted})`}
+                                    >
+                                      <span className="text-[8px] font-black tracking-tighter truncate">
+                                        {r.company} ({startDateFormatted}~{endDateFormatted})
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
 
-                                  {/* 추가 상세 정보 */}
-                                  {isConverted && r.conversion_date && (
-                                    <p className="text-[10.5px] font-bold text-purple-700 bg-purple-50 p-1 px-2 rounded-lg border border-purple-100">
-                                      🎉 채용 전환일: {r.conversion_date}
-                                    </p>
-                                  )}
-                                  {isReturned && r.return_reason && (
-                                    <p className="text-[10.5px] font-bold text-rose-700 bg-rose-50 p-1 px-2 rounded-lg border border-rose-100">
-                                      ⚠️ 복교 사유: {r.return_reason}
-                                    </p>
-                                  )}
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
+                              {/* 3. 복교 사유 및 전환일 추가 상세 안내 */}
+                              <div className="space-y-1">
+                                {records.map((r: any) => (
+                                  <React.Fragment key={r.id || r.training_order}>
+                                    {r.hiring_status === '채용전환' && r.conversion_date && (
+                                      <p className="text-[10px] font-bold text-purple-700 bg-purple-50 p-1 px-2 rounded-lg border border-purple-100 flex items-center gap-1">
+                                        <span>🎉 [{r.training_order}차 {r.company}] 채용 전환일:</span>
+                                        <span className="font-mono">{r.conversion_date}</span>
+                                      </p>
+                                    )}
+                                    {r.hiring_status === '복교' && r.return_reason && (
+                                      <p className="text-[10px] font-bold text-rose-700 bg-rose-50 p-1 px-2 rounded-lg border border-rose-100 flex items-center gap-1">
+                                        <span>⚠️ [{r.training_order}차 {r.company}] 복교 사유:</span>
+                                        <span>{r.return_reason}</span>
+                                      </p>
+                                    )}
+                                  </React.Fragment>
+                                ))}
+                              </div>
+                            </div>
+                          )}                        </div>
                       </div>
                     </Card>
                   );
