@@ -998,7 +998,7 @@ export function FieldTrainingClient({
                                 <span className="text-[11px] text-slate-300 italic font-medium">현장실습 미배정</span>
                               </div>
                             ) : (
-                              <div className="relative z-10 px-1 py-1 w-full h-8.5 sm:h-9">
+                              <div className="relative z-10 px-1 py-0.5 w-full h-9 sm:h-10">
                                 {records.map((r: any) => {
                                   let startPct = 0;
                                   let endPct = 100;
@@ -1063,7 +1063,7 @@ export function FieldTrainingClient({
                                           <div
                                             onClick={() => handleOpenModal(s)}
                                             className={cn(
-                                              "h-7.5 sm:h-8 rounded-lg shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md absolute top-0.5 bottom-0.5 overflow-hidden group/bar",
+                                              "rounded-lg shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md absolute top-1 bottom-1 overflow-hidden group/bar",
                                                effectiveStatus === 'converted'
                                                 ? "border-purple-400/80 p-0 flex items-stretch shadow-sm"
                                                 : effectiveStatus === 'returned'
@@ -1308,7 +1308,7 @@ export function FieldTrainingClient({
                           {!hasRecords ? (
                             <span className="text-[9.5px] text-slate-300 italic text-center relative z-10">미배정</span>
                           ) : (
-                            <div className="relative z-10 w-full h-7">
+                            <div className="relative z-10 w-full h-8">
                               {records.map((r: any) => {
                                 let startPct = 0;
                                 let endPct = 100;
@@ -1494,7 +1494,7 @@ export function FieldTrainingClient({
                               </div>
 
                               {/* 2. 단일 통합 7~2월 타임라인 트랙 (1차/2차 한 줄 나란히 렌더링) */}
-                              <div className="relative h-7.5 bg-slate-200/70 rounded-lg overflow-visible border border-slate-200 shadow-inner">
+                              <div className="relative h-9 sm:h-10 bg-slate-100 rounded-xl overflow-visible border border-slate-200/90 shadow-inner my-1.5">
                                 {/* 월별 배경 세로 트랙 격자선 및 라벨 */}
                                 <div className="absolute inset-0 grid pointer-events-none overflow-hidden rounded-lg" style={{ gridTemplateColumns: `repeat(${timelineMonths.length}, minmax(0, 1fr))` }}>
                                   {timelineMonths.map((m, mIdx) => (
@@ -1580,7 +1580,7 @@ export function FieldTrainingClient({
                                   return isConverted ? (
                                     <div 
                                       key={r.id || r.training_order}
-                                      className="absolute top-0.5 bottom-0.5 rounded-md shadow-sm flex items-stretch transition-all z-10 overflow-hidden border border-purple-400"
+                                      className="absolute top-1 bottom-1 rounded-lg shadow-sm flex items-stretch transition-all z-10 overflow-hidden border border-purple-400"
                                       style={{ left: `${startPct}%`, width: `${barWidthPct}%` }}
                                       title={`[${r.training_order}차 실습] ${r.company || '업체미지정'} (채용전환: ${startDateFormatted}~${convDateFormatted || endDateFormatted})`}
                                     >
@@ -1588,7 +1588,7 @@ export function FieldTrainingClient({
                                         style={{ width: `${trainingRatio}%` }}
                                         className="bg-emerald-600 text-white flex items-center px-1 border-r border-white/80 shrink-0 min-w-0 overflow-hidden"
                                       >
-                                        <span className="text-[8px] font-black tracking-tighter truncate">
+                                        <span className="text-[9px] sm:text-[10px] font-black tracking-tight truncate">
                                           {r.company} ({startDateFormatted}~{convDateFormatted || endDateFormatted})
                                         </span>
                                       </div>
@@ -1605,7 +1605,7 @@ export function FieldTrainingClient({
                                     <div 
                                       key={r.id || r.training_order}
                                       className={cn(
-                                        "absolute top-0.5 bottom-0.5 rounded-md shadow-sm flex items-center px-1 transition-all z-10",
+                                        "absolute top-1 bottom-1 rounded-lg shadow-sm flex items-center px-1.5 transition-all z-10",
                                         effectiveStatus === 'upcoming' ? "bg-sky-500 border border-sky-400 text-white"
                                           : isReturned ? "bg-rose-500 border border-rose-400 text-white"
                                           : effectiveStatus === 'completed' ? "bg-indigo-600 border border-indigo-500 text-white"
