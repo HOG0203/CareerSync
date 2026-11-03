@@ -39,51 +39,28 @@ export const TableHeader = React.memo(({
           const isSorted = sortConfig?.key === col.key;
           const sortDirection = isSorted ? sortConfig.direction : null;
           const isSortable = col.type !== 'action';
+          const isFilterOrSortActive = isFilterActive || isSorted;
 
           return (
             <th 
               key={col.key} 
               className={cn(
                 "sticky z-40 group text-center border-r border-b font-semibold p-0 transition-colors shadow-[0_1px_0_0_rgba(0,0,0,0.1)]",
-                isFilterActive 
+                isFilterOrSortActive 
                   ? "bg-blue-50/90 hover:bg-blue-100/80 text-blue-900 border-blue-200" 
                   : "bg-slate-50 hover:bg-slate-100/90 text-slate-700",
                 hasGroup ? "top-10" : "top-0"
               )} 
               style={{ minWidth: col.width, width: col.width }}
             >
-              <div 
-                className={cn(
-                  "flex items-center justify-center px-0.5 sm:px-1 gap-0.5 h-full min-h-[40px] overflow-hidden",
-                  isSortable && "cursor-pointer hover:text-blue-600 transition-colors"
-                )}
-                onClick={() => {
-                  if (isSortable) {
-                    const nextDir = !isSorted ? 'asc' : sortDirection === 'asc' ? 'desc' : null;
-                    onSortChange?.(col.key, nextDir);
-                  }
-                }}
-                title={isSortable ? (isSorted ? (sortDirection === 'asc' ? '클릭 시 내림차순 정렬' : '클릭 시 정렬 해제') : '클릭 시 오름차순 정렬 (필터는 깔때기 아이콘 클릭)') : undefined}
-              >
+              <div className="flex items-center justify-center px-0.5 sm:px-1 gap-0.5 h-full min-h-[40px] overflow-hidden">
                 <span className={cn(
                   "leading-tight py-1 select-none", 
                   col.label?.includes('\n') ? "whitespace-pre-line text-[11px]" : "whitespace-nowrap text-[11px]",
-                  isFilterActive && "font-bold text-blue-700"
+                  isFilterOrSortActive && "font-bold text-blue-700"
                 )}>
                   {col.label}
                 </span>
-
-                {isSorted && (
-                  sortDirection === 'asc' ? (
-                    <ArrowUp className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-blue-600 shrink-0" />
-                  ) : (
-                    <ArrowDown className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-blue-600 shrink-0" />
-                  )
-                )}
-
-                {!isSorted && isSortable && (
-                  <ArrowUpDown className="h-2.5 w-2.5 text-slate-300 opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
-                )}
 
                 {isSortable && (
                   <Popover modal={false}>
@@ -91,14 +68,20 @@ export const TableHeader = React.memo(({
                       <button 
                         className={cn(
                           "p-0.5 rounded transition-all shrink-0 ml-0.5",
-                          isFilterActive
+                          isFilterOrSortActive
                             ? "opacity-100 text-blue-700 bg-blue-100 ring-1 ring-blue-300/90 hover:bg-blue-200 shadow-2xs font-bold"
                             : "opacity-45 text-slate-400 group-hover:opacity-100 group-hover:text-slate-600 hover:!text-blue-600 hover:!bg-slate-200/80"
                         )}
                         onClick={(e) => e.stopPropagation()}
-                        title={isFilterActive ? "필터 적용 중 (클릭하여 변경/해제)" : "필터 및 정렬 옵션"}
+                        title={
+                          isSorted 
+                            ? `${sortDirection === 'asc' ? '오름차순' : '내림차순'} 정렬 중 (클릭하여 옵션 변경)`
+                            : isFilterActive 
+                            ? "필터 적용 중 (클릭하여 변경/해제)" 
+                            : "필터 및 정렬 옵션"
+                        }
                       >
-                        <ListFilter className={cn("h-3 w-3 sm:h-3.5 sm:w-3.5", isFilterActive && "stroke-[2.5]")} />
+                        <ListFilter className={cn("h-3 w-3 sm:h-3.5 sm:w-3.5", isFilterOrSortActive && "stroke-[2.5]")} />
                       </button>
                     </PopoverTrigger>
                     <PopoverContent className="w-52 p-0 z-[50]" align="start" onClick={(e) => e.stopPropagation()}>
