@@ -3,6 +3,7 @@ import {
   getCurrentUserProfile, 
   getCachedMiddleSchoolEmploymentData, 
 } from '@/lib/data';
+import { getCachedCustomPermissionsMap } from '@/lib/permissions';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { MiddleSchoolEmploymentClient } from './middle-school-employment-client';
 
@@ -15,10 +16,11 @@ export const metadata = {
 
 export default async function MiddleSchoolEmploymentPage() {
   // 프로필, 시스템 설정, 중학교별 학생 취업 데이터를 병렬로 즉각 조회 (초고속 캐시 적중 시 0ms)
-  const [userProfile, settings, students] = await Promise.all([
+  const [userProfile, settings, students, permMap] = await Promise.all([
     getCurrentUserProfile(),
     getSystemSettings(),
     getCachedMiddleSchoolEmploymentData(),
+    getCachedCustomPermissionsMap(),
   ]);
 
   if (!userProfile) {
@@ -27,6 +29,12 @@ export default async function MiddleSchoolEmploymentPage() {
 
   // 학생 계정 접근 제한
   if (userProfile.role === 'student') {
+    redirect('/dashboard');
+  }
+
+  // 개별 커스텀 권한이 지정된 경우 확인
+  const userPerms = permMap[userProfile.id];
+  if (Array.isArray(userPerms) && !userPerms.includes('/admission/middle-school-employment')) {
     redirect('/dashboard');
   }
 

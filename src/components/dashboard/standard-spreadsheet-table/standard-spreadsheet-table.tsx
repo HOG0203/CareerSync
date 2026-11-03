@@ -163,14 +163,18 @@ export function StandardSpreadsheetTable({
               </div>
             )}
             {isColumnFilterActive && (
-              <div className="flex items-center gap-1.5 pl-1">
+              <div className="flex items-center gap-1.5 pl-1 animate-in fade-in">
+                <Badge variant="secondary" className="bg-blue-100/80 text-blue-800 border-blue-200 text-[11px] font-bold py-0.5 px-2">
+                  <Filter className="h-3 w-3 mr-1 text-blue-600" />
+                  열 필터 적용 중 ({Object.keys(columnFilters).filter(k => columnFilters[k] !== undefined).length}개 열)
+                </Badge>
                 <Button 
                   variant="ghost" 
                   size="sm" 
                   onClick={() => handleFilterChange('ALL', 'RESET')}
                   className="h-6 px-2 text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg"
                 >
-                  <X className="h-3 w-3 mr-1" /> 시트 열 필터 초기화
+                  <X className="h-3 w-3 mr-1" /> 열 필터 초기화
                 </Button>
               </div>
             )}

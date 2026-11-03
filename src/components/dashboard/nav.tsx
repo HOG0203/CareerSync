@@ -136,7 +136,7 @@ export default function Nav({
       icon: Briefcase,
       items: [
         { href: '/employment-status', label: '취업진로현황', icon: Grid3X3 },
-        ...(!isLowerGradeTeacher ? [{ href: '/field-training', label: '현장실습현황', icon: CalendarCheck }] : []),
+        { href: '/field-training', label: '현장실습현황', icon: CalendarCheck },
         { href: '/company-info', label: '업체정보', icon: Factory },
         ...(canView3rdGradeDetailMenus ? [{ href: '/students', label: '취업상세데이터', icon: ClipboardList }] : []),
         ...(canView3rdGradeDetailMenus ? [{ href: '/labor-education', label: '노동인권교육', icon: ShieldAlert }] : []),

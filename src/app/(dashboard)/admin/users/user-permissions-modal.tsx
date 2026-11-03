@@ -127,6 +127,7 @@ export function getDefaultRoutesForUser(profile: any, subAdminList: string[] = [
 
   const routes = [
     '/employment-status',
+    '/field-training',
     '/company-info',
     '/merit-demerit',
     '/admin/certification',
@@ -137,10 +138,11 @@ export function getDefaultRoutesForUser(profile: any, subAdminList: string[] = [
     '/teaching-support/timetable',
     '/teaching-support/substitute',
     '/teaching-support/travel-expense',
+    '/admission/middle-school-employment',
   ];
 
   if (isGrade3) {
-    routes.push('/field-training', '/students', '/labor-education');
+    routes.push('/students', '/labor-education');
   }
 
   if (isHomeroom) {

@@ -7,6 +7,7 @@ import {
 } from '@/lib/data';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
 import { FieldTrainingClient } from './field-training-client';
+import { getCachedCustomPermissionsMap } from '@/lib/permissions';
 import { CalendarCheck } from 'lucide-react';
 import { redirect } from 'next/navigation';
 
@@ -22,20 +23,27 @@ export const metadata = {
  */
 export default async function FieldTrainingPage() {
   // 1. 공통 설정 및 학급 구조 완전 동시 병렬 패칭
-  const [settings, graduationYears, userProfile, allCombinations] = await Promise.all([
+  const [settings, graduationYears, userProfile, allCombinations, permMap] = await Promise.all([
     getSystemSettings(),
     getCachedGraduationYears(),
     getCurrentUserProfile(),
-    getCachedClassStructureCombinations()
+    getCachedClassStructureCombinations(),
+    getCachedCustomPermissionsMap()
   ]);
 
   if (!userProfile) {
     redirect('/login');
   }
 
-  // 1, 2학년 담임교사는 현장실습현황 접근 불가 (3학년 담임 및 관리자만 접근 허용)
-  if (userProfile.role === 'teacher' && (userProfile.assigned_grade === 1 || userProfile.assigned_grade === 2)) {
-    redirect('/class-management');
+  // 학생 계정 접근 제한
+  if (userProfile.role === 'student') {
+    redirect('/dashboard');
+  }
+
+  // 개별 커스텀 권한이 지정된 경우 확인
+  const userPerms = permMap[userProfile.id];
+  if (Array.isArray(userPerms) && !userPerms.includes('/field-training')) {
+    redirect('/dashboard');
   }
 
   const isAdmin = userProfile.role === 'admin';
