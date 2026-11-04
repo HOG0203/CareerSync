@@ -151,7 +151,8 @@ async function saveParsedCertificatesToDb(
   targetGradYear: number,
   majorName: string,
   className: string,
-  parsedStudents: Record<string, string[]>
+  parsedStudents: Record<string, string[]>,
+  grade?: number
 ) {
   let successCount = 0;
   let skippedCount = 0;
@@ -183,7 +184,8 @@ async function saveParsedCertificatesToDb(
     });
 
     if (!matched) {
-      errors.push(`[미매칭] ${className} ${studentName} 학생을 DB에서 찾을 수 없습니다.`);
+      const gradeStr = grade ? `${grade}학년 ` : '';
+      errors.push(`${studentName} (${gradeStr}${className} - 학생 명부 미매칭)`);
       skippedCount++;
       continue;
     }
@@ -314,7 +316,8 @@ export async function importUploadedCertificates(rawRows: any[][]) {
       targetGradYear,
       major,
       classInfo,
-      studentCerts
+      studentCerts,
+      grade
     );
 
     await clearCertificateSummariesCache();
@@ -328,14 +331,14 @@ export async function importUploadedCertificates(rawRows: any[][]) {
       const { logAuditAction } = await import('@/lib/audit-logger');
       await logAuditAction({
         action_type: 'STUDENT_BULK_UPDATE',
-        target_name: `[자격증 일괄 등록] ${major} ${grade}학년 ${classInfo} (${res.successCount}명 반영)`,
+        target_name: `[자격증 일괄 등록] ${major} ${grade}학년 ${classInfo} (${res.successCount}명 반영${res.skippedCount > 0 ? `, ${res.skippedCount}명 미매칭 보류` : ''})`,
         details: {
           major,
           grade,
           classInfo,
           successCount: res.successCount,
           skippedCount: res.skippedCount,
-          errorSummary: res.errors.slice(0, 5)
+          skippedStudents: res.errors
         }
       });
     } catch (auditErr) {
@@ -344,9 +347,6 @@ export async function importUploadedCertificates(rawRows: any[][]) {
     revalidatePath('/employment-status');
     revalidatePath('/students');
 
-
-
-
     return {
       success: true,
       major,
@@ -354,6 +354,7 @@ export async function importUploadedCertificates(rawRows: any[][]) {
       classInfo,
       successCount: res.successCount,
       skippedCount: res.skippedCount,
+      skippedStudents: res.errors,
       errors: res.errors.length > 0 ? res.errors : null
     };
 

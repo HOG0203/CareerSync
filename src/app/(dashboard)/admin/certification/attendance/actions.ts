@@ -108,14 +108,35 @@ export async function matchStudentsForAttendance(
 export async function uploadStudentAttendance(
   data: ParsedAttendanceData[],
   baseAcademicYear: number
-) {
+): Promise<{
+  success: boolean;
+  error?: string;
+  count?: number;
+  skippedCount?: number;
+  skippedStudents?: string[];
+}> {
   const profile = await getCurrentUserProfile();
   if (!profile || (profile.role !== 'admin' && profile.role !== 'teacher')) {
-    return { error: "출결 데이터를 등록할 수 있는 권한이 없습니다." };
+    return { success: false, error: "출결 데이터를 등록할 수 있는 권한이 없습니다." };
   }
 
   const supabase = createAdminClient();
   
+  // 1. 미매칭 학생 식별 및 정리 (중복 제거)
+  const unMatchedRows = data.filter(d => !d.studentId);
+  const skippedStudentsMap = new Map<string, string>();
+  unMatchedRows.forEach(d => {
+    const key = `${d.currentGrade}_${d.classInfo}_${d.studentNumber}_${d.studentName}`;
+    if (!skippedStudentsMap.has(key)) {
+      const classStr = d.classInfo ? `${d.classInfo}반 ` : '';
+      const numStr = d.studentNumber ? `${d.studentNumber}번` : '';
+      const gradeStr = d.currentGrade ? `${d.currentGrade}학년 ` : '';
+      skippedStudentsMap.set(key, `${d.studentName} (${gradeStr}${classStr}${numStr} - 학생 명부 미매칭)`.trim());
+    }
+  });
+  const skippedStudents = Array.from(skippedStudentsMap.values());
+  const skippedCount = skippedStudents.length;
+
   const upsertData = data.filter(d => d.studentId).map(d => {
     // 실제 발생 연도 계산 (개별 학생의 업로드 시점 학년 d.currentGrade 기준 적용)
     const actualYear = baseAcademicYear - (d.currentGrade - d.gradeObtained);
@@ -143,7 +164,18 @@ export async function uploadStudentAttendance(
     };
   });
 
-  if (upsertData.length === 0) return { error: "매칭된 학생이 없어 저장할 데이터가 없습니다." };
+  if (upsertData.length === 0 && skippedCount === 0) {
+    return { success: false, error: "매칭된 학생이 없어 저장할 데이터가 없습니다." };
+  }
+
+  if (upsertData.length === 0 && skippedCount > 0) {
+    return {
+      success: true,
+      count: 0,
+      skippedCount,
+      skippedStudents
+    };
+  }
 
   // [디스크 I/O 최적화] 300건 단위 청크 분할 및 미세 지연(50ms) 적용하여 순간 I/O 버짓 소진 방지
   const BATCH_SIZE = 300;
@@ -152,7 +184,7 @@ export async function uploadStudentAttendance(
     const { error: batchErr } = await supabase
       .from('student_attendance')
       .upsert(chunk, { onConflict: 'student_id, academic_year, grade, semester' });
-    if (batchErr) return { error: batchErr.message };
+    if (batchErr) return { success: false, error: batchErr.message };
     if (i + BATCH_SIZE < upsertData.length) {
       await new Promise(res => setTimeout(res, 50));
     }
@@ -172,10 +204,12 @@ export async function uploadStudentAttendance(
     const { logAuditAction } = await import('@/lib/audit-logger');
     await logAuditAction({
       action_type: 'STUDENT_BULK_UPDATE',
-      target_name: `[출결 일괄 등록] ${baseAcademicYear}학년도 출결 (${upsertData.length}건 반영)`,
+      target_name: `[출결 일괄 등록] ${baseAcademicYear}학년도 출결 (${upsertData.length}건 반영${skippedCount > 0 ? `, ${skippedCount}명 미매칭 보류` : ''})`,
       details: {
         baseAcademicYear,
         count: upsertData.length,
+        skippedCount,
+        skippedStudents,
         affectedGrades
       }
     });
@@ -183,7 +217,7 @@ export async function uploadStudentAttendance(
     console.error('Failed to log audit for uploadStudentAttendance:', auditErr);
   }
 
-  return { success: true, count: upsertData.length };
+  return { success: true, count: upsertData.length, skippedCount, skippedStudents };
 }
 
 export async function deleteAllStudentAttendance() {

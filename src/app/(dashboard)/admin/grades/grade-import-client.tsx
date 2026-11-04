@@ -26,6 +26,14 @@ import {
   PopoverTrigger, 
   PopoverContent 
 } from '@/components/ui/popover';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { 
   uploadStudentScores, 
@@ -218,6 +226,12 @@ export function GradeImportClient({ onSuccess }: { onSuccess?: () => void }) {
   const [isUploading, setIsUploading] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [parsedData, setParsedData] = React.useState<ParsedGradeData[]>([]);
+  const [importReport, setImportReport] = React.useState<{
+    updatedCount: number;
+    skippedCount: number;
+    skippedStudents: string[];
+  } | null>(null);
+  const [isReportOpen, setIsReportOpen] = React.useState(false);
   const [studentMatchMap, setStudentMatchMap] = React.useState<Record<string, { id: string; major: string; classInfo: string }>>({});
   const [detectedFileInfo, setDetectedFileInfo] = React.useState<{ major: string, classInfo: string } | null>(null);
   const [fileName, setFileName] = React.useState<string | null>(null);
@@ -690,16 +704,34 @@ export function GradeImportClient({ onSuccess }: { onSuccess?: () => void }) {
       if (result.error) {
         toast({ variant: "destructive", title: "저장 실패", description: result.error });
       } else {
-        toast({ 
-          title: "DB 저장 완료 🎉", 
-          description: `성공: ${result.results?.success}건 반영 완료. 다른 엑셀 파일을 이어서 업로드할 수 있습니다.` 
-        });
-        setParsedData([]);
-        setFileName(null);
-        setDetectedFileInfo(null);
-        setStudentMatchMap({});
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
+        const skipped = result.skippedCount ?? result.results?.notMatched?.length ?? 0;
+        const skippedList = result.skippedStudents ?? result.results?.notMatched ?? [];
+        const successRecords = result.recordCount ?? result.results?.success ?? 0;
+        const successStudents = result.count ?? 0;
+
+        if (skipped > 0) {
+          setImportReport({
+            updatedCount: successRecords,
+            skippedCount: skipped,
+            skippedStudents: skippedList
+          });
+          setIsReportOpen(true);
+          toast({ 
+            title: "성적 데이터 반영 완료 (일부 보류 발생)", 
+            description: `성공 ${successRecords}건(${successStudents}명), 미매칭 보류 ${skipped}명입니다. 미반영 내역 팝업을 확인해주세요.` 
+          });
+        } else {
+          toast({ 
+            title: "성적 일괄 등록 완료 🎉", 
+            description: `총 ${successRecords}건(${successStudents}명)의 성적 데이터가 DB에 성공적으로 반영되었습니다.` 
+          });
+          setParsedData([]);
+          setFileName(null);
+          setDetectedFileInfo(null);
+          setStudentMatchMap({});
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
         }
         router.refresh();
         if (onSuccess) onSuccess();
@@ -1093,6 +1125,100 @@ export function GradeImportClient({ onSuccess }: { onSuccess?: () => void }) {
           <p className="text-xs text-slate-400">분석된 성적 데이터가 없습니다. 엑셀 파일을 선택하세요.</p>
         </div>
       )}
+
+      {/* 미반영/보류 결과 안내 전용 팝업 모달 */}
+      <Dialog open={isReportOpen} onOpenChange={setIsReportOpen}>
+        <DialogContent className="max-w-xl p-6 bg-white border border-slate-200 shadow-2xl rounded-3xl animate-in fade-in-50 zoom-in-95 duration-200">
+          <DialogHeader className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="p-2 bg-amber-100 text-amber-800 rounded-xl">
+                <AlertCircle className="h-5 w-5" />
+              </span>
+              <DialogTitle className="text-lg font-black text-slate-900 tracking-tight">
+                성적 데이터 일괄 업로드 결과 리포트
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-slate-500 font-medium leading-relaxed">
+              업로드한 성적 엑셀 파일 중 시스템 학생 명부와 정상 매칭된 학생과 미매칭으로 보류된 학생 현황입니다.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* 결과 통계 카드 */}
+          <div className="grid grid-cols-2 gap-3 py-1">
+            <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 flex flex-col items-center justify-center">
+              <span className="text-xs font-bold text-emerald-700">정상 반영 건수</span>
+              <span className="text-2xl font-black text-emerald-800 mt-1">{importReport?.updatedCount}건</span>
+            </div>
+            <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-4 flex flex-col items-center justify-center">
+              <span className="text-xs font-bold text-rose-700">미매칭 보류 학생 수</span>
+              <span className="text-2xl font-black text-rose-700 mt-1">{importReport?.skippedCount}명</span>
+            </div>
+          </div>
+
+          {/* 미매칭 보류 상세 명단 */}
+          {importReport && importReport.skippedCount > 0 && (
+            <div className="space-y-2.5 pt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-rose-500 inline-block" />
+                  미반영 학생 명단 ({importReport.skippedCount}명)
+                </span>
+                <span className="text-[11px] text-slate-400">시스템 학생 명부와 불일치</span>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 max-h-[220px] overflow-y-auto space-y-2 divide-y divide-slate-100 custom-scrollbar">
+                {importReport.skippedStudents.map((stStr, idx) => (
+                  <div key={idx} className="pt-2 first:pt-0 flex items-start justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200 font-bold text-[10px] px-2 py-0.5 shrink-0">
+                        미매칭
+                      </Badge>
+                      <span className="font-extrabold text-slate-800">{stStr}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 해결 가이드 안내 */}
+              <div className="p-4 bg-blue-50/80 border border-blue-200/80 rounded-2xl text-xs space-y-2 mt-2 text-left">
+                <p className="font-black text-blue-950 flex items-center gap-1.5">
+                  <Info className="h-4 w-4 text-blue-600 shrink-0" />
+                  미반영 발생 원인 및 해결 가이드
+                </p>
+                <ul className="text-blue-900 text-[11px] leading-relaxed space-y-1.5 list-disc pl-4 font-medium">
+                  <li>
+                    <strong>학생 명부 미등록 (전입생 등)</strong>: 해당 학생이 시스템 학생 명부에 등록되어 있지 않은 경우 매칭되지 않습니다. <span className="font-bold underline text-blue-950">[학생 관리]</span> 또는 <span className="font-bold underline text-blue-950">[학생 등록/진급]</span> 메뉴에서 학생을 먼저 추가해주세요.
+                  </li>
+                  <li>
+                    <strong>이름 표기 불일치 (괄호/오탈자/개명)</strong>: 나이스 엑셀에 학생 이름 뒤 괄호(예: 전입, 유예 등)나 한자, 오탈자가 기재되어 있는지 확인해주세요.
+                  </li>
+                  <li>
+                    <strong>반 또는 번호 불일치</strong>: 본 화면 상단의 <span className="font-bold underline text-blue-950">[수동 매칭]</span> 드롭다운을 통해 시스템 학생을 직접 선택하여 즉시 매칭하거나, 학생 관리에서 반/번호를 동일하게 수정한 뒤 다시 업로드해주세요.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="pt-3">
+            <Button
+              onClick={() => {
+                setIsReportOpen(false);
+                setParsedData([]);
+                setFileName(null);
+                setDetectedFileInfo(null);
+                setStudentMatchMap({});
+                if (fileInputRef.current) {
+                  fileInputRef.current.value = '';
+                }
+              }}
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold h-10 rounded-xl"
+            >
+              확인 완료 (창 닫기)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -125,7 +125,15 @@ export async function matchStudents(
 export async function uploadStudentScores(
   data: ParsedGradeData[], 
   academicYear: number
-) {
+): Promise<{
+  success: boolean;
+  error?: string;
+  count?: number;
+  recordCount?: number;
+  skippedCount?: number;
+  skippedStudents?: string[];
+  results?: { total: number; success: number; failed: number; notMatched: string[] };
+}> {
   const supabase = await createClient()
 
   const results = { total: data.length, success: 0, failed: 0, notMatched: [] as string[] };
@@ -135,7 +143,10 @@ export async function uploadStudentScores(
   for (const item of data) {
     // [보안] UUID가 없는 데이터는 절대로 저장하지 않음 (오매칭 방지)
     if (!item.studentId) {
-      const failKey = `${item.studentName}(${item.studentNumber}번)`;
+      const classStr = item.classInfo ? `${item.classInfo}반 ` : '';
+      const numStr = item.studentNumber ? `${item.studentNumber}번` : '';
+      const gradeStr = item.currentGrade ? `${item.currentGrade}학년 ` : '';
+      const failKey = `${item.studentName} (${gradeStr}${classStr}${numStr} - 학생 명부 미매칭)`.trim();
       if (!results.notMatched.includes(failKey)) results.notMatched.push(failKey);
       results.failed++;
       continue;
@@ -170,6 +181,21 @@ export async function uploadStudentScores(
     });
   }
 
+  if (scoresToInsert.length === 0 && results.notMatched.length === 0) {
+    return { success: false, error: "저장할 유효한 성적 데이터가 없습니다." };
+  }
+
+  if (scoresToInsert.length === 0 && results.notMatched.length > 0) {
+    return {
+      success: true,
+      count: 0,
+      recordCount: 0,
+      skippedCount: results.notMatched.length,
+      skippedStudents: results.notMatched,
+      results
+    };
+  }
+
   if (scoresToInsert.length > 0) {
     // 1. 타겟팅된 UUID/학기 데이터 삭제
     for (const target of Array.from(deleteTargets)) {
@@ -200,7 +226,7 @@ export async function uploadStudentScores(
     for (let i = 0; i < finalScores.length; i += BATCH_SIZE) {
       const chunk = finalScores.slice(i, i + BATCH_SIZE);
       const { error: insertError } = await supabase.from('student_scores').insert(chunk);
-      if (insertError) return { error: `성적 저장 실패: ${insertError.message}` };
+      if (insertError) return { success: false, error: `성적 저장 실패: ${insertError.message}` };
       if (i + BATCH_SIZE < finalScores.length) {
         await new Promise(res => setTimeout(res, 50));
       }
@@ -212,13 +238,14 @@ export async function uploadStudentScores(
       const { logAuditAction } = await import('@/lib/audit-logger');
       await logAuditAction({
         action_type: 'STUDENT_BULK_UPDATE',
-        target_name: `[성적 일괄 등록] ${academicYear}학년도 성적 (${finalScores.length}건 반영)`,
+        target_name: `[성적 일괄 등록] ${academicYear}학년도 성적 (${finalScores.length}건 반영${results.notMatched.length > 0 ? `, ${results.notMatched.length}명 미매칭 보류` : ''})`,
         details: {
           academicYear,
           totalRecords: finalScores.length,
           uniqueStudents: deleteTargets.size,
-          failedCount: results.failed,
-          notMatched: results.notMatched.slice(0, 10)
+          skippedCount: results.notMatched.length,
+          skippedStudents: results.notMatched,
+          failedRecords: results.failed
         }
       });
     } catch (auditErr) {
@@ -239,7 +266,14 @@ export async function uploadStudentScores(
   revalidatePath('/admin/certification/grades');
   revalidatePath('/employment-status');
   revalidatePath('/class-management');
-  return { success: true, results };
+  return { 
+    success: true, 
+    results,
+    count: deleteTargets.size,
+    recordCount: results.success,
+    skippedCount: results.notMatched.length,
+    skippedStudents: results.notMatched
+  };
 }
 
 export async function getAchievementScores(): Promise<Record<string, number>> {
