@@ -9,6 +9,14 @@ import {
 } from '@/lib/neis-volunteer-parser';
 import { batchImportVolunteerAction } from '../actions';
 import { DeleteMyRecordsDialog } from './delete-my-records-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +31,8 @@ import {
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { 
-  HeartHandshake, 
+  HeartHandshake,
+  AlertCircle, 
   UploadCloud, 
   FileSpreadsheet, 
   CheckCircle2, 
@@ -59,6 +68,12 @@ export function VolunteerImportCard({
   const [isSaving, setIsSaving] = React.useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
+  const [importReport, setImportReport] = React.useState<{
+    updatedCount: number;
+    skippedCount: number;
+    skippedStudents: string[];
+  } | null>(null);
+  const [isReportOpen, setIsReportOpen] = React.useState(false);
 
   // 모든 파싱된 파일들의 학생 목록 합산
   const allParsedStudents = React.useMemo(() => {
@@ -167,11 +182,24 @@ export function VolunteerImportCard({
       const res = await batchImportVolunteerAction(payload);
 
       if (res.success) {
-        toast({
-          title: '봉사활동 일괄 등록 완료 🎉',
-          description: `총 ${res.updatedCount}명의 학생 봉사활동 시간이 옥저인재인증제 DB에 성공적으로 반영되었습니다.`
-        });
-        handleClear();
+        if (res.skippedCount && res.skippedCount > 0) {
+          setImportReport({
+            updatedCount: res.updatedCount,
+            skippedCount: res.skippedCount,
+            skippedStudents: res.skippedStudents || [],
+          });
+          setIsReportOpen(true);
+          toast({
+            title: '봉사활동 반영 완료 (일부 보류 발생)',
+            description: `성공 ${res.updatedCount}명, 미매칭 보류 ${res.skippedCount}명입니다. 미반영 내역 팝업을 확인해주세요.`
+          });
+        } else {
+          toast({
+            title: '봉사활동 일괄 등록 완료 🎉',
+            description: `총 ${res.updatedCount}명의 학생 봉사활동 시간이 옥저인재인증제 DB에 성공적으로 반영되었습니다.`
+          });
+          handleClear();
+        }
         if (onImportSuccess) onImportSuccess();
       } else {
         toast({
@@ -457,6 +485,90 @@ export function VolunteerImportCard({
           if (onImportSuccess) onImportSuccess();
         }}
       />
+
+      {/* 4. 미반영 보류 학생 및 결과 상세 리포트 다이얼로그 */}
+      <Dialog open={isReportOpen} onOpenChange={setIsReportOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl p-6">
+          <DialogHeader className="space-y-1.5 text-left">
+            <DialogTitle className="flex items-center gap-2 text-lg font-black text-slate-900">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              <span>나이스 봉사활동 일괄 반영 결과 리포트</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              DB 학생 명부와 대조하여 일치하지 않는 보류(미매칭) 학생 명단과 사유입니다.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* 결과 통계 카드 */}
+          <div className="grid grid-cols-2 gap-3 py-1">
+            <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 flex flex-col items-center justify-center">
+              <span className="text-xs font-bold text-emerald-700">정상 반영 학생 수</span>
+              <span className="text-2xl font-black text-emerald-800 mt-1">{importReport?.updatedCount}명</span>
+            </div>
+            <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-4 flex flex-col items-center justify-center">
+              <span className="text-xs font-bold text-rose-700">미매칭 보류 학생 수</span>
+              <span className="text-2xl font-black text-rose-700 mt-1">{importReport?.skippedCount}명</span>
+            </div>
+          </div>
+
+          {/* 미매칭 보류 상세 명단 */}
+          {importReport && importReport.skippedCount > 0 && (
+            <div className="space-y-2.5 pt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-rose-500 inline-block" />
+                  미반영 학생 명단 ({importReport.skippedCount}명)
+                </span>
+                <span className="text-[11px] text-slate-400">시스템 학생 명부와 불일치</span>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 max-h-[220px] overflow-y-auto space-y-2 divide-y divide-slate-100">
+                {importReport.skippedStudents.map((stStr, idx) => (
+                  <div key={idx} className="pt-2 first:pt-0 flex items-start justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200 font-bold text-[10px] px-2 py-0.5 shrink-0">
+                        미매칭
+                      </Badge>
+                      <span className="font-extrabold text-slate-800">{stStr}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 해결 가이드 안내 */}
+              <div className="p-4 bg-blue-50/80 border border-blue-200/80 rounded-2xl text-xs space-y-2 mt-2 text-left">
+                <p className="font-black text-blue-950 flex items-center gap-1.5">
+                  <Info className="h-4 w-4 text-blue-600 shrink-0" />
+                  미반영 발생 원인 및 해결 가이드
+                </p>
+                <ul className="text-blue-900 text-[11px] leading-relaxed space-y-1.5 list-disc pl-4 font-medium">
+                  <li>
+                    <strong>학생 명부 미등록 (전입생 등)</strong>: 해당 학생이 시스템 학생 명부에 등록되어 있지 않은 경우 매칭되지 않습니다. <span className="font-bold underline text-blue-950">[학생 관리]</span> 또는 <span className="font-bold underline text-blue-950">[학생 등록/진급]</span> 메뉴에서 학생을 먼저 추가해주세요.
+                  </li>
+                  <li>
+                    <strong>이름 표기 불일치 (괄호/오탈자/개명)</strong>: 나이스 엑셀에 학생 이름 뒤 괄호(예: 전입, 유예 등)나 한자, 오탈자가 기재되어 있는지 확인해주세요.
+                  </li>
+                  <li>
+                    <strong>반 또는 번호 불일치</strong>: 학적 변동으로 반/번호가 DB와 다른 경우, 학생 관리에서 반/번호를 동일하게 수정한 뒤 다시 업로드하거나, <span className="font-bold underline text-blue-950">[종합 인증평가]</span> 메뉴에서 해당 학생의 봉사활동 시간을 수기로 직접 입력할 수 있습니다.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="pt-3">
+            <Button
+              onClick={() => {
+                setIsReportOpen(false);
+                handleClear();
+              }}
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold h-10 rounded-xl"
+            >
+              확인 완료 (창 닫기)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

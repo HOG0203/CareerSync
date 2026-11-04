@@ -886,8 +886,12 @@ export async function batchImportVolunteerAction(studentsList: VolunteerImportSt
   await logAuditAction({
     actor_name: profile.full_name || profile.username || '교사',
     action_type: 'STUDENT_BULK_UPDATE',
-    target_name: `[인증제 봉사활동] 나이스 엑셀 일괄 등록 (${updatedCount}명 반영)`,
-    details: { count: updatedCount, skipped: skippedStudents.length }
+    target_name: `[인증제 봉사활동] 나이스 엑셀 일괄 등록 (${updatedCount}명 반영${skippedStudents.length > 0 ? `, ${skippedStudents.length}명 미매칭` : ''})`,
+    details: { 
+      count: updatedCount, 
+      skipped: skippedStudents.length,
+      skippedStudents: skippedStudents.slice(0, 50)
+    }
   });
 
   revalidateTag('cert-eval');
@@ -896,14 +900,12 @@ export async function batchImportVolunteerAction(studentsList: VolunteerImportSt
   revalidateTag(`cert-eval-grade-1`);
   revalidatePath('/admin/certification');
   revalidatePath('/admin/certification/import');
-  revalidatePath('/admin/certification');
-  revalidatePath('/admin/certification/import');
 
   return { 
     success: true, 
     updatedCount, 
     skippedCount: skippedStudents.length,
-    skippedStudents: skippedStudents.slice(0, 10)
+    skippedStudents: skippedStudents
   };
 }
 
