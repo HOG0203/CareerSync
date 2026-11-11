@@ -81,7 +81,8 @@ export function VolunteerImportCard({
 
     parsedResults.forEach(r => {
       r.students.forEach(s => {
-        const key = `${s.grade}_${s.classInfo}_${s.studentNumber}_${s.studentName}`;
+        // 학년 + 학과 + 반 + 번호 + 이름을 모두 포함한 고유 키 생성 (다른 과 1반 동명이인 합산 방지)
+        const key = `${s.grade}_${s.major || ''}_${s.classInfo}_${s.studentNumber}_${s.studentName}`;
         if (!studentMap.has(key)) {
           studentMap.set(key, { ...s });
         } else {

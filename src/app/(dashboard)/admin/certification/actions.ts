@@ -836,41 +836,71 @@ export async function batchImportVolunteerAction(studentsList: VolunteerImportSt
   const cleanClass = (c: any) => String(c || '').replace(/[^0-9]/g, '');
   const cleanNum = (n: any) => String(n || '').replace(/[^0-9]/g, '');
   const cleanName = (n: any) => String(n || '').trim().replace(/\s+/g, '');
+  const cleanMajor = (m: any) => {
+    const s = String(m || '').trim().replace(/\s+/g, '');
+    if (!s) return '';
+    if (s.includes('전기')) return '전기';
+    if (s.includes('기계') || s.includes('자동화')) return '기계';
+    if (s.includes('자동차')) return '자동차';
+    if (s.includes('화학') || s.includes('바이오')) return '화학';
+    if (s.includes('건축') || s.includes('공간') || s.includes('건설') || s.includes('토목')) return '공간';
+    if (s.includes('섬유')) return '섬유';
+    return s;
+  };
 
   for (const row of studentsList) {
+    // 1. 학년 매칭 (해당 학년의 졸업년도 학생들만 1차 격리)
     const targetGradYear = baseYear + (4 - row.grade);
     const gradeStudents = allStudents.filter(s => s.graduation_year === targetGradYear);
 
-    // 1. 학생 매칭: 우선순위 기반 정밀 탐색 (다른 반 학생 오매칭 원천 차단)
-    // 1순위: 이름 + 반 + 번호 완벽 일치
+    const rowMajor = cleanMajor(row.major);
+    const rowClass = cleanClass(row.classInfo);
+    const rowNum = cleanNum(row.studentNumber);
+    const rowName = cleanName(row.studentName);
+
+    // 2. 학생 정밀 매칭 (우선순위 기반: 학년 + 학과 + 반 + 번호 + 이름)
+    // 1순위: 학년 + 학과 + 반 + 번호 + 이름 완벽 일치 (가장 엄격)
     let matched = gradeStudents.find(s => {
-      const nameMatch = cleanName(s.student_name) === cleanName(row.studentName);
-      const classMatch = row.classInfo ? cleanClass(s.class_info) === cleanClass(row.classInfo) : false;
-      const numMatch = cleanNum(s.student_number) === cleanNum(row.studentNumber);
-      return nameMatch && classMatch && numMatch;
+      const nameMatch = cleanName(s.student_name) === rowName;
+      const majorMatch = rowMajor ? cleanMajor(s.major).includes(rowMajor) || rowMajor.includes(cleanMajor(s.major)) : true;
+      const classMatch = rowClass ? cleanClass(s.class_info) === rowClass : true;
+      const numMatch = rowNum ? cleanNum(s.student_number) === rowNum : true;
+      return nameMatch && majorMatch && classMatch && numMatch;
     });
 
-    // 2순위: 이름 + 반 일치 (번호 변동인 경우 동일 반 학생 매칭)
-    if (!matched && row.classInfo) {
+    // 2순위: 학과 + 반 + 이름 일치 (번호 변동인 경우)
+    if (!matched && rowMajor && rowClass) {
       matched = gradeStudents.find(s => {
-        const nameMatch = cleanName(s.student_name) === cleanName(row.studentName);
-        const classMatch = cleanClass(s.class_info) === cleanClass(row.classInfo);
-        return nameMatch && classMatch;
+        const nameMatch = cleanName(s.student_name) === rowName;
+        const majorMatch = cleanMajor(s.major).includes(rowMajor) || rowMajor.includes(cleanMajor(s.major));
+        const classMatch = cleanClass(s.class_info) === rowClass;
+        return nameMatch && majorMatch && classMatch;
       });
     }
 
-    // 3순위: 반 정보가 없는 경우에만 이름 + 번호 일치
-    if (!matched && !row.classInfo) {
+    // 3순위: 학과 + 번호 + 이름 일치 (반 표기가 생략된 경우)
+    if (!matched && rowMajor && rowNum) {
       matched = gradeStudents.find(s => {
-        const nameMatch = cleanName(s.student_name) === cleanName(row.studentName);
-        const numMatch = cleanNum(s.student_number) === cleanNum(row.studentNumber);
-        return nameMatch && numMatch;
+        const nameMatch = cleanName(s.student_name) === rowName;
+        const majorMatch = cleanMajor(s.major).includes(rowMajor) || rowMajor.includes(cleanMajor(s.major));
+        const numMatch = cleanNum(s.student_number) === rowNum;
+        return nameMatch && majorMatch && numMatch;
       });
     }
 
-    // 4순위: 해당 학년에 동명이인이 없는 유일한 이름인 경우 이름만으로 매칭
+    // 4순위: 반 + 번호 + 이름 일치 (학과명이 생략된 파일인 경우)
+    if (!matched && rowClass && rowNum) {
+      matched = gradeStudents.find(s => {
+        const nameMatch = cleanName(s.student_name) === rowName;
+        const classMatch = cleanClass(s.class_info) === rowClass;
+        const numMatch = cleanNum(s.student_number) === rowNum;
+        return nameMatch && classMatch && numMatch;
+      });
+    }
+
+    // 5순위: 해당 학년에 동명이인이 없는 유일한 이름인 경우 이름만으로 매칭
     if (!matched) {
-      const sameNameList = gradeStudents.filter(s => cleanName(s.student_name) === cleanName(row.studentName));
+      const sameNameList = gradeStudents.filter(s => cleanName(s.student_name) === rowName);
       if (sameNameList.length === 1) {
         matched = sameNameList[0];
       }
