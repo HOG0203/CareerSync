@@ -137,11 +137,14 @@ export async function uploadStudentAttendance(
   const skippedStudents = Array.from(skippedStudentsMap.values());
   const skippedCount = skippedStudents.length;
 
-  const upsertData = data.filter(d => d.studentId).map(d => {
+  // PostgreSQL 'ON CONFLICT DO UPDATE command cannot affect row a second time' 방지를 위한 고유 복합키 중복 제거
+  const dedupedUpsertMap = new Map<string, any>();
+  data.filter(d => d.studentId).forEach(d => {
     // 실제 발생 연도 계산 (개별 학생의 업로드 시점 학년 d.currentGrade 기준 적용)
     const actualYear = baseAcademicYear - (d.currentGrade - d.gradeObtained);
+    const conflictKey = `${d.studentId}_${actualYear}_${d.gradeObtained}_1`;
 
-    return {
+    dedupedUpsertMap.set(conflictKey, {
       student_id: d.studentId,
       academic_year: actualYear,
       grade: d.gradeObtained,
@@ -161,8 +164,9 @@ export async function uploadStudentAttendance(
       out_other: d.outOther,
       remarks: d.remarks,
       updated_at: new Date().toISOString()
-    };
+    });
   });
+  const upsertData = Array.from(dedupedUpsertMap.values());
 
   if (upsertData.length === 0 && skippedCount === 0) {
     return { success: false, error: "매칭된 학생이 없어 저장할 데이터가 없습니다." };
