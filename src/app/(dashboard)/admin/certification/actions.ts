@@ -849,7 +849,7 @@ export async function batchImportVolunteerAction(studentsList: VolunteerImportSt
   };
 
   for (const row of studentsList) {
-    // 1. 학년 매칭 (해당 학년의 졸업년도 학생들만 1차 격리)
+    // [나이스 공식 1:1 다이렉트 매칭] 학년 격리
     const targetGradYear = baseYear + (4 - row.grade);
     const gradeStudents = allStudents.filter(s => s.graduation_year === targetGradYear);
 
@@ -858,53 +858,14 @@ export async function batchImportVolunteerAction(studentsList: VolunteerImportSt
     const rowNum = cleanNum(row.studentNumber);
     const rowName = cleanName(row.studentName);
 
-    // 2. 학생 정밀 매칭 (우선순위 기반: 학년 + 학과 + 반 + 번호 + 이름)
-    // 1순위: 학년 + 학과 + 반 + 번호 + 이름 완벽 일치 (가장 엄격)
-    let matched = gradeStudents.find(s => {
+    // 나이스 공식 학적: 학년 + 학과 + 반 + 번호 + 이름 100% 완전 일치 검증 (추측 매칭 원천 배제)
+    const matched = gradeStudents.find(s => {
       const nameMatch = cleanName(s.student_name) === rowName;
-      const majorMatch = rowMajor ? cleanMajor(s.major).includes(rowMajor) || rowMajor.includes(cleanMajor(s.major)) : true;
+      const numMatch = cleanNum(s.student_number) === rowNum;
       const classMatch = rowClass ? cleanClass(s.class_info) === rowClass : true;
-      const numMatch = rowNum ? cleanNum(s.student_number) === rowNum : true;
-      return nameMatch && majorMatch && classMatch && numMatch;
+      const majorMatch = rowMajor ? cleanMajor(s.major).includes(rowMajor) || rowMajor.includes(cleanMajor(s.major)) : true;
+      return nameMatch && numMatch && classMatch && majorMatch;
     });
-
-    // 2순위: 학과 + 반 + 이름 일치 (번호 변동인 경우)
-    if (!matched && rowMajor && rowClass) {
-      matched = gradeStudents.find(s => {
-        const nameMatch = cleanName(s.student_name) === rowName;
-        const majorMatch = cleanMajor(s.major).includes(rowMajor) || rowMajor.includes(cleanMajor(s.major));
-        const classMatch = cleanClass(s.class_info) === rowClass;
-        return nameMatch && majorMatch && classMatch;
-      });
-    }
-
-    // 3순위: 학과 + 번호 + 이름 일치 (반 표기가 생략된 경우)
-    if (!matched && rowMajor && rowNum) {
-      matched = gradeStudents.find(s => {
-        const nameMatch = cleanName(s.student_name) === rowName;
-        const majorMatch = cleanMajor(s.major).includes(rowMajor) || rowMajor.includes(cleanMajor(s.major));
-        const numMatch = cleanNum(s.student_number) === rowNum;
-        return nameMatch && majorMatch && numMatch;
-      });
-    }
-
-    // 4순위: 반 + 번호 + 이름 일치 (학과명이 생략된 파일인 경우)
-    if (!matched && rowClass && rowNum) {
-      matched = gradeStudents.find(s => {
-        const nameMatch = cleanName(s.student_name) === rowName;
-        const classMatch = cleanClass(s.class_info) === rowClass;
-        const numMatch = cleanNum(s.student_number) === rowNum;
-        return nameMatch && classMatch && numMatch;
-      });
-    }
-
-    // 5순위: 해당 학년에 동명이인이 없는 유일한 이름인 경우 이름만으로 매칭
-    if (!matched) {
-      const sameNameList = gradeStudents.filter(s => cleanName(s.student_name) === rowName);
-      if (sameNameList.length === 1) {
-        matched = sameNameList[0];
-      }
-    }
 
     if (matched) {
       const auditMeta = {
@@ -926,7 +887,7 @@ export async function batchImportVolunteerAction(studentsList: VolunteerImportSt
       };
       currentStore[matched.id] = studentEval;
 
-      // 동일 학생이 여러 번 등장해도 1건만 고유하게 보관
+      // 동일 학생이 여러 파일에 등장 시 고유 1건으로 보관
       const existingIdx = updatedRecordsForDb.findIndex(r => r.studentId === matched.id);
       if (existingIdx !== -1) {
         updatedRecordsForDb[existingIdx] = { studentId: matched.id, data: studentEval, academicYear: baseYear };
@@ -935,7 +896,7 @@ export async function batchImportVolunteerAction(studentsList: VolunteerImportSt
         updatedCount++;
       }
     } else {
-      skippedStudents.push(`${row.studentName} (${row.grade}학년 ${row.classInfo} ${row.studentNumber}번 - 매칭 학생 없음)`);
+      skippedStudents.push(`${row.studentName} (${row.grade}학년 ${row.major || ''} ${row.classInfo || ''} ${row.studentNumber}번 - 시스템 학생 명부에 미등록)`);
     }
   }
 
