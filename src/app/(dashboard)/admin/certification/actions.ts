@@ -894,6 +894,7 @@ export async function batchImportVolunteerAction(studentsList: VolunteerImportSt
     }
   });
 
+  clearCertificationSummaryCache();
   revalidateTag('cert-eval');
   revalidateTag(`cert-eval-grade-3`);
   revalidateTag(`cert-eval-grade-2`);
@@ -1063,6 +1064,7 @@ export async function batchImportVocationalAction(studentsList: VocationalImport
     details: { count: updatedCount, skipped: skippedStudents.length }
   });
 
+  clearCertificationSummaryCache();
   revalidateTag('cert-eval');
   revalidateTag('cert-eval-grade-3');
   revalidateTag('cert-eval-grade-2');
@@ -1247,6 +1249,7 @@ export async function batchImportEmploymentAction(
     details: { count: updatedCount }
   });
 
+  clearCertificationSummaryCache();
   revalidateTag('cert-eval');
   revalidateTag('cert-eval-grade-3');
   revalidateTag('cert-eval-grade-2');
@@ -1379,6 +1382,7 @@ export async function batchImportArtsContestAction(
     details: { count: updatedCount }
   });
 
+  clearCertificationSummaryCache();
   clearCertificationSummaryCache();
   revalidateTag('cert-eval');
   revalidateTag('cert-eval-grade-3');
@@ -1620,6 +1624,7 @@ export async function deleteStudentEvaluationItemAction(
     details: { studentId, category, subKeyOrId }
   });
 
+  clearCertificationSummaryCache();
   revalidateTag('cert-eval');
   revalidateTag('cert-eval-grade-3');
   revalidateTag('cert-eval-grade-2');
@@ -2185,6 +2190,7 @@ export async function updateSingleImportedRecordAction(
     details: { category, studentId, data },
   });
 
+  clearCertificationSummaryCache();
   clearCertificationSummaryCache();
   revalidateTag('cert-eval');
   revalidateTag(`cert-eval-grade-3`);
