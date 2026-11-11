@@ -46,9 +46,14 @@ export function parseNeisVolunteerWorkbook(
       return { fileName, students: [], totalActivities: 0, error: '유효한 나이스 봉사활동 데이터가 아닙니다.' };
     }
 
-    let currentGrade = 3;
-    let currentClass = '';
-    let currentMajor = '';
+    // 파일명에서 기본 학년/반/과 백업 추출 (예: "3학년 2반", "전기과 1반")
+    const fileGradeMatch = fileName.match(/(\d)\s*학년/);
+    const fileClassMatch = fileName.match(/(\d+)\s*(?:반|학급)/);
+    const fileMajorMatch = fileName.match(/([가-힣]+과)/);
+    let currentGrade = fileGradeMatch ? parseInt(fileGradeMatch[1], 10) : 3;
+    let currentClass = fileClassMatch ? `${fileClassMatch[1]}반` : '';
+    let currentMajor = fileMajorMatch ? fileMajorMatch[1] : '';
+
     let currentNum = '';
     let currentName = '';
 
@@ -60,12 +65,13 @@ export function parseNeisVolunteerWorkbook(
       if (!row || row.length === 0) continue;
 
       const firstCell = String(row[0] || '').trim();
+      const rowCombined = row.slice(0, 5).map(c => String(c || '').trim()).join(' ');
 
-      // 1. 학급 헤더 감지: e.g. "공업계 스마트전기과 3학년 1반"
-      if (firstCell.includes('학년') && firstCell.includes('반')) {
-        const gMatch = firstCell.match(/(\d)\s*학년/);
-        const cMatch = firstCell.match(/(\d+)\s*반/);
-        const mMatch = firstCell.match(/([가-힣]+과)/);
+      // 1. 학급 헤더 감지: e.g. "공업계 스마트전기과 3학년 1반" (첫 열 또는 병합 행 전체 검사)
+      if (rowCombined.includes('학년') && (rowCombined.includes('반') || rowCombined.includes('학급'))) {
+        const gMatch = rowCombined.match(/(\d)\s*학년/);
+        const cMatch = rowCombined.match(/(\d+)\s*(?:반|학급)/);
+        const mMatch = rowCombined.match(/([가-힣]+과)/);
         if (gMatch) currentGrade = parseInt(gMatch[1], 10);
         if (cMatch) currentClass = cMatch[1] + '반';
         if (mMatch) currentMajor = mMatch[1];

@@ -839,17 +839,42 @@ export async function batchImportVolunteerAction(studentsList: VolunteerImportSt
 
   for (const row of studentsList) {
     const targetGradYear = baseYear + (4 - row.grade);
+    const gradeStudents = allStudents.filter(s => s.graduation_year === targetGradYear);
 
-    // 1. 해당 학년 학생 중 [이름 + 번호] 또는 [이름 + 반] 매칭 (자연수/문자열 정규화)
-    const matched = allStudents.find(s => {
-      if (s.graduation_year !== targetGradYear) return false;
-      
+    // 1. 학생 매칭: 우선순위 기반 정밀 탐색 (다른 반 학생 오매칭 원천 차단)
+    // 1순위: 이름 + 반 + 번호 완벽 일치
+    let matched = gradeStudents.find(s => {
       const nameMatch = cleanName(s.student_name) === cleanName(row.studentName);
+      const classMatch = row.classInfo ? cleanClass(s.class_info) === cleanClass(row.classInfo) : false;
       const numMatch = cleanNum(s.student_number) === cleanNum(row.studentNumber);
-      const classMatch = row.classInfo ? cleanClass(s.class_info) === cleanClass(row.classInfo) : true;
-
-      return nameMatch && (numMatch || classMatch);
+      return nameMatch && classMatch && numMatch;
     });
+
+    // 2순위: 이름 + 반 일치 (번호 변동인 경우 동일 반 학생 매칭)
+    if (!matched && row.classInfo) {
+      matched = gradeStudents.find(s => {
+        const nameMatch = cleanName(s.student_name) === cleanName(row.studentName);
+        const classMatch = cleanClass(s.class_info) === cleanClass(row.classInfo);
+        return nameMatch && classMatch;
+      });
+    }
+
+    // 3순위: 반 정보가 없는 경우에만 이름 + 번호 일치
+    if (!matched && !row.classInfo) {
+      matched = gradeStudents.find(s => {
+        const nameMatch = cleanName(s.student_name) === cleanName(row.studentName);
+        const numMatch = cleanNum(s.student_number) === cleanNum(row.studentNumber);
+        return nameMatch && numMatch;
+      });
+    }
+
+    // 4순위: 해당 학년에 동명이인이 없는 유일한 이름인 경우 이름만으로 매칭
+    if (!matched) {
+      const sameNameList = gradeStudents.filter(s => cleanName(s.student_name) === cleanName(row.studentName));
+      if (sameNameList.length === 1) {
+        matched = sameNameList[0];
+      }
+    }
 
     if (matched) {
       const auditMeta = {
