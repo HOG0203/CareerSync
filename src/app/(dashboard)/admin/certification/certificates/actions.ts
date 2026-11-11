@@ -114,10 +114,17 @@ export async function updateStudentCertificates(studentId: string, certificates:
   await clearCertificateSummariesCache();
   [1, 2, 3].forEach(g => revalidateTag(`cert-certificates-grade-${g}`));
   revalidateTag('cert-certificates');
+  revalidateTag('cert-eval');
   revalidateTag('students');
   revalidatePath('/admin/certification/certificates');
+  revalidatePath('/admin/certification');
   revalidatePath('/employment-status');
   revalidatePath('/students');
+
+  try {
+    const { clearCertificationSummaryCache } = await import('@/app/(dashboard)/admin/certification/actions');
+    await clearCertificationSummaryCache();
+  } catch (e) {}
 
   // 감사 로그 기록 (STUDENT_UPDATE)
   try {
@@ -323,8 +330,15 @@ export async function importUploadedCertificates(rawRows: any[][]) {
     await clearCertificateSummariesCache();
     revalidateTag(`cert-certificates-grade-${grade}`);
     revalidateTag('cert-certificates');
+    revalidateTag('cert-eval');
     revalidateTag('students');
     revalidatePath('/admin/certification/certificates');
+    revalidatePath('/admin/certification');
+
+    try {
+      const { clearCertificationSummaryCache } = await import('@/app/(dashboard)/admin/certification/actions');
+      await clearCertificationSummaryCache();
+    } catch (e) {}
 
     // 감사 로그 기록 (STUDENT_BULK_UPDATE)
     try {

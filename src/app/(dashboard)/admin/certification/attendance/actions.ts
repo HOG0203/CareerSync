@@ -197,7 +197,14 @@ export async function uploadStudentAttendance(
     clearAttendanceCache(g);
   });
   revalidateTag('cert-attendance');
+  revalidateTag('cert-eval');
   revalidatePath('/admin/certification/attendance');
+  revalidatePath('/admin/certification');
+
+  try {
+    const { clearCertificationSummaryCache } = await import('@/app/(dashboard)/admin/certification/actions');
+    await clearCertificationSummaryCache();
+  } catch (e) {}
 
   // 감사 로그 기록 (STUDENT_BULK_UPDATE)
   try {
@@ -234,7 +241,14 @@ export async function deleteAllStudentAttendance() {
     clearAttendanceCache(g);
   });
   revalidateTag('cert-attendance');
+  revalidateTag('cert-eval');
   revalidatePath('/admin/certification/attendance');
+  revalidatePath('/admin/certification');
+
+  try {
+    const { clearCertificationSummaryCache } = await import('@/app/(dashboard)/admin/certification/actions');
+    await clearCertificationSummaryCache();
+  } catch (e) {}
 
   // 감사 로그 기록 (STUDENT_BULK_UPDATE)
   try {

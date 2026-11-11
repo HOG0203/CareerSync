@@ -231,9 +231,14 @@ export async function bulkPromoteFromExcel(csvData: string) {
   revalidateTag('students');
   revalidateTag('student_scores');
   revalidateTag('middle-school-employment');
+  revalidateTag('cert-eval');
   try {
     const { clearYearlyRankingsCache } = await import('@/lib/data');
     await clearYearlyRankingsCache();
+  } catch (e) {}
+  try {
+    const { clearCertificationSummaryCache } = await import('@/app/(dashboard)/admin/certification/actions');
+    await clearCertificationSummaryCache();
   } catch (e) {}
   revalidatePath('/class-management');
   revalidatePath('/admin/students');
@@ -241,6 +246,7 @@ export async function bulkPromoteFromExcel(csvData: string) {
   revalidatePath('/employment-status');
   revalidatePath('/admission/middle-school-employment');
   revalidatePath('/share/admission/middle-school-employment');
+  revalidatePath('/admin/certification');
   
   return { success: true, count: successCount, errors: errors.length > 0 ? errors : null }
 }
@@ -521,8 +527,14 @@ export async function uploadStudentsCSV(csvData: string) {
 
   revalidateTag('students');
   revalidateTag('student-accounts');
+  revalidateTag('cert-eval');
   revalidatePath('/students');
   revalidatePath('/admin/students');
+  revalidatePath('/admin/certification');
+  try {
+    const { clearCertificationSummaryCache } = await import('@/app/(dashboard)/admin/certification/actions');
+    await clearCertificationSummaryCache();
+  } catch (e) {}
 
   // 감사 로그 기록 (STUDENT_BULK_UPDATE)
   try {
@@ -741,8 +753,14 @@ export async function uploadBasicStudentsCSV(csvData: string) {
 
   revalidateTag('students');
   revalidateTag('student-accounts');
+  revalidateTag('cert-eval');
   revalidatePath('/admin/students');
   revalidatePath('/students');
+  revalidatePath('/admin/certification');
+  try {
+    const { clearCertificationSummaryCache } = await import('@/app/(dashboard)/admin/certification/actions');
+    await clearCertificationSummaryCache();
+  } catch (e) {}
 
   // 감사 로그 기록 (STUDENT_BULK_UPDATE)
   try {
