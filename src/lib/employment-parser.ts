@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
+import { matchStudent5Steps, cleanMajor, cleanName, cleanClass, cleanNumber } from './student-matcher';
 
 /**
  * 표준 취업진로코스 목록
@@ -614,25 +615,11 @@ export function buildUploadedOnlyEmploymentRows(
     const rawMajor = sample.major;
     const sourceFiles = Array.from(new Set(records.map(r => r.sourceFile)));
 
-    // 2. DB activeStudents에서 매칭 후보 탐색
-    const nameMatches = activeStudents.filter(st => String(st.student_name || '').trim() === rawName.trim());
+    // 2. 통합 매칭 엔진(matchStudent5Steps)을 통한 5단 정밀 매칭 검증
     let matchedStudent: any = null;
     let matchStatus: 'matched' | 'unmatched' | 'ambiguous' = 'unmatched';
     let unmatchedReason = '';
     let candidateStudents: any[] = [];
-
-    // 숫자 및 학과 정규화 헬퍼 (0 또는 빈값은 null로 처리하여 잘못된 불일치 방지)
-    const toNum = (v: any) => {
-      if (v === null || v === undefined || v === '' || v === 0 || v === '0') return null;
-      const parsed = parseInt(String(v).replace(/[^0-9]/g, ''), 10);
-      return isNaN(parsed) || parsed === 0 ? null : parsed;
-    };
-    const toMajor = (m: any) => String(m || '').trim().replace(/\s+/g, '').replace(/과$/, '').replace(/계열$/, '').replace(/공업계$/, '');
-
-    const excelGrade = toNum(rawGrade);
-    const excelClass = toNum(rawClass);
-    const excelNum = toNum(rawNum);
-    const excelMajor = toMajor(rawMajor);
 
     // 수동 선택이 있으면 최우선 적용
     if (manualSelections[key]) {
@@ -647,61 +634,31 @@ export function buildUploadedOnlyEmploymentRows(
         }
       }
     } else {
-      if (nameMatches.length === 0) {
-        matchStatus = 'unmatched';
-        unmatchedReason = '현재 DB 재학생 목록에 일치하는 이름이 없습니다.';
-      } else if (nameMatches.length === 1) {
-        const st = nameMatches[0];
-        const stGrade = toNum(baseYear - st.graduation_year + 4);
-        const stClass = toNum(st.class_info);
-        const stNum = toNum(st.student_number);
-        const stMajor = toMajor(st.major);
-        
-        // 학년/반/번호/학과가 명시되어 있을 때 불일치 검증
-        if (excelGrade !== null && stGrade !== null && excelGrade !== stGrade) {
-          matchStatus = 'unmatched';
-          unmatchedReason = `엑셀 학년(${excelGrade}학년)과 DB 학적(${stGrade}학년)이 불일치합니다.`;
-        } else if (excelClass !== null && stClass !== null && excelClass !== stClass) {
-          matchStatus = 'unmatched';
-          unmatchedReason = `엑셀 학급(${excelClass}반)과 DB 학적(${stClass}반)이 불일치합니다.`;
-        } else if (excelNum !== null && stNum !== null && excelNum !== stNum) {
-          matchStatus = 'unmatched';
-          unmatchedReason = `엑셀 번호(${excelNum}번)와 DB 학적(${stNum}번)이 불일치합니다.`;
-        } else if (excelMajor && stMajor && !stMajor.includes(excelMajor) && !excelMajor.includes(stMajor)) {
-          matchStatus = 'unmatched';
-          unmatchedReason = `엑셀 학과(${rawMajor})와 DB 학적(${st.major})이 불일치합니다.`;
-        } else {
-          matchedStudent = st;
-          matchStatus = 'matched';
-        }
+      // 통합 매칭 프로그램 호출 (5단 정밀 매칭: 학년 + 학과 + 반 + 번호 + 이름)
+      const matchResult = matchStudent5Steps(
+        {
+          grade: rawGrade,
+          major: rawMajor,
+          classInfo: rawClass,
+          studentNumber: rawNum,
+          studentName: rawName
+        },
+        activeStudents,
+        baseYear
+      );
+
+      if (matchResult.status === 'matched') {
+        matchedStudent = matchResult.matchedStudent;
+        matchStatus = 'matched';
+      } else if (matchResult.status === 'ambiguous') {
+        matchStatus = 'ambiguous';
+        candidateStudents = matchResult.candidateStudents;
+        unmatchedReason = matchResult.reason;
       } else {
-        // 동명이인 다수 존재 -> 학년, 반, 번호, 학과로 좁히기
-        const exactMatches = nameMatches.filter(st => {
-          const stGrade = toNum(baseYear - st.graduation_year + 4);
-          const stClass = toNum(st.class_info);
-          const stNum = toNum(st.student_number);
-          const stMajor = toMajor(st.major);
-
-          if (excelGrade !== null && stGrade !== null && excelGrade !== stGrade) return false;
-          if (excelClass !== null && stClass !== null && excelClass !== stClass) return false;
-          if (excelNum !== null && stNum !== null && excelNum !== stNum) return false;
-          if (excelMajor && stMajor && !stMajor.includes(excelMajor) && !excelMajor.includes(stMajor)) return false;
-          return true;
-        });
-
-        if (exactMatches.length === 1) {
-          matchedStudent = exactMatches[0];
-          matchStatus = 'matched';
-        } else if (exactMatches.length > 1) {
-          // 학년/과/반/번호 정보가 부족하여 여전히 동명이인 여러 명이 남은 경우
-          matchStatus = 'ambiguous';
-          candidateStudents = exactMatches;
-          unmatchedReason = `동명이인 ${exactMatches.length}명이 존재하여 명확한 선택이 필요합니다.`;
-        } else {
-          matchStatus = 'ambiguous';
-          candidateStudents = nameMatches;
-          unmatchedReason = `동명이인 ${nameMatches.length}명이 존재하여 명확한 선택이 필요합니다.`;
-        }
+        // mismatched (학적 불일치 - 오매칭 차단) 또는 unregistered (미등록)
+        matchStatus = 'unmatched';
+        candidateStudents = matchResult.candidateStudents;
+        unmatchedReason = matchResult.reason;
       }
     }
 

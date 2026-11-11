@@ -19,6 +19,7 @@ import {
 import { generateRewardLedgerExcelBuffer } from '@/lib/cert-reward-excel-generator';
 import { logAuditAction } from '@/lib/audit-logger';
 import { formatExcelDate } from '@/lib/employment-parser';
+import { matchStudent5Steps } from '@/lib/student-matcher';
 
 const EVAL_SETTINGS_KEY = 'certification_evaluations_store';
 const REWARD_SETTINGS_KEY = 'certification_rewards_store';
@@ -849,23 +850,20 @@ export async function batchImportVolunteerAction(studentsList: VolunteerImportSt
   };
 
   for (const row of studentsList) {
-    // [나이스 공식 1:1 다이렉트 매칭] 학년 격리
-    const targetGradYear = baseYear + (4 - row.grade);
-    const gradeStudents = allStudents.filter(s => s.graduation_year === targetGradYear);
+    // 통합 5단 정밀 매칭 엔진 호출 (1:1 다이렉트 매칭 검증)
+    const matchRes = matchStudent5Steps(
+      {
+        grade: row.grade,
+        major: row.major,
+        classInfo: row.classInfo,
+        studentNumber: row.studentNumber,
+        studentName: row.studentName
+      },
+      allStudents,
+      baseYear
+    );
 
-    const rowMajor = cleanMajor(row.major);
-    const rowClass = cleanClass(row.classInfo);
-    const rowNum = cleanNum(row.studentNumber);
-    const rowName = cleanName(row.studentName);
-
-    // 나이스 공식 학적: 학년 + 학과 + 반 + 번호 + 이름 100% 완전 일치 검증 (추측 매칭 원천 배제)
-    const matched = gradeStudents.find(s => {
-      const nameMatch = cleanName(s.student_name) === rowName;
-      const numMatch = cleanNum(s.student_number) === rowNum;
-      const classMatch = rowClass ? cleanClass(s.class_info) === rowClass : true;
-      const majorMatch = rowMajor ? cleanMajor(s.major).includes(rowMajor) || rowMajor.includes(cleanMajor(s.major)) : true;
-      return nameMatch && numMatch && classMatch && majorMatch;
-    });
+    const matched = matchRes.status === 'matched' ? matchRes.matchedStudent : null;
 
     if (matched) {
       const auditMeta = {
@@ -896,7 +894,7 @@ export async function batchImportVolunteerAction(studentsList: VolunteerImportSt
         updatedCount++;
       }
     } else {
-      skippedStudents.push(`${row.studentName} (${row.grade}학년 ${row.major || ''} ${row.classInfo || ''} ${row.studentNumber}번 - 시스템 학생 명부에 미등록)`);
+      skippedStudents.push(`${row.studentName} (${row.grade}학년 ${row.major || ''} ${row.classInfo || ''} ${row.studentNumber}번 - ${matchRes.reason})`);
     }
   }
 

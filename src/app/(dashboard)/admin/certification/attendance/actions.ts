@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/server';
 import { getCurrentUserProfile } from '@/lib/data';
 import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
+import { matchStudent5Steps } from '@/lib/student-matcher';
 
 export interface ParsedAttendanceData {
   studentId?: string;
@@ -66,33 +67,25 @@ export async function matchStudentsForAttendance(
     if (error || !students) continue;
 
     keysByGrade[currentGrade].forEach(key => {
-      // [정규화] 엑셀 데이터
-      const targetName = key.name.replace(/\s+/g, '');
-      const targetNum = parseInt(key.number).toString();
-      const targetClass = key.classInfo.replace(/반|학년/g, '').trim();
-      const targetMajor = key.major.replace(/과|공업계/g, '').trim();
+      // 통합 5단 정밀 매칭 엔진 호출
+      const matchRes = matchStudent5Steps(
+        {
+          grade: currentGrade,
+          major: key.major,
+          classInfo: key.classInfo,
+          studentNumber: key.number,
+          studentName: key.name
+        },
+        students as any[],
+        academicYear
+      );
 
-      const match = students.find(s => {
-        // [정규화] DB 데이터
-        const dbName = (s.student_name || '').replace(/\s+/g, '');
-        const dbNum = parseInt(s.student_number || '0').toString();
-        const dbClass = (s.class_info || '').replace(/반|학년/g, '').trim();
-        const dbMajor = (s.major || '').replace(/과|공업계/g, '').trim();
-
-        // 이름과 번호는 필수 일치, 학과와 반은 포함 관계 확인
-        const nameMatch = dbName === targetName;
-        const numMatch = dbNum === targetNum;
-        const classMatch = dbClass === targetClass || dbClass.includes(targetClass) || targetClass.includes(dbClass);
-        const majorMatch = dbMajor === targetMajor || dbMajor.includes(targetMajor) || targetMajor.includes(dbMajor);
-
-        return nameMatch && numMatch && classMatch && majorMatch;
-      });
-
-      if (match) {
+      if (matchRes.status === 'matched' && matchRes.matchedStudent) {
+        const match = matchRes.matchedStudent;
         matchMap[`${key.major}_${key.classInfo}_${key.number}_${key.name}`] = {
           id: match.id,
-          major: match.major,
-          classInfo: match.class_info,
+          major: match.major || '',
+          classInfo: String(match.class_info || ''),
           gradYear: match.graduation_year
         };
       }

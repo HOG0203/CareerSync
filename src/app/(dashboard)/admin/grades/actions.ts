@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { matchStudent5Steps } from '@/lib/student-matcher'
 
 export type ParsedGradeData = {
   studentId?: string; // 클라이언트에서 확정된 UUID
@@ -68,49 +69,31 @@ export async function matchStudents(
     });
 
     keysByGrade[currentGrade].forEach(key => {
-      const targetNum = Number(key.number);
       const targetName = key.name.trim();
-      const targetMajorKey = (key.major || '').replace('스마트', '').replace('자동화', '').replace('과', '').trim();
-      const targetClassNum = Number(key.classInfo?.replace(/[^0-9]/g, ''));
 
-      // 1순위: 학과, 반, 번호, 성명 완벽 일치
-      let matched = allStudents.find(s => {
-        const sName = (s.student_name || '').trim();
-        const sNum = Number(s.student_number);
-        const sMajor = (s.major || '');
-        const sClassNum = Number(s.class_info?.replace(/[^0-9]/g, ''));
+      // 통합 5단 정밀 매칭 엔진 호출 (1:1 완전 일치 검증)
+      const matchRes = matchStudent5Steps(
+        {
+          grade: currentGrade,
+          major: key.major || null,
+          classInfo: key.classInfo || null,
+          studentNumber: key.number || null,
+          studentName: targetName
+        },
+        allStudents as any[],
+        academicYear
+      );
 
-        return sName === targetName && 
-               sNum === targetNum && 
-               (targetMajorKey ? sMajor.includes(targetMajorKey) : true) &&
-               (targetClassNum ? sClassNum === targetClassNum : true);
-      });
-
-      // 2순위: 학과 정보가 없는 경우 (전과목 성적 일람표 양식) 반, 번호, 성명 일치
-      if (!matched && targetClassNum && targetNum) {
-        matched = allStudents.find(s => {
-          const sName = (s.student_name || '').trim();
-          const sNum = Number(s.student_number);
-          const sClassNum = Number(s.class_info?.replace(/[^0-9]/g, ''));
-          return sName === targetName && sNum === targetNum && sClassNum === targetClassNum;
-        });
-      }
-
-      // 3순위: 해당 학년에 동명이인이 없는 경우 성명 단독 일치
-      if (!matched) {
-        const nameMatches = allStudents.filter(s => (s.student_name || '').trim() === targetName);
-        if (nameMatches.length === 1) {
-          matched = nameMatches[0];
-        }
-      }
+      const matched = matchRes.status === 'matched' ? matchRes.matchedStudent : null;
 
       if (matched) {
         // 학과_반_번호_이름 조합 키로 UUID 정보 전달
         const mapKey = `${key.major || ''}_${key.classInfo || ''}_${key.number}_${targetName}`;
+        const rawClassStr = String(matched.class_info || '');
         matchMap[mapKey] = {
           id: matched.id,
           major: matched.major || '미지정',
-          classInfo: matched.class_info ? (matched.class_info.endsWith('반') ? matched.class_info : `${matched.class_info}반`) : '미지정'
+          classInfo: rawClassStr ? (rawClassStr.endsWith('반') ? rawClassStr : `${rawClassStr}반`) : '미지정'
         };
       }
     });

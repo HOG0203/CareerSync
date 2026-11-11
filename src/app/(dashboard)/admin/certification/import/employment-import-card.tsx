@@ -947,11 +947,16 @@ export function EmploymentImportCard({
                                   </div>
                                 ) : (
                                   <div className="space-y-1">
-                                    <Badge className="bg-rose-100 text-rose-800 text-[10px] font-black px-1.5 py-0.5 border border-rose-300 gap-1">
-                                      <UserX className="h-3 w-3 text-rose-600" />
-                                      <span>DB 불일치</span>
+                                    <Badge className={cn(
+                                      "text-[10px] font-black px-1.5 py-0.5 gap-1",
+                                      row.unmatchedReason?.includes('차단') || row.unmatchedReason?.includes('불일치')
+                                        ? "bg-amber-100 text-amber-900 border border-amber-300"
+                                        : "bg-rose-100 text-rose-800 border border-rose-300"
+                                    )}>
+                                      <UserX className={cn("h-3 w-3", row.unmatchedReason?.includes('차단') ? "text-amber-600" : "text-rose-600")} />
+                                      <span>{row.unmatchedReason?.includes('차단') || row.unmatchedReason?.includes('불일치') ? '학적 불일치' : 'DB 미등록'}</span>
                                     </Badge>
-                                    <p className="text-[9px] text-rose-600 max-w-[130px] truncate" title={row.unmatchedReason}>
+                                    <p className="text-[9px] text-slate-500 font-medium max-w-[130px] truncate" title={row.unmatchedReason}>
                                       {row.unmatchedReason}
                                     </p>
                                     <Button

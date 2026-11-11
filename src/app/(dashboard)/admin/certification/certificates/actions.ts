@@ -3,6 +3,7 @@
 import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { getSystemSettings } from '@/app/(dashboard)/admin/settings/actions';
+import { matchStudent5Steps } from '@/lib/student-matcher';
 import * as XLSX from 'xlsx';
 
 // 자격증 현황 학생 데이터 타입
@@ -178,21 +179,23 @@ async function saveParsedCertificatesToDb(
     throw new Error(`학생 데이터 로딩 실패: ${dbError.message}`);
   }
 
-  // 매칭 로직 실행 및 업데이트
+  // 매칭 로직 실행 및 업데이트 (통합 5단 정밀 매칭)
   for (const [studentName, certs] of Object.entries(parsedStudents)) {
-    // 성명, 반, 번호를 기준하여 일치하는 학생 찾기
-    const matched = dbStudents.find((s: any) => {
-      const sName = s.student_name.trim();
-      const sMajor = (s.major || '').replace(/과|공업계/g, '').trim();
-      const sClass = (s.class_info || '').replace(/반|학년/g, '').trim();
-      
-      // 이름이 같고, 반이 같을 경우 매칭 (동명이인은 드물고 과 정보도 비교)
-      return sName === studentName.trim() && sClass === cleanClass && sMajor.includes(cleanMajor);
-    });
+    const matchRes = matchStudent5Steps(
+      {
+        grade: grade || null,
+        major: majorName,
+        classInfo: className,
+        studentName: studentName
+      },
+      dbStudents as any[]
+    );
+
+    const matched = matchRes.status === 'matched' ? matchRes.matchedStudent : null;
 
     if (!matched) {
       const gradeStr = grade ? `${grade}학년 ` : '';
-      errors.push(`${studentName} (${gradeStr}${className} - 학생 명부 미매칭)`);
+      errors.push(`${studentName} (${gradeStr}${className} - ${matchRes.reason})`);
       skippedCount++;
       continue;
     }
