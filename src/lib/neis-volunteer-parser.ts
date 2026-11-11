@@ -94,13 +94,32 @@ export function parseNeisVolunteerWorkbook(
         currentName = String(row[1]).trim().replace(/\s+/g, '');
       }
 
-      const dateStr = String(row[3] || '').trim();
+      const rawDate = row[3];
+      let dateStr = String(rawDate || '').trim();
+      let hasValidDate = /\d{4}[.-]\d{2}[.-]\d{2}/.test(dateStr);
+
+      // 엑셀 날짜 일련번호(숫자) 변환 처리 (단일 날짜 셀이 엑셀 시리얼 숫자로 읽히는 문제 완벽 대응)
+      if (!hasValidDate && rawDate !== undefined && rawDate !== null && rawDate !== '') {
+        const numVal = Number(rawDate);
+        if (!isNaN(numVal) && numVal > 30000 && numVal < 60000) {
+          try {
+            const parsedDate = XLSX.SSF.parse_date_code(numVal);
+            if (parsedDate && parsedDate.y >= 2000) {
+              const y = parsedDate.y;
+              const m = String(parsedDate.m).padStart(2, '0');
+              const d = String(parsedDate.d).padStart(2, '0');
+              dateStr = `${y}.${m}.${d}`;
+              hasValidDate = true;
+            }
+          } catch {
+            // 변환 실패 시 기존 텍스트 유지
+          }
+        }
+      }
+
       const locationStr = String(row[4] || '').trim();
       const contentStr = String(row[5] || '').trim();
       const hours = Number(row[6]) || 0;
-
-      // 날짜 형식(YYYY.MM.DD)과 장소 정보가 있는 유효한 봉사활동 행인지 검증
-      const hasValidDate = /\d{4}\.\d{2}\.\d{2}/.test(dateStr);
       if (currentName && currentNum && hasValidDate && hours > 0) {
         const studentKey = `${currentGrade}_${currentClass}_${currentNum}_${currentName}`;
 
