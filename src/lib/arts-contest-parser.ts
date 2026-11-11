@@ -94,9 +94,13 @@ export function parseArtsContestWorkbook(fileBuffer: ArrayBuffer, fileName: stri
       
       // B. 교내외 대회
       contestCategory: headers.findIndex(h => h === '대회구분' || h === '교내외구분' || (h.includes('교내') && !h.includes('대회명')) || (h.includes('교외') && !h.includes('대회명'))),
-      contestType: headers.findIndex(h => h === '실적구분' || h === '참가입상구분' || h === '수상여부' || h.includes('입상구분')),
+      // 신규 분리 컬럼: 참가여부, 입상여부
+      contestPartStatus: headers.findIndex(h => h === '참가여부' || h === '참가' || (h.includes('참가') && !h.includes('입상') && !h.includes('구분'))),
+      contestAwardStatus: headers.findIndex(h => h === '입상여부' || (h.includes('입상') && !h.includes('참가') && !h.includes('구분')) || (h.includes('수상') && h.includes('여부'))),
+      // 기존 통합 컬럼 (하위 호환)
+      contestType: headers.findIndex(h => h === '실적구분' || h === '참가입상구분' || h.includes('입상구분') || h === '구분'),
       contestTitle: headers.findIndex(h => h === '대회명' || (h.includes('대회명') && !h.includes('구분')) || h === '행사명' || (h.includes('대회') && !h.includes('구분') && !h.includes('학기'))),
-      contestAward: headers.findIndex(h => h === '수상명' || h === '입상명' || h === '수상내역' || h.includes('상명') || (h.includes('수상') && !h.includes('구분')) || (h.includes('입상') && !h.includes('구분'))),
+      contestAward: headers.findIndex(h => h === '수상명' || h === '입상명' || h === '수상내역' || h.includes('상명') || (h.includes('수상') && !h.includes('구분') && !h.includes('여부')) || (h.includes('입상') && !h.includes('구분') && !h.includes('여부'))),
       contestDate: headers.findIndex(h => h.includes('일자') || h.includes('일시') || h.includes('수상일') || h.includes('개최일') || h.includes('날짜')),
     };
 
@@ -173,28 +177,65 @@ export function parseArtsContestWorkbook(fileBuffer: ArrayBuffer, fileName: stri
 
       // B. 교내외 대회 (참가 / 입상) 파싱
       const isContestSheet = sheetName.includes('대회') || sheetName.includes('수상') || fileName.includes('대회') || fileName.includes('수상');
-      const contestTypeVal = colMap.contestType !== -1 ? String(row[colMap.contestType] || '').trim() : (colMap.generalCategory !== -1 ? String(row[colMap.generalCategory] || '').trim() : '');
       const contestCatVal = colMap.contestCategory !== -1 ? String(row[colMap.contestCategory] || '').trim() : '교내대회';
       const contestTitleVal = colMap.contestTitle !== -1 ? String(row[colMap.contestTitle] || '').trim() : '';
       const contestDateVal = colMap.contestDate !== -1 ? String(row[colMap.contestDate] || '').trim() : '';
       const contestAwardVal = colMap.contestAward !== -1 ? String(row[colMap.contestAward] || '').trim() : '';
+      
+      const partStatusVal = colMap.contestPartStatus !== -1 ? String(row[colMap.contestPartStatus] || '').trim() : '';
+      const awardStatusVal = colMap.contestAwardStatus !== -1 ? String(row[colMap.contestAwardStatus] || '').trim() : '';
+      const legacyTypeVal = colMap.contestType !== -1 ? String(row[colMap.contestType] || '').trim() : (colMap.generalCategory !== -1 ? String(row[colMap.generalCategory] || '').trim() : '');
 
-      if (contestTitleVal && (isContestSheet || contestTypeVal || contestAwardVal)) {
-        const isAward = contestTypeVal.includes('입상') || contestTypeVal.includes('수상') || (contestAwardVal && !contestAwardVal.includes('참가') && contestAwardVal !== 'X');
-        const type: 'award' | 'participate' = isAward ? 'award' : 'participate';
+      if (contestTitleVal && (isContestSheet || partStatusVal || awardStatusVal || legacyTypeVal || contestAwardVal)) {
+        // 참가 여부 판정:
+        // 1) 신규 서식: 참가여부 컬럼이 '참가', 'O', 'Y', '1' 이거나 공란이 아니면서 '불참/미참가'가 아닌 경우
+        // 2) 구 서식: 실적구분이 입상이든 참가이든 대회가 기재되어 있으면 기본 참가 인정
+        const hasPartCol = colMap.contestPartStatus !== -1;
+        const isParticipate = hasPartCol
+          ? (!partStatusVal.includes('불참') && !partStatusVal.includes('미참') && !partStatusVal.includes('해당없음') && (partStatusVal.includes('참가') || partStatusVal === 'O' || partStatusVal === 'Y' || partStatusVal === '1' || partStatusVal === ''))
+          : (legacyTypeVal.includes('참가') || legacyTypeVal.includes('입상') || isContestSheet || Boolean(contestTitleVal));
 
-        records.push({
-          id: `${recId}_contest_${contestTitleVal}`,
-          sourceFile: fileName,
-          grade: parsedGrade, major, classNumber, studentNumber, studentName: rawName,
-          contest: {
-            type,
-            category: contestCatVal.includes('교외') ? '교외대회' : '교내대회',
-            title: contestTitleVal,
-            dateOrTerm: contestDateVal,
-            award: contestAwardVal || (type === 'award' ? '입상' : '참가')
-          }
-        });
+        // 입상 여부 판정:
+        // 1) 신규 서식: 입상여부 컬럼이 '입상', '수상' 이거나 수상내역에 실제 상명(금상, 은상 등)이 있는 경우
+        // 2) 구 서식: 실적구분에 '입상'이 포함되어 있거나 수상내역이 있는 경우
+        const hasAwardCol = colMap.contestAwardStatus !== -1;
+        const isAward = hasAwardCol
+          ? (awardStatusVal.includes('입상') || awardStatusVal.includes('수상') || (Boolean(contestAwardVal) && !contestAwardVal.includes('해당없음') && !contestAwardVal.includes('참가') && contestAwardVal !== 'X' && contestAwardVal !== '-'))
+          : (legacyTypeVal.includes('입상') || legacyTypeVal.includes('수상') || (Boolean(contestAwardVal) && !contestAwardVal.includes('해당없음') && !contestAwardVal.includes('참가') && contestAwardVal !== 'X' && contestAwardVal !== '-'));
+
+        const category = contestCatVal.includes('교외') ? '교외대회' : '교내대회';
+
+        // 1. 참가 실적 등록 (참가한 경우)
+        if (isParticipate) {
+          records.push({
+            id: `${recId}_contest_${contestTitleVal}_participate`,
+            sourceFile: fileName,
+            grade: parsedGrade, major, classNumber, studentNumber, studentName: rawName,
+            contest: {
+              type: 'participate',
+              category,
+              title: contestTitleVal,
+              dateOrTerm: contestDateVal,
+              award: '참가'
+            }
+          });
+        }
+
+        // 2. 입상 실적 등록 (입상한 경우: 참가와 입상 둘 다 기록 보장)
+        if (isAward) {
+          records.push({
+            id: `${recId}_contest_${contestTitleVal}_award`,
+            sourceFile: fileName,
+            grade: parsedGrade, major, classNumber, studentNumber, studentName: rawName,
+            contest: {
+              type: 'award',
+              category,
+              title: contestTitleVal,
+              dateOrTerm: contestDateVal,
+              award: contestAwardVal || '입상'
+            }
+          });
+        }
       }
     }
   }
@@ -564,37 +605,41 @@ export async function generateArtsContestTemplate(
     ws.views = [{ showGridLines: true }];
 
     ws.addRow([`${academicYear}학년도 교내외 각종 대회 참가 및 입상 명단 일괄 등록 서식`]);
-    ws.addRow(['※ [학년], [학과], [실적구분], [대회구분] 셀을 클릭하시면 드롭다운 목록이 나타납니다. (입상 건당 1.0점, 참가 건당 0.5점, 최대 5점)']);
+    ws.addRow(['※ [학년], [학과], [대회구분], [참가여부], [입상여부] 셀을 클릭하시면 드롭다운 목록이 나타납니다.']);
+    ws.addRow(['※ [배점 기준] 참가: 건당 0.5점 / 입상: 건당 0.5점 가산 (참가와 입상이 모두 선택되면 1.0점 인정, 최대 5점)']);
+    ws.addRow(['※ [작성 요령] 입상한 학생은 [참가여부: 참가] + [입상여부: 입상]을 선택하시면 참가와 입상이 둘 다 동시 기록됩니다.']);
     ws.addRow([]);
 
-    const headerRow = ws.addRow(['학년', '학과', '반', '번호', '이름', '실적구분', '대회구분', '대회명', '일자(또는 학기)', '수상내역', '비고']);
+    const headerRow = ws.addRow(['학년', '학과', '반', '번호', '이름', '대회구분', '대회명', '일자(또는 학기)', '참가여부', '입상여부', '수상내역', '비고']);
     applyHeaderStyle(headerRow);
 
     const sampleRows = [
-      [3, '스마트전기과', 1, 1, '홍길동', '입상', '교내대회', '교내 창의아이디어 경진대회', `${academicYear}-05-20`, '금상(1위)', ''],
-      [3, '스마트전기과', 1, 1, '홍길동', '단순참가', '교외대회', '충남 청소년 과학탐구대회', `${academicYear}-06-11`, '참가', '본선 진출'],
-      [2, '자동화기계과', 1, 1, '김철수', '입상', '교내대회', '교내 백일장 대회', `${academicYear}-09-15`, '은상(2위)', '']
+      [3, '스마트전기과', 1, 1, '홍길동', '교내대회', '교내 창의아이디어 경진대회', `${academicYear}-05-20`, '참가', '입상', '금상(1위)', ''],
+      [3, '스마트전기과', 1, 1, '홍길동', '교외대회', '충남 청소년 과학탐구대회', `${academicYear}-06-11`, '참가', '해당없음', '', '본선 진출'],
+      [2, '자동화기계과', 1, 1, '김철수', '교내대회', '교내 백일장 대회', `${academicYear}-09-15`, '참가', '입상', '은상(2위)', '']
     ];
     sampleRows.forEach(r => ws.addRow(r));
 
     ws.columns = [
-      { width: 10 }, // 학년
-      { width: 18 }, // 학과
-      { width: 8 },  // 반
-      { width: 8 },  // 번호
-      { width: 14 }, // 이름
-      { width: 14 }, // 실적구분
-      { width: 14 }, // 대회구분
-      { width: 28 }, // 대회명
-      { width: 18 }, // 일자
-      { width: 16 }, // 수상내역
-      { width: 18 }, // 비고
+      { width: 10 }, // 1. 학년
+      { width: 18 }, // 2. 학과
+      { width: 8 },  // 3. 반
+      { width: 8 },  // 4. 번호
+      { width: 14 }, // 5. 이름
+      { width: 14 }, // 6. 대회구분
+      { width: 28 }, // 7. 대회명
+      { width: 18 }, // 8. 일자
+      { width: 14 }, // 9. 참가여부
+      { width: 14 }, // 10. 입상여부
+      { width: 18 }, // 11. 수상내역
+      { width: 18 }, // 12. 비고
     ];
 
     applyDropdownValidation(ws, 1, ['1', '2', '3'], '학년 선택 오류', '1, 2, 3 중 선택해주세요.');
     applyDropdownValidation(ws, 2, STANDARD_MAJORS, '학과 선택 오류', '학교 공식 학과 목록에서 선택해주세요.');
-    applyDropdownValidation(ws, 6, ['입상', '단순참가'], '실적구분 선택 오류', '입상 또는 단순참가 중 선택해주세요.');
-    applyDropdownValidation(ws, 7, ['교내대회', '교외대회'], '대회구분 선택 오류', '교내대회 또는 교외대회 중 선택해주세요.');
+    applyDropdownValidation(ws, 6, ['교내대회', '교외대회'], '대회구분 선택 오류', '교내대회 또는 교외대회 중 선택해주세요.');
+    applyDropdownValidation(ws, 9, ['참가'], '참가여부 선택', '참가를 선택해주세요.');
+    applyDropdownValidation(ws, 10, ['입상', '해당없음'], '입상여부 선택', '입상 또는 해당없음 중 선택해주세요.');
   }
 
   const buffer = await wb.xlsx.writeBuffer();

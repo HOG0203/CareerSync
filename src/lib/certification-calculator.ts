@@ -719,7 +719,7 @@ export function evaluateContestList<T extends { type: 'award' | 'participate'; t
 
   return {
     effectiveAwardCount: totalAwards,
-    effectivePartCount: totalParticipates,
+    effectivePartCount: effectiveBaseParticipate,
     totalAwards,
     totalParticipates,
     score,

@@ -415,7 +415,7 @@ export function ArtsContestImportCard({
                   <Medal className="h-4 w-4 text-purple-600 shrink-0" />
                   <div className="flex flex-col text-left">
                     <span className="font-bold text-slate-800 whitespace-nowrap">2. 교내외대회 참가·입상 명단</span>
-                    <span className="text-[10px] text-slate-400 whitespace-nowrap">입상 1.0점, 단순참가 0.5점 (최대 5점) (.xlsx)</span>
+                    <span className="text-[10px] text-slate-400 whitespace-nowrap">참가 0.5점, 입상 가산 0.5점 (최대 5점) (.xlsx)</span>
                   </div>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -857,7 +857,9 @@ export function ArtsContestImportCard({
                                       : 'bg-slate-100 text-slate-700 border-slate-200'
                                   }`}
                                 >
-                                  {c.award || (c.type === 'award' ? '입상(1.0점)' : '참가(0.5점)')}
+                                  {c.type === 'award' 
+                                    ? (c.award && c.award !== '입상' ? `입상:${c.award}` : '입상(가산 0.5점)') 
+                                    : '참가(0.5점)'}
                                 </Badge>
                               </div>
                             ))}

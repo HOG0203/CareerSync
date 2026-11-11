@@ -1339,7 +1339,7 @@ export function DeleteMyRecordsDialog({
                           <Select value={genericEditForm.contestType || 'award'} onValueChange={v => set('contestType', v)}>
                             <SelectTrigger className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl font-semibold"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="award" className="text-xs font-bold text-amber-600">입상 (1.0점)</SelectItem>
+                              <SelectItem value="award" className="text-xs font-bold text-amber-600">입상 (가산 0.5점)</SelectItem>
                               <SelectItem value="participate" className="text-xs font-bold text-blue-600">참가 (0.5점)</SelectItem>
                             </SelectContent>
                           </Select>
