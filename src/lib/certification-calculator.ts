@@ -45,6 +45,8 @@ export interface CertificationEvaluationData {
   // 작성자 및 수정자 메타데이터
   created_by?: RecordAuditMeta;
   updated_by?: RecordAuditMeta;
+  updated_at?: string;
+  created_at?: string;
   
   // 1. 직업공통능력 (직기초 개별 영역 등급 저장)
   vocational_details?: {

@@ -227,6 +227,8 @@ export async function getEvaluationsStore(): Promise<Record<string, Certificatio
           manual_overrides: row.manual_overrides,
           created_by: row.created_by,
           updated_by: row.updated_by,
+          updated_at: row.updated_at,
+          created_at: row.created_at,
 
           // 하위 호환 및 평가표 렌더링용 집계 플래그 자동 산출
           industry_edu_count: emp.industry_edu_list ? emp.industry_edu_list.length : Number(row.industry_edu_count || 0),
@@ -1730,14 +1732,18 @@ export async function getMyImportedRecordsAction(
       const school = Number(evalData.volunteer_school_hours || 0);
       const outside = Number(evalData.volunteer_outside_hours || 0);
       const hours = school + outside;
-      if (hours > 0 && (isAdmin || vMeta?.userId === currentUserId)) {
+      const isOwner = vMeta?.userId === currentUserId || evalData.updated_by?.userId === currentUserId;
+      // 관리자이거나, 본인이 등록했거나, 작성자 메타가 없는 과거 공용 데이터도 모두 조회 가능하도록 보장
+      if (hours > 0 && (isAdmin || isOwner || !vMeta?.userId)) {
         totalItemCount++;
+        const recordDate = vMeta?.at || evalData.updated_by?.at || (evalData as any).updated_at || (evalData as any).created_at;
+        const recordUser = vMeta?.userName || evalData.updated_by?.userName || '기존 등록 데이터';
         result.push({
           ...base,
           rowKey: `${studentId}_volunteer`,
           summary: [`봉사활동 총 ${hours}시간 (교내 ${school}h / 교외 ${outside}h)`],
-          registeredAt: vMeta?.at,
-          registeredByName: vMeta?.userName,
+          registeredAt: recordDate,
+          registeredByName: recordUser,
         });
       }
 
