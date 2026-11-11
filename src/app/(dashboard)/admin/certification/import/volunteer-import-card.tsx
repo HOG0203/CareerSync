@@ -75,13 +75,39 @@ export function VolunteerImportCard({
   } | null>(null);
   const [isReportOpen, setIsReportOpen] = React.useState(false);
 
-  // 모든 파싱된 파일들의 학생 목록 합산
+  // 모든 파싱된 파일들의 학생 목록을 고유 학생(학년+반+번호+이름) 단위로 지능형 병합 및 시간 합산
   const allParsedStudents = React.useMemo(() => {
-    const list: ParsedNeisVolunteerStudent[] = [];
+    const studentMap = new Map<string, ParsedNeisVolunteerStudent>();
+
     parsedResults.forEach(r => {
-      list.push(...r.students);
+      r.students.forEach(s => {
+        const key = `${s.grade}_${s.classInfo}_${s.studentNumber}_${s.studentName}`;
+        if (!studentMap.has(key)) {
+          studentMap.set(key, { ...s });
+        } else {
+          // 이미 존재하는 학생이면 봉사활동 시간 누적 합산 및 환산 점수 재계산
+          const existing = studentMap.get(key)!;
+          const mergedSchool = existing.schoolHours + s.schoolHours;
+          const mergedOutside = existing.outsideHours + s.outsideHours;
+          const mergedTotal = mergedSchool + mergedOutside;
+          const schoolScore = Math.min(3.0, Math.round(mergedSchool * 0.2 * 10) / 10);
+          const outsideScore = Math.min(3.0, Math.round(mergedOutside * 0.5 * 10) / 10);
+          const calculatedScore = Math.min(5.0, Math.round((schoolScore + outsideScore) * 10) / 10);
+
+          studentMap.set(key, {
+            ...existing,
+            major: existing.major || s.major,
+            schoolHours: mergedSchool,
+            outsideHours: mergedOutside,
+            totalHours: mergedTotal,
+            calculatedScore,
+            details: [...(existing.details || []), ...(s.details || [])],
+          });
+        }
+      });
     });
-    return list;
+
+    return Array.from(studentMap.values());
   }, [parsedResults]);
 
   // 검색 및 필터

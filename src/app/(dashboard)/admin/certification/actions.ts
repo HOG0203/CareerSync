@@ -133,7 +133,16 @@ async function upsertStudentCertEvaluations(
   if (!records || records.length === 0) return { success: true };
   const now = new Date().toISOString();
 
-  const payloads = records.map(r => ({
+  // PostgreSQL 'ON CONFLICT DO UPDATE command cannot affect row a second time' 방지를 위한 studentId 고유 중복 제거
+  const dedupedRecordsMap = new Map<string, { studentId: string; data: CertificationEvaluationData; academicYear: number }>();
+  for (const r of records) {
+    if (r.studentId) {
+      dedupedRecordsMap.set(r.studentId, r);
+    }
+  }
+  const uniqueRecords = Array.from(dedupedRecordsMap.values());
+
+  const payloads = uniqueRecords.map(r => ({
     student_id: r.studentId,
     academic_year: r.academicYear || 2026,
     vocational_details: r.data.vocational_details || {},
@@ -848,8 +857,9 @@ export async function batchImportVolunteerAction(studentsList: VolunteerImportSt
         at: new Date().toISOString(),
       };
 
+      const existingRecord = currentStore[matched.id];
       const studentEval = {
-        ...(currentStore[matched.id] || { student_id: matched.id }),
+        ...(existingRecord || { student_id: matched.id }),
         volunteer_school_hours: row.schoolHours,
         volunteer_outside_hours: row.outsideHours,
         volunteer_meta: auditMeta,
@@ -858,8 +868,15 @@ export async function batchImportVolunteerAction(studentsList: VolunteerImportSt
         academic_year: baseYear,
       };
       currentStore[matched.id] = studentEval;
-      updatedRecordsForDb.push({ studentId: matched.id, data: studentEval, academicYear: baseYear });
-      updatedCount++;
+
+      // 동일 학생이 여러 번 등장해도 1건만 고유하게 보관
+      const existingIdx = updatedRecordsForDb.findIndex(r => r.studentId === matched.id);
+      if (existingIdx !== -1) {
+        updatedRecordsForDb[existingIdx] = { studentId: matched.id, data: studentEval, academicYear: baseYear };
+      } else {
+        updatedRecordsForDb.push({ studentId: matched.id, data: studentEval, academicYear: baseYear });
+        updatedCount++;
+      }
     } else {
       skippedStudents.push(`${row.studentName} (${row.grade}학년 ${row.classInfo} ${row.studentNumber}번 - 매칭 학생 없음)`);
     }
