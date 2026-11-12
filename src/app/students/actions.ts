@@ -55,8 +55,11 @@ async function syncAcademicHistory(supabase: any, studentUuid: string, info: any
       class_info: info.class_info,
       student_number: info.student_number,
       teacher_name: teacherName
-    }, { onConflict: 'student_id, grade' })
-  if (historyError) throw new Error(`학적 이력 동기화 실패: ${historyError.message}`);
+    }, { onConflict: 'student_id, academic_year' });
+  if (historyError) {
+    console.error(`학적 이력 동기화 실패:`, historyError);
+    throw new Error(`학적 이력 동기화 실패: ${historyError.message}`);
+  }
 }
 
 function buildAcademicHistoryRecord(studentUuid: string, info: any, baseYear: number, teachers: any[]) {
@@ -786,9 +789,10 @@ export async function uploadBasicStudentsCSV(csvData: string) {
 
 
 export async function updateStudentField(id: string, field: string, value: any) {
-  const accessError = await authorizeStudentUpdates([{ id, field }]);
-  if (accessError) return { success: false, error: accessError };
-  const supabase = await createClient(); const settings = await getSystemSettings()
+  try {
+    const accessError = await authorizeStudentUpdates([{ id, field }]);
+    if (accessError) return { success: false, error: accessError };
+    const supabase = await createClient(); const settings = await getSystemSettings()
 
   // employment_status(현재진로코스) 변경은 관리자만 가능
   if (field === 'employment_status') {
@@ -868,7 +872,13 @@ export async function updateStudentField(id: string, field: string, value: any) 
   
   if (['major', 'class_info', 'student_number', 'graduation_year'].includes(field)) {
     const { data: student } = await supabase.from('students').select('*').eq('id', id).single();
-    if (student) await syncAcademicHistory(supabase, id, student, settings.baseYear);
+    if (student) {
+      try {
+        await syncAcademicHistory(supabase, id, student, settings.baseYear);
+      } catch (histErr: any) {
+        console.error('학적 이력 동기화 오류 (학생 정보는 정상 저장됨):', histErr);
+      }
+    }
   }
 
   // 휴대폰 번호 변경 시 커스텀 비밀번호 미설정 학생의 비밀번호 자동 동기화
@@ -917,7 +927,11 @@ export async function updateStudentField(id: string, field: string, value: any) 
     const { clearCertificationSummaryCache } = await import('@/app/(dashboard)/admin/certification/actions');
     await clearCertificationSummaryCache();
   } catch (e) {}
-  return { success: true }
+  return { success: true };
+} catch (err: any) {
+  console.error('updateStudentField 서버 처리 에러:', err);
+  return { success: false, error: err?.message || '학생 정보 저장 중 서버 오류가 발생했습니다.' };
+}
 }
 
 
@@ -1090,7 +1104,7 @@ export async function deleteFieldTrainingRecord(id: string) {
     const { clearCertificationSummaryCache } = await import('@/app/(dashboard)/admin/certification/actions');
     await clearCertificationSummaryCache();
   } catch (e) {}
-  return { success: true }
+  return { success: true };
 }
 
 /**
